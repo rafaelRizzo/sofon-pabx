@@ -1,0 +1,47 @@
+@baseUrl = http://localhost:3333
+@token = seu_token_aqui
+@userId = cmk4sm7al0000dshhcububtfj
+
+POST {{baseUrl}}/first-user
+Content-Type: application/json
+
+{
+  "name": "Admin",
+  "username": "admin",
+  "password": "securepassword1234"
+}
+
+###
+POST {{baseUrl}}/users
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "John Doe",
+  "username": "johndoe1",
+  "password": "securepassword123",
+  "role": "agent"
+}
+
+###
+GET {{baseUrl}}/users
+Authorization: Bearer {{token}}
+
+###
+GET {{baseUrl}}/users/{{userId}}
+Authorization: Bearer {{token}}
+
+###
+PUT {{baseUrl}}/users/{{userId}}
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "John Doe",
+  "username": "johndoe1",
+  "role": "agent"
+}
+
+###
+DELETE {{baseUrl}}/users/{{userId}}
+Authorization: Bearer {{token}}
