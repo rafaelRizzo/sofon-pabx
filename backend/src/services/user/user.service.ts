@@ -1,20 +1,20 @@
-import type { UserRole } from "../../generated/prisma/enums";
-import { prisma } from "../../lib/prisma";
-import { hashPassword } from "../../utils/handler.bcrypt";
+import type { UserRole } from '../../generated/prisma/enums'
+import { prisma } from '../../lib/prisma'
+import { hashPassword } from '../../utils/handler.bcrypt'
 
 type UserType = {
-    name: string;
-    username: string;
-    password: string;
-    role?: UserRole;
+    name: string
+    username: string
+    password: string
+    role?: UserRole
 }
 
 type UpdateUserType = {
-    name?: string;
-    username?: string;
-    password?: string;
-    role?: string;
-    status?: boolean;
+    name?: string
+    username?: string
+    password?: string
+    role?: string
+    status?: boolean
 }
 
 export const userSelect = {
@@ -29,13 +29,13 @@ export const userSelect = {
 
 export class UserService {
     async createFirstUser(user: Omit<UserType, 'role'>) {
-        const userCount = await prisma.user.count();
+        const userCount = await prisma.user.count()
 
         if (userCount > 0) {
-            throw new Error('O primeiro usuário já foi criado');
+            throw new Error('O primeiro usuário já foi criado')
         }
 
-        const hashedPassword = await hashPassword(user.password);
+        const hashedPassword = await hashPassword(user.password)
 
         return await prisma.user.create({
             data: {
@@ -45,7 +45,7 @@ export class UserService {
                 role: 'admin'
             },
             select: userSelect
-        });
+        })
     }
 
     async create(user: UserType) {
@@ -53,13 +53,13 @@ export class UserService {
             where: {
                 username: user.username
             }
-        });
+        })
 
         if (existingUser) {
-            throw new Error('Username ou name já existe');
+            throw new Error('Username ou name já existe')
         }
 
-        const hashedPassword = await hashPassword(user.password);
+        const hashedPassword = await hashPassword(user.password)
 
         const userCreatedData = await prisma.user.create({
             data: {
@@ -69,15 +69,15 @@ export class UserService {
                 role: user?.role || 'agent'
             },
             select: userSelect
-        });
+        })
 
-        return userCreatedData;
+        return userCreatedData
     }
 
     async list() {
         return await prisma.user.findMany({
             select: userSelect
-        });
+        })
     }
 
     async getById(id: string) {
@@ -86,23 +86,23 @@ export class UserService {
                 id: id
             },
             select: userSelect
-        });
+        })
 
         if (!user) {
-            throw new Error('Usuário não encontrado');
+            throw new Error('Usuário não encontrado')
         }
 
-        return user;
+        return user
     }
 
     async update(id: string, data: UpdateUserType) {
-        const updateData: any = {};
+        const updateData: any = {}
 
-        if (data.name) updateData.name = data.name;
-        if (data.username) updateData.username = data.username;
-        if (data.password) updateData.password = await hashPassword(data.password);
-        if (data.role) updateData.role = data.role;
-        if (data.status !== undefined) updateData.status = data.status;
+        if (data.name) updateData.name = data.name
+        if (data.username) updateData.username = data.username
+        if (data.password) updateData.password = await hashPassword(data.password)
+        if (data.role) updateData.role = data.role
+        if (data.status !== undefined) updateData.status = data.status
 
         return await prisma.user.update({
             where: {
@@ -110,7 +110,7 @@ export class UserService {
             },
             data: updateData,
             select: userSelect
-        });
+        })
     }
 
     async delete(id: string) {
@@ -118,18 +118,18 @@ export class UserService {
             where: {
                 id: id
             }
-        });
+        })
 
         if (!user) {
-            throw new Error('Usuário não encontrado');
+            throw new Error('Usuário não encontrado')
         }
 
         await prisma.user.delete({
             where: {
                 id: id
             }
-        });
+        })
 
-        return true;
+        return true
     }
 }
