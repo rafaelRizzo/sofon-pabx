@@ -1,42 +1,135 @@
-import type { CreateUserDTO, UpdateUserDTO } from "../../routes/user/schema/user.schema"
+import type { UserRole } from "../../generated/prisma/enums";
+import { prisma } from "../../lib/prisma";
+import { hashPassword } from "../../utils/handler.bcrypt";
 
-// Simulando um banco de dados em memória
-const users: Array<{ id: string; name: string; email: string }> = []
+type UserType = {
+    name: string;
+    username: string;
+    password: string;
+    role?: UserRole;
+}
+
+type UpdateUserType = {
+    name?: string;
+    username?: string;
+    password?: string;
+    role?: string;
+    status?: boolean;
+}
+
+export const userSelect = {
+    id: true,
+    name: true,
+    username: true,
+    role: true,
+    status: true,
+    createdAt: true,
+    updatedAt: true
+}
 
 export class UserService {
-  static async list() {
-    return users
-  }
+    async createFirstUser(user: Omit<UserType, 'role'>) {
+        const userCount = await prisma.user.count();
 
-  static async create(data: CreateUserDTO) {
-    const user = {
-      id: crypto.randomUUID(),
-      ...data,
+        if (userCount > 0) {
+            throw new Error('O primeiro usuário já foi criado');
+        }
+
+        const hashedPassword = await hashPassword(user.password);
+
+        return await prisma.user.create({
+            data: {
+                name: user.name,
+                username: user.username,
+                password: hashedPassword,
+                role: 'admin'
+            },
+            select: userSelect
+        });
     }
-    users.push(user)
-    return user
-  }
 
-  static async getById(id: string) {
-    return users.find(user => user.id === id) || null
-  }
+    async create(user: UserType) {
+        const existingUser = await prisma.user.findUnique({
+            where: {
+                username: user.username
+            }
+        });
 
-  static async update(id: string, data: UpdateUserDTO) {
-    const user = users.find(u => u.id === id)
-    if (!user) return null
+        if (existingUser) {
+            throw new Error('Username ou name já existe');
+        }
 
-    // Garante que apenas name e email sejam atualizados
-    if (data.name) user.name = data.name
-    if (data.email) user.email = data.email
+        const hashedPassword = await hashPassword(user.password);
 
-    return user
-  }
+        const userCreatedData = await prisma.user.create({
+            data: {
+                name: user.name,
+                username: user.username,
+                password: hashedPassword,
+                role: user?.role || 'agent'
+            },
+            select: userSelect
+        });
 
-  static async delete(id: string) {
-    const index = users.findIndex(user => user.id === id)
-    if (index === -1) return false
+        return userCreatedData;
+    }
 
-    users.splice(index, 1)
-    return true
-  }
+    async list() {
+        return await prisma.user.findMany({
+            select: userSelect
+        });
+    }
+
+    async getById(id: string) {
+        const user = await prisma.user.findUnique({
+            where: {
+                id: id
+            },
+            select: userSelect
+        });
+
+        if (!user) {
+            throw new Error('Usuário não encontrado');
+        }
+
+        return user;
+    }
+
+    async update(id: string, data: UpdateUserType) {
+        const updateData: any = {};
+
+        if (data.name) updateData.name = data.name;
+        if (data.username) updateData.username = data.username;
+        if (data.password) updateData.password = await hashPassword(data.password);
+        if (data.role) updateData.role = data.role;
+        if (data.status !== undefined) updateData.status = data.status;
+
+        return await prisma.user.update({
+            where: {
+                id: id
+            },
+            data: updateData,
+            select: userSelect
+        });
+    }
+
+    async delete(id: string) {
+        const user = await prisma.user.findUnique({
+            where: {
+                id: id
+            }
+        });
+
+        if (!user) {
+            throw new Error('Usuário não encontrado');
+        }
+
+        await prisma.user.delete({
+            where: {
+                id: id
+            }
+        });
+
+        return true;
+    }
 }
