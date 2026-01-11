@@ -7,21 +7,462 @@ datasource db {
   provider = "postgresql"
 }
 
+// ============================================
+// ENUMS
+// ============================================
+
 enum UserRole {
   admin
   agent
 }
 
+enum RecurrencyType {
+  DAILY // Todos os dias
+  WEEKLY // Dias específicos da semana
+  MONTHLY // Dias específicos do mês
+  YEARLY // Datas específicas do ano
+  CUSTOM // Período específico (usa startDate e endDate)
+}
+
+enum IVROptionType {
+  DIGIT // Opção simples de 1 dígito (0-9, *, #)
+  INPUT // Captura múltiplos dígitos (CPF, CNPJ, protocolo, etc)
+}
+
+enum HttpMethod {
+  GET
+  POST
+}
+
+enum TrunkType {
+  SIP
+  PJSIP
+  IAX
+}
+
+enum ExtensionType {
+  SIP
+  PJSIP
+  IAX
+}
+
+// ============================================
+// MODELS
+// ============================================
+
 model User {
-  id        String   @id @default(cuid())
-  name      String
-  username  String   @unique
-  password  String
-  token     String?
-  role      UserRole @default(agent)
-  status    Boolean  @default(true)
+  id       String   @id @default(cuid())
+  name     String
+  username String   @unique
+  password String
+  token    String?
+  role     UserRole @default(agent)
+  status   Boolean  @default(true)
+
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@index([username])
+  @@index([role])
+  @@index([status])
+  @@map("users")
+}
+
+model Company {
+  id     String  @id @default(cuid())
+  name   String  @unique
+  status Boolean @default(true)
+
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  // Relacionamentos (ordem alfabética)
+  announcements  Announcement[]
+  apiRequests    ApiRequest[]
+  audios         Audio[]
+  extensions     Extension[]
+  inboundRoutes  InboundRoute[]
+  ivrs           IVR[]
+  ivrOptions     IVROption[]
+  outboundRoutes OutboundRoute[]
+  queues         Queue[]
+  setVariables   SetVariable[]
+  timeConditions TimeCondition[]
+  timeRules      TimeRule[]
+  trunks         Trunk[]
+
+  @@index([name])
+  @@index([status]) // Adicionar índice para filtrar empresas ativas
+  @@map("companies")
+}
+
+model Audio {
+  id       String  @id @default(cuid())
+  name     String
+  filename String? // Nome do arquivo no sistema (ex: "welcome.wav")
+
+  // Relacionamento com Company
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@unique([companyId, name])
+  @@index([companyId])
+  @@index([companyId, createdAt])
+  @@map("audios")
+}
+
+model InboundRoute {
+  id             String  @id @default(cuid())
+  name           String
+  numberReceived String // Número DID/DDR que receberá a chamada
+  description    String? // Descrição opcional
+
+  // Destino da chamada
+  destinationApp String // Tipo do destino (ex: "announcement", "timecondition", "queue", "ivr", "setvariable")
+  destinationId  String // ID do registro de destino
+
+  // Relacionamento com Company
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@unique([companyId, name])
+  @@unique([companyId, numberReceived]) // Garante que número é único por empresa
+  @@index([companyId])
+  @@index([companyId, createdAt])
+  @@index([numberReceived]) // Índice para busca rápida por número
+  @@map("inbound_routes")
+}
+
+model Announcement {
+  id          String  @id @default(cuid())
+  name        String
+  description String? // Descrição opcional
+  audioId     String? // ID do áudio a ser reproduzido
+
+  // Destino após o anúncio
+  destinationApp String // Tipo do destino (ex: "timecondition", "queue", "voicemail", "ivr", "setvariable")
+  destinationId  String // ID do registro de destino
+
+  // Relacionamento com Company
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@unique([companyId, name])
+  @@index([companyId])
+  @@index([companyId, createdAt])
+  @@map("announcements")
+}
+
+model TimeCondition {
+  id          String  @id @default(cuid())
+  name        String
+  description String? // Descrição opcional
+
+  // Destino quando condição é verdadeira (dentro do horário)
+  trueDestinationApp String // Tipo do destino (ex: "queue", "announcement", "ivr", "setvariable")
+  trueDestinationId  String // ID do destino verdadeiro
+
+  // Destino quando condição é falsa (fora do horário)
+  falseDestinationApp String // Tipo do destino (ex: "voicemail", "announcement", "setvariable")
+  falseDestinationId  String // ID do destino falso
+
+  // Relacionamento com Company
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  // Regras de horário
+  timeRules TimeRule[] // Regras que definem quando a condição é verdadeira
+
+  @@unique([companyId, name])
+  @@index([companyId])
+  @@index([companyId, createdAt])
+  @@map("timeconditions")
+}
+
+model TimeRule {
+  id             String         @id @default(cuid())
+  name           String // Nome do grupo (ex: "Horário Comercial", "Fim de Semana", "Feriados")
+  recurrencyType RecurrencyType // Tipo de recorrência da regra
+
+  // Datas (opcional - usado principalmente para CUSTOM e YEARLY)
+  startDate DateTime? // Data inicial do período
+  endDate   DateTime? // Data final do período
+
+  // Horários (obrigatório)
+  startTime String // Hora de início (formato HH:mm, ex: "09:00")
+  endTime   String // Hora de término (formato HH:mm, ex: "18:00")
+
+  // Dias da semana (usado para WEEKLY)
+  weekDays Int[] @default([]) // Array: [0=Domingo, 1=Segunda, 2=Terça, 3=Quarta, 4=Quinta, 5=Sexta, 6=Sábado]
+
+  // Dias do mês (usado para MONTHLY)
+  monthDays Int[] @default([]) // Array de 1 a 31 (ex: [1, 15] para dia 1 e 15 de cada mês)
+
+  // Meses do ano (usado para YEARLY)
+  months Int[] @default([]) // Array de 1 a 12 (ex: [1, 7, 12] para Janeiro, Julho e Dezembro)
+
+  // Relacionamento com TimeCondition
+  timeConditionId String
+  timeCondition   TimeCondition @relation(fields: [timeConditionId], references: [id], onDelete: Cascade)
+
+  // Relacionamento com Company (isolamento e segurança)
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@map("users")
+  @@index([timeConditionId])
+  @@index([companyId])
+  @@index([companyId, timeConditionId])
+  @@map("timerules")
+}
+
+model IVR {
+  id          String  @id @default(cuid())
+  name        String // Nome do IVR (ex: "Menu Principal", "Captura CPF")
+  description String? // Descrição opcional do IVR
+
+  // Configurações de comportamento
+  audioId    String? // ID do áudio com as instruções do menu
+  timeout    Int     @default(5) // Tempo de espera em segundos antes de executar ação de timeout
+  maxRetries Int     @default(3) // Número máximo de tentativas inválidas
+
+  // Ação quando timeout (usuário não digitou nada)
+  timeoutDestinationApp String? // Destino após timeout (ex: "queue", "voicemail", "announcement", "setvariable")
+  timeoutDestinationId  String? // ID do destino de timeout
+
+  // Ação quando opção inválida após maxRetries
+  invalidDestinationApp String? // Destino após tentativas inválidas (ex: "voicemail", "queue", "setvariable")
+  invalidDestinationId  String? // ID do destino inválido
+
+  // Relacionamento com Company
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Opções do menu
+  options IVROption[] // Opções disponíveis no menu
+
+  @@unique([companyId, name])
+  @@index([companyId])
+  @@index([companyId, createdAt])
+  @@map("ivrs")
+}
+
+model IVROption {
+  id    String        @id @default(cuid())
+  type  IVROptionType @default(DIGIT) // Tipo da opção (DIGIT ou INPUT)
+  digit String? // Dígito pressionado (0-9, *, #) - usado apenas para type=DIGIT
+
+  // Configurações para INPUT (captura de múltiplos dígitos)
+  minDigits    Int?    @default(1) // Mínimo de dígitos (usado para type=INPUT)
+  maxDigits    Int?    @default(20) // Máximo de dígitos (usado para type=INPUT)
+  variableName String? // Nome da variável onde o valor será armazenado (ex: "cpf", "protocolo")
+
+  // Destino após a opção
+  destinationApp String // Tipo do destino (ex: "queue", "announcement", "ivr", "api", "setvariable")
+  destinationId  String // ID do registro de destino
+
+  // Relacionamento com IVR
+  ivrId String
+  ivr   IVR    @relation(fields: [ivrId], references: [id], onDelete: Cascade)
+
+  // Relacionamento com Company (isolamento e segurança)
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([ivrId, digit]) // Cada dígito só pode aparecer uma vez por IVR (apenas para type=DIGIT)
+  @@index([ivrId])
+  @@index([companyId])
+  @@index([companyId, ivrId])
+  @@map("ivr_options")
+}
+
+model ApiRequest {
+  id          String  @id @default(cuid())
+  name        String // Nome da requisição (ex: "Buscar Cliente por CPF", "Criar Ticket")
+  description String? // Descrição opcional
+
+  // Configurações da requisição
+  method HttpMethod @default(GET) // Método HTTP (GET ou POST)
+  url    String // URL da requisição (ex: "https://api.exemplo.com/clientes")
+
+  // Headers (armazenado como JSON)
+  headers Json? // Objeto JSON com os headers (ex: {"Authorization": "Bearer token", "Content-Type": "application/json"})
+
+  // Body (apenas para POST)
+  body Json? // Objeto JSON com o body da requisição
+
+  // Query params (para GET ou POST)
+  params Json? // Objeto JSON com os parâmetros da query string (ex: {"cpf": "{{customer_cpf}}", "status": "active"})
+
+  // Timeout da requisição
+  timeout Int @default(5000) // Timeout em milissegundos (padrão 5 segundos)
+
+  // Mapeamento de resposta (extrai valores do JSON retornado e seta como variáveis)
+  responseMapping Json? // Objeto JSON que mapeia campos da resposta para variáveis
+  // Exemplo: {"customer_name": "data.cliente.nome", "customer_status": "data.status", "account_balance": "data.saldo"}
+  // JSONPath: "data.cliente.nome" busca response.data.cliente.nome
+  // Resultado: Seta variáveis CUSTOMER_NAME, CUSTOMER_STATUS, ACCOUNT_BALANCE
+
+  // Destino após sucesso da requisição
+  successDestinationApp String? // Destino se requisição for bem-sucedida (ex: "queue", "announcement", "ivr", "setvariable")
+  successDestinationId  String? // ID do destino de sucesso
+
+  // Destino após falha da requisição
+  failureDestinationApp String? // Destino se requisição falhar (ex: "voicemail", "queue", "setvariable")
+  failureDestinationId  String? // ID do destino de falha
+
+  // Relacionamento com Company
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, name])
+  @@index([companyId])
+  @@index([companyId, createdAt])
+  @@map("api_requests")
+}
+
+model Queue {
+  id          String  @id @default(cuid())
+  name        String
+  description String? // Descrição opcional
+
+  config Json // Configurações da fila (strategy, timeout, announce, etc)
+
+  // Relacionamento com Company
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@unique([companyId, name])
+  @@index([companyId])
+  @@index([companyId, createdAt])
+  @@map("queues")
+}
+
+model Extension {
+  id            String        @id @default(cuid())
+  name          String // Número/nome da extensão (ex: "100", "101", "Ramal João")
+  callerIdName  String // Nome que aparece nas chamadas (ex: "João Silva", "Vendas")
+  callerIdNum   String // Número que aparece nas chamadas (ex: "100", "1133334444")
+  description   String? // Descrição opcional
+  typeExtension ExtensionType @default(SIP)
+
+  config Json // Configurações da extensão (secret, context, host, etc)
+
+  // Relacionamento com Company
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@unique([companyId, name])
+  @@unique([companyId, callerIdNum]) // Garante que número é único por empresa
+  @@index([companyId])
+  @@index([companyId, createdAt])
+  @@map("extensions")
+}
+
+model Trunk {
+  id          String    @id @default(cuid())
+  name        String
+  description String? // Descrição opcional
+  typeTrunk   TrunkType @default(SIP)
+
+  config Json // Configurações do trunk (host, username, secret, etc)
+
+  // Relacionamento com Company
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  // Rotas de saída que usam este trunk
+  outboundRoutes OutboundRoute[]
+
+  @@unique([companyId, name])
+  @@index([companyId])
+  @@index([companyId, createdAt])
+  @@map("trunks")
+}
+
+model OutboundRoute {
+  id          String  @id @default(cuid())
+  name        String
+  description String? // Descrição opcional
+  priority    Int     @default(1) // Prioridade de execução (menor = maior prioridade)
+
+  // Padrões de discagem do Asterisk
+  // Exemplos: "_0.", "_0[2-5]XXXXXXXX", "_9011.", "_55XXXXXXXXXXX"
+  patterns String[] @default([]) // Array de patterns do Asterisk (ex: ["_0.", "_9011."])
+
+  // Relacionamento com Trunk
+  trunkId String
+  trunk   Trunk  @relation(fields: [trunkId], references: [id], onDelete: Cascade)
+
+  // Relacionamento com Company
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@unique([companyId, name])
+  @@index([companyId])
+  @@index([companyId, createdAt])
+  @@index([companyId, priority]) // Índice para ordenação por prioridade
+  @@index([trunkId])
+  @@map("outbound_routes")
+}
+
+model SetVariable {
+  id          String  @id @default(cuid())
+  name        String // Nome descritivo (ex: "Setar Departamento", "Setar CallerID")
+  description String? // Descrição opcional
+
+  // Variável e valor para Set()
+  variable String // Nome da variável (ex: "CALLERID(name)", "CDR(accountcode)", "DEPARTAMENTO")
+  value    String // Valor da variável (ex: "Vendas", "1001", "${EXTEN}")
+
+  // Destino após setar a variável
+  destinationApp String // Tipo do destino (ex: "queue", "ivr", "trunk", "announcement", "api")
+  destinationId  String // ID do registro de destino
+
+  // Relacionamento com Company
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@unique([companyId, name])
+  @@index([companyId])
+  @@index([companyId, createdAt])
+  @@map("set_variables")
 }
