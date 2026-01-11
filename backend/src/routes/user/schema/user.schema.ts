@@ -8,7 +8,7 @@ export const createUserSchema = {
         username: z.string().min(1, 'Username é obrigatório'),
         password: z.string().min(6, 'Senha deve ter no mínimo 6 caracteres'),
         role: z.enum(['admin', 'agent']).default('agent'),
-        status: z.enum(['active', 'inactive']).default('active')
+        status: z.boolean().default(true)
     })
 }
 
@@ -21,7 +21,7 @@ export const updateUserSchema = {
         username: z.string().min(1).optional(),
         password: z.string().min(6).optional(),
         role: z.enum(['admin', 'agent']).optional(),
-        status: z.enum(['active', 'inactive']).optional()
+        status: z.boolean().optional()
     })
 }
 

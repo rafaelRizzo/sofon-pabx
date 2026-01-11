@@ -56,7 +56,7 @@ export class UserService {
         })
 
         if (existingUser) {
-            throw new Error('Username ou name já existe')
+            throw new Error('Username já existe')
         }
 
         const hashedPassword = await hashPassword(user.password)

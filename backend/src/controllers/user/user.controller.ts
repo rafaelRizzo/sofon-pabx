@@ -1,96 +1,84 @@
-import { type FastifyReply } from 'fastify'
-import { handleError } from '../../utils/handler.error'
+import { BaseController } from '../base/base.controller'
 import { UserService } from '../../services/user/user.service'
+import { handleError } from '../../utils/handler.error'
 
-const userService = new UserService();
+export class UserController extends BaseController {
+    private userService = new UserService()
 
-export const firstUser = async (request: any, reply: FastifyReply) => {
-    try {
-        request.log.info('Check first user creation');
-        const user = await userService.createFirstUser(request.body);
-        request.log.info('Finishing user creation');
+    async createFirstUser() {
+        try {
+            const user = await this.userService.createFirstUser(this.request.body)
 
-        return reply.code(201).send({
-            success: true,
-            message: 'Usuário criado com sucesso',
-            user
-        });
-    } catch (error) {
-        return handleError(request, reply, error, 'Erro ao criar usuário');
+            return this.reply.code(201).send({
+                success: true,
+                message: 'Usuário criado com sucesso',
+                user
+            })
+        } catch (error) {
+            return handleError(this.request, this.reply, error, 'Erro ao criar usuário')
+        }
     }
-}
 
-export const createUser = async (request: any, reply: FastifyReply) => {
-    try {
-        request.log.info('Creating new user');
-        const user = await userService.create(request.body);
-        request.log.info('Finishing new user creation');
+    async create() {
+        try {
+            const user = await this.userService.create(this.request.body)
 
-        return reply.code(201).send({
-            success: true,
-            message: 'Usuário criado com sucesso',
-            user
-        });
-    } catch (error) {
-        return handleError(request, reply, error, 'Erro ao criar usuário');
+            return this.reply.code(201).send({
+                success: true,
+                message: 'Usuário criado com sucesso',
+                user
+            })
+        } catch (error) {
+            return handleError(this.request, this.reply, error, 'Erro ao criar usuário')
+        }
     }
-}
 
-export const listUsers = async (request: any, reply: FastifyReply) => {
-    try {
-        request.log.info('Listing users');
-        const users = await userService.list();
+    async list() {
+        try {
+            const users = await this.userService.list()
 
-        return reply.code(200).send({
-            success: true,
-            users
-        });
-    } catch (error) {
-        return handleError(request, reply, error, 'Erro ao listar usuários');
+            return this.reply.send({ success: true, users })
+        } catch (error) {
+            return handleError(this.request, this.reply, error, 'Erro ao listar usuários')
+        }
     }
-}
 
-export const getUser = async (request: any, reply: FastifyReply) => {
-    try {
-        request.log.info(`Getting user with id: ${request.params.id}`);
-        const user = await userService.getById(request.params.id);
-        request.log.info('Finishing getting user');
+    async getById() {
+        try {
+            const { id } = this.request.params
+            const user = await this.userService.getById(id)
 
-        return reply.code(200).send({
-            success: true,
-            user: [user]
-        });
-    } catch (error) {
-        return handleError(request, reply, error, 'Erro ao buscar usuário');
+            return this.reply.send({ success: true, user: [user] })
+        } catch (error) {
+            return handleError(this.request, this.reply, error, 'Erro ao buscar usuário')
+        }
     }
-}
 
-export const updateUser = async (request: any, reply: FastifyReply) => {
-    try {
-        request.log.info(`Updating user with id: ${request.params.id}`);
-        await userService.update(request.params.id, request.body);
-        request.log.info('Finishing user update');
+    async update() {
+        try {
+            const { id } = this.request.params
+            await this.userService.update(id, this.request.body)
 
-        return reply.code(200).send({
-            success: true,
-            message: 'Usuário atualizado com sucesso'
-        });
-    } catch (error) {
-        return handleError(request, reply, error, 'Erro ao atualizar usuário');
+            return this.reply.send({
+                success: true,
+                message: 'Usuário atualizado com sucesso'
+            })
+        } catch (error) {
+            return handleError(this.request, this.reply, error, 'Erro ao atualizar usuário')
+        }
     }
-}
 
-export const deleteUser = async (request: any, reply: FastifyReply) => {
-    try {
-        request.log.info(`Deleting user with id: ${request.params.id}`);
-        await userService.delete(request.params.id);
-        request.log.info('Finishing user deletion');
+    async delete() {
+        try {
+            const { id } = this.request.params
+            await this.userService.delete(id)
 
-        return reply.code(200).send({
-            success: true,
-            message: 'Usuário deletado com sucesso'
-        });
-    } catch (error) {
-        return handleError(request, reply, error, 'Erro ao deletar usuário');
+            return this.reply.send({
+                success: true,
+                message: 'Usuário deletado com sucesso'
+            })
+        } catch (error) {
+            return handleError(this.request, this.reply, error, 'Erro ao deletar usuário')
+        }
     }
 }
