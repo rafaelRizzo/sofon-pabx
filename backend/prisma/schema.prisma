@@ -12,8 +12,8 @@ datasource db {
 // ============================================
 
 enum UserRole {
-  admin
-  agent
+  ADMIN
+  AGENT
 }
 
 enum RecurrencyType {
@@ -46,6 +46,17 @@ enum ExtensionType {
   IAX
 }
 
+enum ApplicationsType {
+  ANNOUNCEMENT // Anúncios
+  TIMECONDITION // Condições de tempo
+  QUEUE // Filas
+  IVR // Menu de voz
+  EXTENSION // Ramais
+  TRUNK // Troncos (saída externa)
+  SETVARIABLE // Definir variáveis
+  API // Requisições API
+}
+
 // ============================================
 // MODELS
 // ============================================
@@ -56,7 +67,7 @@ model User {
   username String   @unique
   password String
   token    String?
-  role     UserRole @default(agent)
+  role     UserRole @default(AGENT)
   status   Boolean  @default(true)
 
   updatedAt DateTime @updatedAt
@@ -121,7 +132,7 @@ model InboundRoute {
   description    String? // Descrição opcional
 
   // Destino da chamada
-  destinationApp String // Tipo do destino (ex: "announcement", "timecondition", "queue", "ivr", "setvariable")
+  destinationApp ApplicationsType
   destinationId  String // ID do registro de destino
 
   // Relacionamento com Company
@@ -146,7 +157,7 @@ model Announcement {
   audioId     String? // ID do áudio a ser reproduzido
 
   // Destino após o anúncio
-  destinationApp String // Tipo do destino (ex: "timecondition", "queue", "voicemail", "ivr", "setvariable")
+  destinationApp ApplicationsType
   destinationId  String // ID do registro de destino
 
   // Relacionamento com Company
@@ -168,11 +179,11 @@ model TimeCondition {
   description String? // Descrição opcional
 
   // Destino quando condição é verdadeira (dentro do horário)
-  trueDestinationApp String // Tipo do destino (ex: "queue", "announcement", "ivr", "setvariable")
+  trueDestinationApp ApplicationsType
   trueDestinationId  String // ID do destino verdadeiro
 
   // Destino quando condição é falsa (fora do horário)
-  falseDestinationApp String // Tipo do destino (ex: "voicemail", "announcement", "setvariable")
+  falseDestinationApp ApplicationsType
   falseDestinationId  String // ID do destino falso
 
   // Relacionamento com Company
@@ -241,11 +252,11 @@ model IVR {
   maxRetries Int     @default(3) // Número máximo de tentativas inválidas
 
   // Ação quando timeout (usuário não digitou nada)
-  timeoutDestinationApp String? // Destino após timeout (ex: "queue", "voicemail", "announcement", "setvariable")
+  timeoutDestinationApp ApplicationsType? // Destino após timeout (ex: "queue", "voicemail", "announcement", "setvariable")
   timeoutDestinationId  String? // ID do destino de timeout
 
   // Ação quando opção inválida após maxRetries
-  invalidDestinationApp String? // Destino após tentativas inválidas (ex: "voicemail", "queue", "setvariable")
+  invalidDestinationApp ApplicationsType? // Destino após tentativas inválidas (ex: "voicemail", "queue", "setvariable")
   invalidDestinationId  String? // ID do destino inválido
 
   // Relacionamento com Company
@@ -275,7 +286,7 @@ model IVROption {
   variableName String? // Nome da variável onde o valor será armazenado (ex: "cpf", "protocolo")
 
   // Destino após a opção
-  destinationApp String // Tipo do destino (ex: "queue", "announcement", "ivr", "api", "setvariable")
+  destinationApp ApplicationsType
   destinationId  String // ID do registro de destino
 
   // Relacionamento com IVR
@@ -324,11 +335,11 @@ model ApiRequest {
   // Resultado: Seta variáveis CUSTOMER_NAME, CUSTOMER_STATUS, ACCOUNT_BALANCE
 
   // Destino após sucesso da requisição
-  successDestinationApp String? // Destino se requisição for bem-sucedida (ex: "queue", "announcement", "ivr", "setvariable")
+  successDestinationApp ApplicationsType? // Destino se requisição for bem-sucedida (ex: "queue", "announcement", "ivr", "setvariable")
   successDestinationId  String? // ID do destino de sucesso
 
   // Destino após falha da requisição
-  failureDestinationApp String? // Destino se requisição falhar (ex: "voicemail", "queue", "setvariable")
+  failureDestinationApp ApplicationsType? // Destino se requisição falhar (ex: "voicemail", "queue", "setvariable")
   failureDestinationId  String? // ID do destino de falha
 
   // Relacionamento com Company
@@ -451,7 +462,7 @@ model SetVariable {
   value    String // Valor da variável (ex: "Vendas", "1001", "${EXTEN}")
 
   // Destino após setar a variável
-  destinationApp String // Tipo do destino (ex: "queue", "ivr", "trunk", "announcement", "api")
+  destinationApp ApplicationsType
   destinationId  String // ID do registro de destino
 
   // Relacionamento com Company

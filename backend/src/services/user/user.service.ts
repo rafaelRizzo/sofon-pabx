@@ -43,7 +43,7 @@ export class UserService {
                 name: user.name,
                 username: user.username,
                 password: hashedPassword,
-                role: 'admin'
+                role: 'ADMIN'
             },
             select: userSelect
         })
@@ -67,7 +67,7 @@ export class UserService {
                 name: user.name,
                 username: user.username,
                 password: hashedPassword,
-                role: user?.role || 'agent'
+                role: user?.role || 'AGENT'
             },
             select: userSelect
         })
