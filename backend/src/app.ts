@@ -2,6 +2,7 @@ import Fastify, { type FastifyRequest, type FastifyReply } from 'fastify'
 import rateLimit from '@fastify/rate-limit'
 import helmet from '@fastify/helmet'
 import cors from '@fastify/cors'
+import multipart from '@fastify/multipart'
 import path from 'path'
 import fs from 'fs'
 import { userRoutes } from './routes/user/user.route'
@@ -9,6 +10,7 @@ import { createStream } from 'rotating-file-stream'
 import { serializerCompiler, validatorCompiler, type ZodTypeProvider } from 'fastify-type-provider-zod'
 import { authRoutes } from './routes/auth/auth.route'
 import { companyRoutes } from './routes/company/company.route'
+import { audioRoutes } from './routes/audio/audio.route'
 
 const isDevelopment = process.env.NODE_ENV === 'development'
 
@@ -98,6 +100,14 @@ export async function build() {
         }
     })
 
+    // Registra o plugin de multipart
+    await fastify.register(multipart, {
+        limits: {
+            fileSize: 50 * 1024 * 1024, // 50MB
+            files: 1 // máximo 1 arquivo por request
+        }
+    })
+
     await fastify.register(cors, {
         origin: process.env.ALLOWED_ORIGINS?.split(',').map(origin => origin.trim()) || ['http://localhost:3000'],
         credentials: true,
@@ -173,6 +183,7 @@ export async function build() {
     await fastify.register(userRoutes)
     await fastify.register(authRoutes)
     await fastify.register(companyRoutes)
+    await fastify.register(audioRoutes)
 
     fastify.setErrorHandler((error: Error, request: FastifyRequest, reply: FastifyReply) => {
         request.log.error({

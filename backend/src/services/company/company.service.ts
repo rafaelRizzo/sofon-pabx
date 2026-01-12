@@ -1,5 +1,7 @@
 import { prisma } from '../../lib/prisma'
 import { AppError } from '../../utils/handler.error'
+import fs from 'fs/promises'
+import path from 'path'
 
 type CompanyType = {
     name: string
@@ -77,6 +79,7 @@ const transformCountToRelations = (company: any) => {
 }
 
 export class CompanyService {
+    private readonly AUDIO_BASE_PATH = path.join(process.cwd(), 'uploads', 'audios')
 
     async create(company: CompanyType) {
         const existingCompany = await prisma.company.findUnique({
@@ -150,6 +153,15 @@ export class CompanyService {
             throw new AppError('Empresa não encontrada', 404)
         }
 
+        // Deleta a pasta da empresa e todos os arquivos
+        const companyPath = path.join(this.AUDIO_BASE_PATH, id)
+        try {
+            await fs.rm(companyPath, { recursive: true, force: true })
+        } catch (error) {
+            console.error('Erro ao deletar pasta da empresa:', error)
+        }
+
+        // Deleta no banco (cascade vai deletar os audios)
         await prisma.company.delete({
             where: { id }
         })
