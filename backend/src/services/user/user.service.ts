@@ -1,6 +1,7 @@
 import type { UserRole } from '../../generated/prisma/enums'
 import { prisma } from '../../lib/prisma'
 import { hashPassword } from '../../utils/handler.bcrypt'
+import { AppError } from '../../utils/handler.error'
 
 type UserType = {
     name: string
@@ -32,7 +33,7 @@ export class UserService {
         const userCount = await prisma.user.count()
 
         if (userCount > 0) {
-            throw new Error('O primeiro usuário já foi criado')
+            throw new AppError('O primeiro usuário já foi criado', 401)
         }
 
         const hashedPassword = await hashPassword(user.password)
@@ -56,7 +57,7 @@ export class UserService {
         })
 
         if (existingUser) {
-            throw new Error('Username já existe')
+            throw new AppError('Username já existe', 401)
         }
 
         const hashedPassword = await hashPassword(user.password)
@@ -89,7 +90,7 @@ export class UserService {
         })
 
         if (!user) {
-            throw new Error('Usuário não encontrado')
+            throw new AppError('Usuário não encontrado', 404)
         }
 
         return user
@@ -121,7 +122,7 @@ export class UserService {
         })
 
         if (!user) {
-            throw new Error('Usuário não encontrado')
+            throw new AppError('Usuário não encontrado', 404)
         }
 
         await prisma.user.delete({

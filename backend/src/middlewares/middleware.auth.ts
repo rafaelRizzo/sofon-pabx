@@ -1,5 +1,6 @@
 import { type FastifyRequest, type FastifyReply } from 'fastify'
 import { verifyToken } from '../utils/handler.jwt'
+import { prisma } from '../lib/prisma'
 
 interface TokenPayload {
     id: string
@@ -39,6 +40,21 @@ export const authMiddleware = async (request: FastifyRequest, reply: FastifyRepl
             return reply.code(401).send({
                 success: false,
                 message: 'Token inválido ou expirado'
+            })
+        }
+
+        // Busca o usuário no banco usando o id do token
+        const user = await prisma.user.findUnique({
+            where: { id: decoded.id },
+            select: {
+                id: true
+            }
+        })
+
+        if (!user) {
+            return reply.code(401).send({
+                success: false,
+                message: 'Token inválido'
             })
         }
 

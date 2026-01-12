@@ -1,5 +1,6 @@
 import { prisma } from '../../lib/prisma'
 import { comparePassword } from '../../utils/handler.bcrypt'
+import { AppError } from '../../utils/handler.error'
 import { generateToken, isTokenValid } from '../../utils/handler.jwt'
 
 type SignInType = {
@@ -14,13 +15,13 @@ export class AuthService {
         })
 
         if (!user) {
-            throw new Error('Credenciais inválidas')
+            throw new AppError('Credenciais inválidas', 401)
         }
 
         const isPasswordValid = await comparePassword(credentials.password, user.password)
 
         if (!isPasswordValid) {
-            throw new Error('Credenciais inválidas')
+            throw new AppError('Credenciais inválidas', 401)
         }
 
         let token = user.token
