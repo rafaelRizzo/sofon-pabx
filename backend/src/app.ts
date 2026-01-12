@@ -8,6 +8,7 @@ import { userRoutes } from './routes/user/user.route'
 import { createStream } from 'rotating-file-stream'
 import { serializerCompiler, validatorCompiler, type ZodTypeProvider } from 'fastify-type-provider-zod'
 import { authRoutes } from './routes/auth/auth.route'
+import { companyRoutes } from './routes/company/company.route'
 
 const isDevelopment = process.env.NODE_ENV === 'development'
 
@@ -171,6 +172,7 @@ export async function build() {
 
     await fastify.register(userRoutes)
     await fastify.register(authRoutes)
+    await fastify.register(companyRoutes)
 
     fastify.setErrorHandler((error: Error, request: FastifyRequest, reply: FastifyReply) => {
         request.log.error({
