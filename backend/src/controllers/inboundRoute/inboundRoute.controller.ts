@@ -22,9 +22,12 @@ export class InboundRouteController extends BaseController {
     async list() {
         try {
             const { companyId } = this.request.query as { companyId?: string }
-            const inboundRoutes = await this.inboundRouteService.list(companyId)
+            const inboundsRoutes = await this.inboundRouteService.list(companyId)
 
-            return this.reply.send({ success: true, inboundRoutes })
+            return this.reply.send({
+                success: true,
+                inboundsRoutes
+            })
         } catch (error) {
             return handleError(this.request, this.reply, error, 'Erro ao listar rotas de entrada')
         }
@@ -35,7 +38,10 @@ export class InboundRouteController extends BaseController {
             const { id } = this.request.params as { id: string }
             const inboundRoute = await this.inboundRouteService.getById(id)
 
-            return this.reply.send({ success: true, inboundRoute })
+            return this.reply.send({
+                success: true,
+                inboundsRoutes: [inboundRoute]
+            })
         } catch (error) {
             return handleError(this.request, this.reply, error, 'Erro ao buscar rota de entrada')
         }
@@ -44,12 +50,11 @@ export class InboundRouteController extends BaseController {
     async update() {
         try {
             const { id } = this.request.params as { id: string }
-            const inboundRoute = await this.inboundRouteService.update(id, this.request.body)
+            await this.inboundRouteService.update(id, this.request.body)
 
             return this.reply.send({
                 success: true,
-                message: 'Rota de entrada atualizada com sucesso',
-                inboundRoute
+                message: 'Rota de entrada atualizada com sucesso'
             })
         } catch (error) {
             return handleError(this.request, this.reply, error, 'Erro ao atualizar rota de entrada')

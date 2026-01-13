@@ -12,6 +12,7 @@ import { authRoutes } from './routes/auth/auth.route'
 import { companyRoutes } from './routes/company/company.route'
 import { audioRoutes } from './routes/audio/audio.route'
 import { inboundRouteRoutes } from './routes/inboundRoute/inboundRoute.route'
+import { announcementRoutes } from './routes/announcement/announcement.route'
 
 const isDevelopment = process.env.NODE_ENV === 'development'
 
@@ -186,7 +187,8 @@ export async function build() {
     await fastify.register(companyRoutes)
     await fastify.register(audioRoutes)
     await fastify.register(inboundRouteRoutes)
-
+    await fastify.register(announcementRoutes)
+    
     fastify.setErrorHandler((error: Error, request: FastifyRequest, reply: FastifyReply) => {
         request.log.error({
             err: error,

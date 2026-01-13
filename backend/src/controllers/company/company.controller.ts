@@ -23,7 +23,10 @@ export class CompanyController extends BaseController {
         try {
             const companies = await this.companyService.list()
 
-            return this.reply.send({ success: true, companies })
+            return this.reply.send({
+                success: true,
+                companies
+            })
         } catch (error) {
             return handleError(this.request, this.reply, error, 'Erro ao listar empresas')
         }
@@ -34,7 +37,10 @@ export class CompanyController extends BaseController {
             const { id } = this.request.params
             const company = await this.companyService.getById(id)
 
-            return this.reply.send({ success: true, companies: [company] })
+            return this.reply.send({
+                success: true,
+                companies: [company]
+            })
         } catch (error) {
             return handleError(this.request, this.reply, error, 'Erro ao buscar empresa')
         }

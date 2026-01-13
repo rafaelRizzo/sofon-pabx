@@ -37,7 +37,10 @@ export class UserController extends BaseController {
         try {
             const users = await this.userService.list()
 
-            return this.reply.send({ success: true, users })
+            return this.reply.send({
+                success: true,
+                users
+            })
         } catch (error) {
             return handleError(this.request, this.reply, error, 'Erro ao listar usuários')
         }
@@ -48,7 +51,10 @@ export class UserController extends BaseController {
             const { id } = this.request.params
             const user = await this.userService.getById(id)
 
-            return this.reply.send({ success: true, user: [user] })
+            return this.reply.send({
+                success: true,
+                users: [user]
+            })
         } catch (error) {
             return handleError(this.request, this.reply, error, 'Erro ao buscar usuário')
         }

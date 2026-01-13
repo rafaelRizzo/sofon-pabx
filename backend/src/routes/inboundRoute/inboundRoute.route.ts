@@ -12,31 +12,31 @@ export const inboundRouteRoutes = async (fastify: FastifyInstance) => {
     const authAdmin = { preHandler: authMiddleware, adminMiddleware }
 
     fastify.post(
-        '/inbound-route',
+        '/inbounds-routes',
         { ...authAdmin, schema: createInboundRouteSchema },
         (request, reply) => new InboundRouteController(request, reply).create()
     )
 
     fastify.get(
-        '/inbound-route',
+        '/inbounds-routes',
         authAdmin,
         (request, reply) => new InboundRouteController(request, reply).list()
     )
 
     fastify.get(
-        '/inbound-route/:id',
+        '/inbounds-routes/:id',
         { ...authAdmin, schema: getInboundRouteSchema },
         (request, reply) => new InboundRouteController(request, reply).getById()
     )
 
     fastify.put(
-        '/inbound-route/:id',
+        '/inbounds-routes/:id',
         { ...authAdmin, schema: updateInboundRouteSchema },
         (request, reply) => new InboundRouteController(request, reply).update()
     )
 
     fastify.delete(
-        '/inbound-route/:id',
+        '/inbounds-routes/:id',
         { ...authAdmin, schema: deleteInboundRouteSchema },
         (request, reply) => new InboundRouteController(request, reply).delete()
     )

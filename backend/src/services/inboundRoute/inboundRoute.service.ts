@@ -1,5 +1,6 @@
 import type { ApplicationsType } from '../../generated/prisma/enums'
 import { prisma } from '../../lib/prisma'
+import { checkDestinationId } from '../../utils/handler.destinations'
 import { AppError } from '../../utils/handler.error'
 
 type InboundRouteType = {
@@ -62,6 +63,8 @@ export class InboundRouteService {
         if (existingName) {
             throw new AppError('Nome já cadastrado para esta empresa', 409)
         }
+
+        await checkDestinationId(inboundRoute.destinationApp, inboundRoute.destinationId)
 
         const inboundRouteCreated = await prisma.inboundRoute.create({
             data: {
@@ -147,8 +150,14 @@ export class InboundRouteService {
 
         if (data.name) updateData.name = data.name
         if (data.numberReceived) updateData.numberReceived = data.numberReceived
-        if (data.destinationApp) updateData.destinationApp = data.destinationApp
-        if (data.destinationId) updateData.destinationId = data.destinationId
+
+        if (data.destinationApp && data.destinationId) {
+            updateData.destinationApp = data.destinationApp
+            updateData.destinationId = data.destinationId
+
+            await checkDestinationId(updateData.destinationApp, updateData.destinationId)
+        }
+
         if (data.description !== undefined) updateData.description = data.description
 
         return await prisma.inboundRoute.update({
