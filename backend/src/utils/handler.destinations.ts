@@ -20,7 +20,7 @@ const destinationModels: Partial<Record<ApplicationsType, string>> = {
 
 export const checkDestinationId = async (
     destinationApp: ApplicationsType,
-    destinationId: string
+    destinationId?: string
 ): Promise<void> => {
     // Se a aplicação não precisa de destinationId, retorna sem validar
     if (appsWithoutDestination.includes(destinationApp)) {
