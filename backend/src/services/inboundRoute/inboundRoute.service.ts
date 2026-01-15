@@ -12,14 +12,7 @@ type InboundRouteType = {
     description?: string
 }
 
-type UpdateInboundRouteType = {
-    name?: string
-    companyId?: string
-    numberReceived?: string
-    destinationApp?: ApplicationsType
-    destinationId?: string
-    description?: string
-}
+type UpdateInboundRouteType = Partial<InboundRouteType>
 
 export const inboundRouteSelect = {
     id: true,

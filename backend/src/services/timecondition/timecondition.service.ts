@@ -13,14 +13,7 @@ type TimeConditionType = {
     companyId: string
 }
 
-type UpdateTimeConditionType = {
-    name?: string
-    description?: string
-    trueDestinationApp?: ApplicationsType
-    trueDestinationId?: string
-    falseDestinationApp?: ApplicationsType
-    falseDestinationId?: string
-}
+type UpdateTimeConditionType = Partial<TimeConditionType>
 
 export const timeConditionSelect = {
     id: true,
@@ -122,9 +115,9 @@ export class TimeConditionService {
         const updateData: any = {}
 
         if (data.name) updateData.name = data.name
-        if (data.description !== undefined) updateData.description = data.description
+        if (data.description) updateData.description = data.description
 
-        if (data.trueDestinationApp && data.trueDestinationId !== undefined) {
+        if (data.trueDestinationApp && data.trueDestinationId) {
             await checkDestinationId(
                 data.trueDestinationApp,
                 data.trueDestinationId
@@ -134,7 +127,7 @@ export class TimeConditionService {
             updateData.trueDestinationId = data.trueDestinationId ?? null
         }
 
-        if (data.falseDestinationApp && data.falseDestinationId !== undefined) {
+        if (data.falseDestinationApp && data.falseDestinationId) {
             await checkDestinationId(
                 data.falseDestinationApp,
                 data.falseDestinationId
@@ -143,6 +136,8 @@ export class TimeConditionService {
             updateData.falseDestinationApp = data.falseDestinationApp
             updateData.falseDestinationId = data.falseDestinationId ?? null
         }
+
+        if (data.companyId) updateData.companyId = data.companyId
 
         return prisma.timeCondition.update({
             where: { id },

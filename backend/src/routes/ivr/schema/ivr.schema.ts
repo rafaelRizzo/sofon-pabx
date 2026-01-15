@@ -10,9 +10,9 @@ export const createIVRSchema = {
         audioId: cuidSchema.optional(),
         timeout: z.number().int().min(1).optional(),
         maxRetries: z.number().int().min(0).optional(),
-        timeoutDestinationApp: z.nativeEnum(ApplicationsType),
+        timeoutDestinationApp: z.enum(ApplicationsType),
         timeoutDestinationId: cuidSchema.optional(),
-        invalidDestinationApp: z.nativeEnum(ApplicationsType),
+        invalidDestinationApp: z.enum(ApplicationsType),
         invalidDestinationId: cuidSchema.optional(),
         companyId: cuidSchema
     })
@@ -28,9 +28,9 @@ export const updateIVRSchema = {
         audioId: cuidSchema.optional(),
         timeout: z.number().int().min(1).optional(),
         maxRetries: z.number().int().min(0).optional(),
-        timeoutDestinationApp: z.nativeEnum(ApplicationsType).optional(),
+        timeoutDestinationApp: z.enum(ApplicationsType).optional(),
         timeoutDestinationId: cuidSchema.optional(),
-        invalidDestinationApp: z.nativeEnum(ApplicationsType).optional(),
+        invalidDestinationApp: z.enum(ApplicationsType).optional(),
         invalidDestinationId: cuidSchema.optional()
     })
 }

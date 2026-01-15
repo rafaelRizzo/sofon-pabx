@@ -21,7 +21,7 @@ export const createTimeRuleSchema = {
         .object({
             name: z.string().min(1, 'Nome é obrigatório').max(100, 'Nome deve ter no máximo 100 caracteres'),
 
-            recurrencyType: z.nativeEnum(RecurrencyType),
+            recurrencyType: z.enum(RecurrencyType),
 
             startDate: z.coerce.date().optional(),
             endDate: z.coerce.date().optional(),
@@ -93,7 +93,7 @@ export const updateTimeRuleSchema = {
         .object({
             name: z.string().min(1).max(100).optional(),
 
-            recurrencyType: z.nativeEnum(RecurrencyType).optional(),
+            recurrencyType: z.enum(RecurrencyType).optional(),
 
             startDate: z.coerce.date().optional(),
             endDate: z.coerce.date().optional(),

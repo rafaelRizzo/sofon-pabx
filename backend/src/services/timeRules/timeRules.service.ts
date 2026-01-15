@@ -20,20 +20,7 @@ type TimeRuleType = {
     companyId: string
 }
 
-type UpdateTimeRuleType = {
-    name?: string
-    recurrencyType?: RecurrencyType
-
-    startDate?: Date
-    endDate?: Date
-
-    startTime?: string
-    endTime?: string
-
-    weekDays?: number[]
-    monthDays?: number[]
-    months?: number[]
-}
+type UpdateTimeRuleType = Partial<TimeRuleType>
 
 export const timeRuleSelect = {
     id: true,

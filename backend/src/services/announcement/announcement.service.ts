@@ -12,14 +12,7 @@ type AnnouncementType = {
     description?: string
 }
 
-type UpdateAnnouncementType = {
-    name?: string
-    companyId?: string
-    audioId?: string
-    destinationApp?: ApplicationsType
-    destinationId?: string
-    description?: string
-}
+type UpdateAnnouncementType = Partial<AnnouncementType>
 
 export const announcementSelect = {
     id: true,
