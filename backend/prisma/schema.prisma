@@ -320,14 +320,16 @@ model IVROption {
 }
 
 model Extension {
-  id            String        @id @default(cuid())
-  name          String // Nome descritivo
-  alias         String // Identificador que pode repetir (ex: "1000")
-  callerIdName  String
-  callerIdNum   String // Número real único GLOBALMENTE
-  description   String?
-  typeExtension ExtensionType @default(SIP)
-  config        Json
+  id             String        @id @default(cuid())
+  name           String // Nome descritivo
+  alias          String // Identificador que pode repetir (ex: "1000")
+  callerIdName   String
+  callerIdNum    String // Número real único GLOBALMENTE
+  description    String?
+  typeExtension  ExtensionType @default(SIP)
+  config         Json
+  enableRegister Boolean       @default(false) // Define se faz registro externo
+  registerString String? // String de registro customizada
 
   // Relacionamento com Company
   companyId String

@@ -35,7 +35,9 @@ const configSchema = z.object({
     trustrpid: z.union([z.string(), z.boolean()]).optional(),
     progressinband: z.string().max(500).optional(),
     promiscredir: z.union([z.string(), z.boolean()]).optional(),
-    useclientcode: z.union([z.string(), z.boolean()]).optional()
+    useclientcode: z.union([z.string(), z.boolean()]).optional(),
+    fromuser: z.string().max(500).optional(),
+    fromdomain: z.string().max(500).optional()
 }).strict()
 
 export const createExtensionSchema = {
@@ -49,8 +51,22 @@ export const createExtensionSchema = {
             message: 'Tipo de extensão inválido. Use: SIP, PJSIP ou IAX'
         }),
         config: configSchema,
-        description: z.string().max(500).optional()
-    })
+        description: z.string().max(500).optional(),
+        enableRegister: z.boolean().default(false).optional(),
+        registerString: z.string().max(1000).optional()
+    }).refine(
+        (data) => {
+            // Se enableRegister for true, registerString é obrigatório
+            if (data.enableRegister && !data.registerString) {
+                return false
+            }
+            return true
+        },
+        {
+            message: 'registerString é obrigatório quando enableRegister está ativo',
+            path: ['registerString']
+        }
+    )
 }
 
 export const updateExtensionSchema = {
@@ -66,7 +82,9 @@ export const updateExtensionSchema = {
             message: 'Tipo de extensão inválido. Use: SIP, PJSIP ou IAX'
         }).optional(),
         config: configSchema.optional(),
-        description: z.string().max(500).optional()
+        description: z.string().max(500).optional(),
+        enableRegister: z.boolean().optional(),
+        registerString: z.string().max(1000).optional()
     })
 }
 

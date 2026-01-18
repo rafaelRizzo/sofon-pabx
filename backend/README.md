@@ -9,7 +9,10 @@ bun install
 To run:
 
 ```bash
-bun run index.ts
+bun run dev
 ```
 
-This project was created using `bun init` in bun v1.3.4. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
+Requisitos:
+Nodejs 24+
+Bun
+Asterisk 20+ com ARI ativo
