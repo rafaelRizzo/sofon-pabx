@@ -17,6 +17,7 @@ import { timeConditionRoutes } from './routes/timecondition/timecondition.route'
 import { timeRulesRoutes } from './routes/timeRule/timeRule.route'
 import { ivrRoutes } from './routes/ivr/ivr.route'
 import { ivrOptionRoutes } from './routes/ivrOption/ivrOption.route'
+import { extensionRoutes } from './routes/extension/extension.route'
 
 const isDevelopment = process.env.NODE_ENV === 'development'
 
@@ -196,6 +197,7 @@ export async function build() {
     await fastify.register(timeRulesRoutes)
     await fastify.register(ivrRoutes)
     await fastify.register(ivrOptionRoutes)
+    await fastify.register(extensionRoutes)
 
     fastify.setErrorHandler((error: Error, request: FastifyRequest, reply: FastifyReply) => {
         request.log.error({
