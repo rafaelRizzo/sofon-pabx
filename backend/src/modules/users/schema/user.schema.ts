@@ -1,5 +1,9 @@
 import { z } from 'zod'
 
+export const idParamSchema = z.object({
+    id: z.uuid()
+})
+
 export const createUserSchema = z.object({
     name: z.string().min(1).max(255).trim(),
     username: z.string().min(3).max(255).trim(),
@@ -15,10 +19,6 @@ export const updateUserSchema = z.object({
 }).refine(
     (data) => Object.keys(data).length > 0, {
     message: 'At least one field must be provided for update',
-})
-
-export const idParamSchema = z.object({
-    id: z.uuid()
 })
 
 export type CreateUserInput = z.infer<typeof createUserSchema>

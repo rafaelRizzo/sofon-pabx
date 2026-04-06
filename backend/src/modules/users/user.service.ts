@@ -21,12 +21,16 @@ const userSelect = {
 }
 
 export const countUsers = async () => {
-    const result = await db.select({ count: count() }).from(users)
+    const result = await db
+        .select({ count: count() })
+        .from(users)
     return Number(result[0]?.count ?? 0)
 }
 
 export const getAllUsers = async () => {
-    return db.select(userSelect).from(users)
+    return db
+        .select(userSelect)
+        .from(users)
 }
 
 export const getUserById = async (id: string) => {
@@ -45,7 +49,7 @@ export const createUser = async (data: CreateUserInput) => {
         .where(eq(users.username, data.username))
 
     if (existingUser) {
-        throw new AppError('Usuario já cadastrado', 409)
+        throw new AppError('Username already exists', 409)
     }
 
     const hashedPassword = await hashPassword(data.password)
@@ -68,7 +72,7 @@ export const updateUser = async (id: string, data: UpdateUserInput) => {
         .where(eq(users.id, id))
 
     if (!existingUser) {
-        throw new AppError('Usuario não encontrado', 404)
+        throw new AppError('User not found', 404)
     }
 
     const updateData: Partial<UpdateUserInput> & {

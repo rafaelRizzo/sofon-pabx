@@ -8,6 +8,20 @@
       "when": 1775412571919,
       "tag": "0000_dazzling_lifeguard",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1775429745959,
+      "tag": "0001_workable_bloodstrike",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1775429779870,
+      "tag": "0002_nasty_silvermane",
+      "breakpoints": true
     }
   ]
 }

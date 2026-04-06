@@ -7,6 +7,7 @@ export const authUser = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
         const data = authUserSchema.parse(req.body)
         const { token } = await AuthService.authUser(data)
+
         return reply.status(200).send({
             success: true,
             message: 'User authenticated successfully',
