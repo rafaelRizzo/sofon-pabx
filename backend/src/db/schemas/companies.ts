@@ -6,14 +6,25 @@ import {
 } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 
+const COMPANY_PLANS = ['free', 'basic', 'pro', 'enterprise'] as const
+type CompanyPlan = (typeof COMPANY_PLANS)[number]
+
 export const companies = pgTable('companies', {
     id: uuid('id')
         .primaryKey()
         .default(sql`gen_random_uuid()`),
 
     name: varchar('name', { length: 255 })
-        .unique()
         .notNull(),
+
+    cnpj: varchar('cnpj', { length: 14 })
+        .notNull()
+        .unique(),
+
+    plan: varchar('plan', { length: 50 })
+        .$type<CompanyPlan>()
+        .notNull()
+        .default('free'),
 
     status: varchar('status')
         .notNull()

@@ -7,6 +7,12 @@ import fastifyJwt from '@fastify/jwt'
 
 import { userRoutes } from './modules/users/user.route'
 import { authRoutes } from './modules/auth/auth.route'
+import { checkEnvsInit } from './utils/handlers/check.envs'
+import { companyRoutes } from './modules/companies/companies.route'
+import { instanceRoutes } from './modules/instances/instances.route'
+
+// check envs
+checkEnvsInit()
 
 const app = Fastify({
     trustProxy: true,
@@ -43,8 +49,6 @@ app.register(fastifyJwt, {
     secret: process.env.JWT_SECRET || 'supersecret'
 })
 
-// Routes
-
 // Health check basic
 app.get('/health', () => ({ status: 'ok' }))
 
@@ -60,6 +64,8 @@ process.on('SIGTERM', () => shutdown('SIGTERM'))
 
 await app.register(userRoutes)
 await app.register(authRoutes)
+await app.register(companyRoutes)
+await app.register(instanceRoutes)
 
 try {
     await app.listen({

@@ -22,6 +22,20 @@
       "when": 1775429779870,
       "tag": "0002_nasty_silvermane",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1776002465161,
+      "tag": "0003_curved_tyrannus",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1776008960830,
+      "tag": "0004_wild_tomorrow_man",
+      "breakpoints": true
     }
   ]
 }

@@ -2,43 +2,39 @@ import {
     pgTable,
     uuid,
     varchar,
-    text,
     timestamp,
+    jsonb,
 } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
+import { companies } from './companies'
 
-const USER_ROLES = ['admin', 'user', 'guest'] as const
-type UserRole = (typeof USER_ROLES)[number]
+const TYPE_ERP = ['ixcsoft', 'sgp', 'hubsoft', 'radius_net'] as const
+type TypeErp = (typeof TYPE_ERP)[number]
 
-const DEFAULT_USER_ROLE: UserRole = 'user'
-
-export const users = pgTable('users', {
+export const instances = pgTable('instances', {
     id: uuid('id')
         .primaryKey()
         .default(sql`gen_random_uuid()`),
 
-    webhook_slug: uuid('webhook_slug')
-        .unique()
-        .notNull()
-        .default(sql`gen_random_uuid()`),
-
     name: varchar('name', { length: 255 })
+        .unique()
         .notNull(),
 
-    username: varchar('username', { length: 255 })
+    company_id: uuid('company_id')
         .notNull()
-        .unique(),
+        .references(() => companies.id, { onDelete: 'cascade' }),
 
-    password: text('password')
+    type: varchar('role', { length: 50 })
+        .$type<TypeErp>()
         .notNull(),
 
-    token: text('token')
-        .unique(),
-
-    role: varchar('role', { length: 50 })
-        .$type<UserRole>()
+    auth: jsonb('auth')
         .notNull()
-        .default(DEFAULT_USER_ROLE),
+        .default({}),
+
+    config: jsonb('config')
+        .notNull()
+        .default({}),
 
     status: varchar('status')
         .notNull()
