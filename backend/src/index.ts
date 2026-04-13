@@ -10,6 +10,7 @@ import { authRoutes } from './modules/auth/auth.route'
 import { checkEnvsInit } from './utils/handlers/check.envs'
 import { companyRoutes } from './modules/companies/companies.route'
 import { instanceRoutes } from './modules/instances/instances.route'
+import { officeTimeRoutes } from './modules/office_time/office_time.route'
 
 // check envs
 checkEnvsInit()
@@ -66,6 +67,7 @@ await app.register(userRoutes)
 await app.register(authRoutes)
 await app.register(companyRoutes)
 await app.register(instanceRoutes)
+await app.register(officeTimeRoutes)
 
 try {
     await app.listen({

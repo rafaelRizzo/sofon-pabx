@@ -36,6 +36,20 @@
       "when": 1776008960830,
       "tag": "0004_wild_tomorrow_man",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1776043346317,
+      "tag": "0005_friendly_centennial",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1776043508088,
+      "tag": "0006_absurd_chronomancer",
+      "breakpoints": true
     }
   ]
 }
