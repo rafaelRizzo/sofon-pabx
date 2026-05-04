@@ -1,100 +1,107 @@
 import { db } from '../../db/config/db'
-import { eq, and } from 'drizzle-orm'
+import { eq, count } from 'drizzle-orm'
 import { companies } from '../../db/schemas/companies'
-import { userCompanies } from '../../db/schemas/user_companies'
 import { AppError } from '../../utils/handlers/app.error'
+import { CompaniesCache } from './cache/companies.cache'
+
 import type {
     CreateCompanyInput,
     UpdateCompanyInput,
-} from './schema/company.schema'
+} from './schemas/company.schema'
 
 const companySelect = {
     id: companies.id,
     name: companies.name,
-    cnpj: companies.cnpj,
-    plan: companies.plan,
+    prefix: companies.prefix,
+    description: companies.description,
+    metadata: companies.metadata,
     status: companies.status,
     created_at: companies.created_at,
     updated_at: companies.updated_at,
 }
 
 export const getAllCompanies = async () => {
-    return db.select(companySelect).from(companies)
+    const cached = await CompaniesCache.getAllCompanies()
+    if (cached) return cached
+
+    const result = await db.select(companySelect).from(companies)
+    await CompaniesCache.setAllCompanies(result)
+
+    return result
 }
 
 export const getCompanyById = async (id: string) => {
+    const cached = await CompaniesCache.getCompany(id)
+    if (cached) return cached
+
     const [company] = await db
         .select(companySelect)
         .from(companies)
         .where(eq(companies.id, id))
+
+    if (company) {
+        await CompaniesCache.setCompany(id, company)
+    }
+
     return company ?? null
 }
 
-export const getCompaniesByUserId = async (userId: string) => {
-    return db
-        .select({
-            ...companySelect,
-            role: userCompanies.role,
-        })
-        .from(companies)
-        .innerJoin(userCompanies, eq(userCompanies.company_id, companies.id))
-        .where(eq(userCompanies.user_id, userId))
-}
-
-export const getUserRoleInCompany = async (userId: string, companyId: string) => {
-    const [row] = await db
-        .select({ role: userCompanies.role })
-        .from(userCompanies)
-        .where(
-            and(
-                eq(userCompanies.user_id, userId),
-                eq(userCompanies.company_id, companyId)
-            )
-        )
-    return row?.role ?? null
-}
-
-export const isUserMemberOfCompany = async (userId: string, companyId: string) => {
-    const role = await getUserRoleInCompany(userId, companyId)
-    return role !== null
-}
-
-export const createCompany = async (data: CreateCompanyInput, ownerId: string) => {
-    const [existing] = await db
+export const createCompany = async (data: CreateCompanyInput) => {
+    const [existingCompany] = await db
         .select()
         .from(companies)
-        .where(eq(companies.cnpj, data.cnpj))
+        .where(eq(companies.name, data.name))
 
-    if (existing) throw new AppError('CNPJ already exists', 409)
+    if (existingCompany) {
+        throw new AppError('Company already exists', 409)
+    }
+
+    const result = await db.select({ count: count() }).from(companies)
+    const companiesCount = Number(result[0]?.count ?? 0) + 1
+    const prefix = String(companiesCount).padStart(3, '0')
 
     const [company] = await db
         .insert(companies)
-        .values(data)
+        .values({
+            name: data.name,
+            prefix: prefix,
+            description: data.description,
+            metadata: data.metadata ?? {},
+            status: 'guest',
+        })
         .returning(companySelect)
 
-    if (!company) throw new AppError('Failed to create company', 500)
-
-    await db.insert(userCompanies).values({
-        user_id: ownerId,
-        company_id: company.id,
-        role: 'owner',
-    })
+    await CompaniesCache.invalidateAllCompanies()
 
     return company
 }
 
 export const updateCompany = async (id: string, data: UpdateCompanyInput) => {
-    const [existing] = await db
+    const [existingCompany] = await db
         .select()
         .from(companies)
         .where(eq(companies.id, id))
-    if (!existing) throw new AppError('Company not found', 404)
+
+    if (!existingCompany) {
+        throw new AppError('Company not found', 404)
+    }
+
+    const updateData: any = {}
+
+    if (data.name !== undefined) updateData.name = data.name
+    if (data.description !== undefined) updateData.description = data.description
+    if (data.metadata !== undefined) updateData.metadata = data.metadata
+    if (data.status !== undefined) updateData.status = data.status
 
     const [company] = await db
         .update(companies)
-        .set(data)
+        .set(updateData)
         .where(eq(companies.id, id))
         .returning(companySelect)
+
+    await CompaniesCache.invalidateCompany(id)
+    await CompaniesCache.invalidateAllCompanies()
+
     return company ?? null
 }
 
@@ -103,37 +110,9 @@ export const deleteCompany = async (id: string) => {
         .delete(companies)
         .where(eq(companies.id, id))
         .returning(companySelect)
+
+    await CompaniesCache.invalidateCompany(id)
+    await CompaniesCache.invalidateAllCompanies()
+
     return company ?? null
-}
-
-export const addMember = async (companyId: string, userId: string, role: 'owner' | 'admin') => {
-    const [existing] = await db
-        .select()
-        .from(userCompanies)
-        .where(
-            and(
-                eq(userCompanies.user_id, userId),
-                eq(userCompanies.company_id, companyId)
-            )
-        )
-    if (existing) throw new AppError('User is already a member of this company', 409)
-
-    const [row] = await db
-        .insert(userCompanies)
-        .values({ user_id: userId, company_id: companyId, role })
-        .returning()
-    return row
-}
-
-export const removeMember = async (companyId: string, userId: string) => {
-    const [row] = await db
-        .delete(userCompanies)
-        .where(
-            and(
-                eq(userCompanies.user_id, userId),
-                eq(userCompanies.company_id, companyId)
-            )
-        )
-        .returning()
-    return row ?? null
 }

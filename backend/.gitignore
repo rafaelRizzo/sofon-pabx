@@ -1,5 +1,7 @@
+# socket
 # dependencies (bun install)
 node_modules
+messages
 
 # output
 out

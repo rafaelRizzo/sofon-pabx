@@ -5,50 +5,36 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1775412571919,
-      "tag": "0000_dazzling_lifeguard",
+      "when": 1777833657285,
+      "tag": "0000_careful_the_call",
       "breakpoints": true
     },
     {
       "idx": 1,
       "version": "7",
-      "when": 1775429745959,
-      "tag": "0001_workable_bloodstrike",
+      "when": 1777833767966,
+      "tag": "0001_grey_nightcrawler",
       "breakpoints": true
     },
     {
       "idx": 2,
       "version": "7",
-      "when": 1775429779870,
-      "tag": "0002_nasty_silvermane",
+      "when": 1777834878687,
+      "tag": "0002_windy_living_lightning",
       "breakpoints": true
     },
     {
       "idx": 3,
       "version": "7",
-      "when": 1776002465161,
-      "tag": "0003_curved_tyrannus",
+      "when": 1777835922025,
+      "tag": "0003_new_misty_knight",
       "breakpoints": true
     },
     {
       "idx": 4,
       "version": "7",
-      "when": 1776008960830,
-      "tag": "0004_wild_tomorrow_man",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1776043346317,
-      "tag": "0005_friendly_centennial",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1776043508088,
-      "tag": "0006_absurd_chronomancer",
+      "when": 1777836734234,
+      "tag": "0004_goofy_talkback",
       "breakpoints": true
     }
   ]

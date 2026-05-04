@@ -1,13 +1,12 @@
+import { sql } from 'drizzle-orm'
 import {
     pgTable,
     uuid,
     varchar,
+    text,
     timestamp,
+    jsonb,
 } from 'drizzle-orm/pg-core'
-import { sql } from 'drizzle-orm'
-
-const COMPANY_PLANS = ['free', 'basic', 'pro', 'enterprise'] as const
-type CompanyPlan = (typeof COMPANY_PLANS)[number]
 
 export const companies = pgTable('companies', {
     id: uuid('id')
@@ -17,18 +16,17 @@ export const companies = pgTable('companies', {
     name: varchar('name', { length: 255 })
         .notNull(),
 
-    cnpj: varchar('cnpj', { length: 14 })
+    prefix: varchar('prefix', { length: 10 })
         .notNull()
         .unique(),
 
-    plan: varchar('plan', { length: 50 })
-        .$type<CompanyPlan>()
-        .notNull()
-        .default('free'),
+    description: text('description'),
 
     status: varchar('status')
         .notNull()
-        .default('active'),
+        .default('guest'),
+
+    metadata: jsonb('metadata'),
 
     created_at: timestamp('created_at', { withTimezone: true })
         .notNull()
@@ -37,5 +35,5 @@ export const companies = pgTable('companies', {
     updated_at: timestamp('updated_at', { withTimezone: true })
         .notNull()
         .defaultNow()
-        .$onUpdate(() => new Date())
+        .$onUpdate(() => new Date()),
 })

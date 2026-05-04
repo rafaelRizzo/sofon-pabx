@@ -3,11 +3,12 @@ import { count, eq } from 'drizzle-orm'
 import { users } from '../../db/schemas/users'
 import { hashPassword } from '../../utils/password-hasher/argon'
 import { AppError } from '../../utils/handlers/app.error'
+import { UsersCache } from './cache/users.cache'
 
 import type {
     CreateUserInput,
     UpdateUserInput,
-} from './schema/user.schema'
+} from './schemas/user.schema'
 
 const userSelect = {
     id: users.id,
@@ -21,23 +22,32 @@ const userSelect = {
 }
 
 export const countUsers = async () => {
-    const result = await db
-        .select({ count: count() })
-        .from(users)
+    const result = await db.select({ count: count() }).from(users)
     return Number(result[0]?.count ?? 0)
 }
 
 export const getAllUsers = async () => {
-    return db
-        .select(userSelect)
-        .from(users)
+    const cached = await UsersCache.getAllUsers()
+    if (cached) return cached
+
+    const result = await db.select(userSelect).from(users)
+    await UsersCache.setAllUsers(result)
+
+    return result
 }
 
 export const getUserById = async (id: string) => {
+    const cached = await UsersCache.getUser(id)
+    if (cached) return cached
+
     const [user] = await db
         .select(userSelect)
         .from(users)
         .where(eq(users.id, id))
+
+    if (user) {
+        await UsersCache.setUser(id, user)
+    }
 
     return user ?? null
 }
@@ -49,7 +59,7 @@ export const createUser = async (data: CreateUserInput) => {
         .where(eq(users.username, data.username))
 
     if (existingUser) {
-        throw new AppError('Username already exists', 409)
+        throw new AppError('Usuario já cadastrado', 409)
     }
 
     const hashedPassword = await hashPassword(data.password)
@@ -62,6 +72,8 @@ export const createUser = async (data: CreateUserInput) => {
         })
         .returning(userSelect)
 
+    await UsersCache.invalidateAllUsers()
+
     return user
 }
 
@@ -72,7 +84,7 @@ export const updateUser = async (id: string, data: UpdateUserInput) => {
         .where(eq(users.id, id))
 
     if (!existingUser) {
-        throw new AppError('User not found', 404)
+        throw new AppError('Usuario não encontrado', 404)
     }
 
     const updateData: Partial<UpdateUserInput> & {
@@ -101,6 +113,9 @@ export const updateUser = async (id: string, data: UpdateUserInput) => {
         .where(eq(users.id, id))
         .returning(userSelect)
 
+    await UsersCache.invalidateUser(id)
+    await UsersCache.invalidateAllUsers()
+
     return user ?? null
 }
 
@@ -109,6 +124,9 @@ export const deleteUser = async (id: string) => {
         .delete(users)
         .where(eq(users.id, id))
         .returning(userSelect)
+
+    await UsersCache.invalidateUser(id)
+    await UsersCache.invalidateAllUsers()
 
     return user ?? null
 }

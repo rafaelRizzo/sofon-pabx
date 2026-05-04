@@ -7,11 +7,6 @@ import {
 } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 
-const USER_ROLES = ['admin', 'user', 'guest'] as const
-type UserRole = (typeof USER_ROLES)[number]
-
-const DEFAULT_USER_ROLE: UserRole = 'user'
-
 export const users = pgTable('users', {
     id: uuid('id')
         .primaryKey()
@@ -35,10 +30,9 @@ export const users = pgTable('users', {
     token: text('token')
         .unique(),
 
-    role: varchar('role', { length: 50 })
-        .$type<UserRole>()
+    role: varchar('role')
         .notNull()
-        .default(DEFAULT_USER_ROLE),
+        .default('user'),
 
     status: varchar('status')
         .notNull()
