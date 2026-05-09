@@ -18,7 +18,7 @@ export const createQueueSchema = z.object({
     announcefrequency: z.number().int().optional(),
     announceholdtime: z.string().optional(),
     context: z.string().default('from-queue'),
-    metadata: z.record(z.union([z.string(), z.number(), z.boolean()])).optional(),
+    obs: z.string().max(1000, 'Obs must be 1000 characters or less').optional(),
 })
 
 export const updateQueueSchema = createQueueSchema.partial().extend({

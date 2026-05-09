@@ -16,7 +16,7 @@ const companySelect = {
     name: companies.name,
     prefix: companies.prefix,
     description: companies.description,
-    metadata: companies.metadata,
+    obs: companies.obs,
     status: companies.status,
     created_at: companies.created_at,
     updated_at: companies.updated_at,
@@ -66,7 +66,7 @@ export const createCompany = async (data: CreateCompanyInput) => {
             name: data.name,
             prefix: prefix,
             description: data.description,
-            metadata: data.metadata ?? {},
+            obs: data.obs,
             status: 'guest',
         })
         .returning(companySelect)
@@ -93,7 +93,7 @@ export const updateCompany = async (id: string, data: UpdateCompanyInput) => {
 
     if (data.name !== undefined) updateData.name = data.name
     if (data.description !== undefined) updateData.description = data.description
-    if (data.metadata !== undefined) updateData.metadata = data.metadata
+    if (data.obs !== undefined) updateData.obs = data.obs
     if (data.status !== undefined) updateData.status = data.status
 
     const [company] = await db

@@ -4,6 +4,7 @@ import { queueMembers } from '../../db/schemas/queue-members'
 import { queues } from '../../db/schemas/queues'
 import { extensions } from '../../db/schemas/extensions'
 import { AppError } from '../../utils/handlers/app.error'
+import { QueuesCache } from './cache/queues.cache'
 
 import type {
     AddMemberInput,
@@ -81,6 +82,8 @@ export const addMember = async (queueId: string, data: AddMemberInput) => {
         })
         .returning(memberSelect)
 
+    await QueuesCache.invalidateQueue(queueId)
+
     return member
 }
 
@@ -108,6 +111,8 @@ export const updateMember = async (queueId: string, memberId: string, data: Upda
         .where(eq(queueMembers.id, memberId))
         .returning(memberSelect)
 
+    await QueuesCache.invalidateQueue(queueId)
+
     return updatedMember ?? null
 }
 
@@ -127,6 +132,8 @@ export const removeMember = async (queueId: string, memberId: string) => {
     await db
         .delete(queueMembers)
         .where(eq(queueMembers.id, memberId))
+
+    await QueuesCache.invalidateQueue(queueId)
 
     return member
 }

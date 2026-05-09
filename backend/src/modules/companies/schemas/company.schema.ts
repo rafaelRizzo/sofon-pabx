@@ -4,10 +4,7 @@ import { COMPANY_STATUSES } from '../../../db/enums'
 export const createCompanySchema = z.object({
     name: z.string().min(1, 'Name is required'),
     description: z.string().optional(),
-    metadata: z.record(
-        z.string(),
-        z.union([z.string(), z.number(), z.boolean()])
-    ).optional(),
+    obs: z.string().max(1000, 'Obs must be 1000 characters or less').optional(),
 })
 
 export const updateCompanySchema = createCompanySchema.extend({

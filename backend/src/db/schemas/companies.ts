@@ -27,7 +27,7 @@ export const companies = pgTable('companies', {
         .notNull()
         .default('guest'),
 
-    metadata: jsonb('metadata'),
+    obs: varchar('obs', { length: 1000 }),
 
     created_at: timestamp('created_at', { withTimezone: true })
         .notNull()

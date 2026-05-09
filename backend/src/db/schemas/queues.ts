@@ -7,7 +7,6 @@ import {
     integer,
     boolean,
     timestamp,
-    jsonb,
     uniqueIndex,
     index,
 } from 'drizzle-orm/pg-core'
@@ -65,7 +64,7 @@ export const queues = pgTable('queues', {
     context: varchar('context', { length: 100 })
         .default('from-queue'),
 
-    metadata: jsonb('metadata'),
+    obs: varchar('obs', { length: 1000 }),
 
     status: varchar('status')
         .notNull()

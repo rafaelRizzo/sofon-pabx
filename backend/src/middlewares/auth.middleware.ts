@@ -14,14 +14,8 @@ export interface JWTPayload {
 
 declare module 'fastify' {
     interface FastifyRequest {
+        user?: JWTPayload
         jti?: string
-    }
-}
-
-declare module '@fastify/jwt' {
-    interface FastifyJWT {
-        payload: JWTPayload
-        user: JWTPayload
     }
 }
 
@@ -65,7 +59,8 @@ export const verifyToken = async (req: FastifyRequest, reply: FastifyReply) => {
             })
         }
 
-        await req.jwtVerify()
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'supersecret') as JWTPayload
+        req.user = decoded
         log.info('auth.verified', {
             userId: req.user.id,
             role: req.user.role,
@@ -110,7 +105,8 @@ export const verifyAdmin = async (req: FastifyRequest, reply: FastifyReply) => {
             })
         }
 
-        await req.jwtVerify()
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'supersecret') as JWTPayload
+        req.user = decoded
 
         if (req.user.role !== 'admin') {
             log.warn('auth.admin_forbidden', {

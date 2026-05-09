@@ -8,7 +8,6 @@ import Fastify from 'fastify'
 import helmet from '@fastify/helmet'
 import cors from '@fastify/cors'
 import rateLimit from '@fastify/rate-limit'
-import fastifyJwt from '@fastify/jwt'
 import cookie from '@fastify/cookie'
 
 import { authRoutes } from './modules/auth/auth.routes'
@@ -90,19 +89,13 @@ await app.register(cors, {
     maxAge: 86400,
 })
 
-// 3. Cookie (antes do JWT)
+// 3. Cookie
 await app.register(cookie, {
     secret: process.env.COOKIE_SECRET || 'your-secret-key-change-this',
     parseOptions: {}
 })
 
-// 4. JWT
-await app.register(fastifyJwt, {
-    secret: process.env.JWT_SECRET || 'supersecret',
-    sign: { expiresIn: '7d' }
-})
-
-// 5. Helmet
+// 4. Helmet
 await app.register(helmet, {
     contentSecurityPolicy: {
         directives: {
@@ -115,7 +108,7 @@ await app.register(helmet, {
     crossOriginResourcePolicy: { policy: 'cross-origin' },
 })
 
-// 6. Rate Limiting
+// 5. Rate Limiting
 await app.register(rateLimit, {
     max: 100,
     timeWindow: '1 minute',

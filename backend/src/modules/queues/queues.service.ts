@@ -29,7 +29,7 @@ const queueSelect = {
     announcefrequency: queues.announcefrequency,
     announceholdtime: queues.announceholdtime,
     context: queues.context,
-    metadata: queues.metadata,
+    obs: queues.obs,
     status: queues.status,
     created_at: queues.created_at,
     updated_at: queues.updated_at,
