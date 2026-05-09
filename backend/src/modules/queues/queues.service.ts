@@ -3,6 +3,7 @@ import { eq, and } from 'drizzle-orm'
 import { queues } from '../../db/schemas/queues'
 import { companies } from '../../db/schemas/companies'
 import { AppError } from '../../utils/handlers/app.error'
+import { TransactionHelper } from '../../utils/db/transaction.helper'
 import { QueuesCache } from './cache/queues.cache'
 
 import type {
@@ -76,7 +77,7 @@ export const getCompanyQueues = async (companyId: string) => {
 
 export const createQueue = async (data: CreateQueueInput) => {
     const [company] = await db
-        .select()
+        .select({ id: companies.id })
         .from(companies)
         .where(eq(companies.id, data.company_id))
 
@@ -85,7 +86,7 @@ export const createQueue = async (data: CreateQueueInput) => {
     }
 
     const [existingName] = await db
-        .select()
+        .select({ id: queues.id })
         .from(queues)
         .where(and(
             eq(queues.company_id, data.company_id),
@@ -97,7 +98,7 @@ export const createQueue = async (data: CreateQueueInput) => {
     }
 
     const [existingNumber] = await db
-        .select()
+        .select({ id: queues.id })
         .from(queues)
         .where(and(
             eq(queues.company_id, data.company_id),
@@ -109,7 +110,7 @@ export const createQueue = async (data: CreateQueueInput) => {
     }
 
     const [existingAccountCode] = await db
-        .select()
+        .select({ id: queues.id })
         .from(queues)
         .where(eq(queues.account_code, data.account_code))
 
@@ -119,36 +120,23 @@ export const createQueue = async (data: CreateQueueInput) => {
 
     const [queue] = await db
         .insert(queues)
-        .values({
-            company_id: data.company_id,
-            name: data.name,
-            number: data.number,
-            account_code: data.account_code,
-            strategy: data.strategy,
-            timeout: data.timeout,
-            maxlen: data.maxlen,
-            musiconhold: data.musiconhold,
-            announce: data.announce,
-            joinempty: data.joinempty,
-            leavewhenempty: data.leavewhenempty,
-            weight: data.weight,
-            autopause: data.autopause,
-            announcefrequency: data.announcefrequency,
-            announceholdtime: data.announceholdtime,
-            context: data.context,
-            metadata: data.metadata,
-        })
+        .values(data)
         .returning(queueSelect)
 
-    await QueuesCache.invalidateCompanyQueues(data.company_id)
-    await QueuesCache.invalidateAllQueues()
+    await TransactionHelper.execute(
+        async () => queue,
+        [
+            { namespace: 'queues', pattern: `company:${data.company_id}` },
+            { namespace: 'queues' }
+        ]
+    )
 
     return queue
 }
 
 export const updateQueue = async (id: string, data: UpdateQueueInput) => {
     const [existingQueue] = await db
-        .select()
+        .select({ company_id: queues.company_id })
         .from(queues)
         .where(eq(queues.id, id))
 
@@ -156,8 +144,7 @@ export const updateQueue = async (id: string, data: UpdateQueueInput) => {
         throw new AppError('Queue not found', 404)
     }
 
-    const updateData: any = {}
-
+    const updateData: Record<string, any> = {}
     Object.entries(data).forEach(([key, value]) => {
         if (value !== undefined) {
             updateData[key] = value
@@ -170,9 +157,14 @@ export const updateQueue = async (id: string, data: UpdateQueueInput) => {
         .where(eq(queues.id, id))
         .returning(queueSelect)
 
-    await QueuesCache.invalidateQueue(id)
-    await QueuesCache.invalidateCompanyQueues(existingQueue.company_id)
-    await QueuesCache.invalidateAllQueues()
+    await TransactionHelper.execute(
+        async () => queue,
+        [
+            { namespace: 'queues', pattern: id },
+            { namespace: 'queues', pattern: `company:${existingQueue.company_id}` },
+            { namespace: 'queues' }
+        ]
+    )
 
     return queue ?? null
 }
@@ -184,9 +176,14 @@ export const deleteQueue = async (id: string) => {
         .returning(queueSelect)
 
     if (queue) {
-        await QueuesCache.invalidateQueue(id)
-        await QueuesCache.invalidateCompanyQueues(queue.company_id)
-        await QueuesCache.invalidateAllQueues()
+        await TransactionHelper.execute(
+            async () => queue,
+            [
+                { namespace: 'queues', pattern: id },
+                { namespace: 'queues', pattern: `company:${queue.company_id}` },
+                { namespace: 'queues' }
+            ]
+        )
     }
 
     return queue ?? null

@@ -3,6 +3,7 @@ import { count, eq } from 'drizzle-orm'
 import { users } from '../../db/schemas/users'
 import { hashPassword } from '../../utils/password-hasher/argon'
 import { AppError } from '../../utils/handlers/app.error'
+import { TransactionHelper } from '../../utils/db/transaction.helper'
 import { UsersCache } from './cache/users.cache'
 
 import type {
@@ -54,7 +55,7 @@ export const getUserById = async (id: string) => {
 
 export const createUser = async (data: CreateUserInput) => {
     const [existingUser] = await db
-        .select()
+        .select({ id: users.id })
         .from(users)
         .where(eq(users.username, data.username))
 
@@ -72,14 +73,17 @@ export const createUser = async (data: CreateUserInput) => {
         })
         .returning(userSelect)
 
-    await UsersCache.invalidateAllUsers()
+    await TransactionHelper.execute(
+        async () => user,
+        [{ namespace: 'users' }]
+    )
 
     return user
 }
 
 export const updateUser = async (id: string, data: UpdateUserInput) => {
     const [existingUser] = await db
-        .select()
+        .select({ id: users.id })
         .from(users)
         .where(eq(users.id, id))
 
@@ -87,25 +91,14 @@ export const updateUser = async (id: string, data: UpdateUserInput) => {
         throw new AppError('Usuario não encontrado', 404)
     }
 
-    const updateData: Partial<UpdateUserInput> & {
-        password?: string
-    } = {}
+    const updateData: Record<string, any> = {}
 
-    if (data.name !== undefined) {
-        updateData.name = data.name
-    }
-
-    if (data.username !== undefined) {
-        updateData.username = data.username
-    }
-
+    if (data.name !== undefined) updateData.name = data.name
+    if (data.username !== undefined) updateData.username = data.username
     if (data.password !== undefined) {
         updateData.password = await hashPassword(data.password)
     }
-
-    if (data.status !== undefined) {
-        updateData.status = data.status
-    }
+    if (data.status !== undefined) updateData.status = data.status
 
     const [user] = await db
         .update(users)
@@ -113,8 +106,10 @@ export const updateUser = async (id: string, data: UpdateUserInput) => {
         .where(eq(users.id, id))
         .returning(userSelect)
 
-    await UsersCache.invalidateUser(id)
-    await UsersCache.invalidateAllUsers()
+    await TransactionHelper.execute(
+        async () => user,
+        [{ namespace: 'users', pattern: id }, { namespace: 'users' }]
+    )
 
     return user ?? null
 }
@@ -125,8 +120,10 @@ export const deleteUser = async (id: string) => {
         .where(eq(users.id, id))
         .returning(userSelect)
 
-    await UsersCache.invalidateUser(id)
-    await UsersCache.invalidateAllUsers()
+    await TransactionHelper.execute(
+        async () => user,
+        [{ namespace: 'users', pattern: id }, { namespace: 'users' }]
+    )
 
     return user ?? null
 }

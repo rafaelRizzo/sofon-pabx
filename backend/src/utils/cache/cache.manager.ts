@@ -1,20 +1,14 @@
-import { createClient, type RedisClientType } from 'redis'
-
-type RedisClient = RedisClientType
+import { redisClient } from './redis.client'
 
 export interface CacheConfig {
     ttl: number // em segundos
 }
 
 class CacheManager {
-    private client: RedisClient
+    private client = redisClient
     private defaultTTL = 3600 // 1 hora padrão
 
     constructor() {
-        this.client = createClient({
-            url: process.env.REDIS_URL || 'redis://localhost:6379'
-        })
-
         this.client.on('error', (err) => {
             console.error('Redis error:', err)
         })

@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm'
 import { extensions } from '../../db/schemas/extensions'
 import { companies } from '../../db/schemas/companies'
 import { AppError } from '../../utils/handlers/app.error'
+import { TransactionHelper } from '../../utils/db/transaction.helper'
 import { ExtensionsCache } from './cache/extensions.cache'
 
 import type {
@@ -83,7 +84,7 @@ export const getCompanyExtensions = async (companyId: string) => {
 
 export const createExtension = async (data: CreateExtensionInput) => {
     const [company] = await db
-        .select()
+        .select({ id: companies.id })
         .from(companies)
         .where(eq(companies.id, data.company_id))
 
@@ -92,7 +93,7 @@ export const createExtension = async (data: CreateExtensionInput) => {
     }
 
     const [existingExtension] = await db
-        .select()
+        .select({ id: extensions.id })
         .from(extensions)
         .where(eq(extensions.account_code, data.account_code))
 
@@ -102,43 +103,23 @@ export const createExtension = async (data: CreateExtensionInput) => {
 
     const [extension] = await db
         .insert(extensions)
-        .values({
-            company_id: data.company_id,
-            number: data.number,
-            account_code: data.account_code,
-            name: data.name,
-            secret: data.secret,
-            host: data.host,
-            type: data.type,
-            send_register: data.send_register,
-            register_string: data.register_string,
-            nat: data.nat,
-            qualify: data.qualify,
-            dtmfmode: data.dtmfmode,
-            context: data.context,
-            codecs: data.codecs,
-            allow: data.allow,
-            disallow: data.disallow,
-            insecure: data.insecure,
-            directmedia: data.directmedia,
-            callgroup: data.callgroup,
-            pickupgroup: data.pickupgroup,
-            voicemail: data.voicemail,
-            mailbox: data.mailbox,
-            username: data.username,
-            metadata: data.metadata,
-        })
+        .values(data)
         .returning(extensionSelect)
 
-    await ExtensionsCache.invalidateCompanyExtensions(data.company_id)
-    await ExtensionsCache.invalidateAllExtensions()
+    await TransactionHelper.execute(
+        async () => extension,
+        [
+            { namespace: 'extensions', pattern: `company:${data.company_id}` },
+            { namespace: 'extensions' }
+        ]
+    )
 
     return extension
 }
 
 export const updateExtension = async (id: string, data: UpdateExtensionInput) => {
     const [existingExtension] = await db
-        .select()
+        .select({ company_id: extensions.company_id })
         .from(extensions)
         .where(eq(extensions.id, id))
 
@@ -146,8 +127,7 @@ export const updateExtension = async (id: string, data: UpdateExtensionInput) =>
         throw new AppError('Extension not found', 404)
     }
 
-    const updateData: any = {}
-
+    const updateData: Record<string, any> = {}
     Object.entries(data).forEach(([key, value]) => {
         if (value !== undefined) {
             updateData[key] = value
@@ -160,9 +140,14 @@ export const updateExtension = async (id: string, data: UpdateExtensionInput) =>
         .where(eq(extensions.id, id))
         .returning(extensionSelect)
 
-    await ExtensionsCache.invalidateExtension(id)
-    await ExtensionsCache.invalidateCompanyExtensions(existingExtension.company_id)
-    await ExtensionsCache.invalidateAllExtensions()
+    await TransactionHelper.execute(
+        async () => extension,
+        [
+            { namespace: 'extensions', pattern: id },
+            { namespace: 'extensions', pattern: `company:${existingExtension.company_id}` },
+            { namespace: 'extensions' }
+        ]
+    )
 
     return extension ?? null
 }
@@ -174,9 +159,14 @@ export const deleteExtension = async (id: string) => {
         .returning(extensionSelect)
 
     if (extension) {
-        await ExtensionsCache.invalidateExtension(id)
-        await ExtensionsCache.invalidateCompanyExtensions(extension.company_id)
-        await ExtensionsCache.invalidateAllExtensions()
+        await TransactionHelper.execute(
+            async () => extension,
+            [
+                { namespace: 'extensions', pattern: id },
+                { namespace: 'extensions', pattern: `company:${extension.company_id}` },
+                { namespace: 'extensions' }
+            ]
+        )
     }
 
     return extension ?? null

@@ -1,8 +1,10 @@
 import { db } from '../../db/config/db'
-import { eq, count } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { companies } from '../../db/schemas/companies'
 import { AppError } from '../../utils/handlers/app.error'
+import { TransactionHelper } from '../../utils/db/transaction.helper'
 import { CompaniesCache } from './cache/companies.cache'
+import { generateCompanyPrefix } from '../../utils/generators/prefix.generator'
 
 import type {
     CreateCompanyInput,
@@ -48,7 +50,7 @@ export const getCompanyById = async (id: string) => {
 
 export const createCompany = async (data: CreateCompanyInput) => {
     const [existingCompany] = await db
-        .select()
+        .select({ id: companies.id })
         .from(companies)
         .where(eq(companies.name, data.name))
 
@@ -56,9 +58,7 @@ export const createCompany = async (data: CreateCompanyInput) => {
         throw new AppError('Company already exists', 409)
     }
 
-    const result = await db.select({ count: count() }).from(companies)
-    const companiesCount = Number(result[0]?.count ?? 0) + 1
-    const prefix = String(companiesCount).padStart(3, '0')
+    const prefix = generateCompanyPrefix()
 
     const [company] = await db
         .insert(companies)
@@ -71,14 +71,17 @@ export const createCompany = async (data: CreateCompanyInput) => {
         })
         .returning(companySelect)
 
-    await CompaniesCache.invalidateAllCompanies()
+    await TransactionHelper.execute(
+        async () => company,
+        [{ namespace: 'companies' }]
+    )
 
     return company
 }
 
 export const updateCompany = async (id: string, data: UpdateCompanyInput) => {
     const [existingCompany] = await db
-        .select()
+        .select({ id: companies.id })
         .from(companies)
         .where(eq(companies.id, id))
 
@@ -86,7 +89,7 @@ export const updateCompany = async (id: string, data: UpdateCompanyInput) => {
         throw new AppError('Company not found', 404)
     }
 
-    const updateData: any = {}
+    const updateData: Record<string, any> = {}
 
     if (data.name !== undefined) updateData.name = data.name
     if (data.description !== undefined) updateData.description = data.description
@@ -99,8 +102,10 @@ export const updateCompany = async (id: string, data: UpdateCompanyInput) => {
         .where(eq(companies.id, id))
         .returning(companySelect)
 
-    await CompaniesCache.invalidateCompany(id)
-    await CompaniesCache.invalidateAllCompanies()
+    await TransactionHelper.execute(
+        async () => company,
+        [{ namespace: 'companies', pattern: id }, { namespace: 'companies' }]
+    )
 
     return company ?? null
 }
@@ -111,8 +116,10 @@ export const deleteCompany = async (id: string) => {
         .where(eq(companies.id, id))
         .returning(companySelect)
 
-    await CompaniesCache.invalidateCompany(id)
-    await CompaniesCache.invalidateAllCompanies()
+    await TransactionHelper.execute(
+        async () => company,
+        [{ namespace: 'companies', pattern: id }, { namespace: 'companies' }]
+    )
 
     return company ?? null
 }

@@ -1,6 +1,9 @@
 import { logger } from './utils/logger'
 import { requestContext } from './utils/context/request.context'
 import { cacheManager } from './utils/cache/cache.manager'
+import { redisClient } from './utils/cache/redis.client'
+import { getHealthStatus } from './utils/health/health.check'
+import { startCleanupJob } from './jobs/cleanup-tokens'
 import Fastify from 'fastify'
 import helmet from '@fastify/helmet'
 import cors from '@fastify/cors'
@@ -136,7 +139,11 @@ await app.register(extensionRoutes)
 await app.register(trunkRoutes)
 await app.register(queueRoutes)
 
-app.get('/health', () => ({ status: 'ok' }))
+app.get('/health', async (req, reply) => {
+    const health = await getHealthStatus()
+    const statusCode = health.status === 'ok' ? 200 : health.status === 'degraded' ? 503 : 503
+    return reply.status(statusCode).send(health)
+})
 
 // ==================== GRACEFUL SHUTDOWN ====================
 const shutdown = async (signal: string) => {
@@ -150,7 +157,12 @@ process.on('SIGINT', () => shutdown('SIGINT'))
 process.on('SIGTERM', () => shutdown('SIGTERM'))
 
 try {
+    redisClient.on('connect', () => logger.info({ event: 'redis.connected' }))
+    redisClient.on('ready', () => logger.info({ event: 'redis.ready' }))
+    redisClient.on('error', (err) => logger.error({ event: 'redis.error', error: err.message }))
+
     await cacheManager.connect()
+    startCleanupJob()
     await app.listen({
         port: Number(process.env.PORT) || 3333,
         host: '0.0.0.0'

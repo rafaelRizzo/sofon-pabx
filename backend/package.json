@@ -41,6 +41,7 @@
         "jsonwebtoken": "^9.0.3",
         "nanoid": "^5.1.11",
         "node-cache": "^5.1.2",
+        "node-cron": "^4.2.1",
         "pg": "^8.20.0",
         "redis": "^5.12.1",
         "uuid": "^13.0.1",

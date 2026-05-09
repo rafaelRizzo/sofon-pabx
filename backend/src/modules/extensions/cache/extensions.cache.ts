@@ -1,30 +1,64 @@
 import { cacheManager, type CacheConfig } from '../../../utils/cache/cache.manager'
+import { logger } from '../../../utils/logger'
 
 const NAMESPACE = 'extensions'
 
 export class ExtensionsCache {
     static async getExtension(extensionId: string) {
-        return cacheManager.get(`${NAMESPACE}:ext`, extensionId)
+        const cached = await cacheManager.get(`${NAMESPACE}:ext`, extensionId)
+        logger.info({
+            event: cached ? 'cache.hit' : 'cache.miss',
+            namespace: NAMESPACE,
+            key: `ext:${extensionId}`
+        })
+        return cached
     }
 
     static async setExtension(extensionId: string, data: any, config?: CacheConfig) {
         await cacheManager.set(`${NAMESPACE}:ext`, extensionId, data, config)
+        logger.info({
+            event: 'cache.set',
+            namespace: NAMESPACE,
+            key: `ext:${extensionId}`
+        })
     }
 
     static async getCompanyExtensions(companyId: string) {
-        return cacheManager.get(`${NAMESPACE}:company`, companyId)
+        const cached = await cacheManager.get(`${NAMESPACE}:company`, companyId)
+        logger.info({
+            event: cached ? 'cache.hit' : 'cache.miss',
+            namespace: NAMESPACE,
+            key: `company:${companyId}`
+        })
+        return cached
     }
 
     static async setCompanyExtensions(companyId: string, data: any, config?: CacheConfig) {
         await cacheManager.set(`${NAMESPACE}:company`, companyId, data, config)
+        logger.info({
+            event: 'cache.set',
+            namespace: NAMESPACE,
+            key: `company:${companyId}`
+        })
     }
 
     static async getAllExtensions() {
-        return cacheManager.get(`${NAMESPACE}:all`, 'list')
+        const cached = await cacheManager.get(`${NAMESPACE}:all`, 'list')
+        logger.info({
+            event: cached ? 'cache.hit' : 'cache.miss',
+            namespace: NAMESPACE,
+            key: `${NAMESPACE}:list`
+        })
+        return cached
     }
 
     static async setAllExtensions(data: any, config?: CacheConfig) {
         await cacheManager.set(`${NAMESPACE}:all`, 'list', data, config)
+        logger.info({
+            event: 'cache.set',
+            namespace: NAMESPACE,
+            key: `${NAMESPACE}:list`
+        })
     }
 
     static async invalidateExtension(extensionId: string) {

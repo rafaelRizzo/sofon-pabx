@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm'
 import { trunks } from '../../db/schemas/trunks'
 import { companies } from '../../db/schemas/companies'
 import { AppError } from '../../utils/handlers/app.error'
+import { TransactionHelper } from '../../utils/db/transaction.helper'
 import { TrunksCache } from './cache/trunks.cache'
 
 import type {
@@ -80,7 +81,7 @@ export const getCompanyTrunks = async (companyId: string) => {
 
 export const createTrunk = async (data: CreateTrunkInput) => {
     const [company] = await db
-        .select()
+        .select({ id: companies.id })
         .from(companies)
         .where(eq(companies.id, data.company_id))
 
@@ -89,7 +90,7 @@ export const createTrunk = async (data: CreateTrunkInput) => {
     }
 
     const [existingTrunk] = await db
-        .select()
+        .select({ id: trunks.id })
         .from(trunks)
         .where(eq(trunks.company_id, data.company_id))
         .where(eq(trunks.name, data.name))
@@ -100,40 +101,23 @@ export const createTrunk = async (data: CreateTrunkInput) => {
 
     const [trunk] = await db
         .insert(trunks)
-        .values({
-            company_id: data.company_id,
-            name: data.name,
-            type: data.type,
-            host: data.host,
-            port: data.port,
-            username: data.username,
-            password: data.password,
-            fromuser: data.fromuser,
-            fromdomain: data.fromdomain,
-            context: data.context,
-            allow: data.allow,
-            disallow: data.disallow,
-            insecure: data.insecure,
-            nat: data.nat,
-            qualify: data.qualify,
-            directmedia: data.directmedia,
-            send_register: data.send_register,
-            register_string: data.register_string,
-            outbound_proxy: data.outbound_proxy,
-            codecs: data.codecs,
-            metadata: data.metadata,
-        })
+        .values(data)
         .returning(trunkSelect)
 
-    await TrunksCache.invalidateCompanyTrunks(data.company_id)
-    await TrunksCache.invalidateAllTrunks()
+    await TransactionHelper.execute(
+        async () => trunk,
+        [
+            { namespace: 'trunks', pattern: `company:${data.company_id}` },
+            { namespace: 'trunks' }
+        ]
+    )
 
     return trunk
 }
 
 export const updateTrunk = async (id: string, data: UpdateTrunkInput) => {
     const [existingTrunk] = await db
-        .select()
+        .select({ company_id: trunks.company_id })
         .from(trunks)
         .where(eq(trunks.id, id))
 
@@ -141,8 +125,7 @@ export const updateTrunk = async (id: string, data: UpdateTrunkInput) => {
         throw new AppError('Trunk not found', 404)
     }
 
-    const updateData: any = {}
-
+    const updateData: Record<string, any> = {}
     Object.entries(data).forEach(([key, value]) => {
         if (value !== undefined) {
             updateData[key] = value
@@ -155,9 +138,14 @@ export const updateTrunk = async (id: string, data: UpdateTrunkInput) => {
         .where(eq(trunks.id, id))
         .returning(trunkSelect)
 
-    await TrunksCache.invalidateTrunk(id)
-    await TrunksCache.invalidateCompanyTrunks(existingTrunk.company_id)
-    await TrunksCache.invalidateAllTrunks()
+    await TransactionHelper.execute(
+        async () => trunk,
+        [
+            { namespace: 'trunks', pattern: id },
+            { namespace: 'trunks', pattern: `company:${existingTrunk.company_id}` },
+            { namespace: 'trunks' }
+        ]
+    )
 
     return trunk ?? null
 }
@@ -169,9 +157,14 @@ export const deleteTrunk = async (id: string) => {
         .returning(trunkSelect)
 
     if (trunk) {
-        await TrunksCache.invalidateTrunk(id)
-        await TrunksCache.invalidateCompanyTrunks(trunk.company_id)
-        await TrunksCache.invalidateAllTrunks()
+        await TransactionHelper.execute(
+            async () => trunk,
+            [
+                { namespace: 'trunks', pattern: id },
+                { namespace: 'trunks', pattern: `company:${trunk.company_id}` },
+                { namespace: 'trunks' }
+            ]
+        )
     }
 
     return trunk ?? null
