@@ -6,6 +6,7 @@ import {
     text,
     timestamp,
     jsonb,
+    index,
 } from 'drizzle-orm/pg-core'
 
 export const companies = pgTable('companies', {
@@ -36,4 +37,7 @@ export const companies = pgTable('companies', {
         .notNull()
         .defaultNow()
         .$onUpdate(() => new Date()),
-})
+}, (table) => [
+    index().on(table.status),
+    index().on(table.name),
+])

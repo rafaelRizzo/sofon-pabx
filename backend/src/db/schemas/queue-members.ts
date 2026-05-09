@@ -6,6 +6,7 @@ import {
     boolean,
     timestamp,
     uniqueIndex,
+    index,
 } from 'drizzle-orm/pg-core'
 import { queues } from './queues'
 import { extensions } from './extensions'
@@ -39,4 +40,6 @@ export const queueMembers = pgTable('queue_members', {
         .$onUpdate(() => new Date()),
 }, (table) => [
     uniqueIndex('queue_members_queue_extension_unique').on(table.queue_id, table.extension_id),
+    index().on(table.queue_id),
+    index().on(table.extension_id),
 ])

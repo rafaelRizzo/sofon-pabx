@@ -4,6 +4,7 @@ import {
     varchar,
     text,
     timestamp,
+    index,
 } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 
@@ -46,4 +47,6 @@ export const users = pgTable('users', {
         .notNull()
         .defaultNow()
         .$onUpdate(() => new Date())
-})
+}, (table) => [
+    index().on(table.status),
+])

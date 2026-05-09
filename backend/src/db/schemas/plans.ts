@@ -7,6 +7,8 @@ import {
     numeric,
     jsonb,
     timestamp,
+    uniqueIndex,
+    index,
 } from 'drizzle-orm/pg-core'
 
 export const plans = pgTable('plans', {
@@ -15,7 +17,8 @@ export const plans = pgTable('plans', {
         .default(sql`gen_random_uuid()`),
 
     name: varchar('name', { length: 255 })
-        .notNull(),
+        .notNull()
+        .unique(),
 
     description: text('description'),
 
@@ -38,4 +41,6 @@ export const plans = pgTable('plans', {
         .notNull()
         .defaultNow()
         .$onUpdate(() => new Date()),
-})
+}, (table) => [
+    index().on(table.status),
+])

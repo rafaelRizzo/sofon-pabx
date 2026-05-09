@@ -3,6 +3,7 @@ import {
     uuid,
     text,
     timestamp,
+    index,
 } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import { users } from './users'
@@ -26,4 +27,7 @@ export const refreshTokens = pgTable('refresh_tokens', {
     created_at: timestamp('created_at', { withTimezone: true })
         .notNull()
         .defaultNow(),
-})
+}, (table) => [
+    index().on(table.user_id),
+    index().on(table.expires_at),
+])

@@ -1,0 +1,1 @@
+ALTER TABLE "trunks" DROP COLUMN "metadata";

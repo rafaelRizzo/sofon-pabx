@@ -7,6 +7,7 @@ import {
     boolean,
     timestamp,
     jsonb,
+    index,
 } from 'drizzle-orm/pg-core'
 import { companies } from './companies'
 
@@ -39,12 +40,6 @@ export const extensions = pgTable('extensions', {
         .notNull()
         .default('friend'),
 
-    send_register: boolean('send_register')
-        .notNull()
-        .default(false),
-
-    register_string: text('register_string'),
-
     nat: varchar('nat', { length: 10 })
         .notNull()
         .default('yes'),
@@ -64,9 +59,6 @@ export const extensions = pgTable('extensions', {
     codecs: jsonb('codecs')
         .default(['ulaw', 'alaw']),
 
-    allow: varchar('allow', { length: 255 })
-        .default('!all,ulaw,alaw'),
-
     disallow: varchar('disallow', { length: 255 }),
 
     insecure: varchar('insecure', { length: 100 })
@@ -85,7 +77,7 @@ export const extensions = pgTable('extensions', {
 
     username: varchar('username', { length: 100 }),
 
-    metadata: jsonb('metadata'),
+    obs: varchar('obs', { length: 1000 }),
 
     status: varchar('status')
         .notNull()
@@ -99,4 +91,8 @@ export const extensions = pgTable('extensions', {
         .notNull()
         .defaultNow()
         .$onUpdate(() => new Date()),
-})
+}, (table) => [
+    index().on(table.account_code),
+    index().on(table.company_id, table.number),
+    index().on(table.number),
+])

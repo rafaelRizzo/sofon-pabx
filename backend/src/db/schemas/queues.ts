@@ -9,6 +9,7 @@ import {
     timestamp,
     jsonb,
     uniqueIndex,
+    index,
 } from 'drizzle-orm/pg-core'
 import { companies } from './companies'
 
@@ -82,4 +83,6 @@ export const queues = pgTable('queues', {
     uniqueIndex('queues_company_id_name_unique').on(table.company_id, table.name),
     uniqueIndex('queues_company_id_number_unique').on(table.company_id, table.number),
     uniqueIndex('queues_account_code_unique').on(table.account_code),
+    index().on(table.company_id),
+    index().on(table.status),
 ])

@@ -9,6 +9,7 @@ import {
     timestamp,
     jsonb,
     uniqueIndex,
+    index,
 } from 'drizzle-orm/pg-core'
 import { companies } from './companies'
 
@@ -47,9 +48,6 @@ export const trunks = pgTable('trunks', {
         .notNull()
         .default('from-trunk'),
 
-    allow: varchar('allow', { length: 255 })
-        .default('!all,ulaw,alaw'),
-
     disallow: varchar('disallow', { length: 255 }),
 
     insecure: varchar('insecure', { length: 100 })
@@ -77,7 +75,7 @@ export const trunks = pgTable('trunks', {
     codecs: jsonb('codecs')
         .default(['ulaw', 'alaw']),
 
-    metadata: jsonb('metadata'),
+    obs: varchar('obs', { length: 1000 }),
 
     status: varchar('status')
         .notNull()
@@ -93,4 +91,6 @@ export const trunks = pgTable('trunks', {
         .$onUpdate(() => new Date()),
 }, (table) => [
     uniqueIndex('trunks_company_id_name_unique').on(table.company_id, table.name),
+    index().on(table.company_id),
+    index().on(table.status),
 ])
