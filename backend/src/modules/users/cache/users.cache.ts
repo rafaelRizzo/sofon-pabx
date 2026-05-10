@@ -3,6 +3,7 @@ import { logger } from '../../../utils/logger'
 
 const NAMESPACE = 'users'
 const USERS_LIST_KEY = 'all'
+const USERS_COUNT_KEY = 'count'
 
 export class UsersCache {
     static async getUser(userId: string) {
@@ -53,5 +54,28 @@ export class UsersCache {
 
     static async invalidateUsersNamespace() {
         await cacheManager.invalidate(NAMESPACE)
+    }
+
+    static async getUserCount() {
+        const cached = await cacheManager.get(`${NAMESPACE}:count`, USERS_COUNT_KEY)
+        logger.info({
+            event: cached !== null ? 'cache.hit' : 'cache.miss',
+            namespace: NAMESPACE,
+            key: 'count'
+        })
+        return cached
+    }
+
+    static async setUserCount(count: number, config?: CacheConfig) {
+        await cacheManager.set(`${NAMESPACE}:count`, USERS_COUNT_KEY, count, config)
+        logger.info({
+            event: 'cache.set',
+            namespace: NAMESPACE,
+            key: 'count'
+        })
+    }
+
+    static async invalidateUserCount() {
+        await cacheManager.invalidateByKey(`${NAMESPACE}:count:${USERS_COUNT_KEY}`)
     }
 }

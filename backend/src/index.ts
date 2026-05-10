@@ -1,3 +1,4 @@
+import './types/fastify'
 import { logger } from './utils/logger'
 import { requestContext } from './utils/context/request.context'
 import { cacheManager } from './utils/cache/cache.manager'

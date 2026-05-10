@@ -23,8 +23,14 @@ const userSelect = {
 }
 
 export const countUsers = async () => {
+    const cached = await UsersCache.getUserCount()
+    if (cached !== null) return cached
+
     const result = await db.select({ count: count() }).from(users)
-    return Number(result[0]?.count ?? 0)
+    const userCount = Number(result[0]?.count ?? 0)
+
+    await UsersCache.setUserCount(userCount)
+    return userCount
 }
 
 export const getAllUsers = async () => {
@@ -78,6 +84,8 @@ export const createUser = async (data: CreateUserInput) => {
         [{ namespace: 'users' }]
     )
 
+    await UsersCache.invalidateUserCount()
+
     return user
 }
 
@@ -124,6 +132,8 @@ export const deleteUser = async (id: string) => {
         async () => user,
         [{ namespace: 'users', pattern: id }, { namespace: 'users' }]
     )
+
+    await UsersCache.invalidateUserCount()
 
     return user ?? null
 }

@@ -5,6 +5,7 @@ import { queues } from '../../db/schemas/queues'
 import { extensions } from '../../db/schemas/extensions'
 import { AppError } from '../../utils/handlers/app.error'
 import { QueuesCache } from './cache/queues.cache'
+import { QueueMembersCache } from './cache/queue-members.cache'
 
 import type {
     AddMemberInput,
@@ -22,6 +23,9 @@ const memberSelect = {
 } as const
 
 export const getQueueMembers = async (queueId: string) => {
+    const cached = await QueueMembersCache.getQueueMembers(queueId)
+    if (cached) return cached
+
     const [queue] = await db
         .select()
         .from(queues)
@@ -31,10 +35,14 @@ export const getQueueMembers = async (queueId: string) => {
         throw new AppError('Queue not found', 404)
     }
 
-    return await db
+    const members = await db
         .select(memberSelect)
         .from(queueMembers)
         .where(eq(queueMembers.queue_id, queueId))
+
+    await QueueMembersCache.setQueueMembers(queueId, members)
+
+    return members
 }
 
 export const addMember = async (queueId: string, data: AddMemberInput) => {
@@ -83,6 +91,7 @@ export const addMember = async (queueId: string, data: AddMemberInput) => {
         .returning(memberSelect)
 
     await QueuesCache.invalidateQueue(queueId)
+    await QueueMembersCache.invalidateQueueMembers(queueId)
 
     return member
 }
@@ -134,6 +143,7 @@ export const removeMember = async (queueId: string, memberId: string) => {
         .where(eq(queueMembers.id, memberId))
 
     await QueuesCache.invalidateQueue(queueId)
+    await QueueMembersCache.invalidateQueueMembers(queueId)
 
     return member
 }
