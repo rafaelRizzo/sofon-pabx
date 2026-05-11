@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm'
 import { createInterface } from 'readline'
 import { db } from '../config/db'
+import { logger } from '../../utils/logger'
 
 function prompt(question: string): Promise<string> {
     const rl = createInterface({ input: process.stdin, output: process.stdout })
@@ -8,11 +9,17 @@ function prompt(question: string): Promise<string> {
 }
 
 async function resetDB() {
-    const first = await prompt('⚠️  Isso vai apagar TODAS as tabelas. Confirma? (yes/no): ')
-    if (first.trim() !== 'yes') return console.log('Cancelado.')
+    const first = await prompt('⚠️  This will DROP ALL tables. Confirm? (yes/no): ')
+    if (first.trim() !== 'yes') {
+        logger.info({ event: 'db.reset.cancelled' })
+        return
+    }
 
-    const second = await prompt('⚠️  Tem certeza? Essa ação é irreversível. (yes/no): ')
-    if (second.trim() !== 'yes') return console.log('Cancelado.')
+    const second = await prompt('⚠️  Are you sure? This action is irreversible. (yes/no): ')
+    if (second.trim() !== 'yes') {
+        logger.info({ event: 'db.reset.cancelled' })
+        return
+    }
 
     await db.execute(sql`
       DO $$ DECLARE
@@ -24,7 +31,7 @@ async function resetDB() {
       END $$;
     `)
     await db.execute(sql`DROP SCHEMA IF EXISTS drizzle CASCADE`)
-    console.log('All tables dropped')
+    logger.info({ event: 'db.reset.completed' })
     process.exit(0)
 }
 

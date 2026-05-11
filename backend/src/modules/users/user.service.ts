@@ -66,7 +66,7 @@ export const createUser = async (data: CreateUserInput) => {
         .where(eq(users.username, data.username))
 
     if (existingUser) {
-        throw new AppError('Usuario já cadastrado', 409)
+        throw new AppError('User already registered', 409)
     }
 
     const hashedPassword = await hashPassword(data.password)
@@ -96,7 +96,7 @@ export const updateUser = async (id: string, data: UpdateUserInput) => {
         .where(eq(users.id, id))
 
     if (!existingUser) {
-        throw new AppError('Usuario não encontrado', 404)
+        throw new AppError('User not found', 404)
     }
 
     const updateData: Record<string, any> = {}

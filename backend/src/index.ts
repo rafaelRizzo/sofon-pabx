@@ -5,6 +5,7 @@ import { cacheManager } from './utils/cache/cache.manager'
 import { redisClient } from './utils/cache/redis.client'
 import { getHealthStatus } from './utils/health/health.check'
 import { startCleanupJob } from './jobs/cleanup-tokens'
+import { startBullWorker } from './bull/init'
 import Fastify from 'fastify'
 import helmet from '@fastify/helmet'
 import cors from '@fastify/cors'
@@ -18,6 +19,7 @@ import { companyRoutes } from './modules/companies/companies.routes'
 import { extensionRoutes } from './modules/extensions/extensions.routes'
 import { trunkRoutes } from './modules/trunks/trunks.routes'
 import { queueRoutes } from './modules/queues/queues.routes'
+import { testRoutes } from './modules/test/test.routes'
 
 const app = Fastify({
     trustProxy: true,
@@ -132,6 +134,7 @@ await app.register(companyRoutes)
 await app.register(extensionRoutes)
 await app.register(trunkRoutes)
 await app.register(queueRoutes)
+await app.register(testRoutes)
 
 app.get('/health', async (req, reply) => {
     const health = await getHealthStatus()
@@ -140,8 +143,10 @@ app.get('/health', async (req, reply) => {
 })
 
 // ==================== GRACEFUL SHUTDOWN ====================
+let bullWorker: any
 const shutdown = async (signal: string) => {
     app.log.info(`Received ${signal}, shutting down...`)
+    if (bullWorker) await bullWorker.close()
     await cacheManager.disconnect()
     await app.close()
     process.exit(0)
@@ -157,6 +162,7 @@ try {
 
     await cacheManager.connect()
     startCleanupJob()
+    bullWorker = await startBullWorker()
     await app.listen({
         port: Number(process.env.PORT) || 3333,
         host: '0.0.0.0'

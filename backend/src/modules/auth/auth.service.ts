@@ -6,17 +6,18 @@ import { verifyPassword } from '../../utils/password-hasher/argon'
 import { AppError } from '../../utils/handlers/app.error'
 import { generateToken, verifyRefreshToken, refreshTokenPair, decodeToken } from '../../utils/jwt/handler.jwt'
 import { TransactionHelper } from '../../utils/db/transaction.helper'
+import { logger } from '../../utils/logger'
 import type { AuthUserInput } from '../../modules/auth/schemas/auth.schema'
 
 export const authUser = async (data: AuthUserInput) => {
     const [user] = await db.select().from(users).where(eq(users.username, data.username))
-    if (!user) throw new AppError('Usuário ou senha incorretos', 401)
+    if (!user) throw new AppError('Username or password incorrect', 401)
 
     const validPassword = await verifyPassword(user.password, data.password)
-    if (!validPassword) throw new AppError('Usuário ou senha incorretos', 401)
+    if (!validPassword) throw new AppError('Username or password incorrect', 401)
 
     if (user.status !== 'active') {
-        throw new AppError(`Conta do usuário está ${user.status}`, 403)
+        throw new AppError(`User account is ${user.status}`, 403)
     }
 
     const tokens = await generateToken(user.id, user.role)
@@ -39,7 +40,7 @@ export const authUser = async (data: AuthUserInput) => {
             [{ namespace: 'users', pattern: user.id }]
         )
     } catch (error) {
-        console.error('Erro ao salvar refresh token:', error)
+        logger.error({ event: 'auth.refresh.token.save.error', error: (error as Error).message })
         throw error
     }
 
@@ -55,7 +56,7 @@ export const refreshAuth = async (refreshToken: string) => {
             .where(eq(users.id, decoded.id))
 
         if (!user) {
-            throw new AppError('Usuário não encontrado', 401)
+            throw new AppError('User not found', 401)
         }
 
         const tokens = await refreshTokenPair(refreshToken, user.role)
@@ -81,12 +82,12 @@ export const refreshAuth = async (refreshToken: string) => {
                 [{ namespace: 'users', pattern: user.id }]
             )
         } catch (error) {
-            console.error('Erro ao renovar refresh token:', error)
+            logger.error({ event: 'auth.refresh.token.renew.error', error: (error as Error).message })
             throw error
         }
 
         return tokens
     } catch (error) {
-        throw new AppError('Falha ao renovar token', 401)
+        throw new AppError('Token renewal failed', 401)
     }
 }

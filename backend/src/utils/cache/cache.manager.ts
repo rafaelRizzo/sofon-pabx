@@ -1,7 +1,8 @@
 import { redisClient } from './redis.client'
+import { logger } from '../logger'
 
 export interface CacheConfig {
-    ttl: number // em segundos
+    ttl: number
 }
 
 class CacheManager {
@@ -10,16 +11,16 @@ class CacheManager {
 
     constructor() {
         this.client.on('error', (err) => {
-            console.error('Redis error:', err)
+            logger.error({ event: 'redis.error', error: (err as Error).message })
         })
     }
 
     async connect() {
         try {
             await this.client.connect()
-            console.log('✓ Redis connected')
+            logger.info({ event: 'redis.connected' })
         } catch (error) {
-            console.error('Failed to connect to Redis:', error)
+            logger.error({ event: 'redis.connection.failed', error: (error as Error).message })
             throw error
         }
     }
@@ -38,7 +39,7 @@ class CacheManager {
             const data = await this.client.get(key)
             return data ? JSON.parse(data) : null
         } catch (error) {
-            console.error('Cache get error:', error)
+            logger.error({ event: 'cache.get.error', error: (error as Error).message })
             return null
         }
     }
@@ -54,7 +55,7 @@ class CacheManager {
             const ttl = config?.ttl || this.defaultTTL
             await this.client.setEx(key, ttl, JSON.stringify(data))
         } catch (error) {
-            console.error('Cache set error:', error)
+            logger.error({ event: 'cache.set.error', error: (error as Error).message })
         }
     }
 
@@ -70,7 +71,7 @@ class CacheManager {
                 await this.client.del(keys)
             }
         } catch (error) {
-            console.error('Cache invalidate error:', error)
+            logger.error({ event: 'cache.invalidate.error', error: (error as Error).message })
         }
     }
 
@@ -78,7 +79,7 @@ class CacheManager {
         try {
             await this.client.del(key)
         } catch (error) {
-            console.error('Cache invalidate by key error:', error)
+            logger.error({ event: 'cache.invalidate.key.error', error: (error as Error).message })
         }
     }
 
@@ -86,7 +87,7 @@ class CacheManager {
         try {
             await this.client.flushDb()
         } catch (error) {
-            console.error('Cache flush error:', error)
+            logger.error({ event: 'cache.flush.error', error: (error as Error).message })
         }
     }
 }

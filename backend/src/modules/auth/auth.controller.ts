@@ -21,7 +21,7 @@ export const authUser = async (req: FastifyRequest, reply: FastifyReply) => {
 
         return reply.status(200).send({
             success: true,
-            message: 'Login realizado com sucesso',
+            message: 'Login successful',
             token
         })
     } catch (error) {
@@ -36,7 +36,7 @@ export const refresh = async (req: FastifyRequest, reply: FastifyReply) => {
         if (!refreshToken) {
             return reply.status(401).send({
                 success: false,
-                message: 'Refresh token não encontrado'
+                message: 'Refresh token not found'
             })
         }
 
@@ -52,7 +52,7 @@ export const refresh = async (req: FastifyRequest, reply: FastifyReply) => {
 
         return reply.status(200).send({
             success: true,
-            message: 'Token renovado com sucesso',
+            message: 'Token refreshed successfully',
             token: tokens.token
         })
     } catch (error) {
@@ -85,7 +85,7 @@ export const logout = async (req: FastifyRequest, reply: FastifyReply) => {
 
         return reply.status(200).send({
             success: true,
-            message: 'Logout realizado com sucesso'
+            message: 'Logout successful'
         })
     } catch (error) {
         return handleError(reply, error)
