@@ -45,8 +45,8 @@ export const getAllQueues = async () => {
     return result
 }
 
-export const getQueueById = async (id: string) => {
-    const cached = await QueuesCache.getQueue(id)
+export const getQueueById = async (id: bigint) => {
+    const cached = await QueuesCache.getQueue(id.toString())
     if (cached) return cached
 
     const [queue] = await db
@@ -55,14 +55,14 @@ export const getQueueById = async (id: string) => {
         .where(eq(queues.id, id))
 
     if (queue) {
-        await QueuesCache.setQueue(id, queue)
+        await QueuesCache.setQueue(id.toString(), queue)
     }
 
     return queue ?? null
 }
 
-export const getCompanyQueues = async (companyId: string) => {
-    const cached = await QueuesCache.getCompanyQueues(companyId)
+export const getCompanyQueues = async (companyId: bigint) => {
+    const cached = await QueuesCache.getCompanyQueues(companyId.toString())
     if (cached) return cached
 
     const result = await db
@@ -70,7 +70,7 @@ export const getCompanyQueues = async (companyId: string) => {
         .from(queues)
         .where(eq(queues.company_id, companyId))
 
-    await QueuesCache.setCompanyQueues(companyId, result)
+    await QueuesCache.setCompanyQueues(companyId.toString(), result)
 
     return result
 }
@@ -126,15 +126,15 @@ export const createQueue = async (data: CreateQueueInput) => {
     await TransactionHelper.execute(
         async () => queue,
         [
-            { namespace: 'queues', pattern: `company:${data.company_id}` },
-            { namespace: 'queues' }
+            { namespace: 'queues:company', pattern: data.company_id.toString() },
+            { namespace: 'queues:all', pattern: 'list' },
         ]
     )
 
     return queue
 }
 
-export const updateQueue = async (id: string, data: UpdateQueueInput) => {
+export const updateQueue = async (id: bigint, data: UpdateQueueInput) => {
     const [existingQueue] = await db
         .select({ company_id: queues.company_id })
         .from(queues)
@@ -160,16 +160,16 @@ export const updateQueue = async (id: string, data: UpdateQueueInput) => {
     await TransactionHelper.execute(
         async () => queue,
         [
-            { namespace: 'queues', pattern: id },
-            { namespace: 'queues', pattern: `company:${existingQueue.company_id}` },
-            { namespace: 'queues' }
+            { namespace: 'queues:queue', pattern: id.toString() },
+            { namespace: 'queues:company', pattern: existingQueue.company_id.toString() },
+            { namespace: 'queues:all', pattern: 'list' },
         ]
     )
 
     return queue ?? null
 }
 
-export const deleteQueue = async (id: string) => {
+export const deleteQueue = async (id: bigint) => {
     const [queue] = await db
         .delete(queues)
         .where(eq(queues.id, id))
@@ -179,9 +179,9 @@ export const deleteQueue = async (id: string) => {
         await TransactionHelper.execute(
             async () => queue,
             [
-                { namespace: 'queues', pattern: id },
-                { namespace: 'queues', pattern: `company:${queue.company_id}` },
-                { namespace: 'queues' }
+                { namespace: 'queues:queue', pattern: id.toString() },
+                { namespace: 'queues:company', pattern: queue.company_id.toString() },
+                { namespace: 'queues:all', pattern: 'list' },
             ]
         )
     }

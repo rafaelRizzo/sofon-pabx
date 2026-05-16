@@ -1,5 +1,3 @@
-import { db } from '../../db/config/db'
-
 interface CacheInvalidation {
     namespace: string
     pattern?: string

@@ -1,5 +1,4 @@
 import { z } from 'zod'
-import { PLAN_STATUSES } from '../../../db/enums'
 
 export const createPlanSchema = z.object({
     name: z.string().min(1, 'Name is required'),
@@ -14,7 +13,7 @@ export const createPlanSchema = z.object({
 export const updatePlanSchema = createPlanSchema.partial()
 
 export const idParamSchema = z.object({
-    id: z.string().uuid('Invalid plan ID')
+    id: z.string().regex(/^\d+$/, 'Invalid plan ID').transform(v => BigInt(v)),
 })
 
 export type CreatePlanInput = z.infer<typeof createPlanSchema>

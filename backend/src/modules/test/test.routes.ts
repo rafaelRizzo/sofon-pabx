@@ -9,7 +9,7 @@ interface ListJobsQuery {
     state?: string
 }
 
-export async function testRoutes(app: FastifyInstance) {
+export const testRoutes = async (app: FastifyInstance) => {
     app.post<{ Body: Record<string, unknown> }>('/test/queue', async (req, reply) => {
         try {
             const job = await testQueue.add('test-job', req.body || { test: true }, { delay: DELAY_MS })

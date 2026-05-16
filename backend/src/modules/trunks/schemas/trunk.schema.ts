@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { EXTENSION_STATUSES, TRUNK_TYPES, TRUNK_INSECURE_OPTIONS, CODECS_ENUM } from '../../../db/enums'
 
 export const createTrunkSchema = z.object({
-    company_id: z.string().uuid('Invalid company ID'),
+    company_id: z.string().regex(/^\d+$/, 'Invalid company ID').transform(v => BigInt(v)),
     name: z.string().min(1, 'Name is required').max(255, 'Name too long'),
     type: z.enum(TRUNK_TYPES).default('sip'),
     host: z.string().min(1, 'Host is required').max(255, 'Host too long'),
@@ -18,7 +18,7 @@ export const createTrunkSchema = z.object({
     qualify: z.union([
         z.literal('yes'),
         z.literal('no'),
-        z.number().int().positive('Must be positive integer (milliseconds)')
+        z.number().int().positive('Must be positive integer (milliseconds)').transform(v => v.toString())
     ]).default('yes'),
     directmedia: z.boolean().default(false),
     send_register: z.boolean().default(false),
@@ -36,11 +36,11 @@ export const updateTrunkSchema = createTrunkSchema.partial().extend({
 })
 
 export const idParamSchema = z.object({
-    id: z.string().uuid('Invalid trunk ID'),
+    id: z.string().regex(/^\d+$/, 'Invalid trunk ID').transform(v => BigInt(v)),
 })
 
 export const companyIdParamSchema = z.object({
-    companyId: z.string().uuid('Invalid company ID'),
+    companyId: z.string().regex(/^\d+$/, 'Invalid company ID').transform(v => BigInt(v)),
 })
 
 export type CreateTrunkInput = z.infer<typeof createTrunkSchema>

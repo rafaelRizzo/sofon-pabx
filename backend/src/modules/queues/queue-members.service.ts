@@ -22,8 +22,8 @@ const memberSelect = {
     updated_at: queueMembers.updated_at,
 } as const
 
-export const getQueueMembers = async (queueId: string) => {
-    const cached = await QueueMembersCache.getQueueMembers(queueId)
+export const getQueueMembers = async (queueId: bigint) => {
+    const cached = await QueueMembersCache.getQueueMembers(queueId.toString())
     if (cached) return cached
 
     const [queue] = await db
@@ -40,12 +40,12 @@ export const getQueueMembers = async (queueId: string) => {
         .from(queueMembers)
         .where(eq(queueMembers.queue_id, queueId))
 
-    await QueueMembersCache.setQueueMembers(queueId, members)
+    await QueueMembersCache.setQueueMembers(queueId.toString(), members)
 
     return members
 }
 
-export const addMember = async (queueId: string, data: AddMemberInput) => {
+export const addMember = async (queueId: bigint, data: AddMemberInput) => {
     const [queue] = await db
         .select()
         .from(queues)
@@ -90,13 +90,13 @@ export const addMember = async (queueId: string, data: AddMemberInput) => {
         })
         .returning(memberSelect)
 
-    await QueuesCache.invalidateQueue(queueId)
-    await QueueMembersCache.invalidateQueueMembers(queueId)
+    await QueuesCache.invalidateQueue(queueId.toString())
+    await QueueMembersCache.invalidateQueueMembers(queueId.toString())
 
     return member
 }
 
-export const updateMember = async (queueId: string, memberId: string, data: UpdateMemberInput) => {
+export const updateMember = async (queueId: bigint, memberId: bigint, data: UpdateMemberInput) => {
     const [member] = await db
         .select()
         .from(queueMembers)
@@ -120,12 +120,12 @@ export const updateMember = async (queueId: string, memberId: string, data: Upda
         .where(eq(queueMembers.id, memberId))
         .returning(memberSelect)
 
-    await QueuesCache.invalidateQueue(queueId)
+    await QueuesCache.invalidateQueue(queueId.toString())
 
     return updatedMember ?? null
 }
 
-export const removeMember = async (queueId: string, memberId: string) => {
+export const removeMember = async (queueId: bigint, memberId: bigint) => {
     const [member] = await db
         .select()
         .from(queueMembers)
@@ -142,8 +142,8 @@ export const removeMember = async (queueId: string, memberId: string) => {
         .delete(queueMembers)
         .where(eq(queueMembers.id, memberId))
 
-    await QueuesCache.invalidateQueue(queueId)
-    await QueueMembersCache.invalidateQueueMembers(queueId)
+    await QueuesCache.invalidateQueue(queueId.toString())
+    await QueueMembersCache.invalidateQueueMembers(queueId.toString())
 
     return member
 }

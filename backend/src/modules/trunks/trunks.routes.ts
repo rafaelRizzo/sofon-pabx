@@ -2,7 +2,7 @@ import { type FastifyInstance } from 'fastify'
 import * as TrunkController from './trunks.controller'
 import { verifyToken } from '../../middlewares/auth.middleware'
 
-export async function trunkRoutes(app: FastifyInstance) {
+export const trunkRoutes = async (app: FastifyInstance) => {
     app.get('/trunks', { preHandler: verifyToken }, TrunkController.getTrunks)
     app.get('/trunks/:id', { preHandler: verifyToken }, TrunkController.getTrunkById)
     app.get('/companies/:companyId/trunks', { preHandler: verifyToken }, TrunkController.getCompanyTrunks)

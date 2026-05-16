@@ -1,4 +1,8 @@
 import './types/fastify'
+
+// Serialize BigInt as string in JSON responses (snowflake IDs exceed JS safe integer range)
+;(BigInt.prototype as any).toJSON = function () { return this.toString() }
+
 import { logger } from './utils/logger'
 import { requestContext } from './utils/context/request.context'
 import { cacheManager } from './utils/cache/cache.manager'
@@ -20,6 +24,8 @@ import { extensionRoutes } from './modules/extensions/extensions.routes'
 import { trunkRoutes } from './modules/trunks/trunks.routes'
 import { queueRoutes } from './modules/queues/queues.routes'
 import { testRoutes } from './modules/test/test.routes'
+import { adminRoutes } from './modules/admin/admin.routes'
+import { validateEnv } from './utils/env/validator'
 
 const app = Fastify({
     trustProxy: true,
@@ -103,7 +109,7 @@ await app.register(helmet, {
     contentSecurityPolicy: {
         directives: {
             defaultSrc: ["'self'"],
-            styleSrc: ["'self'", "'unsafe-inline'"],
+            styleSrc: ["'self'"],
             scriptSrc: ["'self'"],
             imgSrc: ["'self'", 'data:', 'https:'],
         },
@@ -135,6 +141,7 @@ await app.register(extensionRoutes)
 await app.register(trunkRoutes)
 await app.register(queueRoutes)
 await app.register(testRoutes)
+await app.register(adminRoutes)
 
 app.get('/health', async (req, reply) => {
     const health = await getHealthStatus()
@@ -156,6 +163,8 @@ process.on('SIGINT', () => shutdown('SIGINT'))
 process.on('SIGTERM', () => shutdown('SIGTERM'))
 
 try {
+    validateEnv()
+
     redisClient.on('connect', () => logger.info({ event: 'redis.connected' }))
     redisClient.on('ready', () => logger.info({ event: 'redis.ready' }))
     redisClient.on('error', (err) => logger.error({ event: 'redis.error', error: err.message }))

@@ -32,8 +32,8 @@ export const getAllCompanies = async () => {
     return result
 }
 
-export const getCompanyById = async (id: string) => {
-    const cached = await CompaniesCache.getCompany(id)
+export const getCompanyById = async (id: bigint) => {
+    const cached = await CompaniesCache.getCompany(id.toString())
     if (cached) return cached
 
     const [company] = await db
@@ -42,7 +42,7 @@ export const getCompanyById = async (id: string) => {
         .where(eq(companies.id, id))
 
     if (company) {
-        await CompaniesCache.setCompany(id, company)
+        await CompaniesCache.setCompany(id.toString(), company)
     }
 
     return company ?? null
@@ -73,13 +73,13 @@ export const createCompany = async (data: CreateCompanyInput) => {
 
     await TransactionHelper.execute(
         async () => company,
-        [{ namespace: 'companies' }]
+        [{ namespace: 'companies:list', pattern: 'all' }]
     )
 
     return company
 }
 
-export const updateCompany = async (id: string, data: UpdateCompanyInput) => {
+export const updateCompany = async (id: bigint, data: UpdateCompanyInput) => {
     const [existingCompany] = await db
         .select({ id: companies.id })
         .from(companies)
@@ -104,13 +104,16 @@ export const updateCompany = async (id: string, data: UpdateCompanyInput) => {
 
     await TransactionHelper.execute(
         async () => company,
-        [{ namespace: 'companies', pattern: id }, { namespace: 'companies' }]
+        [
+            { namespace: 'companies:company', pattern: id.toString() },
+            { namespace: 'companies:list', pattern: 'all' },
+        ]
     )
 
     return company ?? null
 }
 
-export const deleteCompany = async (id: string) => {
+export const deleteCompany = async (id: bigint) => {
     const [company] = await db
         .delete(companies)
         .where(eq(companies.id, id))
@@ -118,7 +121,10 @@ export const deleteCompany = async (id: string) => {
 
     await TransactionHelper.execute(
         async () => company,
-        [{ namespace: 'companies', pattern: id }, { namespace: 'companies' }]
+        [
+            { namespace: 'companies:company', pattern: id.toString() },
+            { namespace: 'companies:list', pattern: 'all' },
+        ]
     )
 
     return company ?? null

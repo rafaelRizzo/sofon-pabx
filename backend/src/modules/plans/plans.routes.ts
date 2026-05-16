@@ -2,7 +2,7 @@ import { type FastifyInstance } from 'fastify'
 import * as PlanController from './plans.controller'
 import { verifyAdmin, verifyToken } from '../../middlewares/auth.middleware'
 
-export async function planRoutes(app: FastifyInstance) {
+export const planRoutes = async (app: FastifyInstance) => {
     app.get('/plans', { preHandler: verifyToken }, PlanController.getPlans)
     app.get('/plans/:id', { preHandler: verifyToken }, PlanController.getPlanById)
     app.post('/plans', { preHandler: verifyAdmin }, PlanController.createPlan)

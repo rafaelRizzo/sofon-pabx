@@ -1,4 +1,3 @@
-import 'dotenv/config'
 import { Snowflake } from '@sapphire/snowflake'
 
 const epochEnv = process.env.SNOWFLAKE_EPOCH

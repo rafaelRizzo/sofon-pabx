@@ -3,12 +3,12 @@ import { createInterface } from 'readline'
 import { db } from '../config/db'
 import { logger } from '../../utils/logger'
 
-function prompt(question: string): Promise<string> {
+const prompt = (question: string): Promise<string> => {
     const rl = createInterface({ input: process.stdin, output: process.stdout })
     return new Promise(resolve => rl.question(question, ans => { rl.close(); resolve(ans) }))
 }
 
-async function resetDB() {
+const resetDB = async () => {
     const first = await prompt('⚠️  This will DROP ALL tables. Confirm? (yes/no): ')
     if (first.trim() !== 'yes') {
         logger.info({ event: 'db.reset.cancelled' })

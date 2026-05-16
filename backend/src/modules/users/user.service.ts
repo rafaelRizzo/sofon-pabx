@@ -22,7 +22,7 @@ const userSelect = {
     updated_at: users.updated_at,
 }
 
-export const countUsers = async () => {
+export const countUsers = async (): Promise<number> => {
     const cached = await UsersCache.getUserCount()
     if (cached !== null) return cached
 
@@ -43,8 +43,8 @@ export const getAllUsers = async () => {
     return result
 }
 
-export const getUserById = async (id: string) => {
-    const cached = await UsersCache.getUser(id)
+export const getUserById = async (id: bigint) => {
+    const cached = await UsersCache.getUser(id.toString())
     if (cached) return cached
 
     const [user] = await db
@@ -53,7 +53,7 @@ export const getUserById = async (id: string) => {
         .where(eq(users.id, id))
 
     if (user) {
-        await UsersCache.setUser(id, user)
+        await UsersCache.setUser(id.toString(), user)
     }
 
     return user ?? null
@@ -89,7 +89,7 @@ export const createUser = async (data: CreateUserInput) => {
     return user
 }
 
-export const updateUser = async (id: string, data: UpdateUserInput) => {
+export const updateUser = async (id: bigint, data: UpdateUserInput) => {
     const [existingUser] = await db
         .select({ id: users.id })
         .from(users)
@@ -116,13 +116,16 @@ export const updateUser = async (id: string, data: UpdateUserInput) => {
 
     await TransactionHelper.execute(
         async () => user,
-        [{ namespace: 'users', pattern: id }, { namespace: 'users' }]
+        [
+            { namespace: 'users:user', pattern: id.toString() },
+            { namespace: 'users:list', pattern: 'all' },
+        ]
     )
 
     return user ?? null
 }
 
-export const deleteUser = async (id: string) => {
+export const deleteUser = async (id: bigint) => {
     const [user] = await db
         .delete(users)
         .where(eq(users.id, id))
@@ -130,7 +133,10 @@ export const deleteUser = async (id: string) => {
 
     await TransactionHelper.execute(
         async () => user,
-        [{ namespace: 'users', pattern: id }, { namespace: 'users' }]
+        [
+            { namespace: 'users:user', pattern: id.toString() },
+            { namespace: 'users:list', pattern: 'all' },
+        ]
     )
 
     await UsersCache.invalidateUserCount()

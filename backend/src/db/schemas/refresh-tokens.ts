@@ -1,19 +1,19 @@
 import {
     pgTable,
-    uuid,
+    bigint,
     text,
     timestamp,
     index,
 } from 'drizzle-orm/pg-core'
-import { sql } from 'drizzle-orm'
 import { users } from './users'
+import { generateSnowflake } from '../../utils/generators/snowflake.generator'
 
 export const refreshTokens = pgTable('refresh_tokens', {
-    id: uuid('id')
+    id: bigint('id', { mode: 'bigint' })
         .primaryKey()
-        .default(sql`gen_random_uuid()`),
+        .$defaultFn(() => generateSnowflake.generate()),
 
-    user_id: uuid('user_id')
+    user_id: bigint('user_id', { mode: 'bigint' })
         .notNull()
         .references(() => users.id, { onDelete: 'cascade' }),
 

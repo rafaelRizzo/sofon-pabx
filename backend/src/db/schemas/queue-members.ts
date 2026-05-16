@@ -1,7 +1,6 @@
-import { sql } from 'drizzle-orm'
 import {
     pgTable,
-    uuid,
+    bigint,
     integer,
     boolean,
     timestamp,
@@ -10,17 +9,18 @@ import {
 } from 'drizzle-orm/pg-core'
 import { queues } from './queues'
 import { extensions } from './extensions'
+import { generateSnowflake } from '../../utils/generators/snowflake.generator'
 
 export const queueMembers = pgTable('queue_members', {
-    id: uuid('id')
+    id: bigint('id', { mode: 'bigint' })
         .primaryKey()
-        .default(sql`gen_random_uuid()`),
+        .$defaultFn(() => generateSnowflake.generate()),
 
-    queue_id: uuid('queue_id')
+    queue_id: bigint('queue_id', { mode: 'bigint' })
         .notNull()
         .references(() => queues.id, { onDelete: 'cascade' }),
 
-    extension_id: uuid('extension_id')
+    extension_id: bigint('extension_id', { mode: 'bigint' })
         .notNull()
         .references(() => extensions.id, { onDelete: 'cascade' }),
 

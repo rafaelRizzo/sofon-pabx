@@ -65,10 +65,13 @@ class CacheManager {
                 ? this.generateKey(namespace, pattern)
                 : this.generateKey(namespace, '*')
 
-            const keys = await this.client.keys(searchPattern)
+            const keys: string[] = []
+            for await (const batch of this.client.scanIterator({ MATCH: searchPattern, COUNT: 100 })) {
+                keys.push(...batch)
+            }
 
             if (keys.length > 0) {
-                await this.client.del(keys)
+                await Promise.all(keys.map(k => this.client.del(k)))
             }
         } catch (error) {
             logger.error({ event: 'cache.invalidate.error', error: (error as Error).message })
@@ -85,7 +88,16 @@ class CacheManager {
 
     async flush(): Promise<void> {
         try {
-            await this.client.flushDb()
+            const keys: string[] = []
+            for await (const batch of this.client.scanIterator({ MATCH: '*', COUNT: 100 })) {
+                keys.push(...batch)
+            }
+
+            const safeKeys = keys.filter(key => !key.startsWith('jti:') && !key.startsWith('refresh_jti:'))
+
+            if (safeKeys.length > 0) {
+                await Promise.all(safeKeys.map(k => this.client.del(k)))
+            }
         } catch (error) {
             logger.error({ event: 'cache.flush.error', error: (error as Error).message })
         }

@@ -2,14 +2,14 @@ import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'node:
 
 const ENCRYPTION_KEY: string = process.env.ENCRYPTION_KEY || 'seu-encryption-key-aqui-min-32-chars'
 
-function getKey(): Buffer {
+const getKey = (): Buffer => {
     if (ENCRYPTION_KEY.length < 32) {
         return scryptSync(ENCRYPTION_KEY, 'salt', 32)
     }
     return Buffer.from(ENCRYPTION_KEY.slice(0, 32), 'utf-8')
 }
 
-export function encrypt(data: Record<string, unknown>): string {
+export const encrypt = (data: Record<string, unknown>): string => {
     const iv: Buffer = randomBytes(16)
     const cipher = createCipheriv('aes-256-cbc', getKey(), iv)
 
@@ -20,7 +20,7 @@ export function encrypt(data: Record<string, unknown>): string {
     return iv.toString('hex') + ':' + encrypted
 }
 
-export function decrypt(encryptedData: string): Record<string, unknown> {
+export const decrypt = (encryptedData: string): Record<string, unknown> => {
     const parts: string[] = encryptedData.split(':')
     const ivHex: string = parts[0]!
     const encrypted: string = parts[1]!

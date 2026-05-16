@@ -12,7 +12,7 @@ export const updateCompanySchema = createCompanySchema.extend({
 }).partial()
 
 export const idParamSchema = z.object({
-    id: z.string().uuid('Invalid company ID')
+    id: z.string().regex(/^\d+$/, 'Invalid company ID').transform(v => BigInt(v)),
 })
 
 export type CreateCompanyInput = z.infer<typeof createCompanySchema>

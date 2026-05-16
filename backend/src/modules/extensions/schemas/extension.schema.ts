@@ -1,8 +1,8 @@
 import { z } from 'zod'
-import { EXTENSION_STATUSES, EXTENSION_DTMFMODES, EXTENSION_NAT_MODES, EXTENSION_TYPES, EXTENSION_INSECURE_OPTIONS, CODECS_ENUM } from '../../../db/enums'
+import { EXTENSION_STATUSES, EXTENSION_TYPES, CODECS_ENUM } from '../../../db/enums'
 
 export const createExtensionSchema = z.object({
-    company_id: z.string().uuid('Invalid company ID'),
+    company_id: z.string().regex(/^\d+$/, 'Invalid company ID').transform(v => BigInt(v)),
     number: z.string().min(1, 'Number is required').max(10, 'Number too long'),
     account_code: z.string().min(1, 'Account code is required').max(20, 'Account code too long'),
     name: z.string().min(1, 'Name is required').max(255, 'Name too long'),
@@ -13,7 +13,7 @@ export const createExtensionSchema = z.object({
     qualify: z.union([
         z.literal('yes'),
         z.literal('no'),
-        z.number().int().positive('Must be positive integer (milliseconds)')
+        z.number().int().positive('Must be positive integer (milliseconds)').transform(v => v.toString())
     ]).default('yes'),
     dtmfmode: z.enum(['inband', 'rfc2833', 'info', 'auto'] as const).default('rfc2833'),
     context: z.string().max(100, 'Context too long').default('from-internal'),
@@ -34,11 +34,11 @@ export const updateExtensionSchema = createExtensionSchema.partial().extend({
 })
 
 export const idParamSchema = z.object({
-    id: z.uuid('Invalid extension ID'),
+    id: z.string().regex(/^\d+$/, 'Invalid extension ID').transform(v => BigInt(v)),
 })
 
 export const companyIdParamSchema = z.object({
-    companyId: z.uuid('Invalid company ID'),
+    companyId: z.string().regex(/^\d+$/, 'Invalid company ID').transform(v => BigInt(v)),
 })
 
 export type CreateExtensionInput = z.infer<typeof createExtensionSchema>

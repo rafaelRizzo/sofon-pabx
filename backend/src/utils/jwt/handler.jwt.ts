@@ -28,13 +28,14 @@ export const decodeToken = (token: string): DecodedToken => {
     return decoded
 }
 
-export const generateToken = async (userId: string, role: string): Promise<TokenPair> => {
+export const generateToken = async (userId: bigint, role: string): Promise<TokenPair> => {
     const jti = uuidv4()
     const refreshJti = uuidv4()
+    const userIdStr = userId.toString()
 
     const token = jwt.sign(
         {
-            id: userId,
+            id: userIdStr,
             role,
             jti
         },
@@ -44,15 +45,15 @@ export const generateToken = async (userId: string, role: string): Promise<Token
 
     const refreshToken = jwt.sign(
         {
-            id: userId,
+            id: userIdStr,
             jti: refreshJti
         },
         REFRESH_SECRET,
         { expiresIn: JWT_REFRESH_EXP as jwt.SignOptions['expiresIn'] }
     )
 
-    jtiManager.add(jti, userId)
-    jtiManager.addRefresh(refreshJti, userId)
+    jtiManager.add(jti, userIdStr)
+    jtiManager.addRefresh(refreshJti, userIdStr)
 
     return { token, refreshToken }
 }
@@ -89,7 +90,7 @@ export const verifyRefreshToken = async (refreshToken: string) => {
 export const refreshTokenPair = async (refreshToken: string, role: string): Promise<TokenPair> => {
     const decoded = await verifyRefreshToken(refreshToken)
 
-    const newTokenPair = await generateToken(decoded.id, role)
+    const newTokenPair = await generateToken(BigInt(decoded.id), role)
     await jtiManager.revokeRefresh(decoded.jti)
 
     return newTokenPair

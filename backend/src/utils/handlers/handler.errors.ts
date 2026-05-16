@@ -2,7 +2,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify'
 import { ZodError } from 'zod'
 import { AppError } from './app.error'
 
-export function handleError(reply: FastifyReply, error: unknown, req?: FastifyRequest) {
+export const handleError = (reply: FastifyReply, error: unknown, req?: FastifyRequest) => {
     const reqId = req?.id
 
     if (error instanceof ZodError) {

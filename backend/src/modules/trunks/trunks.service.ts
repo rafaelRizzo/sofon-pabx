@@ -1,9 +1,8 @@
 import { db } from '../../db/config/db'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { trunks } from '../../db/schemas/trunks'
 import { companies } from '../../db/schemas/companies'
 import { AppError } from '../../utils/handlers/app.error'
-import { TransactionHelper } from '../../utils/db/transaction.helper'
 import { TrunksCache } from './cache/trunks.cache'
 
 import type {
@@ -48,8 +47,8 @@ export const getAllTrunks = async () => {
     return result
 }
 
-export const getTrunkById = async (id: string) => {
-    const cached = await TrunksCache.getTrunk(id)
+export const getTrunkById = async (id: bigint) => {
+    const cached = await TrunksCache.getTrunk(id.toString())
     if (cached) return cached
 
     const [trunk] = await db
@@ -58,14 +57,14 @@ export const getTrunkById = async (id: string) => {
         .where(eq(trunks.id, id))
 
     if (trunk) {
-        await TrunksCache.setTrunk(id, trunk)
+        await TrunksCache.setTrunk(id.toString(), trunk)
     }
 
     return trunk ?? null
 }
 
-export const getCompanyTrunks = async (companyId: string) => {
-    const cached = await TrunksCache.getCompanyTrunks(companyId)
+export const getCompanyTrunks = async (companyId: bigint) => {
+    const cached = await TrunksCache.getCompanyTrunks(companyId.toString())
     if (cached) return cached
 
     const result = await db
@@ -73,7 +72,7 @@ export const getCompanyTrunks = async (companyId: string) => {
         .from(trunks)
         .where(eq(trunks.company_id, companyId))
 
-    await TrunksCache.setCompanyTrunks(companyId, result)
+    await TrunksCache.setCompanyTrunks(companyId.toString(), result)
 
     return result
 }
@@ -91,8 +90,10 @@ export const createTrunk = async (data: CreateTrunkInput) => {
     const [existingTrunk] = await db
         .select({ id: trunks.id })
         .from(trunks)
-        .where(eq(trunks.company_id, data.company_id))
-        .where(eq(trunks.name, data.name))
+        .where(and(
+            eq(trunks.company_id, data.company_id),
+            eq(trunks.name, data.name)
+        ))
 
     if (existingTrunk) {
         throw new AppError('Trunk with this name already exists in this company', 409)
@@ -103,18 +104,13 @@ export const createTrunk = async (data: CreateTrunkInput) => {
         .values(data)
         .returning(trunkSelect)
 
-    await TransactionHelper.execute(
-        async () => trunk,
-        [
-            { namespace: 'trunks', pattern: `company:${data.company_id}` },
-            { namespace: 'trunks' }
-        ]
-    )
+    await TrunksCache.invalidateCompanyTrunks(data.company_id.toString())
+    await TrunksCache.invalidateAllTrunks()
 
     return trunk
 }
 
-export const updateTrunk = async (id: string, data: UpdateTrunkInput) => {
+export const updateTrunk = async (id: bigint, data: UpdateTrunkInput) => {
     const [existingTrunk] = await db
         .select({ company_id: trunks.company_id })
         .from(trunks)
@@ -137,33 +133,23 @@ export const updateTrunk = async (id: string, data: UpdateTrunkInput) => {
         .where(eq(trunks.id, id))
         .returning(trunkSelect)
 
-    await TransactionHelper.execute(
-        async () => trunk,
-        [
-            { namespace: 'trunks', pattern: id },
-            { namespace: 'trunks', pattern: `company:${existingTrunk.company_id}` },
-            { namespace: 'trunks' }
-        ]
-    )
+    await TrunksCache.invalidateTrunk(id.toString())
+    await TrunksCache.invalidateCompanyTrunks(existingTrunk.company_id.toString())
+    await TrunksCache.invalidateAllTrunks()
 
     return trunk ?? null
 }
 
-export const deleteTrunk = async (id: string) => {
+export const deleteTrunk = async (id: bigint) => {
     const [trunk] = await db
         .delete(trunks)
         .where(eq(trunks.id, id))
         .returning(trunkSelect)
 
     if (trunk) {
-        await TransactionHelper.execute(
-            async () => trunk,
-            [
-                { namespace: 'trunks', pattern: id },
-                { namespace: 'trunks', pattern: `company:${trunk.company_id}` },
-                { namespace: 'trunks' }
-            ]
-        )
+        await TrunksCache.invalidateTrunk(id.toString())
+        await TrunksCache.invalidateCompanyTrunks(trunk.company_id.toString())
+        await TrunksCache.invalidateAllTrunks()
     }
 
     return trunk ?? null

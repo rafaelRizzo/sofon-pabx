@@ -1,5 +1,6 @@
 import {
     pgTable,
+    bigint,
     uuid,
     varchar,
     text,
@@ -7,11 +8,12 @@ import {
     index,
 } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
+import { generateSnowflake } from '../../utils/generators/snowflake.generator'
 
 export const users = pgTable('users', {
-    id: uuid('id')
+    id: bigint('id', { mode: 'bigint' })
         .primaryKey()
-        .default(sql`gen_random_uuid()`),
+        .$defaultFn(() => generateSnowflake.generate()),
 
     webhook_slug: uuid('webhook_slug')
         .unique()

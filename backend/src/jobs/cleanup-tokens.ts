@@ -7,8 +7,12 @@ export const startCleanupJob = () => {
         try {
             await cleanExpiredRefreshTokens()
             logger.info({ event: 'cleanup.tokens.completed' })
-        } catch (error) {
-            logger.error({ event: 'cleanup.tokens.failed', error: (error as Error).message })
+        } catch (error: any) {
+            logger.error({
+                event: 'cleanup.tokens.failed',
+                error: error.message,
+                cause: error.cause?.message ?? String(error.cause ?? ''),
+            })
         }
     })
 }

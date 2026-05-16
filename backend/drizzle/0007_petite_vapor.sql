@@ -1,1 +1,0 @@
-ALTER TABLE "extensions" DROP COLUMN "metadata";

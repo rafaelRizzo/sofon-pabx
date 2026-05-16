@@ -1,7 +1,6 @@
-import { sql } from 'drizzle-orm'
 import {
     pgTable,
-    uuid,
+    bigint,
     varchar,
     text,
     boolean,
@@ -10,13 +9,14 @@ import {
     index,
 } from 'drizzle-orm/pg-core'
 import { companies } from './companies'
+import { generateSnowflake } from '../../utils/generators/snowflake.generator'
 
 export const extensions = pgTable('extensions', {
-    id: uuid('id')
+    id: bigint('id', { mode: 'bigint' })
         .primaryKey()
-        .default(sql`gen_random_uuid()`),
+        .$defaultFn(() => generateSnowflake.generate()),
 
-    company_id: uuid('company_id')
+    company_id: bigint('company_id', { mode: 'bigint' })
         .notNull()
         .references(() => companies.id, { onDelete: 'cascade' }),
 

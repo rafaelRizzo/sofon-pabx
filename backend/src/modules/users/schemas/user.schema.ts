@@ -19,7 +19,7 @@ export const updateUserSchema = z.object({
 })
 
 export const idParamSchema = z.object({
-    id: z.uuid()
+    id: z.string().regex(/^\d+$/, 'Invalid user ID').transform(v => BigInt(v)),
 })
 
 export type CreateUserInput = z.infer<typeof createUserSchema>

@@ -31,7 +31,7 @@ export const getUserById = async (req: FastifyRequest, reply: FastifyReply) => {
         const { id } = idParamSchema.parse(req.params)
         const { role, id: loggedUserId } = getLoggedUser(req)
 
-        if (role !== 'admin' && id !== loggedUserId) {
+        if (role !== 'admin' && id !== BigInt(loggedUserId)) {
             return reply.status(403).send({
                 success: false,
                 message: 'You cannot view another user'
@@ -124,7 +124,7 @@ export const updateUser = async (req: FastifyRequest, reply: FastifyReply) => {
         }
 
         if (role !== 'admin') {
-            if (id !== loggedUserId) {
+            if (id !== BigInt(loggedUserId)) {
                 return reply.status(403).send({
                     success: false,
                     message: 'You cannot update another user'
@@ -156,7 +156,7 @@ export const deleteUser = async (req: FastifyRequest, reply: FastifyReply) => {
         const { id } = idParamSchema.parse(req.params)
         const { role, id: loggedUserId } = getLoggedUser(req)
 
-        if (role !== 'admin' && id !== loggedUserId) {
+        if (role !== 'admin' && id !== BigInt(loggedUserId)) {
             return reply.status(403).send({
                 success: false,
                 message: 'You cannot delete another user'

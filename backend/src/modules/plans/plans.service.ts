@@ -30,8 +30,8 @@ export const getAllPlans = async () => {
     return result
 }
 
-export const getPlanById = async (id: string) => {
-    const cached = await PlansCache.getPlan(id)
+export const getPlanById = async (id: bigint) => {
+    const cached = await PlansCache.getPlan(id.toString())
     if (cached) return cached
 
     const [plan] = await db
@@ -40,7 +40,7 @@ export const getPlanById = async (id: string) => {
         .where(eq(plans.id, id))
 
     if (plan) {
-        await PlansCache.setPlan(id, plan)
+        await PlansCache.setPlan(id.toString(), plan)
     }
 
     return plan ?? null
@@ -63,7 +63,6 @@ export const createPlan = async (data: CreatePlanInput) => {
             description: data.description,
             price: data.price.toString(),
             features: data.features ?? {},
-            status: data.status ?? 'active',
         })
         .returning(planSelect)
 
@@ -72,7 +71,7 @@ export const createPlan = async (data: CreatePlanInput) => {
     return plan
 }
 
-export const updatePlan = async (id: string, data: UpdatePlanInput) => {
+export const updatePlan = async (id: bigint, data: UpdatePlanInput) => {
     const [existingPlan] = await db
         .select()
         .from(plans)
@@ -88,7 +87,6 @@ export const updatePlan = async (id: string, data: UpdatePlanInput) => {
     if (data.description !== undefined) updateData.description = data.description
     if (data.price !== undefined) updateData.price = data.price.toString()
     if (data.features !== undefined) updateData.features = data.features
-    if (data.status !== undefined) updateData.status = data.status
 
     const [plan] = await db
         .update(plans)
@@ -96,19 +94,19 @@ export const updatePlan = async (id: string, data: UpdatePlanInput) => {
         .where(eq(plans.id, id))
         .returning(planSelect)
 
-    await PlansCache.invalidatePlan(id)
+    await PlansCache.invalidatePlan(id.toString())
     await PlansCache.invalidateAllPlans()
 
     return plan ?? null
 }
 
-export const deletePlan = async (id: string) => {
+export const deletePlan = async (id: bigint) => {
     const [plan] = await db
         .delete(plans)
         .where(eq(plans.id, id))
         .returning(planSelect)
 
-    await PlansCache.invalidatePlan(id)
+    await PlansCache.invalidatePlan(id.toString())
     await PlansCache.invalidateAllPlans()
 
     return plan ?? null

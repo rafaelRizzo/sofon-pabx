@@ -49,8 +49,8 @@ export const getAllExtensions = async () => {
     return result
 }
 
-export const getExtensionById = async (id: string) => {
-    const cached = await ExtensionsCache.getExtension(id)
+export const getExtensionById = async (id: bigint) => {
+    const cached = await ExtensionsCache.getExtension(id.toString())
     if (cached) return cached
 
     const [extension] = await db
@@ -59,14 +59,14 @@ export const getExtensionById = async (id: string) => {
         .where(eq(extensions.id, id))
 
     if (extension) {
-        await ExtensionsCache.setExtension(id, extension)
+        await ExtensionsCache.setExtension(id.toString(), extension)
     }
 
     return extension ?? null
 }
 
-export const getCompanyExtensions = async (companyId: string) => {
-    const cached = await ExtensionsCache.getCompanyExtensions(companyId)
+export const getCompanyExtensions = async (companyId: bigint) => {
+    const cached = await ExtensionsCache.getCompanyExtensions(companyId.toString())
     if (cached) return cached
 
     const result = await db
@@ -74,7 +74,7 @@ export const getCompanyExtensions = async (companyId: string) => {
         .from(extensions)
         .where(eq(extensions.company_id, companyId))
 
-    await ExtensionsCache.setCompanyExtensions(companyId, result)
+    await ExtensionsCache.setCompanyExtensions(companyId.toString(), result)
 
     return result
 }
@@ -106,15 +106,15 @@ export const createExtension = async (data: CreateExtensionInput) => {
     await TransactionHelper.execute(
         async () => extension,
         [
-            { namespace: 'extensions', pattern: `company:${data.company_id}` },
-            { namespace: 'extensions' }
+            { namespace: 'extensions:company', pattern: data.company_id.toString() },
+            { namespace: 'extensions:all', pattern: 'list' },
         ]
     )
 
     return extension
 }
 
-export const updateExtension = async (id: string, data: UpdateExtensionInput) => {
+export const updateExtension = async (id: bigint, data: UpdateExtensionInput) => {
     const [existingExtension] = await db
         .select({ company_id: extensions.company_id })
         .from(extensions)
@@ -140,16 +140,16 @@ export const updateExtension = async (id: string, data: UpdateExtensionInput) =>
     await TransactionHelper.execute(
         async () => extension,
         [
-            { namespace: 'extensions', pattern: id },
-            { namespace: 'extensions', pattern: `company:${existingExtension.company_id}` },
-            { namespace: 'extensions' }
+            { namespace: 'extensions:ext', pattern: id.toString() },
+            { namespace: 'extensions:company', pattern: existingExtension.company_id.toString() },
+            { namespace: 'extensions:all', pattern: 'list' },
         ]
     )
 
     return extension ?? null
 }
 
-export const deleteExtension = async (id: string) => {
+export const deleteExtension = async (id: bigint) => {
     const [extension] = await db
         .delete(extensions)
         .where(eq(extensions.id, id))
@@ -159,9 +159,9 @@ export const deleteExtension = async (id: string) => {
         await TransactionHelper.execute(
             async () => extension,
             [
-                { namespace: 'extensions', pattern: id },
-                { namespace: 'extensions', pattern: `company:${extension.company_id}` },
-                { namespace: 'extensions' }
+                { namespace: 'extensions:ext', pattern: id.toString() },
+                { namespace: 'extensions:company', pattern: extension.company_id.toString() },
+                { namespace: 'extensions:all', pattern: 'list' },
             ]
         )
     }

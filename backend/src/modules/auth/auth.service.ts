@@ -20,7 +20,7 @@ export const authUser = async (data: AuthUserInput) => {
         throw new AppError(`User account is ${user.status}`, 403)
     }
 
-    const tokens = await generateToken(user.id, user.role)
+    const tokens = await generateToken(user.id as bigint, user.role)
     const decoded = decodeToken(tokens.refreshToken)
 
     try {
@@ -28,16 +28,16 @@ export const authUser = async (data: AuthUserInput) => {
             async () => {
                 await db.update(users)
                     .set({ token: tokens.token })
-                    .where(eq(users.id, user.id))
+                    .where(eq(users.id, user.id as bigint))
 
                 await db.insert(refreshTokens)
                     .values({
-                        user_id: user.id,
+                        user_id: user.id as bigint,
                         token_jti: decoded.jti,
                         expires_at: new Date(decoded.exp! * 1000),
                     })
             },
-            [{ namespace: 'users', pattern: user.id }]
+            [{ namespace: 'users:user', pattern: String(user.id) }]
         )
     } catch (error) {
         logger.error({ event: 'auth.refresh.token.save.error', error: (error as Error).message })
@@ -53,7 +53,7 @@ export const refreshAuth = async (refreshToken: string) => {
         const [user] = await db
             .select({ id: users.id, role: users.role })
             .from(users)
-            .where(eq(users.id, decoded.id))
+            .where(eq(users.id, BigInt(decoded.id)))
 
         if (!user) {
             throw new AppError('User not found', 401)
@@ -67,19 +67,19 @@ export const refreshAuth = async (refreshToken: string) => {
                 async () => {
                     await db.update(users)
                         .set({ token: tokens.token })
-                        .where(eq(users.id, user.id))
+                        .where(eq(users.id, user.id as bigint))
 
                     await db.delete(refreshTokens)
                         .where(eq(refreshTokens.token_jti, decoded.jti))
 
                     await db.insert(refreshTokens)
                         .values({
-                            user_id: user.id,
+                            user_id: user.id as bigint,
                             token_jti: decodedNew.jti,
                             expires_at: new Date(decodedNew.exp! * 1000),
                         })
                 },
-                [{ namespace: 'users', pattern: user.id }]
+                [{ namespace: 'users:user', pattern: String(user.id) }]
             )
         } catch (error) {
             logger.error({ event: 'auth.refresh.token.renew.error', error: (error as Error).message })

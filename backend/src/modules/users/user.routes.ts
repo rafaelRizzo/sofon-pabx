@@ -2,7 +2,7 @@ import { type FastifyInstance } from 'fastify'
 import * as UserController from './user.controller'
 import { verifyAdmin, verifyToken } from '../../middlewares/auth.middleware'
 
-export async function userRoutes(app: FastifyInstance) {
+export const userRoutes = async (app: FastifyInstance) => {
     app.post('/first-user', UserController.createFirstUser)
     app.post('/users', { preHandler: verifyAdmin }, UserController.createUser)
     app.get('/users', { preHandler: verifyAdmin }, UserController.getUsers)
