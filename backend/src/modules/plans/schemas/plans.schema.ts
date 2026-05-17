@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { snowflakeId } from '../../../utils/validators/snowflake.validator'
 
 export const createPlanSchema = z.object({
     name: z.string().min(1, 'Name is required'),
@@ -13,7 +14,7 @@ export const createPlanSchema = z.object({
 export const updatePlanSchema = createPlanSchema.partial()
 
 export const idParamSchema = z.object({
-    id: z.string().regex(/^\d+$/, 'Invalid plan ID').transform(v => BigInt(v)),
+    id: snowflakeId('plan ID'),
 })
 
 export type CreatePlanInput = z.infer<typeof createPlanSchema>

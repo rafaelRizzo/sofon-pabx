@@ -1,8 +1,9 @@
 import { z } from 'zod'
 import { EXTENSION_STATUSES, EXTENSION_TYPES, CODECS_ENUM } from '../../../db/enums'
+import { snowflakeId } from '../../../utils/validators/snowflake.validator'
 
 export const createExtensionSchema = z.object({
-    company_id: z.string().regex(/^\d+$/, 'Invalid company ID').transform(v => BigInt(v)),
+    company_id: snowflakeId('company ID'),
     number: z.string().min(1, 'Number is required').max(10, 'Number too long'),
     account_code: z.string().min(1, 'Account code is required').max(20, 'Account code too long'),
     name: z.string().min(1, 'Name is required').max(255, 'Name too long'),
@@ -34,11 +35,11 @@ export const updateExtensionSchema = createExtensionSchema.partial().extend({
 })
 
 export const idParamSchema = z.object({
-    id: z.string().regex(/^\d+$/, 'Invalid extension ID').transform(v => BigInt(v)),
+    id: snowflakeId('extension ID'),
 })
 
 export const companyIdParamSchema = z.object({
-    companyId: z.string().regex(/^\d+$/, 'Invalid company ID').transform(v => BigInt(v)),
+    companyId: snowflakeId('company ID'),
 })
 
 export type CreateExtensionInput = z.infer<typeof createExtensionSchema>

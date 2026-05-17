@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { USER_ROLES, USER_STATUSES } from '../../../db/enums'
+import { snowflakeId } from '../../../utils/validators/snowflake.validator'
 
 export const createUserSchema = z.object({
     name: z.string().min(1).max(255).trim(),
@@ -19,7 +20,7 @@ export const updateUserSchema = z.object({
 })
 
 export const idParamSchema = z.object({
-    id: z.string().regex(/^\d+$/, 'Invalid user ID').transform(v => BigInt(v)),
+    id: snowflakeId('user ID'),
 })
 
 export type CreateUserInput = z.infer<typeof createUserSchema>

@@ -1,8 +1,9 @@
 import { z } from 'zod'
 import { EXTENSION_STATUSES, TRUNK_TYPES, TRUNK_INSECURE_OPTIONS, CODECS_ENUM } from '../../../db/enums'
+import { snowflakeId } from '../../../utils/validators/snowflake.validator'
 
 export const createTrunkSchema = z.object({
-    company_id: z.string().regex(/^\d+$/, 'Invalid company ID').transform(v => BigInt(v)),
+    company_id: snowflakeId('company ID'),
     name: z.string().min(1, 'Name is required').max(255, 'Name too long'),
     type: z.enum(TRUNK_TYPES).default('sip'),
     host: z.string().min(1, 'Host is required').max(255, 'Host too long'),
@@ -36,11 +37,11 @@ export const updateTrunkSchema = createTrunkSchema.partial().extend({
 })
 
 export const idParamSchema = z.object({
-    id: z.string().regex(/^\d+$/, 'Invalid trunk ID').transform(v => BigInt(v)),
+    id: snowflakeId('trunk ID'),
 })
 
 export const companyIdParamSchema = z.object({
-    companyId: z.string().regex(/^\d+$/, 'Invalid company ID').transform(v => BigInt(v)),
+    companyId: snowflakeId('company ID'),
 })
 
 export type CreateTrunkInput = z.infer<typeof createTrunkSchema>
