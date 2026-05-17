@@ -3,13 +3,20 @@ import { eq, and } from 'drizzle-orm'
 import { queues } from '../../db/schemas/queues'
 import { companies } from '../../db/schemas/companies'
 import { AppError } from '../../utils/handlers/app.error'
-import { TransactionHelper } from '../../utils/db/transaction.helper'
 import { QueuesCache } from './cache/queues.cache'
 
 import type {
     CreateQueueInput,
     UpdateQueueInput,
 } from './schemas/queue.schema'
+
+const getCompanyOwner = async (company_id: bigint) => {
+    const [company] = await db
+        .select({ owner_id: companies.owner_id })
+        .from(companies)
+        .where(eq(companies.id, company_id))
+    return company?.owner_id || null
+}
 
 const queueSelect = {
     id: queues.id,
@@ -75,7 +82,7 @@ export const getCompanyQueues = async (companyId: bigint) => {
     return result
 }
 
-export const createQueue = async (data: CreateQueueInput) => {
+export const createQueue = async (data: CreateQueueInput, isAdmin = false) => {
     const [company] = await db
         .select({ id: companies.id })
         .from(companies)
@@ -123,18 +130,15 @@ export const createQueue = async (data: CreateQueueInput) => {
         .values(data)
         .returning(queueSelect)
 
-    await TransactionHelper.execute(
-        async () => queue,
-        [
-            { namespace: 'queues:company', pattern: data.company_id.toString() },
-            { namespace: 'queues:all', pattern: 'list' },
-        ]
-    )
+    if (queue) {
+        await QueuesCache.invalidateCompanyQueues(data.company_id.toString())
+        if (isAdmin) await QueuesCache.invalidateAllQueues()
+    }
 
     return queue
 }
 
-export const updateQueue = async (id: bigint, data: UpdateQueueInput) => {
+export const updateQueue = async (id: bigint, data: UpdateQueueInput, isAdmin = false) => {
     const [existingQueue] = await db
         .select({ company_id: queues.company_id })
         .from(queues)
@@ -157,34 +161,29 @@ export const updateQueue = async (id: bigint, data: UpdateQueueInput) => {
         .where(eq(queues.id, id))
         .returning(queueSelect)
 
-    await TransactionHelper.execute(
-        async () => queue,
-        [
-            { namespace: 'queues:queue', pattern: id.toString() },
-            { namespace: 'queues:company', pattern: existingQueue.company_id.toString() },
-            { namespace: 'queues:all', pattern: 'list' },
-        ]
-    )
+    if (queue) {
+        await QueuesCache.invalidateQueue(id.toString())
+        await QueuesCache.invalidateCompanyQueues(queue.company_id.toString())
+        if (isAdmin) await QueuesCache.invalidateAllQueues()
+    }
 
     return queue ?? null
 }
 
-export const deleteQueue = async (id: bigint) => {
-    const [queue] = await db
+export const deleteQueue = async (id: bigint, isAdmin = false) => {
+    const queue = await getQueueById(id)
+    if (!queue) return null
+
+    const [deletedQueue] = await db
         .delete(queues)
         .where(eq(queues.id, id))
         .returning(queueSelect)
 
-    if (queue) {
-        await TransactionHelper.execute(
-            async () => queue,
-            [
-                { namespace: 'queues:queue', pattern: id.toString() },
-                { namespace: 'queues:company', pattern: queue.company_id.toString() },
-                { namespace: 'queues:all', pattern: 'list' },
-            ]
-        )
+    if (deletedQueue) {
+        await QueuesCache.invalidateQueue(id.toString())
+        await QueuesCache.invalidateCompanyQueues(queue.company_id.toString())
+        if (isAdmin) await QueuesCache.invalidateAllQueues()
     }
 
-    return queue ?? null
+    return deletedQueue ?? null
 }

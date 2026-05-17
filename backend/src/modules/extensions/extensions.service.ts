@@ -3,13 +3,20 @@ import { eq } from 'drizzle-orm'
 import { extensions } from '../../db/schemas/extensions'
 import { companies } from '../../db/schemas/companies'
 import { AppError } from '../../utils/handlers/app.error'
-import { TransactionHelper } from '../../utils/db/transaction.helper'
 import { ExtensionsCache } from './cache/extensions.cache'
 
 import type {
     CreateExtensionInput,
     UpdateExtensionInput,
 } from './schemas/extension.schema'
+
+const getCompanyOwner = async (company_id: bigint) => {
+    const [company] = await db
+        .select({ owner_id: companies.owner_id })
+        .from(companies)
+        .where(eq(companies.id, company_id))
+    return company?.owner_id || null
+}
 
 const extensionSelect = {
     id: extensions.id,
@@ -79,7 +86,7 @@ export const getCompanyExtensions = async (companyId: bigint) => {
     return result
 }
 
-export const createExtension = async (data: CreateExtensionInput) => {
+export const createExtension = async (data: CreateExtensionInput, isAdmin = false) => {
     const [company] = await db
         .select({ id: companies.id })
         .from(companies)
@@ -103,18 +110,16 @@ export const createExtension = async (data: CreateExtensionInput) => {
         .values(data)
         .returning(extensionSelect)
 
-    await TransactionHelper.execute(
-        async () => extension,
-        [
-            { namespace: 'extensions:company', pattern: data.company_id.toString() },
-            { namespace: 'extensions:all', pattern: 'list' },
-        ]
-    )
+    if (extension) {
+        const ownerId = await getCompanyOwner(data.company_id)
+        await ExtensionsCache.invalidateCompanyExtensions(data.company_id.toString())
+        if (isAdmin) await ExtensionsCache.invalidateAllExtensions()
+    }
 
     return extension
 }
 
-export const updateExtension = async (id: bigint, data: UpdateExtensionInput) => {
+export const updateExtension = async (id: bigint, data: UpdateExtensionInput, isAdmin = false) => {
     const [existingExtension] = await db
         .select({ company_id: extensions.company_id })
         .from(extensions)
@@ -137,34 +142,29 @@ export const updateExtension = async (id: bigint, data: UpdateExtensionInput) =>
         .where(eq(extensions.id, id))
         .returning(extensionSelect)
 
-    await TransactionHelper.execute(
-        async () => extension,
-        [
-            { namespace: 'extensions:ext', pattern: id.toString() },
-            { namespace: 'extensions:company', pattern: existingExtension.company_id.toString() },
-            { namespace: 'extensions:all', pattern: 'list' },
-        ]
-    )
+    if (extension) {
+        await ExtensionsCache.invalidateExtension(id.toString())
+        await ExtensionsCache.invalidateCompanyExtensions(extension.company_id.toString())
+        if (isAdmin) await ExtensionsCache.invalidateAllExtensions()
+    }
 
     return extension ?? null
 }
 
-export const deleteExtension = async (id: bigint) => {
-    const [extension] = await db
+export const deleteExtension = async (id: bigint, isAdmin = false) => {
+    const extension = await getExtensionById(id)
+    if (!extension) return null
+
+    const [deletedExtension] = await db
         .delete(extensions)
         .where(eq(extensions.id, id))
         .returning(extensionSelect)
 
-    if (extension) {
-        await TransactionHelper.execute(
-            async () => extension,
-            [
-                { namespace: 'extensions:ext', pattern: id.toString() },
-                { namespace: 'extensions:company', pattern: extension.company_id.toString() },
-                { namespace: 'extensions:all', pattern: 'list' },
-            ]
-        )
+    if (deletedExtension) {
+        await ExtensionsCache.invalidateExtension(id.toString())
+        await ExtensionsCache.invalidateCompanyExtensions(extension.company_id.toString())
+        if (isAdmin) await ExtensionsCache.invalidateAllExtensions()
     }
 
-    return extension ?? null
+    return deletedExtension ?? null
 }

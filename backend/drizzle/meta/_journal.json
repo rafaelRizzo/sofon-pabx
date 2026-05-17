@@ -8,6 +8,48 @@
       "when": 1778947512278,
       "tag": "0000_clever_slyde",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1778966923930,
+      "tag": "0001_bouncy_the_santerians",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1778974819165,
+      "tag": "0002_windy_luke_cage",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1778974867714,
+      "tag": "0003_hot_titanium_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1778975771045,
+      "tag": "0004_friendly_mauler",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1778975900834,
+      "tag": "0005_goofy_the_executioner",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1778975935126,
+      "tag": "0006_careful_toro",
+      "breakpoints": true
     }
   ]
 }

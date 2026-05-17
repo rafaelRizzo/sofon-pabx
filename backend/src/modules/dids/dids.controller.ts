@@ -1,60 +1,41 @@
 import type { FastifyRequest, FastifyReply } from 'fastify'
-import { createTrunkSchema, updateTrunkSchema, idParamSchema, companyIdParamSchema } from './schemas/trunk.schema'
-import * as TrunkService from './trunks.service'
+import {
+    createDidSchema,
+    updateDidSchema,
+    idParamSchema,
+    companyIdParamSchema,
+} from './schemas/dids.schema'
+import * as DidService from './dids.service'
 import * as CompanyService from '../companies/companies.service'
 import { handleError } from '../../utils/handlers/handler.errors'
 import { getLoggedUser } from '../../utils/handlers/handler.req.user'
 
-export const getTrunks = async (req: FastifyRequest, reply: FastifyReply) => {
+export const getDids = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
-        const trunks = await TrunkService.getAllTrunks()
-
-        return reply.send({
-            success: true,
-            trunks
-        })
-    } catch (error) {
-        return handleError(reply, error, req)
-    }
-}
-
-export const getTrunkById = async (req: FastifyRequest, reply: FastifyReply) => {
-    try {
-        const { id } = idParamSchema.parse(req.params)
         const { role, id: userId } = getLoggedUser(req)
 
-        const trunk = await TrunkService.getTrunkById(id)
-        if (!trunk) return reply.status(404).send({
-            success: false,
-            message: 'Trunk not found'
-        })
-
-        const isAdmin = role === 'admin'
-        const company = await CompanyService.getCompanyById(trunk.company_id)
-        const isOwner = company && company.owner_id.toString() === userId
-
-        if (!isAdmin && !isOwner) {
-            return reply.status(403).send({
-                success: false,
-                message: 'You do not have permission to access this trunk',
-            })
+        let dids
+        if (role === 'admin') {
+            dids = await DidService.getAllDids()
+        } else {
+            dids = await DidService.getDidsByOwnerId(BigInt(userId))
         }
 
         return reply.send({
             success: true,
-            trunk
+            dids,
         })
     } catch (error) {
         return handleError(reply, error, req)
     }
 }
 
-export const getCompanyTrunks = async (req: FastifyRequest, reply: FastifyReply) => {
+export const getDidsByCompany = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
-        const { companyId } = companyIdParamSchema.parse(req.params)
+        const { company_id } = companyIdParamSchema.parse(req.params)
         const { role, id: userId } = getLoggedUser(req)
 
-        const company = await CompanyService.getCompanyById(companyId)
+        const company = await CompanyService.getCompanyById(company_id)
         if (!company) {
             return reply.status(404).send({
                 success: false,
@@ -68,24 +49,56 @@ export const getCompanyTrunks = async (req: FastifyRequest, reply: FastifyReply)
         if (!isAdmin && !isOwner) {
             return reply.status(403).send({
                 success: false,
-                message: 'You do not have permission to access this company trunks',
+                message: 'You do not have permission to access this company DIDs',
             })
         }
 
-        const trunks = await TrunkService.getCompanyTrunks(companyId)
+        const dids = await DidService.getDidsByCompanyId(company_id)
 
         return reply.send({
             success: true,
-            trunks
+            dids,
         })
     } catch (error) {
         return handleError(reply, error, req)
     }
 }
 
-export const createTrunk = async (req: FastifyRequest, reply: FastifyReply) => {
+export const getDidById = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
-        const data = createTrunkSchema.parse(req.body)
+        const { id } = idParamSchema.parse(req.params)
+        const { role, id: userId } = getLoggedUser(req)
+
+        const did = await DidService.getDidById(id)
+        if (!did)
+            return reply.status(404).send({
+                success: false,
+                message: 'DID not found',
+            })
+
+        const isAdmin = role === 'admin'
+        const company = await CompanyService.getCompanyById(did.company_id)
+        const isOwner = company && company.owner_id.toString() === userId
+
+        if (!isAdmin && !isOwner) {
+            return reply.status(403).send({
+                success: false,
+                message: 'You do not have permission to access this DID',
+            })
+        }
+
+        return reply.send({
+            success: true,
+            did,
+        })
+    } catch (error) {
+        return handleError(reply, error, req)
+    }
+}
+
+export const createDid = async (req: FastifyRequest, reply: FastifyReply) => {
+    try {
+        const data = createDidSchema.parse(req.body)
         const { role, id: userId } = getLoggedUser(req)
 
         const isAdmin = role === 'admin'
@@ -104,103 +117,103 @@ export const createTrunk = async (req: FastifyRequest, reply: FastifyReply) => {
             if (!isOwner) {
                 return reply.status(403).send({
                     success: false,
-                    message: 'You can only create trunks for your own companies',
+                    message: 'You can only create DIDs for your own companies',
                 })
             }
         }
 
-        const trunk = await TrunkService.createTrunk(data, isAdmin)
+        const did = await DidService.createDid(data, isAdmin)
 
-        if (!trunk) {
+        if (!did) {
             return reply.status(500).send({
                 success: false,
-                message: 'Failed to create trunk'
+                message: 'Failed to create DID',
             })
         }
 
         return reply.status(201).send({
             success: true,
-            message: 'Trunk created successfully',
-            trunk_id: trunk.id
+            message: 'DID created successfully',
+            did_id: did.id,
         })
     } catch (error) {
         return handleError(reply, error, req)
     }
 }
 
-export const updateTrunk = async (req: FastifyRequest, reply: FastifyReply) => {
+export const updateDid = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
         const { id } = idParamSchema.parse(req.params)
-        const data = updateTrunkSchema.parse(req.body)
+        const data = updateDidSchema.parse(req.body)
         const { role, id: userId } = getLoggedUser(req)
 
         const isAdmin = role === 'admin'
-        const existingTrunk = await TrunkService.getTrunkById(id)
-        if (!existingTrunk) {
+        const existingDid = await DidService.getDidById(id)
+        if (!existingDid) {
             return reply.status(404).send({
                 success: false,
-                message: 'Trunk not found'
+                message: 'DID not found',
             })
         }
 
         if (!isAdmin) {
-            const company = await CompanyService.getCompanyById(existingTrunk.company_id)
+            const company = await CompanyService.getCompanyById(existingDid.company_id)
             const isOwner = company && company.owner_id.toString() === userId
 
             if (!isOwner) {
                 return reply.status(403).send({
                     success: false,
-                    message: 'You can only update trunks in your own companies',
+                    message: 'You can only update DIDs in your own companies',
                 })
             }
         }
 
-        await TrunkService.updateTrunk(id, data, isAdmin)
+        await DidService.updateDid(id, data, isAdmin)
 
         return reply.send({
             success: true,
-            message: 'Trunk updated successfully'
+            message: 'DID updated successfully',
         })
     } catch (error) {
         return handleError(reply, error, req)
     }
 }
 
-export const deleteTrunk = async (req: FastifyRequest, reply: FastifyReply) => {
+export const deleteDid = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
         const { id } = idParamSchema.parse(req.params)
         const { role, id: userId } = getLoggedUser(req)
 
         const isAdmin = role === 'admin'
-        const trunk = await TrunkService.getTrunkById(id)
-        if (!trunk) {
+        const did = await DidService.getDidById(id)
+        if (!did)
             return reply.status(404).send({
                 success: false,
-                message: 'Trunk not found',
+                message: 'DID not found',
             })
-        }
 
         if (!isAdmin) {
-            const company = await CompanyService.getCompanyById(trunk.company_id)
+            const company = await CompanyService.getCompanyById(did.company_id)
             const isOwner = company && company.owner_id.toString() === userId
 
             if (!isOwner) {
                 return reply.status(403).send({
                     success: false,
-                    message: 'You can only delete trunks in your own companies',
+                    message: 'You can only delete DIDs in your own companies',
                 })
             }
         }
 
-        const deletedTrunk = await TrunkService.deleteTrunk(id, isAdmin)
-        if (!deletedTrunk) return reply.status(404).send({
-            success: false,
-            message: 'Trunk not found'
-        })
+        const deletedDid = await DidService.deleteDid(id, isAdmin)
+        if (!deletedDid)
+            return reply.status(404).send({
+                success: false,
+                message: 'DID not found',
+            })
 
         return reply.send({
             success: true,
-            message: 'Trunk deleted successfully'
+            message: 'DID deleted successfully',
         })
     } catch (error) {
         return handleError(reply, error, req)

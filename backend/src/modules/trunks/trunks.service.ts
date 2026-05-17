@@ -77,7 +77,7 @@ export const getCompanyTrunks = async (companyId: bigint) => {
     return result
 }
 
-export const createTrunk = async (data: CreateTrunkInput) => {
+export const createTrunk = async (data: CreateTrunkInput, isAdmin = false) => {
     const [company] = await db
         .select({ id: companies.id })
         .from(companies)
@@ -104,13 +104,15 @@ export const createTrunk = async (data: CreateTrunkInput) => {
         .values(data)
         .returning(trunkSelect)
 
-    await TrunksCache.invalidateCompanyTrunks(data.company_id.toString())
-    await TrunksCache.invalidateAllTrunks()
+    if (trunk) {
+        await TrunksCache.invalidateCompanyTrunks(data.company_id.toString())
+        if (isAdmin) await TrunksCache.invalidateAllTrunks()
+    }
 
     return trunk
 }
 
-export const updateTrunk = async (id: bigint, data: UpdateTrunkInput) => {
+export const updateTrunk = async (id: bigint, data: UpdateTrunkInput, isAdmin = false) => {
     const [existingTrunk] = await db
         .select({ company_id: trunks.company_id })
         .from(trunks)
@@ -133,24 +135,29 @@ export const updateTrunk = async (id: bigint, data: UpdateTrunkInput) => {
         .where(eq(trunks.id, id))
         .returning(trunkSelect)
 
-    await TrunksCache.invalidateTrunk(id.toString())
-    await TrunksCache.invalidateCompanyTrunks(existingTrunk.company_id.toString())
-    await TrunksCache.invalidateAllTrunks()
+    if (trunk) {
+        await TrunksCache.invalidateTrunk(id.toString())
+        await TrunksCache.invalidateCompanyTrunks(existingTrunk.company_id.toString())
+        if (isAdmin) await TrunksCache.invalidateAllTrunks()
+    }
 
     return trunk ?? null
 }
 
-export const deleteTrunk = async (id: bigint) => {
-    const [trunk] = await db
+export const deleteTrunk = async (id: bigint, isAdmin = false) => {
+    const trunk = await getTrunkById(id)
+    if (!trunk) return null
+
+    const [deletedTrunk] = await db
         .delete(trunks)
         .where(eq(trunks.id, id))
         .returning(trunkSelect)
 
-    if (trunk) {
+    if (deletedTrunk) {
         await TrunksCache.invalidateTrunk(id.toString())
         await TrunksCache.invalidateCompanyTrunks(trunk.company_id.toString())
-        await TrunksCache.invalidateAllTrunks()
+        if (isAdmin) await TrunksCache.invalidateAllTrunks()
     }
 
-    return trunk ?? null
+    return deletedTrunk ?? null
 }

@@ -47,8 +47,41 @@ export class CompaniesCache {
         await cacheManager.invalidateByKey(`${NAMESPACE}:company:${companyId}`)
     }
 
+    static async getAllCompaniesByOwner() {
+        const cached = await cacheManager.get(`${NAMESPACE}:list`, COMPANIES_LIST_KEY)
+        logger.info({
+            event: cached ? 'cache.hit' : 'cache.miss',
+            namespace: NAMESPACE,
+            key: `${NAMESPACE}:list`
+        })
+        return cached
+    }
+
+    static async getCompaniesByOwner(ownerId: string) {
+        const cached = await cacheManager.get(`${NAMESPACE}:owner`, ownerId)
+        logger.info({
+            event: cached ? 'cache.hit' : 'cache.miss',
+            namespace: NAMESPACE,
+            key: `owner:${ownerId}`
+        })
+        return cached
+    }
+
+    static async setCompaniesByOwner(ownerId: string, data: any, config?: CacheConfig) {
+        await cacheManager.set(`${NAMESPACE}:owner`, ownerId, data, config)
+        logger.info({
+            event: 'cache.set',
+            namespace: NAMESPACE,
+            key: `owner:${ownerId}`
+        })
+    }
+
     static async invalidateAllCompanies() {
         await cacheManager.invalidateByKey(`${NAMESPACE}:list:${COMPANIES_LIST_KEY}`)
+    }
+
+    static async invalidateCompaniesByOwner(ownerId: string) {
+        await cacheManager.invalidateByKey(`${NAMESPACE}:owner:${ownerId}`)
     }
 
     static async invalidateCompaniesNamespace() {

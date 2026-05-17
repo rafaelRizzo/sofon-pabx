@@ -23,6 +23,8 @@ import { companyRoutes } from './modules/companies/companies.routes'
 import { extensionRoutes } from './modules/extensions/extensions.routes'
 import { trunkRoutes } from './modules/trunks/trunks.routes'
 import { queueRoutes } from './modules/queues/queues.routes'
+import { instanceRoutes } from './modules/instances/instances.routes'
+import { didRoutes } from './modules/dids/dids.routes'
 import { testRoutes } from './modules/test/test.routes'
 import { adminRoutes } from './modules/admin/admin.routes'
 import { validateEnv } from './utils/env/validator'
@@ -140,6 +142,8 @@ await app.register(companyRoutes)
 await app.register(extensionRoutes)
 await app.register(trunkRoutes)
 await app.register(queueRoutes)
+await app.register(instanceRoutes)
+await app.register(didRoutes)
 await app.register(testRoutes)
 await app.register(adminRoutes)
 

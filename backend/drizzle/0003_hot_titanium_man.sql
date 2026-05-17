@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "dids_company_id_number_index" ON "dids" USING btree ("company_id","number");

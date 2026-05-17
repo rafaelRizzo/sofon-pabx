@@ -10,6 +10,8 @@ export const EXTENSION_INSECURE_OPTIONS = ['port', 'invite'] as const
 export const CODECS_ENUM = ['ulaw', 'alaw', 'g722', 'g729', 'opus', 'gsm'] as const
 export const TRUNK_TYPES = ['sip', 'iax2'] as const
 export const TRUNK_INSECURE_OPTIONS = ['port', 'invite'] as const
+export const ERP_TYPES = ['sgp', 'ixcsoft', 'hubsoft'] as const
+export const INSTANCE_STATUSES = ['active', 'inactive'] as const
 
 export type UserRole = typeof USER_ROLES[number]
 export type UserStatus = typeof USER_STATUSES[number]
@@ -21,3 +23,5 @@ export type ExtensionNatMode = typeof EXTENSION_NAT_MODES[number]
 export type ExtensionType = typeof EXTENSION_TYPES[number]
 export type Codec = typeof CODECS_ENUM[number]
 export type TrunkType = typeof TRUNK_TYPES[number]
+export type ErpType = typeof ERP_TYPES[number]
+export type InstanceStatus = typeof INSTANCE_STATUSES[number]

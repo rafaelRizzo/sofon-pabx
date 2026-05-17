@@ -42,7 +42,7 @@ export const verifyToken = async (req: FastifyRequest, reply: FastifyReply) => {
         log.warn('auth.token_missing')
         return reply.status(401).send({
             success: false,
-            message: 'Token não fornecido'
+            message: 'Token not provided'
         })
     }
 
@@ -55,7 +55,7 @@ export const verifyToken = async (req: FastifyRequest, reply: FastifyReply) => {
             log.warn('auth.token_revoked', { jti, duration: Date.now() - start })
             return reply.status(401).send({
                 success: false,
-                message: 'Token revogado'
+                message: 'Token revoked'
             })
         }
 
@@ -74,7 +74,7 @@ export const verifyToken = async (req: FastifyRequest, reply: FastifyReply) => {
         })
         return reply.status(401).send({
             success: false,
-            message: 'Token inválido ou expirado'
+            message: 'Invalid or expired token'
         })
     }
 }
@@ -88,7 +88,7 @@ export const verifyAdmin = async (req: FastifyRequest, reply: FastifyReply) => {
         log.warn('auth.admin_token_missing')
         return reply.status(401).send({
             success: false,
-            message: 'Token não fornecido'
+            message: 'Token not provided'
         })
     }
 
@@ -101,7 +101,7 @@ export const verifyAdmin = async (req: FastifyRequest, reply: FastifyReply) => {
             log.warn('auth.token_revoked', { jti, duration: Date.now() - start })
             return reply.status(401).send({
                 success: false,
-                message: 'Token revogado'
+                message: 'Token revoked'
             })
         }
 
@@ -117,7 +117,7 @@ export const verifyAdmin = async (req: FastifyRequest, reply: FastifyReply) => {
             })
             return reply.status(403).send({
                 success: false,
-                message: 'Acesso negado'
+                message: 'Access denied'
             })
         }
 
@@ -133,7 +133,37 @@ export const verifyAdmin = async (req: FastifyRequest, reply: FastifyReply) => {
         })
         return reply.status(401).send({
             success: false,
-            message: 'Token inválido ou expirado'
+            message: 'Invalid or expired token'
         })
+    }
+}
+
+export const verifyOwnerOrAdmin = (resourceIdParam: string) => {
+    return async (req: FastifyRequest, reply: FastifyReply) => {
+        const log = createAuthLogger(req)
+
+        if (!req.user) {
+            log.warn('auth.no_user')
+            return reply.status(401).send({
+                success: false,
+                message: 'Token not provided'
+            })
+        }
+
+        const resourceId = (req.params as Record<string, any>)[resourceIdParam]
+        const isAdmin = req.user.role === 'admin'
+        const isOwner = req.user.id === resourceId
+
+        if (!isAdmin && !isOwner) {
+            log.warn('auth.owner_forbidden', {
+                userId: req.user.id,
+                resourceId,
+                role: req.user.role
+            })
+            return reply.status(403).send({
+                success: false,
+                message: 'Access denied'
+            })
+        }
     }
 }

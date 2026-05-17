@@ -7,6 +7,7 @@ import {
     timestamp,
     jsonb,
     index,
+    uniqueIndex,
 } from 'drizzle-orm/pg-core'
 import { companies } from './companies'
 import { generateSnowflake } from '../../utils/generators/snowflake.generator'
@@ -92,7 +93,7 @@ export const extensions = pgTable('extensions', {
         .defaultNow()
         .$onUpdate(() => new Date()),
 }, (table) => [
-    index().on(table.account_code),
-    index().on(table.company_id, table.number),
+    uniqueIndex().on(table.account_code),
+    uniqueIndex().on(table.company_id, table.number),
     index().on(table.number),
 ])

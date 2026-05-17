@@ -1,5 +1,5 @@
 import { db } from '../../db/config/db'
-import { eq } from 'drizzle-orm'
+import { eq, and, ne } from 'drizzle-orm'
 import { companies } from '../../db/schemas/companies'
 import { AppError } from '../../utils/handlers/app.error'
 import { TransactionHelper } from '../../utils/db/transaction.helper'
@@ -13,6 +13,7 @@ import type {
 
 const companySelect = {
     id: companies.id,
+    owner_id: companies.owner_id,
     name: companies.name,
     prefix: companies.prefix,
     description: companies.description,
@@ -48,14 +49,31 @@ export const getCompanyById = async (id: bigint) => {
     return company ?? null
 }
 
-export const createCompany = async (data: CreateCompanyInput) => {
+export const getCompaniesByOwnerId = async (owner_id: bigint) => {
+    const cached = await CompaniesCache.getCompaniesByOwner(owner_id.toString())
+    if (cached) return cached
+
+    const result = await db
+        .select(companySelect)
+        .from(companies)
+        .where(eq(companies.owner_id, owner_id))
+
+    await CompaniesCache.setCompaniesByOwner(owner_id.toString(), result)
+
+    return result
+}
+
+export const createCompany = async (data: CreateCompanyInput & { createdByAdmin?: boolean }) => {
     const [existingCompany] = await db
         .select({ id: companies.id })
         .from(companies)
-        .where(eq(companies.name, data.name))
+        .where(and(
+            eq(companies.owner_id, data.owner_id),
+            eq(companies.name, data.name)
+        ))
 
     if (existingCompany) {
-        throw new AppError('Company already exists', 409)
+        throw new AppError('You already have a company with this name', 409)
     }
 
     const prefix = generateCompanyPrefix()
@@ -63,6 +81,7 @@ export const createCompany = async (data: CreateCompanyInput) => {
     const [company] = await db
         .insert(companies)
         .values({
+            owner_id: data.owner_id,
             name: data.name,
             prefix: prefix,
             description: data.description,
@@ -71,22 +90,37 @@ export const createCompany = async (data: CreateCompanyInput) => {
         })
         .returning(companySelect)
 
-    await TransactionHelper.execute(
-        async () => company,
-        [{ namespace: 'companies:list', pattern: 'all' }]
-    )
+    await CompaniesCache.invalidateCompaniesByOwner(data.owner_id.toString())
+    if (data.createdByAdmin) {
+        await CompaniesCache.invalidateAllCompanies()
+    }
 
     return company
 }
 
-export const updateCompany = async (id: bigint, data: UpdateCompanyInput) => {
+export const updateCompany = async (id: bigint, data: UpdateCompanyInput, isAdmin = false) => {
     const [existingCompany] = await db
-        .select({ id: companies.id })
+        .select({ id: companies.id, owner_id: companies.owner_id, name: companies.name })
         .from(companies)
         .where(eq(companies.id, id))
 
     if (!existingCompany) {
         throw new AppError('Company not found', 404)
+    }
+
+    if (data.name && data.name !== existingCompany.name) {
+        const [duplicateCompany] = await db
+            .select({ id: companies.id })
+            .from(companies)
+            .where(and(
+                eq(companies.owner_id, existingCompany.owner_id),
+                eq(companies.name, data.name),
+                ne(companies.id, id)
+            ))
+
+        if (duplicateCompany) {
+            throw new AppError('You already have a company with this name', 409)
+        }
     }
 
     const updateData: Record<string, any> = {}
@@ -102,30 +136,31 @@ export const updateCompany = async (id: bigint, data: UpdateCompanyInput) => {
         .where(eq(companies.id, id))
         .returning(companySelect)
 
-    await TransactionHelper.execute(
-        async () => company,
-        [
-            { namespace: 'companies:company', pattern: id.toString() },
-            { namespace: 'companies:list', pattern: 'all' },
-        ]
-    )
+    await CompaniesCache.invalidateCompany(id.toString())
+    await CompaniesCache.invalidateCompaniesByOwner(existingCompany.owner_id.toString())
+    if (isAdmin) {
+        await CompaniesCache.invalidateAllCompanies()
+    }
 
     return company ?? null
 }
 
-export const deleteCompany = async (id: bigint) => {
-    const [company] = await db
+export const deleteCompany = async (id: bigint, isAdmin = false) => {
+    const company = await getCompanyById(id)
+    if (!company) return null
+
+    const [deletedCompany] = await db
         .delete(companies)
         .where(eq(companies.id, id))
         .returning(companySelect)
 
-    await TransactionHelper.execute(
-        async () => company,
-        [
-            { namespace: 'companies:company', pattern: id.toString() },
-            { namespace: 'companies:list', pattern: 'all' },
-        ]
-    )
+    if (deletedCompany) {
+        await CompaniesCache.invalidateCompany(id.toString())
+        await CompaniesCache.invalidateCompaniesByOwner(company.owner_id.toString())
+        if (isAdmin) {
+            await CompaniesCache.invalidateAllCompanies()
+        }
+    }
 
-    return company ?? null
+    return deletedCompany ?? null
 }

@@ -5,6 +5,9 @@ import { hashPassword } from '../../utils/password-hasher/argon'
 import { AppError } from '../../utils/handlers/app.error'
 import { TransactionHelper } from '../../utils/db/transaction.helper'
 import { UsersCache } from './cache/users.cache'
+import { CompaniesCache } from '../companies/cache/companies.cache'
+import { InstancesCache } from '../instances/cache/instances.cache'
+import { DidsCache } from '../dids/cache/dids.cache'
 
 import type {
     CreateUserInput,
@@ -139,7 +142,13 @@ export const deleteUser = async (id: bigint) => {
         ]
     )
 
-    await UsersCache.invalidateUserCount()
+    if (user) {
+        const userId = id.toString()
+        await UsersCache.invalidateUserCount()
+        await CompaniesCache.invalidateCompaniesByOwner(userId)
+        await InstancesCache.invalidateInstancesByOwner(userId)
+        await DidsCache.invalidateDidsByOwner(userId)
+    }
 
     return user ?? null
 }

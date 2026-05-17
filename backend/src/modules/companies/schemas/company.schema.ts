@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { COMPANY_STATUSES } from '../../../db/enums'
 
 export const createCompanySchema = z.object({
+    owner_id: z.string().regex(/^\d+$/, 'Invalid owner ID').transform(v => BigInt(v)).optional(),
     name: z.string().min(1, 'Name is required'),
     description: z.string().optional(),
     obs: z.string().max(1000, 'Obs must be 1000 characters or less').optional(),
