@@ -1,8 +1,9 @@
 import { z } from 'zod'
 import { EXTENSION_STATUSES } from '../../../db/enums'
+import { snowflakeId } from '../../../utils/validators/snowflake.validator'
 
 export const createQueueSchema = z.object({
-    company_id: z.string().regex(/^\d+$/, 'Invalid company ID').transform(v => BigInt(v)),
+    company_id: snowflakeId('company ID'),
     name: z.string().min(1, 'Name is required'),
     number: z.string().min(1, 'Number is required'),
     account_code: z.string().min(1, 'Account code is required'),
@@ -26,11 +27,11 @@ export const updateQueueSchema = createQueueSchema.partial().extend({
 })
 
 export const idParamSchema = z.object({
-    id: z.string().regex(/^\d+$/, 'Invalid queue ID').transform(v => BigInt(v)),
+    id: snowflakeId('queue ID'),
 })
 
 export const companyIdParamSchema = z.object({
-    companyId: z.string().regex(/^\d+$/, 'Invalid company ID').transform(v => BigInt(v)),
+    companyId: snowflakeId('company ID'),
 })
 
 export type CreateQueueInput = z.infer<typeof createQueueSchema>

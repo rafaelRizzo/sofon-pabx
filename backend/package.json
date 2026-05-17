@@ -28,7 +28,7 @@
         "@fastify/rate-limit": "^10.3.0",
         "@sapphire/snowflake": "^3.5.5",
         "argon2": "^0.44.0",
-        "bullmq": "^5.76.9",
+        "bullmq": "^5.76.10",
         "dotenv": "^17.4.2",
         "drizzle-orm": "^0.45.2",
         "esbuild": "^0.28.0",
