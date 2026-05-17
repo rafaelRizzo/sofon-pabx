@@ -55,7 +55,7 @@ export const verifyToken = async (req: FastifyRequest, reply: FastifyReply) => {
             log.warn('auth.token_revoked', { jti, duration: Date.now() - start })
             return reply.status(401).send({
                 success: false,
-                message: 'Token revoked'
+                message: 'Token revoked, refresh your token'
             })
         }
 
@@ -101,7 +101,7 @@ export const verifyAdmin = async (req: FastifyRequest, reply: FastifyReply) => {
             log.warn('auth.token_revoked', { jti, duration: Date.now() - start })
             return reply.status(401).send({
                 success: false,
-                message: 'Token revoked'
+                message: 'Token revoked, refresh your token'
             })
         }
 
