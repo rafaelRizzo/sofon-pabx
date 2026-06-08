@@ -1,46 +1,22 @@
-import { cacheManager, type CacheConfig } from '../../../utils/cache/cache.manager'
+import { cacheManager, type CacheConfig } from '../../../config/cache'
 import { logger } from '../../../utils/logger'
 
 const NAMESPACE = 'dids'
-const DIDS_LIST_KEY = 'all'
 
 export class DidsCache {
-    static async getDid(didId: string) {
-        const cached = await cacheManager.get(`${NAMESPACE}:item`, didId)
+    static async getDid(id: string) {
+        const cached = await cacheManager.get(`${NAMESPACE}:did`, id)
         logger.info({
             event: cached ? 'cache.hit' : 'cache.miss',
             namespace: NAMESPACE,
-            key: `item:${didId}`
+            key: `did:${id}`,
         })
         return cached
     }
 
-    static async setDid(didId: string, data: any, config?: CacheConfig) {
-        await cacheManager.set(`${NAMESPACE}:item`, didId, data, config)
-        logger.info({
-            event: 'cache.set',
-            namespace: NAMESPACE,
-            key: `item:${didId}`
-        })
-    }
-
-    static async getAllDids() {
-        const cached = await cacheManager.get(`${NAMESPACE}:list`, DIDS_LIST_KEY)
-        logger.info({
-            event: cached ? 'cache.hit' : 'cache.miss',
-            namespace: NAMESPACE,
-            key: `${NAMESPACE}:list`
-        })
-        return cached
-    }
-
-    static async setAllDids(data: any, config?: CacheConfig) {
-        await cacheManager.set(`${NAMESPACE}:list`, DIDS_LIST_KEY, data, config)
-        logger.info({
-            event: 'cache.set',
-            namespace: NAMESPACE,
-            key: `${NAMESPACE}:list`
-        })
+    static async setDid(id: string, data: any, config?: CacheConfig) {
+        await cacheManager.set(`${NAMESPACE}:did`, id, data, config)
+        logger.info({ event: 'cache.set', namespace: NAMESPACE, key: `did:${id}` })
     }
 
     static async getDidsByCompany(companyId: string) {
@@ -48,56 +24,28 @@ export class DidsCache {
         logger.info({
             event: cached ? 'cache.hit' : 'cache.miss',
             namespace: NAMESPACE,
-            key: `company:${companyId}`
+            key: `company:${companyId}`,
         })
         return cached
     }
 
     static async setDidsByCompany(companyId: string, data: any, config?: CacheConfig) {
         await cacheManager.set(`${NAMESPACE}:company`, companyId, data, config)
-        logger.info({
-            event: 'cache.set',
-            namespace: NAMESPACE,
-            key: `company:${companyId}`
-        })
+        logger.info({ event: 'cache.set', namespace: NAMESPACE, key: `company:${companyId}` })
     }
 
-    static async invalidateDid(didId: string) {
-        await cacheManager.invalidateByKey(`${NAMESPACE}:item:${didId}`)
-    }
-
-    static async invalidateAllDids() {
-        await cacheManager.invalidateByKey(`${NAMESPACE}:list:${DIDS_LIST_KEY}`)
+    static async invalidateDid(id: string) {
+        await cacheManager.invalidateByKey(`${NAMESPACE}:did:${id}`)
+        logger.info({ event: 'cache.invalidate', namespace: NAMESPACE, key: `did:${id}` })
     }
 
     static async invalidateDidsByCompany(companyId: string) {
         await cacheManager.invalidateByKey(`${NAMESPACE}:company:${companyId}`)
+        logger.info({ event: 'cache.invalidate', namespace: NAMESPACE, key: `company:${companyId}` })
     }
 
-    static async getDidsByOwner(ownerId: string) {
-        const cached = await cacheManager.get(`${NAMESPACE}:owner`, ownerId)
-        logger.info({
-            event: cached ? 'cache.hit' : 'cache.miss',
-            namespace: NAMESPACE,
-            key: `owner:${ownerId}`
-        })
-        return cached
-    }
-
-    static async setDidsByOwner(ownerId: string, data: any, config?: CacheConfig) {
-        await cacheManager.set(`${NAMESPACE}:owner`, ownerId, data, config)
-        logger.info({
-            event: 'cache.set',
-            namespace: NAMESPACE,
-            key: `owner:${ownerId}`
-        })
-    }
-
-    static async invalidateDidsByOwner(ownerId: string) {
-        await cacheManager.invalidateByKey(`${NAMESPACE}:owner:${ownerId}`)
-    }
-
-    static async invalidateDidsNamespace() {
+    static async invalidateNamespace() {
         await cacheManager.invalidate(NAMESPACE)
+        logger.info({ event: 'cache.invalidate', namespace: NAMESPACE, key: 'all' })
     }
 }

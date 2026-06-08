@@ -1,192 +1,83 @@
-import { db } from '../../db/config/db'
-import { dids } from '../../db/schemas/dids'
-import { companies } from '../../db/schemas/companies'
-import { eq, and, inArray } from 'drizzle-orm'
-import { AppError } from '../../utils/handlers/app.error'
+import { prisma } from '../../lib/prisma'
 import { DidsCache } from './cache/dids.cache'
-import type { CreateDidInput, UpdateDidInput } from './schemas/dids.schema'
+import type { CreateDidInput, UpdateDidInput } from './schemas/did.schema'
+import { AppError } from '../../utils/errors/app.error'
 
-const getCompanyOwner = async (company_id: bigint) => {
-    const [company] = await db
-        .select({ owner_id: companies.owner_id })
-        .from(companies)
-        .where(eq(companies.id, company_id))
-    return company?.owner_id || null
+const select = {
+    id: true,
+    number: true,
+    companyId: true,
+    createdAt: true,
+    updatedAt: true,
 }
 
 export const getAllDids = async () => {
-    const cached = await DidsCache.getAllDids()
-    if (cached) return cached
-
-    const result = await db.select().from(dids).orderBy(dids.created_at)
-    await DidsCache.setAllDids(result)
-
-    return result
+    return prisma.did.findMany({ select })
 }
 
-export const getDidsByCompanyId = async (company_id: bigint) => {
-    const cached = await DidsCache.getDidsByCompany(company_id.toString())
+export const getDidsByCompany = async (companyId: string) => {
+    const company = await prisma.company.findUnique({ where: { id: companyId } })
+    if (!company) throw new AppError('Company not found', 404)
+
+    const cached = await DidsCache.getDidsByCompany(companyId)
     if (cached) return cached
 
-    const result = await db
-        .select()
-        .from(dids)
-        .where(eq(dids.company_id, company_id))
-        .orderBy(dids.created_at)
+    const dids = await prisma.did.findMany({ where: { companyId }, select })
 
-    await DidsCache.setDidsByCompany(company_id.toString(), result)
-
-    return result
+    await DidsCache.setDidsByCompany(companyId, dids)
+    return dids
 }
 
-export const getDidById = async (id: bigint) => {
-    const cached = await DidsCache.getDid(id.toString())
+export const getDidById = async (id: string) => {
+    const cached = await DidsCache.getDid(id)
     if (cached) return cached
 
-    const result = await db
-        .select()
-        .from(dids)
-        .where(eq(dids.id, id))
-        .limit(1)
+    const did = await prisma.did.findUnique({ where: { id }, select })
+    if (!did) throw new AppError('DID not found', 404)
 
-    const did = result[0] || null
-    if (did) {
-        await DidsCache.setDid(id.toString(), did)
-    }
-
+    await DidsCache.setDid(id, did)
     return did
 }
 
-export const createDid = async (data: CreateDidInput, isAdmin = false) => {
-    const existingDid = await db
-        .select({ id: dids.id })
-        .from(dids)
-        .where(and(
-            eq(dids.company_id, data.company_id),
-            eq(dids.number, data.number)
-        ))
-        .limit(1)
+export const createDid = async (data: CreateDidInput) => {
+    const company = await prisma.company.findUnique({ where: { id: data.companyId } })
+    if (!company) throw new AppError('Company not found', 404)
 
-    if (existingDid.length > 0) {
-        throw new AppError('DID already exists for this company', 409)
-    }
+    const existing = await prisma.did.findUnique({
+        where: { number_companyId: { number: data.number, companyId: data.companyId } },
+    })
+    if (existing) throw new AppError('DID already exists for this company', 409)
 
-    const result = await db
-        .insert(dids)
-        .values({
-            company_id: data.company_id,
-            number: data.number,
-            description: data.description,
+    const did = await prisma.did.create({ data, select })
+
+    await DidsCache.invalidateDidsByCompany(data.companyId)
+    return did
+}
+
+export const updateDid = async (id: string, data: UpdateDidInput) => {
+    const existing = await prisma.did.findUnique({ where: { id } })
+    if (!existing) throw new AppError('DID not found', 404)
+
+    if (data.number) {
+        const conflict = await prisma.did.findUnique({
+            where: { number_companyId: { number: data.number, companyId: existing.companyId } },
         })
-        .returning()
-
-    const did = result[0]
-    if (did) {
-        const ownerId = await getCompanyOwner(data.company_id)
-        await DidsCache.invalidateDidsByCompany(data.company_id.toString())
-        if (ownerId) await DidsCache.invalidateDidsByOwner(ownerId.toString())
-        if (isAdmin) await DidsCache.invalidateAllDids()
+        if (conflict && conflict.id !== id) throw new AppError('DID already exists for this company', 409)
     }
 
+    const did = await prisma.did.update({ where: { id }, data, select })
+
+    await DidsCache.invalidateDid(id)
+    await DidsCache.invalidateDidsByCompany(existing.companyId)
     return did
 }
 
-export const updateDid = async (id: bigint, data: UpdateDidInput, isAdmin = false) => {
-    const existingDid = await getDidById(id)
-    if (!existingDid) {
-        throw new AppError('DID not found', 404)
-    }
+export const deleteDid = async (id: string) => {
+    const existing = await prisma.did.findUnique({ where: { id } })
+    if (!existing) throw new AppError('DID not found', 404)
 
-    if (data.number && data.number !== existingDid.number) {
-        const duplicateDid = await db
-            .select({ id: dids.id })
-            .from(dids)
-            .where(and(
-                eq(dids.company_id, existingDid.company_id),
-                eq(dids.number, data.number)
-            ))
-            .limit(1)
+    await prisma.did.delete({ where: { id } })
 
-        if (duplicateDid.length > 0) {
-            throw new AppError('DID already exists for this company', 409)
-        }
-    }
-
-    const updateData: Record<string, any> = {}
-
-    if (data.number) updateData.number = data.number
-    if (data.description !== undefined) updateData.description = data.description
-    if (data.status) updateData.status = data.status
-
-    const result = await db
-        .update(dids)
-        .set(updateData)
-        .where(eq(dids.id, id))
-        .returning()
-
-    const did = result[0]
-    if (did) {
-        const ownerId = await getCompanyOwner(did.company_id)
-        await DidsCache.invalidateDid(id.toString())
-        await DidsCache.invalidateDidsByCompany(did.company_id.toString())
-        if (ownerId) await DidsCache.invalidateDidsByOwner(ownerId.toString())
-        if (isAdmin) await DidsCache.invalidateAllDids()
-    }
-
-    return did || null
-}
-
-export const deleteDid = async (id: bigint, isAdmin = false) => {
-    const did = await getDidById(id)
-    if (!did) return null
-
-    const result = await db
-        .delete(dids)
-        .where(eq(dids.id, id))
-        .returning()
-
-    const deletedDid = result[0]
-    if (deletedDid) {
-        const ownerId = await getCompanyOwner(did.company_id)
-        await DidsCache.invalidateDid(id.toString())
-        await DidsCache.invalidateDidsByCompany(did.company_id.toString())
-        if (ownerId) await DidsCache.invalidateDidsByOwner(ownerId.toString())
-        if (isAdmin) await DidsCache.invalidateAllDids()
-    }
-
-    return deletedDid || null
-}
-
-export const getDidByIdAndCompanyId = async (id: bigint, company_id: bigint) => {
-    const result = await db
-        .select()
-        .from(dids)
-        .where(and(eq(dids.id, id), eq(dids.company_id, company_id)))
-        .limit(1)
-
-    return result[0] || null
-}
-
-export const getDidsByOwnerId = async (owner_id: bigint) => {
-    const cached = await DidsCache.getDidsByOwner(owner_id.toString())
-    if (cached) return cached
-
-    const userCompanies = await db
-        .select({ id: companies.id })
-        .from(companies)
-        .where(eq(companies.owner_id, owner_id))
-
-    const companyIds = userCompanies.map(c => c.id)
-
-    if (companyIds.length === 0) return []
-
-    const result = await db
-        .select()
-        .from(dids)
-        .where(inArray(dids.company_id, companyIds))
-        .orderBy(dids.created_at)
-
-    await DidsCache.setDidsByOwner(owner_id.toString(), result)
-
-    return result
+    await DidsCache.invalidateDid(id)
+    await DidsCache.invalidateDidsByCompany(existing.companyId)
 }

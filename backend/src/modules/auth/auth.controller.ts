@@ -1,31 +1,31 @@
 import type { FastifyRequest, FastifyReply } from 'fastify'
-import * as AuthService from './auth.service'
-import { handleError } from '../../utils/handlers/handler.errors'
-import { authUserSchema } from './schemas/auth.schema'
-import { jtiManager } from '../../utils/jwt/jti.cache'
-import { revokeRefreshTokenByJti } from '../../utils/jwt/handler.jwt'
 import jwt from 'jsonwebtoken'
+import * as AuthService from './auth.service'
+import { loginSchema } from './schemas/auth.schema'
+import { createUserSchema } from '../users/schemas/user.schema'
+import { handleError } from '../../utils/errors/handler.error'
+import { jtiManager } from '../../lib/jti'
 
-export const authUser = async (req: FastifyRequest, reply: FastifyReply) => {
+export const login = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
-        const data = authUserSchema.parse(req.body)
-        const { token, refreshToken } = await AuthService.authUser(data)
+        const data = loginSchema.parse(req.body)
+        const { token, refreshToken } = await AuthService.login(data)
 
         reply.setCookie('refreshToken', refreshToken, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'strict',
-            maxAge: 7 * 24 * 60 * 60,
-            path: '/'
+            maxAge: 7 * 24 * 60 * 60 * 1000,
+            path: '/',
         })
 
         return reply.status(200).send({
             success: true,
             message: 'Login successful',
-            token
+            token,
         })
     } catch (error) {
-        return handleError(reply, error)
+        return handleError(reply, error, req)
     }
 }
 
@@ -36,27 +36,27 @@ export const refresh = async (req: FastifyRequest, reply: FastifyReply) => {
         if (!refreshToken) {
             return reply.status(401).send({
                 success: false,
-                message: 'Refresh token not found'
+                message: 'Refresh token not found',
             })
         }
 
-        const tokens = await AuthService.refreshAuth(refreshToken)
+        const tokens = await AuthService.refreshAccessToken(refreshToken)
 
         reply.setCookie('refreshToken', tokens.refreshToken, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'strict',
-            maxAge: 7 * 24 * 60 * 60,
-            path: '/'
+            maxAge: 7 * 24 * 60 * 60 * 1000,
+            path: '/',
         })
 
         return reply.status(200).send({
             success: true,
             message: 'Token refreshed successfully',
-            token: tokens.token
+            token: tokens.token,
         })
     } catch (error) {
-        return handleError(reply, error)
+        return handleError(reply, error, req)
     }
 }
 
@@ -64,7 +64,6 @@ export const logout = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
         const auth = req.headers.authorization
         const token = auth?.startsWith('Bearer ') ? auth.slice(7) : null
-        const refreshToken = req.cookies.refreshToken
 
         if (token) {
             const decoded = jwt.decode(token) as { jti?: string }
@@ -73,21 +72,37 @@ export const logout = async (req: FastifyRequest, reply: FastifyReply) => {
             }
         }
 
-        if (refreshToken) {
-            const decoded = jwt.decode(refreshToken) as { jti?: string }
-            if (decoded?.jti) {
-                await jtiManager.revokeRefresh(decoded.jti)
-                await revokeRefreshTokenByJti(decoded.jti)
-            }
-        }
-
-        reply.clearCookie('refreshToken', { path: '/auth' })
+        reply.clearCookie('refreshToken', { path: '/' })
 
         return reply.status(200).send({
             success: true,
-            message: 'Logout successful'
+            message: 'Logout successful',
         })
     } catch (error) {
-        return handleError(reply, error)
+        return handleError(reply, error, req)
+    }
+}
+
+export const register = async (req: FastifyRequest, reply: FastifyReply) => {
+    try {
+        const data = createUserSchema.parse(req.body)
+        const { user, tokens } = await AuthService.register(data)
+
+        reply.setCookie('refreshToken', tokens.refreshToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: 7 * 24 * 60 * 60 * 1000,
+            path: '/',
+        })
+
+        return reply.status(201).send({
+            success: true,
+            message: 'User registered successfully',
+            token: tokens.token,
+            user,
+        })
+    } catch (error) {
+        return handleError(reply, error, req)
     }
 }

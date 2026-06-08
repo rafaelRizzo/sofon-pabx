@@ -1,11 +1,12 @@
-import { type FastifyInstance } from 'fastify'
-import * as CompanyController from './companies.controller'
-import { verifyAdmin, verifyToken } from '../../middlewares/auth.middleware'
+import type { FastifyInstance } from 'fastify'
+import * as CompaniesController from './companies.controller'
+import { authMiddleware } from '../../middleware/auth.middleware'
 
-export const companyRoutes = async (app: FastifyInstance) => {
-    app.get('/companies', { preHandler: verifyToken }, CompanyController.getCompanies)
-    app.get('/companies/:id', { preHandler: verifyToken }, CompanyController.getCompanyById)
-    app.post('/companies', { preHandler: verifyToken }, CompanyController.createCompany)
-    app.put('/companies/:id', { preHandler: verifyToken }, CompanyController.updateCompany)
-    app.delete('/companies/:id', { preHandler: verifyToken }, CompanyController.deleteCompany)
+export const companiesRoutes = async (app: FastifyInstance) => {
+    app.get('/companies', { onRequest: authMiddleware }, CompaniesController.getAllCompanies)
+    app.get('/companies/:id', { onRequest: authMiddleware }, CompaniesController.getCompanyById)
+    app.get('/companies/users/:id_user', { onRequest: authMiddleware }, CompaniesController.getCompaniesByUser)
+    app.post('/companies', { onRequest: authMiddleware }, CompaniesController.createCompany)
+    app.put('/companies/:id', { onRequest: authMiddleware }, CompaniesController.updateCompany)
+    app.delete('/companies/:id', { onRequest: authMiddleware }, CompaniesController.deleteCompany)
 }

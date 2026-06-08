@@ -1,90 +1,99 @@
-import { cacheManager, type CacheConfig } from '../../../utils/cache/cache.manager'
+import { cacheManager, type CacheConfig } from '../../../config/cache'
 import { logger } from '../../../utils/logger'
 
 const NAMESPACE = 'companies'
-const COMPANIES_LIST_KEY = 'all'
 
 export class CompaniesCache {
-    static async getCompany(companyId: string) {
-        const cached = await cacheManager.get(`${NAMESPACE}:company`, companyId)
+    static async getCompany(id: string) {
+        const cached = await cacheManager.get(`${NAMESPACE}:company`, id)
         logger.info({
             event: cached ? 'cache.hit' : 'cache.miss',
             namespace: NAMESPACE,
-            key: `company:${companyId}`
+            key: `company:${id}`,
         })
         return cached
     }
 
-    static async setCompany(companyId: string, data: any, config?: CacheConfig) {
-        await cacheManager.set(`${NAMESPACE}:company`, companyId, data, config)
+    static async setCompany(id: string, data: any, config?: CacheConfig) {
+        await cacheManager.set(`${NAMESPACE}:company`, id, data, config)
         logger.info({
             event: 'cache.set',
             namespace: NAMESPACE,
-            key: `company:${companyId}`
+            key: `company:${id}`,
         })
     }
 
     static async getAllCompanies() {
-        const cached = await cacheManager.get(`${NAMESPACE}:list`, COMPANIES_LIST_KEY)
+        const cached = await cacheManager.get(`${NAMESPACE}:list`, 'all')
         logger.info({
             event: cached ? 'cache.hit' : 'cache.miss',
             namespace: NAMESPACE,
-            key: `${NAMESPACE}:list`
+            key: `${NAMESPACE}:list`,
         })
         return cached
     }
 
     static async setAllCompanies(data: any, config?: CacheConfig) {
-        await cacheManager.set(`${NAMESPACE}:list`, COMPANIES_LIST_KEY, data, config)
+        await cacheManager.set(`${NAMESPACE}:list`, 'all', data, config)
         logger.info({
             event: 'cache.set',
             namespace: NAMESPACE,
-            key: `${NAMESPACE}:list`
+            key: `${NAMESPACE}:list`,
         })
     }
 
-    static async invalidateCompany(companyId: string) {
-        await cacheManager.invalidateByKey(`${NAMESPACE}:company:${companyId}`)
-    }
-
-    static async getAllCompaniesByOwner() {
-        const cached = await cacheManager.get(`${NAMESPACE}:list`, COMPANIES_LIST_KEY)
+    static async invalidateCompany(id: string) {
+        await cacheManager.invalidateByKey(`${NAMESPACE}:company:${id}`)
         logger.info({
-            event: cached ? 'cache.hit' : 'cache.miss',
+            event: 'cache.invalidate',
             namespace: NAMESPACE,
-            key: `${NAMESPACE}:list`
-        })
-        return cached
-    }
-
-    static async getCompaniesByOwner(ownerId: string) {
-        const cached = await cacheManager.get(`${NAMESPACE}:owner`, ownerId)
-        logger.info({
-            event: cached ? 'cache.hit' : 'cache.miss',
-            namespace: NAMESPACE,
-            key: `owner:${ownerId}`
-        })
-        return cached
-    }
-
-    static async setCompaniesByOwner(ownerId: string, data: any, config?: CacheConfig) {
-        await cacheManager.set(`${NAMESPACE}:owner`, ownerId, data, config)
-        logger.info({
-            event: 'cache.set',
-            namespace: NAMESPACE,
-            key: `owner:${ownerId}`
+            key: `company:${id}`,
         })
     }
 
     static async invalidateAllCompanies() {
-        await cacheManager.invalidateByKey(`${NAMESPACE}:list:${COMPANIES_LIST_KEY}`)
+        await cacheManager.invalidateByKey(`${NAMESPACE}:list:all`)
+        logger.info({
+            event: 'cache.invalidate',
+            namespace: NAMESPACE,
+            key: `${NAMESPACE}:list`,
+        })
     }
 
-    static async invalidateCompaniesByOwner(ownerId: string) {
-        await cacheManager.invalidateByKey(`${NAMESPACE}:owner:${ownerId}`)
+    static async getCompaniesByUser(userId: string) {
+        const cached = await cacheManager.get(`${NAMESPACE}:user`, userId)
+        logger.info({
+            event: cached ? 'cache.hit' : 'cache.miss',
+            namespace: NAMESPACE,
+            key: `user:${userId}`,
+        })
+        return cached
     }
 
-    static async invalidateCompaniesNamespace() {
+    static async setCompaniesByUser(userId: string, data: any, config?: CacheConfig) {
+        await cacheManager.set(`${NAMESPACE}:user`, userId, data, config)
+        logger.info({
+            event: 'cache.set',
+            namespace: NAMESPACE,
+            key: `user:${userId}`,
+        })
+    }
+
+    static async invalidateCompaniesByUser(userId: string) {
+        await cacheManager.invalidateByKey(`${NAMESPACE}:user:${userId}`)
+        logger.info({
+            event: 'cache.invalidate',
+            namespace: NAMESPACE,
+            key: `user:${userId}`,
+        })
+    }
+
+    static async invalidateNamespace() {
         await cacheManager.invalidate(NAMESPACE)
+        logger.info({
+            event: 'cache.invalidate',
+            namespace: NAMESPACE,
+            key: 'all',
+        })
     }
 }

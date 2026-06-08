@@ -1,23 +1,17 @@
 import type { FastifyRequest, FastifyReply } from 'fastify'
-import { createCompanySchema, updateCompanySchema, idParamSchema } from './schemas/company.schema'
-import * as CompanyService from './companies.service'
-import { handleError } from '../../utils/handlers/handler.errors'
-import { getLoggedUser } from '../../utils/handlers/handler.req.user'
+import * as CompaniesService from './companies.service'
+import { createCompanySchema, updateCompanySchema, idParamSchema, userIdParamSchema } from './schemas/company.schema'
+import * as UsersService from '../users/users.service'
+import { handleError } from '../../utils/errors/handler.error'
+import { AppError } from '../../utils/errors/app.error'
 
-export const getCompanies = async (req: FastifyRequest, reply: FastifyReply) => {
+export const getAllCompanies = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
-        const { role, id: userId } = getLoggedUser(req)
-
-        let companies
-        if (role === 'admin') {
-            companies = await CompanyService.getAllCompanies()
-        } else {
-            companies = await CompanyService.getCompaniesByOwnerId(BigInt(userId))
-        }
-
+        const companies = await CompaniesService.getAllCompanies()
         return reply.send({
             success: true,
-            companies
+            message: 'Companies fetched successfully',
+            companies,
         })
     } catch (error) {
         return handleError(reply, error, req)
@@ -27,27 +21,11 @@ export const getCompanies = async (req: FastifyRequest, reply: FastifyReply) => 
 export const getCompanyById = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
         const { id } = idParamSchema.parse(req.params)
-        const { role, id: userId } = getLoggedUser(req)
-
-        const company = await CompanyService.getCompanyById(id)
-        if (!company) return reply.status(404).send({
-            success: false,
-            message: 'Company not found'
-        })
-
-        const isAdmin = role === 'admin'
-        const isOwner = company.owner_id.toString() === userId
-
-        if (!isAdmin && !isOwner) {
-            return reply.status(403).send({
-                success: false,
-                message: 'You do not have permission to access this company'
-            })
-        }
-
+        const company = await CompaniesService.getCompanyById(id)
         return reply.send({
             success: true,
-            company
+            message: 'Company fetched successfully',
+            company,
         })
     } catch (error) {
         return handleError(reply, error, req)
@@ -57,27 +35,15 @@ export const getCompanyById = async (req: FastifyRequest, reply: FastifyReply) =
 export const createCompany = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
         const data = createCompanySchema.parse(req.body)
-        const { role, id: userId } = getLoggedUser(req)
+        const { id: requesterId, role } = req.user!
 
-        const ownerId = role === 'admin' && data.owner_id ? data.owner_id : BigInt(userId)
+        const userId = role === 'admin' && data.userId ? data.userId : requesterId
 
-        const company = await CompanyService.createCompany({
-            ...data,
-            owner_id: ownerId,
-            createdByAdmin: role === 'admin'
-        })
-
-        if (!company) {
-            return reply.status(500).send({
-                success: false,
-                message: 'Failed to create company'
-            })
-        }
-
+        const company = await CompaniesService.createCompany({ ...data, userId })
         return reply.status(201).send({
             success: true,
             message: 'Company created successfully',
-            company_id: company.id
+            companyId: company.id,
         })
     } catch (error) {
         return handleError(reply, error, req)
@@ -88,31 +54,30 @@ export const updateCompany = async (req: FastifyRequest, reply: FastifyReply) =>
     try {
         const { id } = idParamSchema.parse(req.params)
         const data = updateCompanySchema.parse(req.body)
-        const { role, id: userId } = getLoggedUser(req)
-
-        const existingCompany = await CompanyService.getCompanyById(id)
-        if (!existingCompany) {
-            return reply.status(404).send({
-                success: false,
-                message: 'Company not found'
-            })
-        }
-
-        const isAdmin = role === 'admin'
-        const isOwner = existingCompany.owner_id.toString() === userId
-
-        if (!isAdmin && !isOwner) {
-            return reply.status(403).send({
-                success: false,
-                message: 'You do not have permission to update this company'
-            })
-        }
-
-        await CompanyService.updateCompany(id, data, isAdmin)
-
+        await CompaniesService.updateCompany(id, data)
         return reply.send({
             success: true,
-            message: 'Company updated successfully'
+            message: 'Company updated successfully',
+        })
+    } catch (error) {
+        return handleError(reply, error, req)
+    }
+}
+
+export const getCompaniesByUser = async (req: FastifyRequest, reply: FastifyReply) => {
+    try {
+        const { id_user } = userIdParamSchema.parse(req.params)
+        const { id: requesterId, role } = req.user!
+
+        if (role !== 'admin' && role !== 'reseller' && requesterId !== id_user) {
+            throw new AppError('Forbidden', 403)
+        }
+
+        const companies = await UsersService.getCompaniesByUser(id_user)
+        return reply.send({
+            success: true,
+            message: 'Companies fetched successfully',
+            companies,
         })
     } catch (error) {
         return handleError(reply, error, req)
@@ -122,35 +87,10 @@ export const updateCompany = async (req: FastifyRequest, reply: FastifyReply) =>
 export const deleteCompany = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
         const { id } = idParamSchema.parse(req.params)
-        const { role, id: userId } = getLoggedUser(req)
-
-        const existingCompany = await CompanyService.getCompanyById(id)
-        if (!existingCompany) {
-            return reply.status(404).send({
-                success: false,
-                message: 'Company not found'
-            })
-        }
-
-        const isAdmin = role === 'admin'
-        const isOwner = existingCompany.owner_id.toString() === userId
-
-        if (!isAdmin && !isOwner) {
-            return reply.status(403).send({
-                success: false,
-                message: 'You do not have permission to delete this company'
-            })
-        }
-
-        const company = await CompanyService.deleteCompany(id, isAdmin)
-        if (!company) return reply.status(404).send({
-            success: false,
-            message: 'Company not found'
-        })
-
+        await CompaniesService.deleteCompany(id)
         return reply.send({
             success: true,
-            message: 'Company deleted successfully'
+            message: 'Company deleted successfully',
         })
     } catch (error) {
         return handleError(reply, error, req)

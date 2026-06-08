@@ -1,93 +1,108 @@
-import { db } from '../../db/config/db'
-import { users } from '../../db/schemas/users'
-import { refreshTokens } from '../../db/schemas/refresh-tokens'
-import { eq } from 'drizzle-orm'
-import { verifyPassword } from '../../utils/password-hasher/argon'
-import { AppError } from '../../utils/handlers/app.error'
-import { generateToken, verifyRefreshToken, refreshTokenPair, decodeToken } from '../../utils/jwt/handler.jwt'
-import { TransactionHelper } from '../../utils/db/transaction.helper'
-import { logger } from '../../utils/logger'
-import type { AuthUserInput } from '../../modules/auth/schemas/auth.schema'
+import { prisma } from '../../lib/prisma'
+import { generateTokens, verifyRefreshToken } from '../../lib/jwt'
+import { AppError } from '../../utils/errors/app.error'
+import argon2 from 'argon2'
+import type { LoginInput } from './schemas/auth.schema'
+import type { CreateUserInput } from '../users/schemas/user.schema'
 
-export const authUser = async (data: AuthUserInput) => {
-    const [user] = await db.select().from(users).where(eq(users.username, data.username))
-    if (!user) throw new AppError('Username or password incorrect', 401)
+export const login = async (data: LoginInput) => {
+    const user = await prisma.user.findUnique({
+        where: { username: data.username },
+        select: {
+            id: true,
+            password: true,
+            status: true,
+            role: true,
+        },
+    })
 
-    const validPassword = await verifyPassword(user.password, data.password)
-    if (!validPassword) throw new AppError('Username or password incorrect', 401)
+    if (!user) {
+        throw new AppError('Username or password incorrect', 401)
+    }
+
+    const validPassword = await argon2.verify(user.password, data.password)
+    if (!validPassword) {
+        throw new AppError('Username or password incorrect', 401)
+    }
 
     if (user.status !== 'active') {
         throw new AppError(`User account is ${user.status}`, 403)
     }
 
-    const tokens = await generateToken(user.id as bigint, user.role)
-    const decoded = decodeToken(tokens.refreshToken)
-
-    try {
-        await TransactionHelper.execute(
-            async () => {
-                await db.update(users)
-                    .set({ token: tokens.token })
-                    .where(eq(users.id, user.id as bigint))
-
-                await db.insert(refreshTokens)
-                    .values({
-                        user_id: user.id as bigint,
-                        token_jti: decoded.jti,
-                        expires_at: new Date(decoded.exp! * 1000),
-                    })
-            },
-            [{ namespace: 'users:user', pattern: String(user.id) }]
-        )
-    } catch (error) {
-        logger.error({ event: 'auth.refresh.token.save.error', error: (error as Error).message })
-        throw error
-    }
+    const tokens = await generateTokens({
+        id: user.id,
+        role: user.role,
+    })
 
     return tokens
 }
 
-export const refreshAuth = async (refreshToken: string) => {
+export const refreshAccessToken = async (refreshToken: string) => {
     try {
-        const decoded = await verifyRefreshToken(refreshToken)
-        const [user] = await db
-            .select({ id: users.id, role: users.role })
-            .from(users)
-            .where(eq(users.id, BigInt(decoded.id)))
+        const decoded = verifyRefreshToken(refreshToken)
 
-        if (!user) {
-            throw new AppError('User not found', 401)
+        const user = await prisma.user.findUnique({
+            where: { id: decoded.id },
+            select: {
+                id: true,
+                status: true,
+                role: true,
+            },
+        })
+
+        if (!user || user.status !== 'active') {
+            throw new AppError('User not found or inactive', 401)
         }
 
-        const tokens = await refreshTokenPair(refreshToken, user.role)
-        const decodedNew = decodeToken(tokens.refreshToken)
-
-        try {
-            await TransactionHelper.execute(
-                async () => {
-                    await db.update(users)
-                        .set({ token: tokens.token })
-                        .where(eq(users.id, user.id as bigint))
-
-                    await db.delete(refreshTokens)
-                        .where(eq(refreshTokens.token_jti, decoded.jti))
-
-                    await db.insert(refreshTokens)
-                        .values({
-                            user_id: user.id as bigint,
-                            token_jti: decodedNew.jti,
-                            expires_at: new Date(decodedNew.exp! * 1000),
-                        })
-                },
-                [{ namespace: 'users:user', pattern: String(user.id) }]
-            )
-        } catch (error) {
-            logger.error({ event: 'auth.refresh.token.renew.error', error: (error as Error).message })
-            throw error
-        }
+        const tokens = generateTokens({
+            id: user.id,
+            role: user.role,
+        })
 
         return tokens
     } catch (error) {
         throw new AppError('Token renewal failed', 401)
     }
+}
+
+export const register = async (data: CreateUserInput) => {
+    const userCount = await prisma.user.count()
+    if (userCount > 0) {
+        throw new AppError('Registration is disabled', 403)
+    }
+
+    const existingUser = await prisma.user.findUnique({
+        where: { username: data.username },
+    })
+
+    if (existingUser) {
+        throw new AppError('User already exists', 409)
+    }
+
+    const hashedPassword = await argon2.hash(data.password)
+
+    const user = await prisma.user.create({
+        data: {
+            ...data,
+            password: hashedPassword,
+            role: 'admin',
+        },
+        select: {
+            id: true,
+            webhookSlug: true,
+            name: true,
+            username: true,
+            role: true,
+            status: true,
+            createdAt: true,
+            updatedAt: true,
+        },
+    })
+
+    const tokens = await generateTokens({
+        id: user.id,
+        role: user.role,
+    })
+
+    return { user, tokens }
 }
