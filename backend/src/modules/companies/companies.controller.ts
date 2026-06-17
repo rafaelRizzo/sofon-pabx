@@ -7,7 +7,7 @@ import { AppError } from '../../utils/errors/app.error'
 
 export const getAllCompanies = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
-        const companies = await CompaniesService.getAllCompanies()
+        const companies = await CompaniesService.getAllCompanies(req.scope.companyIds ?? undefined)
         return reply.send({
             success: true,
             message: 'Companies fetched successfully',
@@ -21,6 +21,7 @@ export const getAllCompanies = async (req: FastifyRequest, reply: FastifyReply) 
 export const getCompanyById = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
         const { id } = idParamSchema.parse(req.params)
+        req.scope.assertAccess(id)
         const company = await CompaniesService.getCompanyById(id)
         return reply.send({
             success: true,
@@ -35,9 +36,7 @@ export const getCompanyById = async (req: FastifyRequest, reply: FastifyReply) =
 export const createCompany = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
         const data = createCompanySchema.parse(req.body)
-        const { id: requesterId, role } = req.user!
-
-        const userId = role === 'admin' && data.userId ? data.userId : requesterId
+        const userId = req.scope.isAdmin && data.userId ? data.userId : req.user!.id
 
         const company = await CompaniesService.createCompany({ ...data, userId })
         return reply.status(201).send({
@@ -54,6 +53,7 @@ export const updateCompany = async (req: FastifyRequest, reply: FastifyReply) =>
     try {
         const { id } = idParamSchema.parse(req.params)
         const data = updateCompanySchema.parse(req.body)
+        req.scope.assertAccess(id)
         await CompaniesService.updateCompany(id, data)
         return reply.send({
             success: true,
@@ -67,9 +67,8 @@ export const updateCompany = async (req: FastifyRequest, reply: FastifyReply) =>
 export const getCompaniesByUser = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
         const { id_user } = userIdParamSchema.parse(req.params)
-        const { id: requesterId, role } = req.user!
 
-        if (role !== 'admin' && role !== 'reseller' && requesterId !== id_user) {
+        if (!req.scope.isAdmin && req.user!.id !== id_user) {
             throw new AppError('Forbidden', 403)
         }
 
@@ -87,6 +86,7 @@ export const getCompaniesByUser = async (req: FastifyRequest, reply: FastifyRepl
 export const deleteCompany = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
         const { id } = idParamSchema.parse(req.params)
+        req.scope.assertAccess(id)
         await CompaniesService.deleteCompany(id)
         return reply.send({
             success: true,

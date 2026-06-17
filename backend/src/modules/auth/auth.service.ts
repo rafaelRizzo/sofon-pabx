@@ -8,12 +8,7 @@ import type { CreateUserInput } from '../users/schemas/user.schema'
 export const login = async (data: LoginInput) => {
     const user = await prisma.user.findUnique({
         where: { username: data.username },
-        select: {
-            id: true,
-            password: true,
-            status: true,
-            role: true,
-        },
+        select: { id: true, password: true, role: true, status: true },
     })
 
     if (!user) {
@@ -29,12 +24,7 @@ export const login = async (data: LoginInput) => {
         throw new AppError(`User account is ${user.status}`, 403)
     }
 
-    const tokens = await generateTokens({
-        id: user.id,
-        role: user.role,
-    })
-
-    return tokens
+    return generateTokens({ id: user.id, role: user.role })
 }
 
 export const refreshAccessToken = async (refreshToken: string) => {
@@ -54,7 +44,7 @@ export const refreshAccessToken = async (refreshToken: string) => {
             throw new AppError('User not found or inactive', 401)
         }
 
-        const tokens = generateTokens({
+        const tokens = await generateTokens({
             id: user.id,
             role: user.role,
         })
@@ -82,27 +72,9 @@ export const register = async (data: CreateUserInput) => {
     const hashedPassword = await argon2.hash(data.password)
 
     const user = await prisma.user.create({
-        data: {
-            ...data,
-            password: hashedPassword,
-            role: 'admin',
-        },
-        select: {
-            id: true,
-            webhookSlug: true,
-            name: true,
-            username: true,
-            role: true,
-            status: true,
-            createdAt: true,
-            updatedAt: true,
-        },
+        data: { ...data, password: hashedPassword, role: 'admin' },
+        select: { id: true, role: true },
     })
 
-    const tokens = await generateTokens({
-        id: user.id,
-        role: user.role,
-    })
-
-    return { user, tokens }
+    return generateTokens({ id: user.id, role: user.role })
 }

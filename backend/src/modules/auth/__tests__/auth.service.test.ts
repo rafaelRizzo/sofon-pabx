@@ -25,7 +25,7 @@ afterAll(async () => {
 
 // --------------------------------------------------------------------- login
 describe('AuthService.login', () => {
-    it('retorna tokens com credenciais válidas', async () => {
+    it('returns tokens with valid credentials', async () => {
         const result = await AuthService.login({ username: EMAIL, password: PASSWORD })
 
         expect(result).toHaveProperty('token')
@@ -33,19 +33,19 @@ describe('AuthService.login', () => {
         expect(typeof result.token).toBe('string')
     })
 
-    it('throws 401 com senha errada', async () => {
+    it('throws 401 with wrong password', async () => {
         await expect(
             AuthService.login({ username: EMAIL, password: 'wrong-password' })
         ).rejects.toMatchObject({ statusCode: 401 })
     })
 
-    it('throws 401 com username inexistente', async () => {
+    it('throws 401 with non-existent username', async () => {
         await expect(
-            AuthService.login({ username: 'nao-existe@test.com', password: PASSWORD })
+            AuthService.login({ username: 'does-not-exist@test.com', password: PASSWORD })
         ).rejects.toMatchObject({ statusCode: 401 })
     })
 
-    it('throws 403 com usuário inativo', async () => {
+    it('throws 403 with inactive user', async () => {
         const inactiveEmail = `${PREFIX}_inactive@test.com`
         await prisma.user.create({
             data: {
@@ -64,7 +64,7 @@ describe('AuthService.login', () => {
 
 // ------------------------------------------------------------------ register
 describe('AuthService.register', () => {
-    it('throws 403 quando já existe um usuário no sistema', async () => {
+    it('throws 403 when a user already exists in the system', async () => {
         await expect(
             AuthService.register({ name: 'New User', username: `${PREFIX}_new@test.com`, password: PASSWORD })
         ).rejects.toMatchObject({ statusCode: 403 })
@@ -73,7 +73,7 @@ describe('AuthService.register', () => {
 
 // --------------------------------------------------------- refreshAccessToken
 describe('AuthService.refreshAccessToken', () => {
-    it('retorna novos tokens com refresh token válido', async () => {
+    it('returns new tokens with valid refresh token', async () => {
         const { refreshToken } = await AuthService.login({ username: EMAIL, password: PASSWORD })
 
         const result = await AuthService.refreshAccessToken(refreshToken)
@@ -82,9 +82,9 @@ describe('AuthService.refreshAccessToken', () => {
         expect(result).toHaveProperty('refreshToken')
     })
 
-    it('throws 401 com refresh token inválido', async () => {
+    it('throws 401 with invalid refresh token', async () => {
         await expect(
-            AuthService.refreshAccessToken('token-invalido')
+            AuthService.refreshAccessToken('invalid-token')
         ).rejects.toMatchObject({ statusCode: 401 })
     })
 })

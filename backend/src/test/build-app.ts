@@ -5,6 +5,7 @@ import { authRoutes } from '../modules/auth/auth.routes'
 import { usersRoutes } from '../modules/users/users.routes'
 import { companiesRoutes } from '../modules/companies/companies.routes'
 import { didsRoutes } from '../modules/dids/dids.routes'
+import { extensionsRoutes } from '../modules/extensions/extensions.routes'
 import { connectRedis } from '../config/redis'
 
 export const buildApp = async (): Promise<FastifyInstance> => {
@@ -16,6 +17,7 @@ export const buildApp = async (): Promise<FastifyInstance> => {
     await app.register(usersRoutes)
     await app.register(companiesRoutes)
     await app.register(didsRoutes)
+    await app.register(extensionsRoutes)
     await app.ready()
     return app
 }

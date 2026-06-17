@@ -4,6 +4,26 @@ import { logger } from '../../../utils/logger'
 const NAMESPACE = 'dids'
 
 export class DidsCache {
+    static async getAll() {
+        const cached = await cacheManager.get(`${NAMESPACE}:all`, 'list')
+        logger.info({
+            event: cached ? 'cache.hit' : 'cache.miss',
+            namespace: NAMESPACE,
+            key: 'all:list',
+        })
+        return cached
+    }
+
+    static async setAll(data: any, config?: CacheConfig) {
+        await cacheManager.set(`${NAMESPACE}:all`, 'list', data, config)
+        logger.info({ event: 'cache.set', namespace: NAMESPACE, key: 'all:list' })
+    }
+
+    static async invalidateAll() {
+        await cacheManager.invalidateByKey(`${NAMESPACE}:all:list`)
+        logger.info({ event: 'cache.invalidate', namespace: NAMESPACE, key: 'all:list' })
+    }
+
     static async getDid(id: string) {
         const cached = await cacheManager.get(`${NAMESPACE}:did`, id)
         logger.info({

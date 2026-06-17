@@ -30,7 +30,7 @@ afterAll(async () => {
 
 // -------------------------------------------------------- createCompany
 describe('CompaniesService.createCompany', () => {
-    it('cria empresa e vínculo com usuário', async () => {
+    it('creates company and user link', async () => {
         const company = await CompaniesService.createCompany({
             name: `${PREFIX} Speed SP`,
             userId,
@@ -48,7 +48,7 @@ describe('CompaniesService.createCompany', () => {
         expect(link).not.toBeNull()
     })
 
-    it('throws 404 com userId inexistente', async () => {
+    it('throws 404 with non-existent userId', async () => {
         await expect(
             CompaniesService.createCompany({
                 name: `${PREFIX} Fail`,
@@ -61,14 +61,14 @@ describe('CompaniesService.createCompany', () => {
 
 // ------------------------------------------------------- getAllCompanies
 describe('CompaniesService.getAllCompanies', () => {
-    it('retorna lista com pelo menos a empresa criada', async () => {
+    it('returns list with at least the created company', async () => {
         const companies = await CompaniesService.getAllCompanies() as any[]
 
         expect(Array.isArray(companies)).toBe(true)
         expect(companies.some((c) => c.id === companyId)).toBe(true)
     })
 
-    it('não expõe campo users', async () => {
+    it('does not expose users field', async () => {
         const companies = await CompaniesService.getAllCompanies() as any[]
         const company = companies.find((c) => c.id === companyId)
         expect(company?.users).toBeUndefined()
@@ -77,14 +77,14 @@ describe('CompaniesService.getAllCompanies', () => {
 
 // ----------------------------------------------------- getCompanyById
 describe('CompaniesService.getCompanyById', () => {
-    it('retorna empresa pelo id', async () => {
+    it('returns company by id', async () => {
         const company = await CompaniesService.getCompanyById(companyId) as any
 
         expect(company.id).toBe(companyId)
         expect(company.name).toBe(`${PREFIX} Speed SP`)
     })
 
-    it('throws 404 com id inexistente', async () => {
+    it('throws 404 with non-existent id', async () => {
         await expect(
             CompaniesService.getCompanyById('clxxxxxxxxxxxxxxxxxxxxxxxxx')
         ).rejects.toMatchObject({ statusCode: 404 })
@@ -93,7 +93,7 @@ describe('CompaniesService.getCompanyById', () => {
 
 // ------------------------------------------------------ updateCompany
 describe('CompaniesService.updateCompany', () => {
-    it('atualiza nome da empresa', async () => {
+    it('updates company name', async () => {
         const updated = await CompaniesService.updateCompany(companyId, {
             name: `${PREFIX} Speed RJ`,
         })
@@ -101,7 +101,7 @@ describe('CompaniesService.updateCompany', () => {
         expect(updated.name).toBe(`${PREFIX} Speed RJ`)
     })
 
-    it('atualiza metadata', async () => {
+    it('updates metadata', async () => {
         const updated = await CompaniesService.updateCompany(companyId, {
             metadata: { city: 'Sao Paulo' },
         })
@@ -109,7 +109,7 @@ describe('CompaniesService.updateCompany', () => {
         expect((updated.metadata as any).city).toBe('Sao Paulo')
     })
 
-    it('throws 404 com id inexistente', async () => {
+    it('throws 404 with non-existent id', async () => {
         await expect(
             CompaniesService.updateCompany('clxxxxxxxxxxxxxxxxxxxxxxxxx', { name: 'X' })
         ).rejects.toMatchObject({ statusCode: 404 })
@@ -118,7 +118,7 @@ describe('CompaniesService.updateCompany', () => {
 
 // ------------------------------------------------------ deleteCompany
 describe('CompaniesService.deleteCompany', () => {
-    it('deleta empresa e vínculo', async () => {
+    it('deletes company and link', async () => {
         const toDelete = await CompaniesService.createCompany({
             name: `${PREFIX} To Delete`,
             userId,
@@ -136,7 +136,7 @@ describe('CompaniesService.deleteCompany', () => {
         expect(link).toBeNull()
     })
 
-    it('throws 404 com id inexistente', async () => {
+    it('throws 404 with non-existent id', async () => {
         await expect(
             CompaniesService.deleteCompany('clxxxxxxxxxxxxxxxxxxxxxxxxx')
         ).rejects.toMatchObject({ statusCode: 404 })

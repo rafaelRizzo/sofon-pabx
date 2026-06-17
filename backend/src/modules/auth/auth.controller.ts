@@ -9,9 +9,9 @@ import { jtiManager } from '../../lib/jti'
 export const login = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
         const data = loginSchema.parse(req.body)
-        const { token, refreshToken } = await AuthService.login(data)
+        const tokens = await AuthService.login(data)
 
-        reply.setCookie('refreshToken', refreshToken, {
+        reply.setCookie('refreshToken', tokens.refreshToken, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'strict',
@@ -22,7 +22,7 @@ export const login = async (req: FastifyRequest, reply: FastifyReply) => {
         return reply.status(200).send({
             success: true,
             message: 'Login successful',
-            token,
+            token: tokens.token,
         })
     } catch (error) {
         return handleError(reply, error, req)
@@ -86,7 +86,7 @@ export const logout = async (req: FastifyRequest, reply: FastifyReply) => {
 export const register = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
         const data = createUserSchema.parse(req.body)
-        const { user, tokens } = await AuthService.register(data)
+        const tokens = await AuthService.register(data)
 
         reply.setCookie('refreshToken', tokens.refreshToken, {
             httpOnly: true,
@@ -100,7 +100,6 @@ export const register = async (req: FastifyRequest, reply: FastifyReply) => {
             success: true,
             message: 'User registered successfully',
             token: tokens.token,
-            user,
         })
     } catch (error) {
         return handleError(reply, error, req)

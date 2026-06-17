@@ -54,14 +54,14 @@ const auth = () => ({ authorization: `Bearer ${accessToken}` })
 
 // ---------------------------------------- GET /dids
 describe('GET /dids', () => {
-    it('200 admin lista todos os DIDs sem companyId', async () => {
+    it('200 admin lists all DIDs without companyId', async () => {
         const res = await app.inject({ method: 'GET', url: '/dids', headers: auth() })
 
         expect(res.statusCode).toBe(200)
         expect(Array.isArray(res.json().dids)).toBe(true)
     })
 
-    it('200 admin lista DIDs filtrando por companyId', async () => {
+    it('200 admin lists DIDs filtering by companyId', async () => {
         const res = await app.inject({
             method: 'GET',
             url: `/dids?companyId=${companyId}`,
@@ -72,7 +72,7 @@ describe('GET /dids', () => {
         expect(Array.isArray(res.json().dids)).toBe(true)
     })
 
-    it('401 sem token', async () => {
+    it('401 without token', async () => {
         const res = await app.inject({ method: 'GET', url: '/dids' })
         expect(res.statusCode).toBe(401)
     })
@@ -80,7 +80,7 @@ describe('GET /dids', () => {
 
 // -------------------------------- GET /dids/company/:id_company
 describe('GET /dids/company/:id_company', () => {
-    it('200 retorna DIDs da company', async () => {
+    it('200 returns DIDs from the company', async () => {
         const res = await app.inject({
             method: 'GET',
             url: `/dids/company/${companyId}`,
@@ -91,7 +91,7 @@ describe('GET /dids/company/:id_company', () => {
         expect(Array.isArray(res.json().dids)).toBe(true)
     })
 
-    it('404 com companyId inexistente', async () => {
+    it('404 with non-existent companyId', async () => {
         const res = await app.inject({
             method: 'GET',
             url: '/dids/company/clxxxxxxxxxxxxxxxxxxxxxxxxx',
@@ -101,7 +101,7 @@ describe('GET /dids/company/:id_company', () => {
         expect(res.statusCode).toBe(404)
     })
 
-    it('401 sem token', async () => {
+    it('401 without token', async () => {
         const res = await app.inject({
             method: 'GET',
             url: `/dids/company/${companyId}`,
@@ -113,7 +113,7 @@ describe('GET /dids/company/:id_company', () => {
 
 // ------------------------------------------------- POST /dids
 describe('POST /dids', () => {
-    it('201 cria DID', async () => {
+    it('201 creates DID', async () => {
         const res = await app.inject({
             method: 'POST',
             url: '/dids',
@@ -128,7 +128,7 @@ describe('POST /dids', () => {
         didId = body.didId
     })
 
-    it('409 com número duplicado na mesma company', async () => {
+    it('409 with duplicate number in the same company', async () => {
         const res = await app.inject({
             method: 'POST',
             url: '/dids',
@@ -139,7 +139,7 @@ describe('POST /dids', () => {
         expect(res.statusCode).toBe(409)
     })
 
-    it('400 com número não numérico', async () => {
+    it('400 with non-numeric number', async () => {
         const res = await app.inject({
             method: 'POST',
             url: '/dids',
@@ -150,7 +150,7 @@ describe('POST /dids', () => {
         expect(res.statusCode).toBe(400)
     })
 
-    it('400 com body inválido', async () => {
+    it('400 with invalid body', async () => {
         const res = await app.inject({
             method: 'POST',
             url: '/dids',
@@ -161,7 +161,7 @@ describe('POST /dids', () => {
         expect(res.statusCode).toBe(400)
     })
 
-    it('401 sem token', async () => {
+    it('401 without token', async () => {
         const res = await app.inject({
             method: 'POST',
             url: '/dids',
@@ -174,7 +174,7 @@ describe('POST /dids', () => {
 
 // ---------------------------------------------- GET /dids/:id
 describe('GET /dids/:id', () => {
-    it('200 retorna DID pelo id', async () => {
+    it('200 returns DID by id', async () => {
         const res = await app.inject({
             method: 'GET',
             url: `/dids/${didId}`,
@@ -185,7 +185,7 @@ describe('GET /dids/:id', () => {
         expect(res.json().did.id).toBe(didId)
     })
 
-    it('404 com id inexistente', async () => {
+    it('404 with non-existent id', async () => {
         const res = await app.inject({
             method: 'GET',
             url: '/dids/clxxxxxxxxxxxxxxxxxxxxxxxxx',
@@ -195,10 +195,10 @@ describe('GET /dids/:id', () => {
         expect(res.statusCode).toBe(404)
     })
 
-    it('400 com id fora do formato cuid2', async () => {
+    it('400 with id outside cuid2 format', async () => {
         const res = await app.inject({
             method: 'GET',
-            url: '/dids/id-invalido',
+            url: '/dids/invalid-id',
             headers: auth(),
         })
 
@@ -208,7 +208,7 @@ describe('GET /dids/:id', () => {
 
 // ---------------------------------------------- PUT /dids/:id
 describe('PUT /dids/:id', () => {
-    it('200 atualiza DID', async () => {
+    it('200 updates DID', async () => {
         const res = await app.inject({
             method: 'PUT',
             url: `/dids/${didId}`,
@@ -220,7 +220,7 @@ describe('PUT /dids/:id', () => {
         expect(res.json().success).toBe(true)
     })
 
-    it('400 com número não numérico', async () => {
+    it('400 with non-numeric number', async () => {
         const res = await app.inject({
             method: 'PUT',
             url: `/dids/${didId}`,
@@ -231,7 +231,7 @@ describe('PUT /dids/:id', () => {
         expect(res.statusCode).toBe(400)
     })
 
-    it('404 com id inexistente', async () => {
+    it('404 with non-existent id', async () => {
         const res = await app.inject({
             method: 'PUT',
             url: '/dids/clxxxxxxxxxxxxxxxxxxxxxxxxx',
@@ -245,7 +245,7 @@ describe('PUT /dids/:id', () => {
 
 // ------------------------------------------- DELETE /dids/:id
 describe('DELETE /dids/:id', () => {
-    it('200 deleta DID', async () => {
+    it('200 deletes DID', async () => {
         const created = await app.inject({
             method: 'POST',
             url: '/dids',
@@ -263,7 +263,7 @@ describe('DELETE /dids/:id', () => {
         expect(res.statusCode).toBe(200)
     })
 
-    it('404 com id inexistente', async () => {
+    it('404 with non-existent id', async () => {
         const res = await app.inject({
             method: 'DELETE',
             url: '/dids/clxxxxxxxxxxxxxxxxxxxxxxxxx',
@@ -273,7 +273,7 @@ describe('DELETE /dids/:id', () => {
         expect(res.statusCode).toBe(404)
     })
 
-    it('401 sem token', async () => {
+    it('401 without token', async () => {
         const res = await app.inject({
             method: 'DELETE',
             url: `/dids/${didId}`,

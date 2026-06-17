@@ -3,22 +3,28 @@ import { CompaniesCache } from './cache/companies.cache'
 import type { CreateCompanyInput, UpdateCompanyInput } from './schemas/company.schema'
 import { AppError } from '../../utils/errors/app.error'
 
-export const getAllCompanies = async () => {
-    const cached = await CompaniesCache.getAllCompanies()
-    if (cached) return cached
+export const getAllCompanies = async (companyIds?: string[]) => {
+    if (companyIds && companyIds.length === 0) return []
+
+    if (!companyIds) {
+        const cached = await CompaniesCache.getAllCompanies()
+        if (cached) return cached
+    }
 
     const companies = await prisma.company.findMany({
+        where: companyIds ? { id: { in: companyIds } } : undefined,
         select: {
             id: true,
             name: true,
             doc: true,
+            asteriskId: true,
             metadata: true,
             createdAt: true,
             updatedAt: true,
         },
     })
 
-    await CompaniesCache.setAllCompanies(companies)
+    if (!companyIds) await CompaniesCache.setAllCompanies(companies)
     return companies
 }
 
@@ -32,6 +38,7 @@ export const getCompanyById = async (id: string) => {
             id: true,
             name: true,
             doc: true,
+            asteriskId: true,
             metadata: true,
             createdAt: true,
             updatedAt: true,
@@ -93,6 +100,7 @@ export const updateCompany = async (id: string, data: UpdateCompanyInput) => {
             id: true,
             name: true,
             doc: true,
+            asteriskId: true,
             metadata: true,
             createdAt: true,
             updatedAt: true,
@@ -114,7 +122,24 @@ export const deleteCompany = async (id: string) => {
         throw new AppError('Company not found', 404)
     }
 
-    await prisma.company.delete({ where: { id } })
+    const extensions = await prisma.extension.findMany({
+        where: { companyId: id },
+        select: { number: true, context: true, type: true },
+    })
+
+    await prisma.$transaction(async (tx) => {
+        for (const ext of extensions) {
+            await tx.extensions.deleteMany({ where: { context: ext.context, exten: ext.number } })
+            if (ext.type === 'pjsip') {
+                await tx.$executeRaw`DELETE FROM ps_endpoints WHERE id = ${ext.number}`
+                await tx.$executeRaw`DELETE FROM ps_auths WHERE id = ${ext.number}`
+                await tx.$executeRaw`DELETE FROM ps_aors WHERE id = ${ext.number}`
+            } else {
+                await tx.sip_peers.deleteMany({ where: { name: ext.number } })
+            }
+        }
+        await tx.company.delete({ where: { id } })
+    })
 
     await CompaniesCache.invalidateCompany(id)
     await CompaniesCache.invalidateAllCompanies()

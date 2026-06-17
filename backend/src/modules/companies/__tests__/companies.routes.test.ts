@@ -48,7 +48,7 @@ const auth = () => ({ authorization: `Bearer ${accessToken}` })
 
 // ------------------------------------------------- GET /companies
 describe('GET /companies', () => {
-    it('200 retorna lista', async () => {
+    it('200 returns list', async () => {
         const res = await app.inject({ method: 'GET', url: '/companies', headers: auth() })
 
         expect(res.statusCode).toBe(200)
@@ -56,7 +56,7 @@ describe('GET /companies', () => {
         expect(Array.isArray(res.json().companies)).toBe(true)
     })
 
-    it('401 sem token', async () => {
+    it('401 without token', async () => {
         const res = await app.inject({ method: 'GET', url: '/companies' })
         expect(res.statusCode).toBe(401)
     })
@@ -64,7 +64,7 @@ describe('GET /companies', () => {
 
 // ------------------------------------------------- POST /companies
 describe('POST /companies', () => {
-    it('201 cria empresa vinculada ao próprio usuário', async () => {
+    it('201 creates company linked to the own user', async () => {
         const res = await app.inject({
             method: 'POST',
             url: '/companies',
@@ -79,7 +79,7 @@ describe('POST /companies', () => {
         companyId = body.companyId
     })
 
-    it('201 admin cria empresa vinculada a outro userId', async () => {
+    it('201 admin creates company linked to another userId', async () => {
         const other = await prisma.user.create({
             data: {
                 name: 'Other',
@@ -98,7 +98,7 @@ describe('POST /companies', () => {
         expect(res.statusCode).toBe(201)
     })
 
-    it('400 com body inválido', async () => {
+    it('400 with invalid body', async () => {
         const res = await app.inject({
             method: 'POST',
             url: '/companies',
@@ -109,7 +109,7 @@ describe('POST /companies', () => {
         expect(res.statusCode).toBe(400)
     })
 
-    it('401 sem token', async () => {
+    it('401 without token', async () => {
         const res = await app.inject({
             method: 'POST',
             url: '/companies',
@@ -122,7 +122,7 @@ describe('POST /companies', () => {
 
 // ----------------------------------------------- GET /companies/:id
 describe('GET /companies/:id', () => {
-    it('200 retorna empresa pelo id', async () => {
+    it('200 returns company by id', async () => {
         const res = await app.inject({
             method: 'GET',
             url: `/companies/${companyId}`,
@@ -133,7 +133,7 @@ describe('GET /companies/:id', () => {
         expect(res.json().company.id).toBe(companyId)
     })
 
-    it('404 com id inexistente', async () => {
+    it('404 with non-existent id', async () => {
         const res = await app.inject({
             method: 'GET',
             url: '/companies/clxxxxxxxxxxxxxxxxxxxxxxxxx',
@@ -143,10 +143,10 @@ describe('GET /companies/:id', () => {
         expect(res.statusCode).toBe(404)
     })
 
-    it('400 com id fora do formato cuid2', async () => {
+    it('400 with id outside cuid2 format', async () => {
         const res = await app.inject({
             method: 'GET',
-            url: '/companies/id-invalido',
+            url: '/companies/invalid-id',
             headers: auth(),
         })
 
@@ -156,19 +156,19 @@ describe('GET /companies/:id', () => {
 
 // ----------------------------------------------- PUT /companies/:id
 describe('PUT /companies/:id', () => {
-    it('200 atualiza empresa', async () => {
+    it('200 updates company', async () => {
         const res = await app.inject({
             method: 'PUT',
             url: `/companies/${companyId}`,
             headers: auth(),
-            body: { name: `${PREFIX} Speed Atualizado` },
+            body: { name: `${PREFIX} Speed Updated` },
         })
 
         expect(res.statusCode).toBe(200)
         expect(res.json().success).toBe(true)
     })
 
-    it('404 com id inexistente', async () => {
+    it('404 with non-existent id', async () => {
         const res = await app.inject({
             method: 'PUT',
             url: '/companies/clxxxxxxxxxxxxxxxxxxxxxxxxx',
@@ -182,7 +182,7 @@ describe('PUT /companies/:id', () => {
 
 // -------------------------------------------- DELETE /companies/:id
 describe('DELETE /companies/:id', () => {
-    it('200 deleta empresa', async () => {
+    it('200 deletes company', async () => {
         const created = await app.inject({
             method: 'POST',
             url: '/companies',
@@ -200,7 +200,7 @@ describe('DELETE /companies/:id', () => {
         expect(res.statusCode).toBe(200)
     })
 
-    it('404 com id inexistente', async () => {
+    it('404 with non-existent id', async () => {
         const res = await app.inject({
             method: 'DELETE',
             url: '/companies/clxxxxxxxxxxxxxxxxxxxxxxxxx',
@@ -210,7 +210,7 @@ describe('DELETE /companies/:id', () => {
         expect(res.statusCode).toBe(404)
     })
 
-    it('401 sem token', async () => {
+    it('401 without token', async () => {
         const res = await app.inject({
             method: 'DELETE',
             url: `/companies/${companyId}`,

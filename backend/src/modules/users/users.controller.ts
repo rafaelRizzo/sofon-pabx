@@ -4,6 +4,12 @@ import { createUserSchema, updateUserSchema, idParamSchema } from './schemas/use
 import { handleError } from '../../utils/errors/handler.error'
 import { AppError } from '../../utils/errors/app.error'
 
+const assertSelfOrAdmin = (req: FastifyRequest, id: string) => {
+    if (!req.scope.isAdmin && req.user!.id !== id) {
+        throw new AppError('Forbidden', 403)
+    }
+}
+
 export const getAllUsers = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
         const users = await UsersService.getAllUsers()
@@ -20,8 +26,9 @@ export const getAllUsers = async (req: FastifyRequest, reply: FastifyReply) => {
 export const getUserById = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
         const { id } = idParamSchema.parse(req.params)
-        const user = await UsersService.getUserById(id)
+        assertSelfOrAdmin(req, id)
 
+        const user = await UsersService.getUserById(id)
         return reply.send({
             success: true,
             message: 'User fetched successfully',
@@ -50,8 +57,10 @@ export const createUser = async (req: FastifyRequest, reply: FastifyReply) => {
 export const updateUser = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
         const { id } = idParamSchema.parse(req.params)
+        assertSelfOrAdmin(req, id)
+
         const data = updateUserSchema.parse(req.body)
-        const user = await UsersService.updateUser(id, data)
+        await UsersService.updateUser(id, data)
 
         return reply.send({
             success: true,
@@ -65,11 +74,7 @@ export const updateUser = async (req: FastifyRequest, reply: FastifyReply) => {
 export const getCompaniesByUser = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
         const { id } = idParamSchema.parse(req.params)
-        const { id: requesterId, role } = req.user!
-
-        if (role !== 'admin' && role !== 'reseller' && requesterId !== id) {
-            throw new AppError('Forbidden', 403)
-        }
+        assertSelfOrAdmin(req, id)
 
         const companies = await UsersService.getCompaniesByUser(id)
         return reply.send({
@@ -85,7 +90,7 @@ export const getCompaniesByUser = async (req: FastifyRequest, reply: FastifyRepl
 export const deleteUser = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
         const { id } = idParamSchema.parse(req.params)
-        const user = await UsersService.deleteUser(id)
+        await UsersService.deleteUser(id)
 
         return reply.send({
             success: true,

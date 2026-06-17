@@ -7,15 +7,19 @@ datasource db {
     provider = "postgresql"
 }
 
+// ─── Application Models ───────────────────────────────────────────────────────
+
 model Company {
-    id        String        @id @default(cuid())
-    name      String
-    doc       String?
-    metadata  Json          @default("{}")
-    createdAt DateTime      @default(now())
-    updatedAt DateTime      @updatedAt
-    users     UserCompany[]
-    dids      Did[]
+    id         String        @id @default(cuid())
+    asteriskId String        @unique @default(dbgenerated("substring(replace(gen_random_uuid()::text, '-', ''), 1, 10)")) @db.VarChar(10)
+    name       String
+    doc        String?
+    metadata   Json          @default("{}")
+    createdAt  DateTime      @default(now())
+    updatedAt  DateTime      @updatedAt
+    users      UserCompany[]
+    dids       Did[]
+    extensions Extension[]
 
     @@map("companies")
 }
@@ -56,4 +60,210 @@ model UserCompany {
 
     @@id([userId, companyId])
     @@map("user_companies")
+}
+
+model Extension {
+    id        String   @id @default(cuid())
+    alias     String
+    number    String   @unique
+    type      String
+    name      String
+    context   String   @default("ramais")
+    companyId String
+    company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([alias, companyId])
+    @@index([companyId])
+    @@map("phone_extensions")
+}
+
+// ─── Asterisk Realtime Models ─────────────────────────────────────────────────
+
+model extensions {
+    id       BigInt  @id @default(autoincrement())
+    context  String  @default("ramais") @db.VarChar(40)
+    exten    String  @db.VarChar(40)
+    priority Int
+    app      String  @db.VarChar(40)
+    appdata  String? @db.VarChar(256)
+
+    @@unique([context, exten, priority])
+}
+
+model ps_aors {
+    id                   String   @id @db.VarChar(40)
+    contact              String?  @db.VarChar(255)
+    default_expiration   Int?     @default(3600)
+    max_contacts         Int?     @default(1)
+    minimum_expiration   Int?     @default(60)
+    maximum_expiration   Int?     @default(7200)
+    remove_existing      Boolean? @default(true)
+    qualify_frequency    Int?     @default(60)
+    qualify_timeout      Float?   @default(3.0)
+    authenticate_qualify Boolean? @default(false)
+    outbound_proxy       String?  @db.VarChar(40)
+    support_path         Boolean? @default(false)
+    mailboxes            String?  @db.VarChar(80)
+}
+
+model ps_auths {
+    id             String  @id @db.VarChar(40)
+    auth_type      String? @default("userpass") @db.VarChar(40)
+    password       String? @db.VarChar(80)
+    username       String? @db.VarChar(40)
+    realm          String? @db.VarChar(40)
+    md5_cred       String? @db.VarChar(40)
+    nonce_lifetime Int?
+}
+
+model ps_contacts {
+    id                   String   @id @db.VarChar(255)
+    uri                  String?  @db.VarChar(255)
+    expiration_time      BigInt?
+    qualify_frequency    Int?
+    outbound_proxy       String?  @db.VarChar(40)
+    path                 String?
+    user_agent           String?  @db.VarChar(255)
+    qualify_timeout      Float?
+    reg_server           String?  @db.VarChar(20)
+    authenticate_qualify Boolean?
+    via_addr             String?  @db.VarChar(40)
+    via_port             Int?
+    call_id              String?  @db.VarChar(255)
+    endpoint             String?  @db.VarChar(40)
+    prune_on_boot        Boolean? @default(false)
+    qualify_2xx_only     Boolean? @default(false)
+}
+
+model ps_endpoints {
+    id                  String   @id @db.VarChar(40)
+    transport           String?  @db.VarChar(40)
+    aors                String?  @db.VarChar(200)
+    auth                String?  @db.VarChar(200)
+    context             String?  @default("ramais") @db.VarChar(40)
+    disallow            String?  @default("all") @db.VarChar(200)
+    allow               String?  @default("ulaw,alaw") @db.VarChar(200)
+    direct_media        Boolean? @default(false)
+    dtmf_mode           String?  @default("rfc4733") @db.VarChar(40)
+    force_rport         Boolean? @default(true)
+    ice_support         Boolean? @default(false)
+    rewrite_contact     Boolean? @default(false)
+    rtp_symmetric       Boolean? @default(false)
+    send_diversion      Boolean? @default(true)
+    timers              String?  @default("yes") @db.VarChar(40)
+    timers_min_se       Int?     @default(90)
+    timers_sess_expires Int?     @default(1800)
+    callerid            String?  @db.VarChar(40)
+    language            String?  @default("pt_BR") @db.VarChar(10)
+    one_touch_recording Boolean? @default(false)
+    allow_transfer      Boolean? @default(true)
+    allow_subscribe     Boolean? @default(true)
+    from_user           String?  @db.VarChar(40)
+    from_domain         String?  @db.VarChar(40)
+    outbound_proxy      String?  @db.VarChar(40)
+    mailboxes           String?  @db.VarChar(40)
+    moh_suggest         String?  @default("default") @db.VarChar(40)
+    rel                 String?  @default("yes") @map("100rel") @db.VarChar(40)
+}
+
+model sip_peers {
+    id                Int     @id @default(autoincrement())
+    name              String  @unique @db.VarChar(40)
+    ipaddr            String? @db.VarChar(45)
+    port              String? @default("5062") @db.VarChar(6)
+    regseconds        BigInt? @default(0)
+    defaultuser       String? @db.VarChar(40)
+    fullcontact       String? @db.VarChar(80)
+    regserver         String? @db.VarChar(20)
+    useragent         String? @db.VarChar(40)
+    lastms            Int?    @default(0)
+    host              String? @default("dynamic") @db.VarChar(40)
+    type              String? @default("friend") @db.VarChar(10)
+    context           String? @default("ramais") @db.VarChar(40)
+    permit            String? @db.VarChar(95)
+    deny              String? @db.VarChar(95)
+    secret            String? @db.VarChar(80)
+    md5secret         String? @db.VarChar(40)
+    remotesecret      String? @db.VarChar(40)
+    transport         String? @db.VarChar(10)
+    dtmfmode          String? @default("rfc2833") @db.VarChar(10)
+    directmedia       String? @default("no") @db.VarChar(10)
+    nat               String? @default("force_rport,comedia") @db.VarChar(40)
+    callgroup         String? @db.VarChar(40)
+    pickupgroup       String? @db.VarChar(40)
+    language          String? @default("pt_BR") @db.VarChar(40)
+    disallow          String? @default("all") @db.VarChar(200)
+    allow             String? @default("ulaw,alaw,g729") @db.VarChar(200)
+    insecure          String? @db.VarChar(40)
+    trustrpid         String? @db.VarChar(10)
+    progressinband    String? @db.VarChar(10)
+    promiscredir      String? @db.VarChar(10)
+    useclientcode     String? @db.VarChar(10)
+    accountcode       String? @db.VarChar(40)
+    setvar            String? @db.VarChar(200)
+    callerid          String? @db.VarChar(40)
+    amaflags          String? @db.VarChar(40)
+    callcounter       String? @db.VarChar(10)
+    busylevel         Int?
+    allowoverlap      String? @db.VarChar(10)
+    allowsubscribe    String? @db.VarChar(10)
+    videosupport      String? @db.VarChar(10)
+    maxcallbitrate    Int?
+    rfc2833compensate String? @db.VarChar(10)
+    mailbox           String? @db.VarChar(40)
+    sessionTimers     String? @map("session-timers") @db.VarChar(10)
+    sessionExpires    Int?    @map("session-expires")
+    sessionMinse      Int?    @map("session-minse")
+    sessionRefresher  String? @map("session-refresher") @db.VarChar(10)
+    t38ptUsertpsource String? @map("t38pt_usertpsource") @db.VarChar(10)
+    regexten          String? @db.VarChar(40)
+    fromdomain        String? @db.VarChar(40)
+    fromuser          String? @db.VarChar(40)
+    qualify           String? @default("yes") @db.VarChar(10)
+    defaultip         String? @db.VarChar(45)
+    rtptimeout        Int?
+    rtpholdtimeout    Int?
+    sendrpid          String? @db.VarChar(10)
+    outboundproxy     String? @db.VarChar(40)
+    callbackextension String? @db.VarChar(40)
+    timert1           Int?
+    timerb            Int?
+    qualifyfreq       Int?
+    constantssrc      String? @db.VarChar(10)
+    contactpermit     String? @db.VarChar(95)
+    contactdeny       String? @db.VarChar(95)
+    usereqphone       String? @db.VarChar(10)
+    textsupport       String? @db.VarChar(10)
+    faxdetect         String? @db.VarChar(10)
+    buggymwi          String? @db.VarChar(10)
+    auth              String? @db.VarChar(40)
+    fullname          String? @db.VarChar(40)
+    trunkname         String? @db.VarChar(40)
+    cidNumber         String? @map("cid_number") @db.VarChar(40)
+    callingpres       String? @db.VarChar(20)
+    mohinterpret      String? @db.VarChar(40)
+    mohsuggest        String? @db.VarChar(40)
+    parkinglot        String? @db.VarChar(40)
+    hasvoicemail      String? @db.VarChar(10)
+    subscribecontext  String? @db.VarChar(80)
+    subscribemwi      String? @db.VarChar(10)
+    vmexten           String? @db.VarChar(40)
+    autoframing       String? @db.VarChar(10)
+    rtpkeepalive      Int?
+}
+
+model voicemail_users {
+    uniqueid  Int       @id @default(autoincrement())
+    context   String?   @default("default") @db.VarChar(80)
+    mailbox   String    @db.VarChar(80)
+    password  String?   @default("0000") @db.VarChar(80)
+    fullname  String?   @db.VarChar(80)
+    email     String?   @db.VarChar(80)
+    attach    String?   @default("yes") @db.VarChar(4)
+    delete_vm String?   @default("no") @db.VarChar(4)
+    stamp     DateTime? @default(now()) @db.Timestamp(6)
+
+    @@unique([context, mailbox])
 }

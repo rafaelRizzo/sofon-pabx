@@ -28,14 +28,14 @@ afterAll(async () => {
 
 // --------------------------------------------------------- getAllUsers
 describe('UsersService.getAllUsers', () => {
-    it('retorna lista com pelo menos o usuário criado', async () => {
+    it('returns list with at least the created user', async () => {
         const users = await UsersService.getAllUsers() as UserRow[]
 
         expect(Array.isArray(users)).toBe(true)
         expect(users.some((u) => u.id === userId)).toBe(true)
     })
 
-    it('não expõe campo password', async () => {
+    it('does not expose password field', async () => {
         const users = await UsersService.getAllUsers() as UserRow[]
         expect((users[0] as any).password).toBeUndefined()
     })
@@ -43,7 +43,7 @@ describe('UsersService.getAllUsers', () => {
 
 // -------------------------------------------------------- getUserById
 describe('UsersService.getUserById', () => {
-    it('retorna o usuário pelo id', async () => {
+    it('returns the user by id', async () => {
         const user = await UsersService.getUserById(userId) as UserRow
 
         expect(user.id).toBe(userId)
@@ -51,7 +51,7 @@ describe('UsersService.getUserById', () => {
         expect((user as any).password).toBeUndefined()
     })
 
-    it('throws 404 com id inexistente', async () => {
+    it('throws 404 with non-existent id', async () => {
         await expect(
             UsersService.getUserById('clxxxxxxxxxxxxxxxxxxxxxxxxx')
         ).rejects.toMatchObject({ statusCode: 404 })
@@ -60,7 +60,7 @@ describe('UsersService.getUserById', () => {
 
 // --------------------------------------------------------- createUser
 describe('UsersService.createUser', () => {
-    it('cria usuário com senha hasheada', async () => {
+    it('creates user with hashed password', async () => {
         const email = `${PREFIX}create@test.com`
 
         const user = await UsersService.createUser({
@@ -79,20 +79,20 @@ describe('UsersService.createUser', () => {
 
 // --------------------------------------------------------- updateUser
 describe('UsersService.updateUser', () => {
-    it('atualiza nome do usuário', async () => {
+    it('updates user name', async () => {
         const user = await UsersService.updateUser(userId, { name: 'Updated Name' })
 
         expect(user.name).toBe('Updated Name')
     })
 
-    it('re-hasheia quando password é atualizado', async () => {
+    it('re-hashes when password is updated', async () => {
         await UsersService.updateUser(userId, { password: 'new-password-456' })
 
         const raw = await prisma.user.findUnique({ where: { id: userId } })
         expect(raw?.password).not.toBe('new-password-456')
     })
 
-    it('throws 404 com id inexistente', async () => {
+    it('throws 404 with non-existent id', async () => {
         await expect(
             UsersService.updateUser('clxxxxxxxxxxxxxxxxxxxxxxxxx', { name: 'X' })
         ).rejects.toMatchObject({ statusCode: 404 })
@@ -101,14 +101,14 @@ describe('UsersService.updateUser', () => {
 
 // ------------------------------------------------- getCompaniesByUser
 describe('UsersService.getCompaniesByUser', () => {
-    it('retorna lista vazia para usuário sem empresas', async () => {
+    it('returns empty list for user without companies', async () => {
         const companies = await UsersService.getCompaniesByUser(userId) as any[]
 
         expect(Array.isArray(companies)).toBe(true)
         expect(companies).toHaveLength(0)
     })
 
-    it('throws 404 com id inexistente', async () => {
+    it('throws 404 with non-existent id', async () => {
         await expect(
             UsersService.getCompaniesByUser('clxxxxxxxxxxxxxxxxxxxxxxxxx')
         ).rejects.toMatchObject({ statusCode: 404 })
@@ -117,7 +117,7 @@ describe('UsersService.getCompaniesByUser', () => {
 
 // --------------------------------------------------------- deleteUser
 describe('UsersService.deleteUser', () => {
-    it('deleta o usuário', async () => {
+    it('deletes the user', async () => {
         const toDelete = await prisma.user.create({
             data: {
                 name: 'To Delete',

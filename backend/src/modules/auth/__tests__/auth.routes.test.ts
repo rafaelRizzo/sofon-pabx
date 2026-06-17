@@ -24,7 +24,7 @@ beforeAll(async () => {
         },
     })
 
-    // login real p/ obter tokens
+    // real login to obtain tokens
     const res = await app.inject({
         method: 'POST',
         url: '/auth/login',
@@ -43,7 +43,7 @@ afterAll(async () => {
 
 // -------------------------------------------------- POST /auth/login
 describe('POST /auth/login', () => {
-    it('200 com credenciais válidas', async () => {
+    it('200 with valid credentials', async () => {
         const res = await app.inject({
             method: 'POST',
             url: '/auth/login',
@@ -58,22 +58,22 @@ describe('POST /auth/login', () => {
         expect(cookies.some((c) => c.startsWith('refreshToken='))).toBe(true)
     })
 
-    it('401 com senha errada', async () => {
+    it('401 with wrong password', async () => {
         const res = await app.inject({
             method: 'POST',
             url: '/auth/login',
-            body: { username: EMAIL, password: 'errada123' },
+            body: { username: EMAIL, password: 'wrong123' },
         })
 
         expect(res.statusCode).toBe(401)
         expect(res.json().success).toBe(false)
     })
 
-    it('400 com username fora do formato email', async () => {
+    it('400 with username not in email format', async () => {
         const res = await app.inject({
             method: 'POST',
             url: '/auth/login',
-            body: { username: 'nao-e-email', password: PASSWORD },
+            body: { username: 'not-an-email', password: PASSWORD },
         })
 
         expect(res.statusCode).toBe(400)
@@ -82,21 +82,21 @@ describe('POST /auth/login', () => {
 
 // ----------------------------------------------- POST /auth/register
 describe('POST /auth/register', () => {
-    it('403 quando já existe um usuário no sistema', async () => {
+    it('403 when a user already exists in the system', async () => {
         const res = await app.inject({
             method: 'POST',
             url: '/auth/register',
-            body: { name: 'Novo User', username: `${PREFIX}_register@test.com`, password: PASSWORD },
+            body: { name: 'New User', username: `${PREFIX}_register@test.com`, password: PASSWORD },
         })
 
         expect(res.statusCode).toBe(403)
     })
 
-    it('400 com body inválido', async () => {
+    it('400 with invalid body', async () => {
         const res = await app.inject({
             method: 'POST',
             url: '/auth/register',
-            body: { username: 'nao-email', password: '123' },
+            body: { username: 'not-email', password: '123' },
         })
 
         expect(res.statusCode).toBe(400)
@@ -105,7 +105,7 @@ describe('POST /auth/register', () => {
 
 // ----------------------------------------------- POST /auth/refresh
 describe('POST /auth/refresh', () => {
-    it('200 com cookie de refresh válido', async () => {
+    it('200 with valid refresh cookie', async () => {
         const res = await app.inject({
             method: 'POST',
             url: '/auth/refresh',
@@ -118,7 +118,7 @@ describe('POST /auth/refresh', () => {
         expect(body.token).toBeTruthy()
     })
 
-    it('401 sem cookie de refresh', async () => {
+    it('401 without refresh cookie', async () => {
         const res = await app.inject({ method: 'POST', url: '/auth/refresh' })
 
         expect(res.statusCode).toBe(401)
@@ -127,7 +127,7 @@ describe('POST /auth/refresh', () => {
 
 // ----------------------------------------------- POST /auth/logout
 describe('POST /auth/logout', () => {
-    it('200 com token válido e limpa cookie', async () => {
+    it('200 with valid token and clears cookie', async () => {
         const res = await app.inject({
             method: 'POST',
             url: '/auth/logout',
@@ -138,7 +138,7 @@ describe('POST /auth/logout', () => {
         expect(res.json().success).toBe(true)
     })
 
-    it('401 sem token', async () => {
+    it('401 without token', async () => {
         const res = await app.inject({ method: 'POST', url: '/auth/logout' })
 
         expect(res.statusCode).toBe(401)

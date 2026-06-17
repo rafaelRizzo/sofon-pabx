@@ -1,0 +1,94 @@
+import type { FastifyRequest, FastifyReply } from 'fastify'
+import * as ExtensionsService from './extensions.service'
+import { createExtensionSchema, createExtensionBatchSchema, updateExtensionSchema, extensionIdParamSchema, extensionQuerySchema, BATCH_LIMIT } from './schemas/extension.schema'
+import { handleError } from '../../utils/errors/handler.error'
+import { AppError } from '../../utils/errors/app.error'
+import { prisma } from '../../lib/prisma'
+
+export const getAllExtensions = async (req: FastifyRequest, reply: FastifyReply) => {
+    try {
+        const filter = extensionQuerySchema.safeParse(req.query)
+
+        if (filter.success) {
+            req.scope.assertAccess(filter.data.companyId)
+            const extensions = await ExtensionsService.getAllExtensions([filter.data.companyId])
+            return reply.send({ success: true, message: 'Extensions fetched successfully', extensions })
+        }
+
+        const extensions = await ExtensionsService.getAllExtensions(req.scope.companyIds ?? undefined)
+        return reply.send({ success: true, message: 'Extensions fetched successfully', extensions })
+    } catch (error) {
+        return handleError(reply, error, req)
+    }
+}
+
+export const getExtensionById = async (req: FastifyRequest, reply: FastifyReply) => {
+    try {
+        const { id } = extensionIdParamSchema.parse(req.params)
+        const owner = await prisma.extension.findUnique({ where: { id }, select: { companyId: true } })
+        if (!owner) throw new AppError('Extension not found', 404)
+        req.scope.assertAccess(owner.companyId)
+        const extension = await ExtensionsService.getExtensionById(id)
+        return reply.send({ success: true, message: 'Extension fetched successfully', extension })
+    } catch (error) {
+        return handleError(reply, error, req)
+    }
+}
+
+export const createExtension = async (req: FastifyRequest, reply: FastifyReply) => {
+    try {
+        const data = createExtensionSchema.parse(req.body)
+        req.scope.assertAccess(data.companyId)
+        const extension = await ExtensionsService.createExtension(data)
+        return reply.status(201).send({ success: true, message: 'Extension created successfully', extension })
+    } catch (error) {
+        return handleError(reply, error, req)
+    }
+}
+
+export const createExtensionBatch = async (req: FastifyRequest, reply: FastifyReply) => {
+    try {
+        const { extensions } = createExtensionBatchSchema.parse(req.body)
+
+        const companyIds = [...new Set(extensions.map((e) => e.companyId))]
+        for (const cid of companyIds) req.scope.assertAccess(cid)
+
+        const result = await ExtensionsService.createExtensionBatch(extensions)
+
+        const status = result.errors.length === 0 ? 201 : result.created.length === 0 ? 422 : 207
+        return reply.status(status).send({ success: result.created.length > 0, ...result })
+    } catch (error) {
+        return handleError(reply, error, req)
+    }
+}
+
+export const updateExtension = async (req: FastifyRequest, reply: FastifyReply) => {
+    try {
+        const { id } = extensionIdParamSchema.parse(req.params)
+        const data = updateExtensionSchema.parse(req.body)
+
+        const existing = await prisma.extension.findUnique({ where: { id }, select: { companyId: true } })
+        if (!existing) throw new AppError('Extension not found', 404)
+
+        req.scope.assertAccess(existing.companyId)
+        const extension = await ExtensionsService.updateExtension(id, data)
+        return reply.send({ success: true, message: 'Extension updated successfully', extension })
+    } catch (error) {
+        return handleError(reply, error, req)
+    }
+}
+
+export const deleteExtension = async (req: FastifyRequest, reply: FastifyReply) => {
+    try {
+        const { id } = extensionIdParamSchema.parse(req.params)
+
+        const extension = await prisma.extension.findUnique({ where: { id }, select: { companyId: true } })
+        if (!extension) throw new AppError('Extension not found', 404)
+
+        req.scope.assertAccess(extension.companyId)
+        await ExtensionsService.deleteExtension(id)
+        return reply.send({ success: true, message: 'Extension deleted successfully' })
+    } catch (error) {
+        return handleError(reply, error, req)
+    }
+}

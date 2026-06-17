@@ -127,6 +127,7 @@ export const getCompaniesByUser = async (id: string) => {
             id: true,
             name: true,
             doc: true,
+            asteriskId: true,
             metadata: true,
             createdAt: true,
             updatedAt: true,

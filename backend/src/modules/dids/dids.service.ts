@@ -11,8 +11,21 @@ const select = {
     updatedAt: true,
 }
 
-export const getAllDids = async () => {
-    return prisma.did.findMany({ select })
+export const getAllDids = async (companyIds?: string[]) => {
+    if (companyIds && companyIds.length === 0) return []
+
+    if (!companyIds) {
+        const cached = await DidsCache.getAll()
+        if (cached) return cached
+    }
+
+    const dids = await prisma.did.findMany({
+        where: companyIds ? { companyId: { in: companyIds } } : undefined,
+        select,
+    })
+
+    if (!companyIds) await DidsCache.setAll(dids)
+    return dids
 }
 
 export const getDidsByCompany = async (companyId: string) => {
@@ -51,6 +64,7 @@ export const createDid = async (data: CreateDidInput) => {
     const did = await prisma.did.create({ data, select })
 
     await DidsCache.invalidateDidsByCompany(data.companyId)
+    await DidsCache.invalidateAll()
     return did
 }
 
@@ -69,6 +83,7 @@ export const updateDid = async (id: string, data: UpdateDidInput) => {
 
     await DidsCache.invalidateDid(id)
     await DidsCache.invalidateDidsByCompany(existing.companyId)
+    await DidsCache.invalidateAll()
     return did
 }
 
@@ -80,4 +95,5 @@ export const deleteDid = async (id: string) => {
 
     await DidsCache.invalidateDid(id)
     await DidsCache.invalidateDidsByCompany(existing.companyId)
+    await DidsCache.invalidateAll()
 }

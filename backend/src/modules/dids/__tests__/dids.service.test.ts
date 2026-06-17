@@ -36,7 +36,7 @@ afterAll(async () => {
 
 // ------------------------------------------------------ createDid
 describe('DidsService.createDid', () => {
-    it('cria DID vinculado à company', async () => {
+    it('creates DID linked to company', async () => {
         const did = await DidsService.createDid({ number: '551100001111', companyId })
         didId = did.id
 
@@ -44,13 +44,13 @@ describe('DidsService.createDid', () => {
         expect(did.companyId).toBe(companyId)
     })
 
-    it('throws 409 com número duplicado na mesma company', async () => {
+    it('throws 409 with duplicate number in the same company', async () => {
         await expect(
             DidsService.createDid({ number: '551100001111', companyId })
         ).rejects.toMatchObject({ statusCode: 409 })
     })
 
-    it('throws 404 com companyId inexistente', async () => {
+    it('throws 404 with non-existent companyId', async () => {
         await expect(
             DidsService.createDid({ number: '999', companyId: 'clxxxxxxxxxxxxxxxxxxxxxxxxx' })
         ).rejects.toMatchObject({ statusCode: 404 })
@@ -59,14 +59,14 @@ describe('DidsService.createDid', () => {
 
 // -------------------------------------------------- getDidsByCompany
 describe('DidsService.getDidsByCompany', () => {
-    it('retorna lista de DIDs da company', async () => {
+    it('returns list of DIDs from the company', async () => {
         const dids = await DidsService.getDidsByCompany(companyId) as any[]
 
         expect(Array.isArray(dids)).toBe(true)
         expect(dids.some((d) => d.id === didId)).toBe(true)
     })
 
-    it('throws 404 com companyId inexistente', async () => {
+    it('throws 404 with non-existent companyId', async () => {
         await expect(
             DidsService.getDidsByCompany('clxxxxxxxxxxxxxxxxxxxxxxxxx')
         ).rejects.toMatchObject({ statusCode: 404 })
@@ -75,13 +75,13 @@ describe('DidsService.getDidsByCompany', () => {
 
 // ----------------------------------------------------- getDidById
 describe('DidsService.getDidById', () => {
-    it('retorna DID pelo id', async () => {
+    it('returns DID by id', async () => {
         const did = await DidsService.getDidById(didId) as any
         expect(did.id).toBe(didId)
         expect(did.number).toBe('551100001111')
     })
 
-    it('throws 404 com id inexistente', async () => {
+    it('throws 404 with non-existent id', async () => {
         await expect(
             DidsService.getDidById('clxxxxxxxxxxxxxxxxxxxxxxxxx')
         ).rejects.toMatchObject({ statusCode: 404 })
@@ -90,12 +90,12 @@ describe('DidsService.getDidById', () => {
 
 // ------------------------------------------------------- updateDid
 describe('DidsService.updateDid', () => {
-    it('atualiza número do DID', async () => {
+    it('updates DID number', async () => {
         const did = await DidsService.updateDid(didId, { number: '551100009999' })
         expect(did.number).toBe('551100009999')
     })
 
-    it('throws 409 com número já existente na mesma company', async () => {
+    it('throws 409 with number already existing in the same company', async () => {
         const other = await DidsService.createDid({ number: '551100002222', companyId })
 
         await expect(
@@ -105,7 +105,7 @@ describe('DidsService.updateDid', () => {
         await DidsService.deleteDid(other.id)
     })
 
-    it('throws 404 com id inexistente', async () => {
+    it('throws 404 with non-existent id', async () => {
         await expect(
             DidsService.updateDid('clxxxxxxxxxxxxxxxxxxxxxxxxx', { number: '123' })
         ).rejects.toMatchObject({ statusCode: 404 })
@@ -114,7 +114,7 @@ describe('DidsService.updateDid', () => {
 
 // ------------------------------------------------------- deleteDid
 describe('DidsService.deleteDid', () => {
-    it('deleta DID', async () => {
+    it('deletes DID', async () => {
         const did = await DidsService.createDid({ number: '551100003333', companyId })
         await DidsService.deleteDid(did.id)
 
@@ -122,7 +122,7 @@ describe('DidsService.deleteDid', () => {
         expect(check).toBeNull()
     })
 
-    it('throws 404 com id inexistente', async () => {
+    it('throws 404 with non-existent id', async () => {
         await expect(
             DidsService.deleteDid('clxxxxxxxxxxxxxxxxxxxxxxxxx')
         ).rejects.toMatchObject({ statusCode: 404 })
