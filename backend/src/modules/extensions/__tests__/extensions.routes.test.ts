@@ -74,7 +74,7 @@ describe('POST /extensions', () => {
             method: 'POST',
             url: '/extensions',
             headers: auth(),
-            body: { alias: '3001', type: 'sip', password: SIP_SECRET, name: 'SIP', companyId },
+            body: { alias: '3001', type: 'sip', name: 'SIP', companyId },
         })
 
         expect(res.statusCode).toBe(201)
@@ -88,7 +88,7 @@ describe('POST /extensions', () => {
             method: 'POST',
             url: '/extensions',
             headers: auth(),
-            body: { alias: '3002', type: 'pjsip', password: SIP_SECRET, name: 'PJSIP', companyId },
+            body: { alias: '3002', type: 'pjsip', name: 'PJSIP', companyId },
         })
 
         expect(res.statusCode).toBe(201)
@@ -102,18 +102,18 @@ describe('POST /extensions', () => {
             method: 'POST',
             url: '/extensions',
             headers: auth(),
-            body: { alias: '3001', type: 'sip', password: SIP_SECRET, name: 'Dup', companyId },
+            body: { alias: '3001', type: 'sip', name: 'Dup', companyId },
         })
 
         expect(res.statusCode).toBe(409)
     })
 
-    it('400 with password < 16 chars', async () => {
+    it('400 when password field is provided (always auto-generated)', async () => {
         const res = await app.inject({
             method: 'POST',
             url: '/extensions',
             headers: auth(),
-            body: { alias: '3050', type: 'sip', password: 'short', name: 'X', companyId },
+            body: { alias: '3050', type: 'sip', password: 'verystrongpassword123456', name: 'X', companyId },
         })
 
         expect(res.statusCode).toBe(400)
@@ -124,7 +124,7 @@ describe('POST /extensions', () => {
             method: 'POST',
             url: '/extensions',
             headers: auth(),
-            body: { alias: 'abc', type: 'sip', password: SIP_SECRET, name: 'X', companyId },
+            body: { alias: 'abc', type: 'sip', name: 'X', companyId },
         })
 
         expect(res.statusCode).toBe(400)
@@ -135,7 +135,7 @@ describe('POST /extensions', () => {
             method: 'POST',
             url: '/extensions',
             headers: auth(),
-            body: { alias: '3060', type: 'h323', password: SIP_SECRET, name: 'X', companyId },
+            body: { alias: '3060', type: 'h323', name: 'X', companyId },
         })
 
         expect(res.statusCode).toBe(400)
@@ -145,7 +145,7 @@ describe('POST /extensions', () => {
         const res = await app.inject({
             method: 'POST',
             url: '/extensions',
-            body: { alias: '3070', type: 'sip', password: SIP_SECRET, name: 'X', companyId },
+            body: { alias: '3070', type: 'sip', name: 'X', companyId },
         })
 
         expect(res.statusCode).toBe(401)
@@ -238,7 +238,7 @@ describe('PUT /extensions/:id', () => {
             method: 'PUT',
             url: `/extensions/${pjsipId}`,
             headers: auth(),
-            body: { name: 'PJSIP Updated', password: 'anothernewpassword12345' },
+            body: { name: 'PJSIP Updated' },
         })
 
         expect(res.statusCode).toBe(200)
@@ -268,6 +268,56 @@ describe('PUT /extensions/:id', () => {
     })
 })
 
+// ---------------------------------------- PATCH /extensions/:id/password
+describe('PATCH /extensions/:id/password', () => {
+    it('200 resets password for sip extension', async () => {
+        const res = await app.inject({
+            method: 'PATCH',
+            url: `/extensions/${sipId}/password`,
+            headers: auth(),
+        })
+
+        expect(res.statusCode).toBe(200)
+        const body = res.json()
+        expect(body.success).toBe(true)
+        expect(typeof body.password).toBe('string')
+        expect(body.password.length).toBeGreaterThanOrEqual(16)
+    })
+
+    it('200 resets password for pjsip extension', async () => {
+        const res = await app.inject({
+            method: 'PATCH',
+            url: `/extensions/${pjsipId}/password`,
+            headers: auth(),
+        })
+
+        expect(res.statusCode).toBe(200)
+        const body = res.json()
+        expect(body.success).toBe(true)
+        expect(typeof body.password).toBe('string')
+        expect(body.password.length).toBeGreaterThanOrEqual(16)
+    })
+
+    it('404 with non-existent id', async () => {
+        const res = await app.inject({
+            method: 'PATCH',
+            url: '/extensions/clxxxxxxxxxxxxxxxxxxxxxxxxx/password',
+            headers: auth(),
+        })
+
+        expect(res.statusCode).toBe(404)
+    })
+
+    it('401 without token', async () => {
+        const res = await app.inject({
+            method: 'PATCH',
+            url: `/extensions/${sipId}/password`,
+        })
+
+        expect(res.statusCode).toBe(401)
+    })
+})
+
 // ---------------------------------------- DELETE /extensions/:id
 describe('DELETE /extensions/:id', () => {
     it('200 deletes extension sip', async () => {
@@ -275,7 +325,7 @@ describe('DELETE /extensions/:id', () => {
             method: 'POST',
             url: '/extensions',
             headers: auth(),
-            body: { alias: '3080', type: 'sip', password: SIP_SECRET, name: 'Del', companyId },
+            body: { alias: '3080', type: 'sip', name: 'Del', companyId },
         })
         const id = created.json().extension.id
 
@@ -294,7 +344,7 @@ describe('DELETE /extensions/:id', () => {
             method: 'POST',
             url: '/extensions',
             headers: auth(),
-            body: { alias: '3081', type: 'pjsip', password: SIP_SECRET, name: 'Del', companyId },
+            body: { alias: '3081', type: 'pjsip', name: 'Del', companyId },
         })
         const id = created.json().extension.id
 

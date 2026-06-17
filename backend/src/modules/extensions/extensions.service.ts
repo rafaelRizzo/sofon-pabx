@@ -180,26 +180,34 @@ export const updateExtension = async (id: string, data: UpdateExtensionInput) =>
     const { number, type } = existing
 
     if (type === 'pjsip') {
-        const ops: any[] = []
-        if (data.password)
-            ops.push(prisma.$executeRaw`UPDATE ps_auths SET password = ${data.password} WHERE id = ${number}`)
-        if (data.name) {
-            ops.push(
-                prisma.$executeRaw`UPDATE ps_endpoints SET callerid = ${`${data.name} <${number}>`} WHERE id = ${number}`,
-            )
-            ops.push(prisma.extension.update({ where: { id }, data: { name: data.name } }))
-        }
-        await prisma.$transaction(ops)
+        await prisma.$transaction([
+            prisma.ps_endpoints.update({ where: { id: number }, data: { callerid: `${data.name} <${number}>` } }),
+            prisma.extension.update({ where: { id }, data: { name: data.name } }),
+        ])
     } else {
-        await prisma.$transaction(async (tx) => {
-            if (data.password) await tx.sip_peers.update({ where: { name: number }, data: { secret: data.password } })
-            if (data.name) await tx.extension.update({ where: { id }, data: { name: data.name } })
-        })
+        await prisma.extension.update({ where: { id }, data: { name: data.name } })
     }
 
     await ExtensionsCache.invalidateExtension(id)
     await ExtensionsCache.invalidateAllExtensions()
     return getExtensionById(id)
+}
+
+export const resetExtensionPassword = async (id: string) => {
+    const existing = await prisma.extension.findUnique({ where: { id } })
+    if (!existing) throw new AppError('Extension not found', 404)
+
+    const { number, type } = existing
+    const password = generatePassword()
+
+    if (type === 'pjsip') {
+        await prisma.ps_auths.update({ where: { id: number }, data: { password } })
+    } else {
+        await prisma.sip_peers.update({ where: { name: number }, data: { secret: password } })
+    }
+
+    await ExtensionsCache.invalidateExtension(id)
+    return { password }
 }
 
 export const createExtensionBatch = async (items: CreateExtensionInput[]): Promise<BatchResult> => {
@@ -230,21 +238,24 @@ export const deleteExtension = async (id: string) => {
     if (!existing) throw new AppError('Extension not found', 404)
 
     const { alias, companyId, number, type, context } = existing
+    const asteriskInterface = `${type.toUpperCase()}/${number}`
 
     if (type === 'pjsip') {
         await prisma.$transaction([
+            prisma.queue_members.deleteMany({ where: { interface: asteriskInterface } }),
             prisma.extensions.deleteMany({ where: { context, exten: number } }),
-            prisma.$executeRaw`DELETE FROM ps_endpoints WHERE id = ${number}`,
-            prisma.$executeRaw`DELETE FROM ps_auths WHERE id = ${number}`,
-            prisma.$executeRaw`DELETE FROM ps_aors WHERE id = ${number}`,
+            prisma.ps_endpoints.delete({ where: { id: number } }),
+            prisma.ps_auths.delete({ where: { id: number } }),
+            prisma.ps_aors.delete({ where: { id: number } }),
             prisma.extension.delete({ where: { id } }),
         ])
     } else {
-        await prisma.$transaction(async (tx) => {
-            await tx.extensions.deleteMany({ where: { context, exten: number } })
-            await tx.sip_peers.delete({ where: { name: number } })
-            await tx.extension.delete({ where: { id } })
-        })
+        await prisma.$transaction([
+            prisma.queue_members.deleteMany({ where: { interface: asteriskInterface } }),
+            prisma.extensions.deleteMany({ where: { context, exten: number } }),
+            prisma.sip_peers.delete({ where: { name: number } }),
+            prisma.extension.delete({ where: { id } }),
+        ])
     }
 
     await ExtensionsCache.invalidateExtension(id)

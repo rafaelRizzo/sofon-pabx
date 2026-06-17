@@ -11,6 +11,7 @@ import { authRoutes } from './modules/auth/auth.routes'
 import { companiesRoutes } from './modules/companies/companies.routes'
 import { didsRoutes } from './modules/dids/dids.routes'
 import { extensionsRoutes } from './modules/extensions/extensions.routes'
+import { queuesRoutes } from './modules/queues/queues.routes'
 
 const env = validateEnv()
 
@@ -77,6 +78,7 @@ app.register(usersRoutes)
 app.register(companiesRoutes)
 app.register(didsRoutes)
 app.register(extensionsRoutes)
+app.register(queuesRoutes)
 
 // Health check
 app.get('/health', async (req, reply) => {

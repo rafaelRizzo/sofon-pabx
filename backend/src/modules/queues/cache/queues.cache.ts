@@ -1,0 +1,75 @@
+import { cacheManager, type CacheConfig } from '../../../config/cache'
+import { logger } from '../../../utils/logger'
+
+const NAMESPACE = 'queues'
+
+export class QueuesCache {
+    static async getAll() {
+        const cached = await cacheManager.get(`${NAMESPACE}:all`, 'list')
+        logger.info({ event: cached ? 'cache.hit' : 'cache.miss', namespace: NAMESPACE, key: 'all:list' })
+        return cached
+    }
+
+    static async setAll(data: any, config?: CacheConfig) {
+        await cacheManager.set(`${NAMESPACE}:all`, 'list', data, config)
+        logger.info({ event: 'cache.set', namespace: NAMESPACE, key: 'all:list' })
+    }
+
+    static async invalidateAll() {
+        await cacheManager.invalidateByKey(`${NAMESPACE}:all:list`)
+        logger.info({ event: 'cache.invalidate', namespace: NAMESPACE, key: 'all:list' })
+    }
+
+    static async getQueue(id: string) {
+        const cached = await cacheManager.get(`${NAMESPACE}:queue`, id)
+        logger.info({ event: cached ? 'cache.hit' : 'cache.miss', namespace: NAMESPACE, key: `queue:${id}` })
+        return cached
+    }
+
+    static async setQueue(id: string, data: any, config?: CacheConfig) {
+        await cacheManager.set(`${NAMESPACE}:queue`, id, data, config)
+        logger.info({ event: 'cache.set', namespace: NAMESPACE, key: `queue:${id}` })
+    }
+
+    static async invalidateQueue(id: string) {
+        await cacheManager.invalidateByKey(`${NAMESPACE}:queue:${id}`)
+        logger.info({ event: 'cache.invalidate', namespace: NAMESPACE, key: `queue:${id}` })
+    }
+
+    static async getByCompany(companyId: string) {
+        const cached = await cacheManager.get(`${NAMESPACE}:company`, companyId)
+        logger.info({ event: cached ? 'cache.hit' : 'cache.miss', namespace: NAMESPACE, key: `company:${companyId}` })
+        return cached
+    }
+
+    static async setByCompany(companyId: string, data: any, config?: CacheConfig) {
+        await cacheManager.set(`${NAMESPACE}:company`, companyId, data, config)
+        logger.info({ event: 'cache.set', namespace: NAMESPACE, key: `company:${companyId}` })
+    }
+
+    static async invalidateByCompany(companyId: string) {
+        await cacheManager.invalidateByKey(`${NAMESPACE}:company:${companyId}`)
+        logger.info({ event: 'cache.invalidate', namespace: NAMESPACE, key: `company:${companyId}` })
+    }
+
+    static async getMembers(queueId: string) {
+        const cached = await cacheManager.get(`${NAMESPACE}:members`, queueId)
+        logger.info({ event: cached ? 'cache.hit' : 'cache.miss', namespace: NAMESPACE, key: `members:${queueId}` })
+        return cached
+    }
+
+    static async setMembers(queueId: string, data: any, config?: CacheConfig) {
+        await cacheManager.set(`${NAMESPACE}:members`, queueId, data, config)
+        logger.info({ event: 'cache.set', namespace: NAMESPACE, key: `members:${queueId}` })
+    }
+
+    static async invalidateMembers(queueId: string) {
+        await cacheManager.invalidateByKey(`${NAMESPACE}:members:${queueId}`)
+        logger.info({ event: 'cache.invalidate', namespace: NAMESPACE, key: `members:${queueId}` })
+    }
+
+    static async invalidateNamespace() {
+        await cacheManager.invalidate(NAMESPACE)
+        logger.info({ event: 'cache.invalidate', namespace: NAMESPACE, key: 'all' })
+    }
+}

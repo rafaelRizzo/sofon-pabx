@@ -116,30 +116,40 @@ export const updateCompany = async (id: string, data: UpdateCompanyInput) => {
 export const deleteCompany = async (id: string) => {
     const existing = await prisma.company.findUnique({
         where: { id },
-        include: { users: { select: { userId: true } } },
+        select: { id: true, asteriskId: true, users: { select: { userId: true } } },
     })
     if (!existing) {
         throw new AppError('Company not found', 404)
     }
 
-    const extensions = await prisma.extension.findMany({
-        where: { companyId: id },
-        select: { number: true, context: true, type: true },
-    })
+    const [extensions, queues] = await Promise.all([
+        prisma.extension.findMany({
+            where: { companyId: id },
+            select: { number: true, context: true, type: true },
+        }),
+        prisma.queue.findMany({
+            where: { companyId: id },
+            select: { name: true },
+        }),
+    ])
 
-    await prisma.$transaction(async (tx) => {
-        for (const ext of extensions) {
-            await tx.extensions.deleteMany({ where: { context: ext.context, exten: ext.number } })
-            if (ext.type === 'pjsip') {
-                await tx.$executeRaw`DELETE FROM ps_endpoints WHERE id = ${ext.number}`
-                await tx.$executeRaw`DELETE FROM ps_auths WHERE id = ${ext.number}`
-                await tx.$executeRaw`DELETE FROM ps_aors WHERE id = ${ext.number}`
-            } else {
-                await tx.sip_peers.deleteMany({ where: { name: ext.number } })
-            }
-        }
-        await tx.company.delete({ where: { id } })
-    })
+    const numbers = extensions.map((e) => e.number)
+    const pjsipNumbers = extensions.filter((e) => e.type === 'pjsip').map((e) => e.number)
+    const sipNumbers = extensions.filter((e) => e.type === 'sip').map((e) => e.number)
+    const asteriskInterfaces = extensions.map((e) => `${e.type.toUpperCase()}/${e.number}`)
+    const asteriskQueueNames = queues.map((q) => `${existing.asteriskId}-${q.name}`)
+
+    await prisma.$transaction([
+        prisma.queue_members.deleteMany({ where: { interface: { in: asteriskInterfaces } } }),
+        prisma.queues.deleteMany({ where: { name: { in: asteriskQueueNames } } }),
+        prisma.extensions.deleteMany({ where: { exten: { in: numbers } } }),
+        prisma.ps_endpoints.deleteMany({ where: { id: { in: pjsipNumbers } } }),
+        prisma.ps_auths.deleteMany({ where: { id: { in: pjsipNumbers } } }),
+        prisma.ps_aors.deleteMany({ where: { id: { in: pjsipNumbers } } }),
+        prisma.sip_peers.deleteMany({ where: { name: { in: sipNumbers } } }),
+        prisma.extension.deleteMany({ where: { companyId: id } }),
+        prisma.company.delete({ where: { id } }),
+    ])
 
     await CompaniesCache.invalidateCompany(id)
     await CompaniesCache.invalidateAllCompanies()

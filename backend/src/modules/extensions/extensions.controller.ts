@@ -92,3 +92,18 @@ export const deleteExtension = async (req: FastifyRequest, reply: FastifyReply) 
         return handleError(reply, error, req)
     }
 }
+
+export const resetExtensionPassword = async (req: FastifyRequest, reply: FastifyReply) => {
+    try {
+        const { id } = extensionIdParamSchema.parse(req.params)
+
+        const extension = await prisma.extension.findUnique({ where: { id }, select: { companyId: true } })
+        if (!extension) throw new AppError('Extension not found', 404)
+
+        req.scope.assertAccess(extension.companyId)
+        const result = await ExtensionsService.resetExtensionPassword(id)
+        return reply.send({ success: true, message: 'Password reset successfully', password: result.password })
+    } catch (error) {
+        return handleError(reply, error, req)
+    }
+}

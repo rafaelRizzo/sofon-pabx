@@ -162,17 +162,9 @@ describe('ExtensionsService.getExtensionById', () => {
 
 // ----------------------------------------------------------- updateExtension
 describe('ExtensionsService.updateExtension (sip)', () => {
-    it('updates password and name on sip_peers + extension', async () => {
-        const newPass = 'newverystrongpassword99999'
-        const ext = await ExtensionsService.updateExtension(sipId, {
-            password: newPass,
-            name: 'SIP Renamed',
-        }) as any
-
+    it('updates name on extension', async () => {
+        const ext = await ExtensionsService.updateExtension(sipId, { name: 'SIP Renamed' }) as any
         expect(ext.name).toBe('SIP Renamed')
-
-        const peer = await prisma.sip_peers.findUnique({ where: { name: ext.username } })
-        expect(peer?.secret).toBe(newPass)
     })
 
     it('throws 404 with non-existent id', async () => {
@@ -183,18 +175,38 @@ describe('ExtensionsService.updateExtension (sip)', () => {
 })
 
 describe('ExtensionsService.updateExtension (pjsip)', () => {
-    it('updates password on ps_auths and callerid on ps_endpoints', async () => {
-        const newPass = 'pjsipnewpassword12345678'
-        const ext = await ExtensionsService.updateExtension(pjsipId, {
-            password: newPass,
-            name: 'PJSIP Renamed',
-        }) as any
+    it('updates callerid on ps_endpoints and name on extension', async () => {
+        const ext = await ExtensionsService.updateExtension(pjsipId, { name: 'PJSIP Renamed' }) as any
 
-        const auth = await prisma.ps_auths.findUnique({ where: { id: ext.username } })
         const endpoint = await prisma.ps_endpoints.findUnique({ where: { id: ext.username } })
-
-        expect(auth?.password).toBe(newPass)
         expect(endpoint?.callerid).toBe(`PJSIP Renamed <${ext.username}>`)
+    })
+})
+
+// ----------------------------------------------------------- resetExtensionPassword
+describe('ExtensionsService.resetExtensionPassword', () => {
+    it('generates and persists new password for sip', async () => {
+        const { password } = await ExtensionsService.resetExtensionPassword(sipId)
+
+        expect(password.length).toBeGreaterThanOrEqual(16)
+        const ext = await ExtensionsService.getExtensionById(sipId) as any
+        const peer = await prisma.sip_peers.findUnique({ where: { name: ext.username } })
+        expect(peer?.secret).toBe(password)
+    })
+
+    it('generates and persists new password for pjsip', async () => {
+        const { password } = await ExtensionsService.resetExtensionPassword(pjsipId)
+
+        expect(password.length).toBeGreaterThanOrEqual(16)
+        const ext = await ExtensionsService.getExtensionById(pjsipId) as any
+        const auth = await prisma.ps_auths.findUnique({ where: { id: ext.username } })
+        expect(auth?.password).toBe(password)
+    })
+
+    it('throws 404 with non-existent id', async () => {
+        await expect(
+            ExtensionsService.resetExtensionPassword('clxxxxxxxxxxxxxxxxxxxxxxxxx')
+        ).rejects.toMatchObject({ statusCode: 404 })
     })
 })
 

@@ -8,5 +8,6 @@ export const extensionsRoutes = async (app: FastifyInstance) => {
     app.post('/extensions', { onRequest: protectedRoute }, ExtensionsController.createExtension)
     app.post('/extensions/batch', { onRequest: protectedRoute }, ExtensionsController.createExtensionBatch)
     app.put('/extensions/:id', { onRequest: protectedRoute }, ExtensionsController.updateExtension)
+    app.patch('/extensions/:id/password', { onRequest: protectedRoute }, ExtensionsController.resetExtensionPassword)
     app.delete('/extensions/:id', { onRequest: protectedRoute }, ExtensionsController.deleteExtension)
 }

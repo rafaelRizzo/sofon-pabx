@@ -138,12 +138,9 @@ export const createExtensionSchema = z.discriminatedUnion('type', [
     z.object({ ...baseShape, type: z.literal('pjsip'), ...pjsipFields }).strict(),
 ])
 
-export const updateExtensionSchema = z
-    .object({
-        password: z.string().min(16).max(80).optional(),
-        name: z.string().min(1).max(80).optional(),
-    })
-    .refine((d) => d.password || d.name, { message: 'Provide at least one field to update' })
+export const updateExtensionSchema = z.object({
+    name: z.string().min(1).max(80),
+})
 
 export const BATCH_LIMIT = 50
 
