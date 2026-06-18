@@ -21,6 +21,7 @@ model Company {
     dids       Did[]
     extensions Extension[]
     queues     Queue[]
+    trunks     Trunk[]
 
     @@map("companies")
 }
@@ -124,6 +125,27 @@ model QueueMember {
     @@map("queue_members_app")
 }
 
+model Trunk {
+    id               String   @id @default(cuid())
+    name             String   @db.VarChar(20)
+    companyId        String
+    company          Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+    type             String   @db.VarChar(10)
+    registrationMode String   @db.VarChar(10)
+    host             String?  @db.VarChar(255)
+    username         String?  @db.VarChar(80)
+    password         String?  @db.VarChar(80)
+    context          String   @default("from-trunk") @db.VarChar(40)
+    codecs           String   @default("ulaw,alaw") @db.VarChar(200)
+    metadata         Json     @default("{}")
+    createdAt        DateTime @default(now())
+    updatedAt        DateTime @updatedAt
+
+    @@unique([name, companyId])
+    @@index([companyId])
+    @@map("trunks_app")
+}
+
 // ─── Asterisk Realtime Models ─────────────────────────────────────────────────
 
 model extensions {
@@ -185,6 +207,7 @@ model ps_contacts {
 }
 
 // rel usa @map("100rel") porque Prisma não aceita campos começando com número, mas o Asterisk lê a coluna "100rel"
+// outbound_auth: autenticação para chamadas saintes (trunks) — separado do auth que é para chamadas entrantes
 model ps_endpoints {
     id                  String   @id @db.VarChar(40)
     transport           String?  @db.VarChar(40)
@@ -213,6 +236,7 @@ model ps_endpoints {
     outbound_proxy      String?  @db.VarChar(40)
     mailboxes           String?  @db.VarChar(40)
     moh_suggest         String?  @default("default") @db.VarChar(40)
+    outbound_auth       String?  @db.VarChar(200)
     rel                 String?  @default("yes") @map("100rel") @db.VarChar(40)
 }
 
@@ -335,6 +359,22 @@ model queue_members {
     wrapuptime      Int?    @default(0)
 
     @@unique([queue_name, interface])
+}
+
+// Asterisk Realtime — registro de saída PJSIP (Asterisk registra no provedor)
+model ps_registrations {
+    id                       String   @id @db.VarChar(40)
+    transport                String?  @db.VarChar(40)
+    outbound_auth            String?  @db.VarChar(40)
+    server_uri               String?  @db.VarChar(256)
+    client_uri               String?  @db.VarChar(256)
+    contact_user             String?  @db.VarChar(40)
+    expiration               Int?     @default(3600)
+    retry_interval           Int?     @default(60)
+    max_retries              Int?     @default(10)
+    auth_rejection_permanent Boolean? @default(true)
+    support_path             Boolean? @default(false)
+    endpoint                 String?  @db.VarChar(40)
 }
 
 // uniqueid é o nome exato que o Asterisk Realtime espera — não renomear para id
