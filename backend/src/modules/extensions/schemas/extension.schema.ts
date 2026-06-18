@@ -3,11 +3,11 @@ import { z } from 'zod'
 const aliasSchema = z.string().regex(/^\d{2,6}$/, 'Must be 2-6 digits')
 
 export const extensionIdParamSchema = z.object({
-    id: z.string().cuid(),
+    id: z.cuid2(),
 })
 
 export const extensionQuerySchema = z.object({
-    companyId: z.string().cuid2(),
+    companyId: z.cuid2(),
 })
 
 // ─── SIP-only fields (sip_peers) ─────────────────────────────────────────────
@@ -129,7 +129,7 @@ const pjsipFields = {
 const baseShape = {
     alias: aliasSchema,
     name: z.string().min(1).max(80),
-    companyId: z.string().cuid2(),
+    companyId: z.cuid2(),
     context: z.string().max(40).default('ramais'),
 }
 
