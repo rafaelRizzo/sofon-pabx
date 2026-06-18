@@ -84,6 +84,7 @@ model Extension {
 model Queue {
     id                String        @id @default(cuid())
     name              String        @db.VarChar(80)
+    number            String?       @db.VarChar(20)
     companyId         String
     company           Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
     strategy          String        @default("ringall")
@@ -103,6 +104,7 @@ model Queue {
     members           QueueMember[]
 
     @@unique([name, companyId])
+    @@unique([number, companyId])
     @@index([companyId])
     @@map("queues_app")
 }
@@ -178,6 +180,8 @@ model ps_contacts {
     endpoint             String?  @db.VarChar(40)
     prune_on_boot        Boolean? @default(false)
     qualify_2xx_only     Boolean? @default(false)
+
+    @@index([endpoint])
 }
 
 // rel usa @map("100rel") porque Prisma não aceita campos começando com número, mas o Asterisk lê a coluna "100rel"

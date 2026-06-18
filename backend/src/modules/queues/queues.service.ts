@@ -6,6 +6,7 @@ import { AppError } from '../../utils/errors/app.error'
 const queueSelect = {
     id: true,
     name: true,
+    number: true,
     companyId: true,
     strategy: true,
     musicOnHold: true,
@@ -184,9 +185,28 @@ export const updateQueue = async (id: string, data: UpdateQueueInput) => {
     })
     if (!existing) throw new AppError('Queue not found', 404)
 
-    const asteriskName = toAsteriskQueueName(existing.company.asteriskId, existing.name)
-    const asteriskUpdate: Record<string, any> = {}
+    const nameChanged = data.name !== undefined && data.name !== existing.name
+    const oldAsteriskName = toAsteriskQueueName(existing.company.asteriskId, existing.name)
+    const newAsteriskName = nameChanged
+        ? toAsteriskQueueName(existing.company.asteriskId, data.name!)
+        : oldAsteriskName
 
+    if (nameChanged) {
+        const duplicate = await prisma.queue.findUnique({
+            where: { name_companyId: { name: data.name!, companyId: existing.companyId } },
+        })
+        if (duplicate) throw new AppError('Queue name already in use for this company', 409)
+    }
+
+    if (data.number !== undefined && data.number !== null && data.number !== existing.number) {
+        const duplicate = await prisma.queue.findFirst({
+            where: { number: data.number, companyId: existing.companyId, NOT: { id } },
+        })
+        if (duplicate) throw new AppError('Queue number already in use for this company', 409)
+    }
+
+    const asteriskUpdate: Record<string, any> = {}
+    if (nameChanged) asteriskUpdate.name = newAsteriskName
     if (data.strategy !== undefined) asteriskUpdate.strategy = data.strategy
     if (data.musicOnHold !== undefined) asteriskUpdate.musiconhold = data.musicOnHold
     if (data.timeout !== undefined) asteriskUpdate.timeout = data.timeout
@@ -199,10 +219,21 @@ export const updateQueue = async (id: string, data: UpdateQueueInput) => {
     if (data.leaveWhenEmpty !== undefined) asteriskUpdate.leavewhenempty = data.leaveWhenEmpty ? 'yes' : 'no'
     if (data.weight !== undefined) asteriskUpdate.weight = data.weight
 
-    const [queue] = await prisma.$transaction([
-        prisma.queue.update({ where: { id }, data, select: queueSelect }),
-        prisma.queues.update({ where: { name: asteriskName }, data: asteriskUpdate }),
-    ])
+    const { name, number, ...appRest } = data
+    const appUpdate: Record<string, any> = { ...appRest }
+    if (name !== undefined) appUpdate.name = name
+    if (number !== undefined) appUpdate.number = number
+
+    const queue = await prisma.$transaction(async (tx) => {
+        if (nameChanged) {
+            await tx.queue_members.updateMany({
+                where: { queue_name: oldAsteriskName },
+                data: { queue_name: newAsteriskName },
+            })
+        }
+        await tx.queues.update({ where: { name: oldAsteriskName }, data: asteriskUpdate })
+        return tx.queue.update({ where: { id }, data: appUpdate, select: queueSelect })
+    })
 
     await QueuesCache.invalidateQueue(id)
     await QueuesCache.invalidateByCompany(existing.companyId)

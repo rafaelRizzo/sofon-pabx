@@ -33,6 +33,7 @@ export const createQueueSchema = z.object({
         .min(1)
         .max(80)
         .regex(/^[a-z0-9_-]+$/i, 'Only alphanumeric, dash and underscore allowed'),
+    number: z.string().min(1).max(20).regex(/^\d+$/, 'Only digits allowed').optional(),
     companyId: z.cuid2(),
     strategy: z.enum(QUEUE_STRATEGIES).default('ringall'),
     musicOnHold: z.string().min(1).max(128).default('default'),
@@ -48,6 +49,13 @@ export const createQueueSchema = z.object({
 })
 
 export const updateQueueSchema = z.object({
+    name: z
+        .string()
+        .min(1)
+        .max(80)
+        .regex(/^[a-z0-9_-]+$/i, 'Only alphanumeric, dash and underscore allowed')
+        .optional(),
+    number: z.string().min(1).max(20).regex(/^\d+$/, 'Only digits allowed').optional().nullable(),
     strategy: z.enum(QUEUE_STRATEGIES).optional(),
     musicOnHold: z.string().min(1).max(128).optional(),
     timeout: z.number().int().min(1).max(300).optional(),

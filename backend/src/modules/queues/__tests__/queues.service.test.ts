@@ -39,6 +39,7 @@ afterAll(async () => {
     await prisma.queue.deleteMany({ where: { companyId } })
     await prisma.extension.deleteMany({ where: { companyId } })
     await prisma.userCompany.deleteMany({ where: { userId } })
+    await prisma.company.deleteMany({ where: { id: companyId } })
     await teardownTestEnv(PREFIX)
 })
 
