@@ -12,4 +12,3 @@ ALTER TABLE voicemail_users OWNER TO asterisk;
 ALTER TABLE queues OWNER TO asterisk;
 ALTER TABLE queue_members OWNER TO asterisk;
 ALTER TABLE ps_registrations OWNER TO asterisk;
-ALTER TABLE ps_contacts OWNER TO asterisk;

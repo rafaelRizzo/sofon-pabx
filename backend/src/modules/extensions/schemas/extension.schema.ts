@@ -106,10 +106,10 @@ const pjsipFields = {
     one_touch_recording: z.boolean().optional(),
     allow_transfer: z.boolean().optional(),
     allow_subscribe: z.boolean().optional(),
-    from_user: z.string().max(40).optional(),
-    from_domain: z.string().max(40).optional(),
-    outbound_proxy: z.string().max(40).optional(),
-    mailboxes: z.string().max(40).optional(),
+    from_user: z.string().max(40).nullish(),
+    from_domain: z.string().max(40).nullish(),
+    outbound_proxy: z.string().max(40).nullish(),
+    mailboxes: z.string().max(40).nullish(),
     moh_suggest: z.string().max(40).optional(),
     rel: z.string().max(40).optional(),
     // ps_aors (aor_ prefix)
@@ -122,8 +122,8 @@ const pjsipFields = {
     aor_remove_existing: z.boolean().optional(),
     aor_authenticate_qualify: z.boolean().optional(),
     aor_support_path: z.boolean().optional(),
-    aor_outbound_proxy: z.string().max(40).optional(),
-    aor_mailboxes: z.string().max(80).optional(),
+    aor_outbound_proxy: z.string().max(40).nullish(),
+    aor_mailboxes: z.string().max(80).nullish(),
 }
 
 const baseShape = {
