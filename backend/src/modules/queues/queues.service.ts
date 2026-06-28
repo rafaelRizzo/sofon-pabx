@@ -1,6 +1,7 @@
 import { prisma } from '../../lib/prisma'
 import { QueuesCache } from './cache/queues.cache'
 import type { CreateQueueInput, UpdateQueueInput, AddMemberInput, UpdateMemberInput } from './schemas/queue.schema'
+import { AsteriskQueueRepository } from '../../asterisk/queue.repository'
 import { AppError } from '../../utils/errors/app.error'
 
 const queueSelect = {
@@ -108,25 +109,11 @@ export const createQueue = async (data: CreateQueueInput) => {
 
     const asteriskName = toAsteriskQueueName(company.asteriskId, data.name)
 
-    const [queue] = await prisma.$transaction([
-        prisma.queue.create({ data, select: queueSelect }),
-        prisma.queues.create({
-            data: {
-                name: asteriskName,
-                strategy: data.strategy,
-                musiconhold: data.musicOnHold,
-                timeout: data.timeout,
-                retry: data.retry,
-                maxlen: data.maxLen,
-                wrapuptime: data.wrapupTime,
-                announce: data.announce ?? null,
-                announceFreq: data.announceFrequency,
-                joinempty: data.joinEmpty ? 'yes' : 'no',
-                leavewhenempty: data.leaveWhenEmpty ? 'yes' : 'no',
-                weight: data.weight,
-            },
-        }),
-    ])
+    const queue = await prisma.$transaction(async (tx) => {
+        const q = await tx.queue.create({ data, select: queueSelect })
+        await AsteriskQueueRepository.createQueue(tx, asteriskName, data)
+        return q
+    })
 
     await QueuesCache.invalidateByCompany(data.companyId)
     await QueuesCache.invalidateAll()
@@ -145,9 +132,8 @@ export const addMember = async (queueId: string, data: AddMemberInput) => {
         select: { id: true, name: true, number: true, type: true, companyId: true },
     })
     if (!extension) throw new AppError('Extension not found', 404)
-    if (extension.companyId !== queue.companyId) {
+    if (extension.companyId !== queue.companyId)
         throw new AppError('Extension does not belong to the same company as the queue', 403)
-    }
 
     const alreadyMember = await prisma.queueMember.findUnique({
         where: { queueId_extensionId: { queueId, extensionId: data.extensionId } },
@@ -157,19 +143,15 @@ export const addMember = async (queueId: string, data: AddMemberInput) => {
     const asteriskName = toAsteriskQueueName(queue.company.asteriskId, queue.name)
     const iface = toAsteriskInterface(extension.type, extension.number)
 
-    const [member] = await prisma.$transaction([
-        prisma.queueMember.create({ data: { queueId, ...data }, select: memberSelect }),
-        prisma.queue_members.create({
-            data: {
-                queue_name: asteriskName,
-                interface: iface,
-                membername: extension.name,
-                state_interface: iface,
-                penalty: data.penalty ?? 0,
-                paused: (data.paused ?? false) ? 1 : 0,
-            },
-        }),
-    ])
+    const member = await prisma.$transaction(async (tx) => {
+        const m = await tx.queueMember.create({ data: { queueId, ...data }, select: memberSelect })
+        await AsteriskQueueRepository.addMember(tx, asteriskName, iface, {
+            memberName: extension.name,
+            penalty: data.penalty ?? 0,
+            paused: data.paused ?? false,
+        })
+        return m
+    })
 
     await QueuesCache.invalidateMembers(queueId)
     await QueuesCache.invalidateQueue(queueId)
@@ -206,7 +188,6 @@ export const updateQueue = async (id: string, data: UpdateQueueInput) => {
     }
 
     const asteriskUpdate: Record<string, any> = {}
-    if (nameChanged) asteriskUpdate.name = newAsteriskName
     if (data.strategy !== undefined) asteriskUpdate.strategy = data.strategy
     if (data.musicOnHold !== undefined) asteriskUpdate.musiconhold = data.musicOnHold
     if (data.timeout !== undefined) asteriskUpdate.timeout = data.timeout
@@ -225,13 +206,8 @@ export const updateQueue = async (id: string, data: UpdateQueueInput) => {
     if (number !== undefined) appUpdate.number = number
 
     const queue = await prisma.$transaction(async (tx) => {
-        if (nameChanged) {
-            await tx.queue_members.updateMany({
-                where: { queue_name: oldAsteriskName },
-                data: { queue_name: newAsteriskName },
-            })
-        }
-        await tx.queues.update({ where: { name: oldAsteriskName }, data: asteriskUpdate })
+        if (nameChanged) await AsteriskQueueRepository.renameQueue(tx, oldAsteriskName, newAsteriskName)
+        await AsteriskQueueRepository.updateQueue(tx, newAsteriskName, asteriskUpdate)
         return tx.queue.update({ where: { id }, data: appUpdate, select: queueSelect })
     })
 
@@ -253,17 +229,12 @@ export const updateMember = async (queueId: string, memberId: string, data: Upda
 
     const asteriskName = toAsteriskQueueName(member.queue.company.asteriskId, member.queue.name)
     const iface = toAsteriskInterface(member.extension.type, member.extension.number)
-    const asteriskUpdate: Record<string, any> = {}
-    if (data.penalty !== undefined) asteriskUpdate.penalty = data.penalty
-    if (data.paused !== undefined) asteriskUpdate.paused = data.paused ? 1 : 0
 
-    const [updated] = await prisma.$transaction([
-        prisma.queueMember.update({ where: { id: memberId }, data, select: memberSelect }),
-        prisma.queue_members.update({
-            where: { queue_name_interface: { queue_name: asteriskName, interface: iface } },
-            data: asteriskUpdate,
-        }),
-    ])
+    const updated = await prisma.$transaction(async (tx) => {
+        const m = await tx.queueMember.update({ where: { id: memberId }, data, select: memberSelect })
+        await AsteriskQueueRepository.updateMember(tx, asteriskName, iface, data)
+        return m
+    })
 
     await QueuesCache.invalidateMembers(queueId)
     await QueuesCache.invalidateQueue(queueId)
@@ -279,11 +250,10 @@ export const deleteQueue = async (id: string) => {
 
     const asteriskName = toAsteriskQueueName(existing.company.asteriskId, existing.name)
 
-    await prisma.$transaction([
-        prisma.queue_members.deleteMany({ where: { queue_name: asteriskName } }),
-        prisma.queues.deleteMany({ where: { name: asteriskName } }),
-        prisma.queue.delete({ where: { id } }),
-    ])
+    await prisma.$transaction(async (tx) => {
+        await AsteriskQueueRepository.deleteQueue(tx, asteriskName)
+        await tx.queue.delete({ where: { id } })
+    })
 
     await QueuesCache.invalidateQueue(id)
     await QueuesCache.invalidateMembers(id)
@@ -304,10 +274,10 @@ export const removeMember = async (queueId: string, memberId: string) => {
     const asteriskName = toAsteriskQueueName(member.queue.company.asteriskId, member.queue.name)
     const iface = toAsteriskInterface(member.extension.type, member.extension.number)
 
-    await prisma.$transaction([
-        prisma.queueMember.delete({ where: { id: memberId } }),
-        prisma.queue_members.deleteMany({ where: { queue_name: asteriskName, interface: iface } }),
-    ])
+    await prisma.$transaction(async (tx) => {
+        await tx.queueMember.delete({ where: { id: memberId } })
+        await AsteriskQueueRepository.removeMember(tx, asteriskName, iface)
+    })
 
     await QueuesCache.invalidateMembers(queueId)
     await QueuesCache.invalidateQueue(queueId)

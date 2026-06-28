@@ -188,6 +188,7 @@ ps_endpoints     => odbc,asterisk,ps_endpoints
 ps_auths         => odbc,asterisk,ps_auths
 ps_aors          => odbc,asterisk,ps_aors
 ps_contacts      => odbc,asterisk,ps_contacts
+ps_identifies    => odbc,asterisk,ps_identifies
 ps_registrations => odbc,asterisk,ps_registrations
 sippeers         => odbc,asterisk,sip_peers
 sipregs          => odbc,asterisk,sip_peers
@@ -201,8 +202,9 @@ cat > /etc/asterisk/sorcery.conf << 'EOF'
 [res_pjsip]
 endpoint => realtime,ps_endpoints
 auth => realtime,ps_auths
-aor => realtime,ps_aors 
+aor => realtime,ps_aors
 contact => realtime,ps_contacts
+identify => realtime,ps_identifies
 
 [res_pjsip_outbound_registration]
 registration => realtime,ps_registrations
@@ -226,16 +228,26 @@ object_lifetime_maximum=60
 expire_on_reload=yes
 EOF
 
+# Garante que res_odbc e res_config_odbc carregam antes do res_pjsip no startup
+# Sem isso, o sorcery 'identify' (ps_identifies) falha ao inicializar
+MODULES_CONF="/etc/asterisk/modules.conf"
+if ! grep -q "preload => res_odbc.so" "$MODULES_CONF" 2>/dev/null; then
+    sed -i '/^autoload=yes/a preload => res_odbc.so\npreload => res_config_odbc.so' "$MODULES_CONF"
+    log "modules.conf: preload res_odbc + res_config_odbc adicionado"
+else
+    log "modules.conf: preload já configurado"
+fi
+
 chown asterisk:asterisk \
     /etc/asterisk/res_odbc.conf \
     /etc/asterisk/extconfig.conf \
     /etc/asterisk/sorcery.conf \
-    /etc/asterisk/sorcery_memory_cache.conf 
+    /etc/asterisk/sorcery_memory_cache.conf
 chmod 640 \
     /etc/asterisk/res_odbc.conf \
     /etc/asterisk/extconfig.conf \
     /etc/asterisk/sorcery.conf \
-    /etc/asterisk/sorcery_memory_cache.conf 
+    /etc/asterisk/sorcery_memory_cache.conf
 
 log "Configurações Asterisk criadas"
 
@@ -283,6 +295,7 @@ ALTER TABLE IF EXISTS sip_peers       OWNER TO ${PG_USER};
 ALTER TABLE IF EXISTS voicemail_users OWNER TO ${PG_USER};
 ALTER TABLE IF EXISTS queues          OWNER TO ${PG_USER};
 ALTER TABLE IF EXISTS queue_members   OWNER TO ${PG_USER};
+ALTER TABLE IF EXISTS ps_identifies    OWNER TO ${PG_USER};
 ALTER TABLE IF EXISTS ps_registrations OWNER TO ${PG_USER};
 
 ENDSQL2

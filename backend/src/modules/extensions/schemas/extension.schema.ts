@@ -138,9 +138,23 @@ export const createExtensionSchema = z.discriminatedUnion('type', [
     z.object({ ...baseShape, type: z.literal('pjsip'), ...pjsipFields }).strict(),
 ])
 
-export const updateExtensionSchema = z.object({
-    name: z.string().min(1).max(80),
-})
+export const updateExtensionSchema = z
+    .object({
+        name: z.string().min(1).max(80).optional(),
+        alias: aliasSchema.optional(),
+        context: z.string().max(40).optional(),
+        ...sipFields,
+        ...pjsipFields,
+        // shared fields: use most permissive constraint
+        language: z.string().max(40).optional(),
+        transport: z.string().max(40).optional(),
+    })
+    .refine((data) => Object.values(data).some((v) => v !== undefined), {
+        message: 'At least one field is required',
+    })
+
+export const sipFieldKeys = Object.keys(sipFields)
+export const pjsipFieldKeys = Object.keys(pjsipFields)
 
 export const BATCH_LIMIT = 50
 

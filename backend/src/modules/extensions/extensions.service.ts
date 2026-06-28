@@ -2,12 +2,16 @@ import { randomBytes } from 'crypto'
 import { prisma } from '../../lib/prisma'
 import { ExtensionsCache } from './cache/extensions.cache'
 import type { CreateExtensionInput, UpdateExtensionInput } from './schemas/extension.schema'
+import { sipFieldKeys, pjsipFieldKeys } from './schemas/extension.schema'
+import { PjsipRepository } from '../../asterisk/pjsip.repository'
+import { SipRepository } from '../../asterisk/sip.repository'
+import { DialplanRepository } from '../../asterisk/dialplan.repository'
+import { AsteriskQueueRepository } from '../../asterisk/queue.repository'
 import { AppError } from '../../utils/errors/app.error'
 
 const CHARSET = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
 const generatePassword = () => {
-    const len = 20
-    const bytes = randomBytes(len)
+    const bytes = randomBytes(20)
     return Array.from(bytes, (b) => CHARSET[b % CHARSET.length]).join('')
 }
 
@@ -113,57 +117,20 @@ export const createExtension = async (data: CreateExtensionInput) => {
     if (type === 'pjsip') {
         const { alias: _a, type: _t, name: _n, companyId: _c, context: _ctx, ...pjsipExtras } = data
 
-        const aorData: Record<string, any> = { id: number }
-        const endpointData: Record<string, any> = {
-            id: number,
-            aors: number,
-            auth: number,
-            context,
-            callerid: `${name} <${number}>`,
-        }
-
-        for (const [key, value] of Object.entries(pjsipExtras)) {
-            if (value === undefined) continue
-            if (key.startsWith('aor_')) aorData[key.slice(4)] = value
-            else endpointData[key] = value
-        }
-
-        await prisma.$transaction([
-            prisma.ps_aors.create({ data: aorData as any }),
-            prisma.ps_auths.create({ data: { id: number, auth_type: 'userpass', username: number, password } }),
-            prisma.ps_endpoints.create({ data: endpointData as any }),
-            prisma.extensions.createMany({
-                data: [
-                    { context, exten: number, priority: 1, app: 'Dial', appdata: `PJSIP/${number},20` },
-                    { context, exten: number, priority: 2, app: 'HangUp', appdata: null },
-                ],
-            }),
-            prisma.extension.create({
-                data: { alias, number, type, name, context, companyId },
-            }),
-        ])
+        await prisma.$transaction(async (tx) => {
+            await PjsipRepository.createExtension(tx, number, { password, name, context, extras: pjsipExtras })
+            await DialplanRepository.create(tx, context, number, 'pjsip')
+            await tx.extension.create({ data: { alias, number, type, name, context, companyId } })
+        })
     } else {
         const { alias: _a, type: _t, name: _n, companyId: _c, context: _ctx, peerType, ...sipExtras } = data
-
-        const sipData: Record<string, any> = {
-            name: number,
-            secret: password,
-            ...sipExtras,
-            context,
-        }
+        const sipData: Record<string, any> = { ...sipExtras }
         if (peerType) sipData.type = peerType
 
         await prisma.$transaction(async (tx) => {
-            await tx.sip_peers.create({ data: sipData as any })
-            await tx.extensions.createMany({
-                data: [
-                    { context, exten: number, priority: 1, app: 'Dial', appdata: `SIP/${number},20` },
-                    { context, exten: number, priority: 2, app: 'HangUp', appdata: null },
-                ],
-            })
-            await tx.extension.create({
-                data: { alias, number, type, name, context, companyId },
-            })
+            await SipRepository.createExtension(tx, number, password, context, sipData)
+            await DialplanRepository.create(tx, context, number, 'sip')
+            await tx.extension.create({ data: { alias, number, type, name, context, companyId } })
         })
     }
 
@@ -174,19 +141,77 @@ export const createExtension = async (data: CreateExtensionInput) => {
 }
 
 export const updateExtension = async (id: string, data: UpdateExtensionInput) => {
-    const existing = await prisma.extension.findUnique({ where: { id } })
+    const existing = await prisma.extension.findUnique({
+        where: { id },
+        include: { company: { select: { asteriskId: true } } },
+    })
     if (!existing) throw new AppError('Extension not found', 404)
 
-    const { number, type } = existing
+    const { alias, number, type, context, companyId } = existing
+    const { name, alias: newAlias, context: newContext, ...typeFields } = data
 
-    if (type === 'pjsip') {
-        await prisma.$transaction([
-            prisma.ps_endpoints.update({ where: { id: number }, data: { callerid: `${data.name} <${number}>` } }),
-            prisma.extension.update({ where: { id }, data: { name: data.name } }),
-        ])
-    } else {
-        await prisma.extension.update({ where: { id }, data: { name: data.name } })
+    const aliasChanged = newAlias !== undefined && newAlias !== alias
+    const contextChanged = newContext !== undefined && newContext !== context
+    const effectiveNumber = aliasChanged ? generateAsteriskNumber(newAlias, existing.company.asteriskId) : number
+    const effectiveContext = newContext ?? context
+
+    if (aliasChanged) {
+        const conflict = await prisma.extension.findUnique({
+            where: { alias_companyId: { alias: newAlias, companyId } },
+        })
+        if (conflict) throw new AppError('Extension alias already in use for this company', 409)
     }
+
+    await prisma.$transaction(async (tx) => {
+        if (aliasChanged || contextChanged) {
+            await DialplanRepository.recreate(tx, context, number, effectiveContext, effectiveNumber, type as 'sip' | 'pjsip')
+        }
+
+        if (type === 'pjsip') {
+            if (aliasChanged) {
+                await PjsipRepository.renameExtension(tx, number, effectiveNumber)
+                await AsteriskQueueRepository.updateMemberInterfaces(tx, `PJSIP/${number}`, `PJSIP/${effectiveNumber}`)
+            }
+
+            const endpointUpdate: Record<string, any> = {}
+            const aorUpdate: Record<string, any> = {}
+
+            if (name !== undefined) endpointUpdate.callerid = `${name} <${effectiveNumber}>`
+            if (contextChanged) endpointUpdate.context = effectiveContext
+
+            for (const key of pjsipFieldKeys) {
+                const value = (typeFields as any)[key]
+                if (value === undefined) continue
+                if (key.startsWith('aor_')) aorUpdate[key.slice(4)] = value
+                else endpointUpdate[key] = value
+            }
+
+            await PjsipRepository.updateExtension(tx, effectiveNumber, endpointUpdate, aorUpdate)
+        } else {
+            if (aliasChanged) {
+                await SipRepository.renameExtension(tx, number, effectiveNumber)
+                await AsteriskQueueRepository.updateMemberInterfaces(tx, `SIP/${number}`, `SIP/${effectiveNumber}`)
+            }
+
+            const sipUpdate: Record<string, any> = {}
+            if (contextChanged) sipUpdate.context = effectiveContext
+
+            for (const key of sipFieldKeys) {
+                const value = (typeFields as any)[key]
+                if (value !== undefined) sipUpdate[key] = value
+            }
+
+            await SipRepository.updateExtension(tx, effectiveNumber, sipUpdate)
+        }
+
+        const extUpdate: Record<string, any> = {}
+        if (name !== undefined) extUpdate.name = name
+        if (aliasChanged) { extUpdate.alias = newAlias; extUpdate.number = effectiveNumber }
+        if (contextChanged) extUpdate.context = effectiveContext
+
+        if (Object.keys(extUpdate).length > 0)
+            await tx.extension.update({ where: { id }, data: extUpdate })
+    })
 
     await ExtensionsCache.invalidateExtension(id)
     await ExtensionsCache.invalidateAllExtensions()
@@ -240,23 +265,18 @@ export const deleteExtension = async (id: string) => {
     const { alias, companyId, number, type, context } = existing
     const asteriskInterface = `${type.toUpperCase()}/${number}`
 
-    if (type === 'pjsip') {
-        await prisma.$transaction([
-            prisma.queue_members.deleteMany({ where: { interface: asteriskInterface } }),
-            prisma.extensions.deleteMany({ where: { context, exten: number } }),
-            prisma.ps_endpoints.delete({ where: { id: number } }),
-            prisma.ps_auths.delete({ where: { id: number } }),
-            prisma.ps_aors.delete({ where: { id: number } }),
-            prisma.extension.delete({ where: { id } }),
-        ])
-    } else {
-        await prisma.$transaction([
-            prisma.queue_members.deleteMany({ where: { interface: asteriskInterface } }),
-            prisma.extensions.deleteMany({ where: { context, exten: number } }),
-            prisma.sip_peers.delete({ where: { name: number } }),
-            prisma.extension.delete({ where: { id } }),
-        ])
-    }
+    await prisma.$transaction(async (tx) => {
+        await AsteriskQueueRepository.removeMembersByInterfaces(tx, [asteriskInterface])
+        await DialplanRepository.delete(tx, context, number)
+
+        if (type === 'pjsip') {
+            await PjsipRepository.deleteExtension(tx, number)
+        } else {
+            await SipRepository.deleteExtension(tx, number)
+        }
+
+        await tx.extension.delete({ where: { id } })
+    })
 
     await ExtensionsCache.invalidateExtension(id)
     await ExtensionsCache.invalidateAllExtensions()

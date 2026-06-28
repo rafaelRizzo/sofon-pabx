@@ -7,7 +7,6 @@ const baseTrunkShape = {
         .max(20)
         .regex(/^[a-z0-9_-]+$/i, 'Only alphanumeric, dash and underscore allowed'),
     companyId: z.cuid2(),
-    type: z.enum(['sip', 'pjsip']),
     context: z.string().max(40).default('from-trunk'),
     codecs: z.string().max(200).default('ulaw,alaw'),
 }
