@@ -495,26 +495,36 @@ fi
 
 DEBIAN_FRONTEND=noninteractive apt-get install -y nftables >> "$LOG_FILE" 2>&1 || err "Falha ao instalar nftables"
 
-# Garante arquivo de whitelist (usado pelo Fail2Ban)
 mkdir -p /etc/fail2ban
 [[ -f /etc/fail2ban/ip.whitelist ]] || touch /etc/fail2ban/ip.whitelist
 
-# Define portas SIP/PJSIP
+# Lê whitelist existente para popular o set inicial
+INITIAL_ELEMENTS=$(grep -v '^[[:space:]]*#\|^[[:space:]]*$' /etc/fail2ban/ip.whitelist 2>/dev/null \
+    | tr '\n' ',' | sed 's/,$//' | sed 's/,/, /g' || true)
+
 if [[ "$USE_LEGACY_SIP" == true ]]; then
-    NFT_SIP_PORTS="{ ${SIP_PORT}, 5061, ${PJSIP_PORT} }"
+    JAIL_PORTS="$SIP_PORT,5061,$PJSIP_PORT"
 else
-    NFT_SIP_PORTS="{ ${PJSIP_PORT} }"
+    JAIL_PORTS="$PJSIP_PORT"
 fi
 
-# Gera /etc/nftables.conf
 {
     echo '#!/usr/sbin/nft -f'
     echo ''
-    echo '# Recria apenas nossa tabela — preserva tabelas do Docker (ip nat, ip filter)'
+    echo '# Recria apenas nossa tabela — preserva tabelas do Docker'
     echo 'add table inet filter'
     echo 'flush table inet filter'
     echo ''
     echo 'table inet filter {'
+    echo ''
+    echo '    set whitelist {'
+    echo '        type ipv4_addr'
+    echo '        flags interval'
+    if [[ -n "$INITIAL_ELEMENTS" ]]; then
+        echo "        elements = { ${INITIAL_ELEMENTS} }"
+    fi
+    echo '    }'
+    echo ''
     echo '    chain input {'
     echo '        type filter hook input priority 0; policy drop;'
     echo ''
@@ -525,10 +535,15 @@ fi
     echo ''
     echo '        tcp dport { 22, 21122 } accept'
     echo ''
-    echo "        udp dport ${NFT_SIP_PORTS} accept"
-    echo "        tcp dport ${NFT_SIP_PORTS} accept"
+    if [[ "$USE_LEGACY_SIP" == true ]]; then
+        echo "        ip saddr @whitelist tcp dport { ${SIP_PORT}, 5061, ${PJSIP_PORT} } accept"
+        echo "        ip saddr @whitelist udp dport { ${SIP_PORT}, 5061, ${PJSIP_PORT} } accept"
+    else
+        echo "        ip saddr @whitelist tcp dport ${PJSIP_PORT} accept"
+        echo "        ip saddr @whitelist udp dport ${PJSIP_PORT} accept"
+    fi
     echo ''
-    echo '        udp dport 10000-20000 accept'
+    echo '        ip saddr @whitelist udp dport 10000-20000 accept'
     echo ''
     echo '        ip saddr 127.0.0.1 tcp dport 5038 accept'
     echo '    }'
@@ -545,7 +560,14 @@ fi
 
 nft -f /etc/nftables.conf >> "$LOG_FILE" 2>&1 || err "Falha ao aplicar regras nftables"
 systemctl enable nftables >> "$LOG_FILE" 2>&1 || true
-log "Firewall nftables configurado (SSH 22+21122, SIP, RTP, AMI localhost-only)"
+log "Firewall nftables configurado (SSH 22+21122, SIP/RTP whitelist-only, AMI localhost-only)"
+
+# Docker perde as regras de MASQUERADE quando nftables é recarregado
+if systemctl is-active --quiet docker 2>/dev/null; then
+    warn "Docker detectado — reiniciando para restaurar regras de NAT (MASQUERADE)..."
+    systemctl restart docker >> "$LOG_FILE" 2>&1 || warn "Falha ao reiniciar Docker"
+    log "Docker reiniciado — regras de MASQUERADE restauradas"
+fi
 
 # ============================================================
 # STEP 12 - SEGURANÇA
@@ -579,7 +601,6 @@ log "Logger configurado → /var/log/asterisk/messages"
 DEBIAN_FRONTEND=noninteractive apt-get install -y fail2ban >> "$LOG_FILE" 2>&1 || warn "Fail2Ban não instalado"
 mkdir -p /etc/fail2ban/filter.d /etc/fail2ban/jail.d
 
-# Filter customizado — casa PJSIP (pjsip_distributor) e chan_sip
 cat > /etc/fail2ban/filter.d/asterisk.conf << 'EOF'
 [Definition]
 failregex = NOTICE\[\d+\].*failed for '?<HOST>:\d+'?.*(No matching endpoint|Failed to authenticate|Wrong password)
@@ -588,39 +609,31 @@ failregex = NOTICE\[\d+\].*failed for '?<HOST>:\d+'?.*(No matching endpoint|Fail
 ignoreregex =
 EOF
 
-# Whitelist inline — ignoreipfile não suportado em versões antigas
-WHITELIST=$(grep -v '^#\|^$' /etc/fail2ban/ip.whitelist 2>/dev/null | tr '\n' ' ' || true)
+WHITELIST_F2B=$(grep -v '^#\|^$' /etc/fail2ban/ip.whitelist 2>/dev/null | tr '\n' ' ' || true)
 
-# Jail — bane só portas SIP (não bloqueia SSH)
 cat > /etc/fail2ban/jail.d/asterisk.conf << EOF
 [asterisk]
 enabled   = true
-port      = $SIP_PORT,5061,$PJSIP_PORT
+port      = ${JAIL_PORTS}
 protocol  = udp,tcp
 filter    = asterisk
 logpath   = /var/log/asterisk/messages
 maxretry  = 3
 findtime  = 300
 bantime   = 86400
-ignoreip  = 127.0.0.1/8 ::1 ${WHITELIST}
+ignoreip  = 127.0.0.1/8 ::1 ${WHITELIST_F2B}
 action    = nftables-allports[name=asterisk]
 EOF
 
 systemctl enable fail2ban >> "$LOG_FILE" 2>&1 || true
 systemctl restart fail2ban >> "$LOG_FILE" 2>&1 || warn "Fail2Ban não reiniciou"
 
-# Desbaneia IPs da whitelist — previne lockout após restart
 sleep 2
 while IFS= read -r ip; do
     [[ "$ip" =~ ^#|^$ ]] && continue
     fail2ban-client set asterisk unbanip "$ip" >> "$LOG_FILE" 2>&1 || true
 done < /etc/fail2ban/ip.whitelist
-log "Whitelist aplicada — IPs desbanados após restart"
-
-# Valida regex após Asterisk ter logado algo
-sleep 3
-MATCHES=$(fail2ban-regex /var/log/asterisk/messages /etc/fail2ban/filter.d/asterisk.conf 2>/dev/null | grep "Lines: " | awk '{print $2}')
-log "Fail2Ban configurado (regex matches no log: ${MATCHES:-0})"
+log "Fail2Ban configurado"
 
 AMI_SECRET="$(openssl rand -base64 24)"
 cat > /etc/asterisk/manager.conf << EOF
@@ -647,11 +660,11 @@ chown -R asterisk:asterisk /etc/asterisk
 asterisk -rx "manager reload" >> "$LOG_FILE" 2>&1 || true
 log "Hardening aplicado"
 
-# --- manage-fw (helper global para whitelist Fail2Ban) ---
+# --- manage-fw (helper global — whitelist nftables + Fail2Ban) ---
 cat > /usr/local/sbin/manage-fw << 'MANAGE_FW_EOF'
 #!/bin/bash
-# Gerencia IPs na whitelist do Fail2Ban
-# Uso: manage-fw {add|remove|list} [IP]
+# manage-fw — gerencia whitelist de IPs no nftables + Fail2Ban (Asterisk)
+# Uso: manage-fw {add|remove|list} [IP[/CIDR]]
 
 set -euo pipefail
 
@@ -659,10 +672,13 @@ readonly GREEN='\033[0;32m'
 readonly RED='\033[0;31m'
 readonly YELLOW='\033[1;33m'
 readonly CYAN='\033[0;36m'
+readonly BOLD='\033[1m'
 readonly NC='\033[0m'
 
 WHITELIST="/etc/fail2ban/ip.whitelist"
+NFT_CONF="/etc/nftables.conf"
 JAIL_CONF="/etc/fail2ban/jail.d/asterisk.conf"
+JAIL_NAME="asterisk"
 
 log()  { echo -e "${GREEN}[+]${NC} $1"; }
 warn() { echo -e "${YELLOW}[!]${NC} $1"; }
@@ -672,43 +688,54 @@ err()  { echo -e "${RED}[x]${NC} $1" >&2; exit 1; }
 
 validate_ip() {
     local ip=$1
-    [[ $ip =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}(/[0-9]{1,2})?$ ]] || return 1
+    [[ $ip =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}(/([0-9]|[1-2][0-9]|3[0-2]))?$ ]] || return 1
     local base; base=$(cut -d/ -f1 <<< "$ip")
     IFS='.' read -ra A <<< "$base"
     for i in "${A[@]}"; do [[ $i -le 255 ]] || return 1; done
     return 0
 }
 
+# Atualiza elements = { ... } no nftables.conf e recarrega
+rebuild_nft_whitelist() {
+    local elements
+    elements=$(grep -v '^[[:space:]]*#\|^[[:space:]]*$' "$WHITELIST" 2>/dev/null \
+        | tr '\n' ',' | sed 's/,$//' | sed 's/,/, /g' || true)
+
+    sed -i '/set whitelist {/,/^    }/{/elements = {/d}' "$NFT_CONF"
+
+    if [[ -n "$elements" ]]; then
+        sed -i "/flags interval/a\\        elements = { ${elements} }" "$NFT_CONF"
+    fi
+
+    nft -f "$NFT_CONF" 2>/dev/null && log "nftables recarregado" || warn "Falha ao recarregar nftables"
+}
+
 reload_fail2ban() {
     if [[ -f "$JAIL_CONF" ]]; then
-        local wl; wl=$(grep -v '^[[:space:]]*#\|^[[:space:]]*$' "$WHITELIST" 2>/dev/null | tr '\n' ' ')
+        local wl; wl=$(grep -v '^[[:space:]]*#\|^[[:space:]]*$' "$WHITELIST" 2>/dev/null | tr '\n' ' ' || true)
         sed -i "s|^ignoreip.*|ignoreip  = 127.0.0.1/8 ::1 ${wl}|" "$JAIL_CONF"
         fail2ban-client reload &>/dev/null && log "Fail2Ban recarregado" || warn "Fail2Ban não recarregou"
-    else
-        warn "$JAIL_CONF não encontrado"
     fi
 }
 
 cmd_add() {
     local ip=$1
-    validate_ip "$ip" || err "IP inválido: $ip"
+    validate_ip "$ip" || err "IP inválido: $ip  (ex: 1.2.3.4 ou 10.0.0.0/24)"
 
     if grep -qxF "$ip" "$WHITELIST" 2>/dev/null; then
         warn "$ip já está na whitelist"
     else
         echo "$ip" >> "$WHITELIST"
-        log "$ip adicionado à whitelist"
+        log "$ip adicionado"
     fi
 
+    nft add element inet filter whitelist { $ip } 2>/dev/null || true
+    rebuild_nft_whitelist
     reload_fail2ban
-
-    if command -v fail2ban-client &>/dev/null; then
-        fail2ban-client set asterisk unbanip "$ip" &>/dev/null && \
-            log "$ip desbanado no fail2ban" || true
-    fi
+    fail2ban-client set "$JAIL_NAME" unbanip "$ip" &>/dev/null || true
 
     echo ""
-    echo -e "${GREEN}✓ $ip na whitelist — Fail2Ban não vai mais bani-lo${NC}"
+    echo -e "${GREEN}✓ $ip liberado — acesso às portas SIP/RTP permitido${NC}"
 }
 
 cmd_remove() {
@@ -717,39 +744,50 @@ cmd_remove() {
 
     if grep -qxF "$ip" "$WHITELIST" 2>/dev/null; then
         sed -i "\|^${ip}$|d" "$WHITELIST"
-        log "$ip removido da whitelist"
-        reload_fail2ban
-        echo ""
-        echo -e "${GREEN}✓ $ip removido — sujeito a ban pelo Fail2Ban${NC}"
+        log "$ip removido"
     else
         warn "$ip não está na whitelist"
+        return 0
     fi
+
+    nft delete element inet filter whitelist { $ip } 2>/dev/null || true
+    rebuild_nft_whitelist
+    reload_fail2ban
+
+    echo ""
+    echo -e "${GREEN}✓ $ip removido — acesso bloqueado${NC}"
 }
 
 cmd_list() {
     echo ""
-    echo -e "${CYAN}=== Whitelist (/etc/fail2ban/ip.whitelist) ===${NC}"
+    echo -e "${CYAN}══════════════════════════════════════════${NC}"
+    echo -e "  ${BOLD}Whitelist — IPs com acesso liberado${NC}"
+    echo -e "${CYAN}══════════════════════════════════════════${NC}"
+
     if [[ ! -f "$WHITELIST" ]] || ! grep -qv '^[[:space:]]*#\|^[[:space:]]*$' "$WHITELIST" 2>/dev/null; then
-        echo -e "  ${YELLOW}(vazia)${NC}"
+        echo -e "  ${YELLOW}(vazia — portas SIP/RTP bloqueadas para todos)${NC}"
     else
         grep -v '^[[:space:]]*#\|^[[:space:]]*$' "$WHITELIST" | while read -r ip; do
-            echo -e "  ${GREEN}•${NC} $ip"
+            echo -e "  ${GREEN}●${NC} $ip"
         done
     fi
 
     echo ""
-    echo -e "${CYAN}=== Banidos atualmente (fail2ban) ===${NC}"
-    if command -v fail2ban-client &>/dev/null; then
-        banned=$(fail2ban-client status asterisk 2>/dev/null | grep "Banned IP" | cut -d: -f2 | tr ' ' '\n' | grep -v '^$' || true)
-        if [[ -z "$banned" ]]; then
-            echo -e "  ${GREEN}(nenhum)${NC}"
-        else
-            echo "$banned" | while read -r ip; do
-                echo -e "  ${RED}•${NC} $ip"
-            done
-        fi
+    echo -e "${CYAN}  Set nftables atual:${NC}"
+    nft list set inet filter whitelist 2>/dev/null \
+        | grep -E 'elements|^}' \
+        | sed 's/^/    /' \
+        || echo -e "    ${YELLOW}(set não encontrado)${NC}"
+
+    echo ""
+    echo -e "${CYAN}  Banidos atualmente (Fail2Ban):${NC}"
+    banned=$(fail2ban-client status asterisk 2>/dev/null | grep "Banned IP" | cut -d: -f2 | tr ' ' '\n' | grep -v '^$' || true)
+    if [[ -z "$banned" ]]; then
+        echo -e "    ${GREEN}(nenhum)${NC}"
     else
-        echo -e "  ${YELLOW}fail2ban-client não disponível${NC}"
+        echo "$banned" | while read -r ip; do
+            echo -e "    ${RED}✗${NC} $ip"
+        done
     fi
     echo ""
 }
@@ -759,22 +797,24 @@ IP="${2:-}"
 
 case "$CMD" in
     add)
-        [[ -n "$IP" ]] || err "Uso: manage-fw add <IP>"
+        [[ -n "$IP" ]] || err "Uso: manage-fw add <IP[/CIDR]>"
         cmd_add "$IP"
         ;;
     remove|rm)
-        [[ -n "$IP" ]] || err "Uso: manage-fw remove <IP>"
+        [[ -n "$IP" ]] || err "Uso: manage-fw remove <IP[/CIDR]>"
         cmd_remove "$IP"
         ;;
     list|ls)
         cmd_list
         ;;
     *)
-        echo "Uso: manage-fw {add|remove|list} [IP]"
+        echo -e "${BOLD}Uso:${NC} manage-fw {add|remove|list} [IP]"
         echo ""
-        echo "  add    <IP>  — adiciona IP na whitelist (Fail2Ban não bane)"
-        echo "  remove <IP>  — remove IP da whitelist"
-        echo "  list         — mostra whitelist e banidos atualmente"
+        echo "  add    <IP>  — libera IP nas portas SIP/RTP"
+        echo "  remove <IP>  — bloqueia IP"
+        echo "  list         — whitelist + set nftables + banidos"
+        echo ""
+        echo "  Suporta CIDR: manage-fw add 10.0.0.0/24"
         exit 1
         ;;
 esac
@@ -808,10 +848,11 @@ echo -e "  Fail2Ban   : ${GREEN}ativo${NC}"
 echo -e "  manage-fw  : ${GREEN}/usr/local/sbin/manage-fw${NC}"
 echo -e "  Log        : ${CYAN}${LOG_FILE}${NC}"
 echo ""
-echo -e "  Gerenciar whitelist Fail2Ban:"
-echo -e "    ${YELLOW}manage-fw add 1.2.3.4${NC}     → protege IP de ban"
-echo -e "    ${YELLOW}manage-fw remove 1.2.3.4${NC}  → remove da whitelist"
-echo -e "    ${YELLOW}manage-fw list${NC}             → whitelist + banidos"
+echo -e "  Liberar acesso às portas SIP/RTP:"
+echo -e "    ${YELLOW}manage-fw add 1.2.3.4${NC}       → libera IP (nftables + Fail2Ban)"
+echo -e "    ${YELLOW}manage-fw add 10.0.0.0/24${NC}   → libera bloco CIDR"
+echo -e "    ${YELLOW}manage-fw remove 1.2.3.4${NC}    → bloqueia IP"
+echo -e "    ${YELLOW}manage-fw list${NC}               → whitelist + banidos"
 echo ""
 echo -e "  Comandos úteis:"
 echo -e "    ${YELLOW}asterisk -rvvv${NC}              → console"

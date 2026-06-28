@@ -37,7 +37,7 @@ show_header
 # ============================================================
 echo -e "${RED}${BOLD}  ATENÇÃO: Esta operação é irreversível!${NC}"
 echo ""
-echo -e "  Será removido:"
+echo -e "  Sempre removido:"
 echo -e "    ${YELLOW}•${NC} Asterisk (binários, serviço, módulos)"
 echo -e "    ${YELLOW}•${NC} Configurações em /etc/asterisk"
 echo -e "    ${YELLOW}•${NC} Logs em /var/log/asterisk"
@@ -46,12 +46,17 @@ echo -e "    ${YELLOW}•${NC} Libs em /usr/lib/asterisk"
 echo -e "    ${YELLOW}•${NC} Fontes em /usr/src/asterisk-*"
 echo -e "    ${YELLOW}•${NC} Usuário asterisk"
 echo -e "    ${YELLOW}•${NC} Logrotate asterisk"
-echo -e "    ${YELLOW}•${NC} manage-fw (/usr/local/sbin/manage-fw)"
-echo -e "    ${YELLOW}•${NC} Fail2Ban jail/filter do Asterisk"
-echo -e "    ${YELLOW}•${NC} Firewall nftables (flush + política permissiva)"
+echo ""
+echo -e "  Opcional (perguntado abaixo):"
+echo -e "    ${CYAN}•${NC} manage-fw + Fail2Ban jail/filter do Asterisk"
+echo -e "    ${CYAN}•${NC} Firewall nftables (reset + política permissiva)"
+echo -e "    ${CYAN}•${NC} ip.whitelist (/etc/fail2ban/ip.whitelist)"
 echo ""
 echo -ne "  ${BOLD}Deseja manter backup das configs?${NC} [S/n]: "
 read -r KEEP_BACKUP
+echo ""
+echo -ne "  ${BOLD}Remover firewall (nftables + Fail2Ban + manage-fw)?${NC} [s/N]: "
+read -r REMOVE_FW
 echo ""
 echo -ne "${RED}  Confirma remoção completa?${NC} Digite ${BOLD}REMOVER${NC}: "
 read -r CONFIRM
@@ -152,45 +157,44 @@ fi
 groupdel asterisk >> "$LOG_FILE" 2>&1 || true
 
 # ============================================================
-# 8. REMOVER MANAGE-FW
+# 8. REMOVER MANAGE-FW + FAIL2BAN + NFTABLES (opcional)
 # ============================================================
-rm -f /usr/local/sbin/manage-fw 2>/dev/null && log "  Removido: /usr/local/sbin/manage-fw" || true
+if [[ $REMOVE_FW =~ ^[SsYy]$ ]]; then
 
-# ============================================================
-# 9. REMOVER FAIL2BAN CONFIGS DO ASTERISK
-# ============================================================
-log "Removendo configurações Fail2Ban do Asterisk..."
-for f in \
-    /etc/fail2ban/jail.d/asterisk.conf \
-    /etc/fail2ban/filter.d/asterisk.conf; do
-    [[ -f "$f" ]] && rm -f "$f" && log "  Removido: $f"
-done
+    rm -f /usr/local/sbin/manage-fw 2>/dev/null && log "  Removido: /usr/local/sbin/manage-fw" || true
 
-if command -v fail2ban-client &>/dev/null && systemctl is-active --quiet fail2ban 2>/dev/null; then
-    fail2ban-client reload >> "$LOG_FILE" 2>&1 || true
-    log "Fail2Ban recarregado"
-fi
+    log "Removendo configurações Fail2Ban do Asterisk..."
+    for f in \
+        /etc/fail2ban/jail.d/asterisk.conf \
+        /etc/fail2ban/filter.d/asterisk.conf; do
+        [[ -f "$f" ]] && rm -f "$f" && log "  Removido: $f"
+    done
 
-echo -ne "  ${BOLD}Remover ip.whitelist?${NC} [s/N]: "
-read -r DEL_WL
-if [[ $DEL_WL =~ ^[SsYy]$ ]]; then
-    rm -f /etc/fail2ban/ip.whitelist && log "  Removido: /etc/fail2ban/ip.whitelist"
+    if command -v fail2ban-client &>/dev/null && systemctl is-active --quiet fail2ban 2>/dev/null; then
+        fail2ban-client reload >> "$LOG_FILE" 2>&1 || true
+        log "Fail2Ban recarregado"
+    fi
+
+    echo -ne "  ${BOLD}Remover ip.whitelist?${NC} [s/N]: "
+    read -r DEL_WL
+    if [[ $DEL_WL =~ ^[SsYy]$ ]]; then
+        rm -f /etc/fail2ban/ip.whitelist && log "  Removido: /etc/fail2ban/ip.whitelist"
+    else
+        log "  ip.whitelist preservado"
+    fi
+
+    log "Resetando firewall (nftables)..."
+    if command -v nft &>/dev/null; then
+        nft delete table inet filter >> "$LOG_FILE" 2>&1 || true
+        printf '#!/usr/sbin/nft -f\n\nadd table inet filter\nflush table inet filter\n' > /etc/nftables.conf
+        systemctl disable nftables >> "$LOG_FILE" 2>&1 || true
+        log "nftables resetado — tabela inet filter removida, Docker preservado"
+    else
+        warn "nft não encontrado — firewall não resetado"
+    fi
+
 else
-    log "  ip.whitelist preservado"
-fi
-
-# ============================================================
-# 10. RESETAR NFTABLES
-# ============================================================
-log "Resetando firewall (nftables)..."
-if command -v nft &>/dev/null; then
-    # Remove apenas nossa tabela — preserva tabelas do Docker
-    nft delete table inet filter >> "$LOG_FILE" 2>&1 || true
-    printf '#!/usr/sbin/nft -f\n\nadd table inet filter\nflush table inet filter\n' > /etc/nftables.conf
-    systemctl disable nftables >> "$LOG_FILE" 2>&1 || true
-    log "nftables resetado — tabela inet filter removida, Docker preservado"
-else
-    warn "nft não encontrado — firewall não resetado"
+    log "Firewall preservado (manage-fw, Fail2Ban e nftables mantidos)"
 fi
 
 # ============================================================
@@ -208,6 +212,10 @@ echo -e "  Verificações:"
 echo -e "    Binário  : $(command -v asterisk 2>/dev/null || echo 'não encontrado ✓')"
 echo -e "    Serviço  : $(systemctl is-active asterisk 2>/dev/null || echo 'inativo ✓')"
 echo -e "    Processo : $(pgrep -x asterisk &>/dev/null && echo 'ainda rodando !' || echo 'nenhum ✓')"
-echo -e "    Firewall : $(nft list tables 2>/dev/null | grep -c 'table' || echo 0) tabela(s) nft restantes"
+if [[ $REMOVE_FW =~ ^[SsYy]$ ]]; then
+    echo -e "    Firewall : $(nft list tables 2>/dev/null | grep -c 'table' || echo 0) tabela(s) nft restantes"
+else
+    echo -e "    Firewall : preservado"
+fi
 echo ""
 echo -e "${GREEN}════════════════════════════════════════════════════════${NC}"
