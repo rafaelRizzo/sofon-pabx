@@ -19,9 +19,10 @@ model Company {
     updatedAt  DateTime      @updatedAt
     users      UserCompany[]
     dids       Did[]
-    extensions Extension[]
-    queues     Queue[]
-    trunks     Trunk[]
+    extensions     Extension[]
+    queues         Queue[]
+    trunks         Trunk[]
+    outboundRoutes OutboundRoute[]
 
     @@map("companies")
 }
@@ -77,8 +78,9 @@ model Extension {
     company          Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
     createdAt        DateTime      @default(now())
     updatedAt        DateTime      @updatedAt
-    queueMemberships QueueMember[]
-    user             User?
+    queueMemberships  QueueMember[]
+    user              User?
+    outboundRoutes    OutboundRouteExtension[]
 
     @@unique([alias, companyId])
     @@index([companyId])
@@ -129,23 +131,79 @@ model QueueMember {
 }
 
 model Trunk {
-    id               String   @id @default(cuid())
-    name             String   @db.VarChar(20)
+    id               String               @id @default(cuid())
+    name             String               @db.VarChar(20)
     companyId        String
-    company          Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-    registrationMode String   @db.VarChar(10)
-    host             String?  @db.VarChar(255)
-    username         String?  @db.VarChar(80)
-    password         String?  @db.VarChar(80)
-    context          String   @default("from-trunk") @db.VarChar(40)
-    codecs           String   @default("ulaw,alaw") @db.VarChar(200)
-    metadata         Json     @default("{}")
-    createdAt        DateTime @default(now())
-    updatedAt        DateTime @updatedAt
+    company          Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+    registrationMode String               @db.VarChar(10)
+    host             String?              @db.VarChar(255)
+    username         String?              @db.VarChar(80)
+    password         String?              @db.VarChar(80)
+    context          String               @default("from-trunk") @db.VarChar(40)
+    codecs           String               @default("ulaw,alaw") @db.VarChar(200)
+    metadata         Json                 @default("{}")
+    createdAt        DateTime             @default(now())
+    updatedAt        DateTime             @updatedAt
+    outboundRoutes   OutboundRouteTrunk[]
 
     @@unique([name, companyId])
     @@index([companyId])
     @@map("trunks_app")
+}
+
+model OutboundRoute {
+    id         String                   @id @default(cuid())
+    name       String
+    companyId  String
+    company    Company                  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+    position   Int                      @default(0)
+    patterns   OutboundDialPattern[]
+    trunks     OutboundRouteTrunk[]
+    extensions OutboundRouteExtension[]
+    createdAt  DateTime                 @default(now())
+    updatedAt  DateTime                 @updatedAt
+
+    @@index([companyId])
+    @@map("outbound_routes")
+}
+
+model OutboundDialPattern {
+    id        String        @id @default(cuid())
+    routeId   String
+    route     OutboundRoute @relation(fields: [routeId], references: [id], onDelete: Cascade)
+    pattern   String        @db.VarChar(40)
+    prepend   String?       @db.VarChar(40)
+    prefix    String?       @db.VarChar(40)
+    position  Int           @default(0)
+    createdAt DateTime      @default(now())
+
+    @@index([routeId])
+    @@map("outbound_dial_patterns")
+}
+
+model OutboundRouteTrunk {
+    id        String        @id @default(cuid())
+    routeId   String
+    route     OutboundRoute @relation(fields: [routeId], references: [id], onDelete: Cascade)
+    trunkId   String
+    trunk     Trunk         @relation(fields: [trunkId], references: [id])
+    position  Int           @default(0)
+
+    @@unique([routeId, trunkId])
+    @@index([routeId])
+    @@map("outbound_route_trunks")
+}
+
+model OutboundRouteExtension {
+    id          String        @id @default(cuid())
+    routeId     String
+    route       OutboundRoute @relation(fields: [routeId], references: [id], onDelete: Cascade)
+    extensionId String
+    extension   Extension     @relation(fields: [extensionId], references: [id], onDelete: Cascade)
+
+    @@unique([routeId, extensionId])
+    @@index([routeId])
+    @@map("outbound_route_extensions")
 }
 
 // ─── Asterisk Realtime Models ─────────────────────────────────────────────────

@@ -9,6 +9,8 @@ import { DialplanRepository } from '../../asterisk/dialplan.repository'
 import { AsteriskQueueRepository } from '../../asterisk/queue.repository'
 import { AppError } from '../../utils/errors/app.error'
 
+type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
+
 const CHARSET = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
 const generatePassword = () => {
     const bytes = randomBytes(20)
@@ -41,42 +43,104 @@ function applyGroupPrefixes(data: Record<string, any>, asteriskId: string): Reco
     return result
 }
 
+async function checkAsteriskSync(number: string, type: string): Promise<boolean> {
+    if (type === 'pjsip') {
+        const r = await prisma.ps_endpoints.findUnique({ where: { id: number }, select: { id: true } })
+        return !!r
+    }
+    const r = await prisma.sip_peers.findUnique({ where: { name: number }, select: { id: true } })
+    return !!r
+}
+
+async function provisionMissingAsteriskRecord(
+    tx: Tx,
+    opts: { number: string; type: string; name: string; context: string }
+): Promise<string | null> {
+    const { number, type, name, context } = opts
+
+    if (type === 'pjsip') {
+        const exists = await tx.ps_endpoints.findUnique({ where: { id: number }, select: { id: true } })
+        if (exists) return null
+        const password = generatePassword()
+        await PjsipRepository.createExtension(tx, number, { password, name, context, extras: {} })
+        await tx.extensions.createMany({
+            data: [
+                { context, exten: number, priority: 1, app: 'Dial', appdata: `PJSIP/${number},20` },
+                { context, exten: number, priority: 2, app: 'HangUp', appdata: null },
+            ],
+            skipDuplicates: true,
+        })
+        return password
+    }
+
+    const exists = await tx.sip_peers.findUnique({ where: { name: number }, select: { id: true } })
+    if (exists) return null
+    const password = generatePassword()
+    await SipRepository.createExtension(tx, number, password, context, {})
+    await tx.extensions.createMany({
+        data: [
+            { context, exten: number, priority: 1, app: 'Dial', appdata: `SIP/${number},20` },
+            { context, exten: number, priority: 2, app: 'HangUp', appdata: null },
+        ],
+        skipDuplicates: true,
+    })
+    return password
+}
+
 export const getAllExtensions = async (companyIds?: string[]) => {
     const singleCompanyId = companyIds?.length === 1 ? companyIds[0] : null
     const isAll = companyIds === undefined
 
-    if (singleCompanyId) {
-        const cached = await ExtensionsCache.getByCompany(singleCompanyId)
-        if (cached) return cached
-    } else if (isAll) {
-        const cached = await ExtensionsCache.getAllExtensions()
-        if (cached) return cached
+    type GroupedExtensions = { sip: any[]; pjsip: any[] }
+    let grouped: GroupedExtensions | null = null
+
+    if (singleCompanyId) grouped = (await ExtensionsCache.getByCompany(singleCompanyId)) as GroupedExtensions | null
+    else if (isAll) grouped = (await ExtensionsCache.getAllExtensions()) as GroupedExtensions | null
+
+    if (!grouped) {
+        const extensions = await prisma.extension.findMany({
+            where: companyIds ? { companyId: { in: companyIds } } : undefined,
+            select: {
+                id: true,
+                alias: true,
+                number: true,
+                type: true,
+                name: true,
+                context: true,
+                companyId: true,
+                createdAt: true,
+            },
+        })
+
+        const mapped = extensions.map(({ number, ...rest }) => ({ ...rest, username: number }))
+        grouped = {
+            sip: mapped.filter((e) => e.type === 'sip'),
+            pjsip: mapped.filter((e) => e.type === 'pjsip'),
+        }
+
+        if (singleCompanyId) await ExtensionsCache.setByCompany(singleCompanyId, grouped)
+        else if (isAll) await ExtensionsCache.setAllExtensions(grouped)
     }
 
-    const extensions = await prisma.extension.findMany({
-        where: companyIds ? { companyId: { in: companyIds } } : undefined,
-        select: {
-            id: true,
-            alias: true,
-            number: true,
-            type: true,
-            name: true,
-            context: true,
-            companyId: true,
-            createdAt: true,
-        },
-    })
+    const pjsipNumbers = grouped.pjsip.map((e: any) => e.username)
+    const sipNumbers = grouped.sip.map((e: any) => e.username)
 
-    const mapped = extensions.map(({ number, ...rest }) => ({ ...rest, username: number }))
+    const [pjsipSync, sipSync] = await Promise.all([
+        pjsipNumbers.length > 0
+            ? prisma.ps_endpoints.findMany({ where: { id: { in: pjsipNumbers } }, select: { id: true } })
+            : [],
+        sipNumbers.length > 0
+            ? prisma.sip_peers.findMany({ where: { name: { in: sipNumbers } }, select: { name: true } })
+            : [],
+    ])
 
-    const grouped = {
-        sip: mapped.filter((e) => e.type === 'sip'),
-        pjsip: mapped.filter((e) => e.type === 'pjsip'),
+    const pjsipSynced = new Set(pjsipSync.map((e: any) => e.id))
+    const sipSynced = new Set(sipSync.map((e: any) => e.name))
+
+    return {
+        sip: grouped.sip.map((e: any) => ({ ...e, synced: sipSynced.has(e.username) })),
+        pjsip: grouped.pjsip.map((e: any) => ({ ...e, synced: pjsipSynced.has(e.username) })),
     }
-
-    if (singleCompanyId) await ExtensionsCache.setByCompany(singleCompanyId, grouped)
-    else if (isAll) await ExtensionsCache.setAllExtensions(grouped)
-    return grouped
 }
 
 const extensionSelect = {
@@ -101,21 +165,25 @@ type ExtensionDto = {
     createdAt: Date
 }
 
-export const getExtensionById = async (id: string): Promise<ExtensionDto> => {
+export const getExtensionById = async (id: string): Promise<ExtensionDto & { synced: boolean }> => {
     const cached = await ExtensionsCache.getExtension<ExtensionDto>(id)
-    if (cached) return cached
 
-    const extension = await prisma.extension.findUnique({
-        where: { id },
-        select: extensionSelect,
-    })
+    let dto: ExtensionDto
+    if (cached) {
+        dto = cached
+    } else {
+        const extension = await prisma.extension.findUnique({
+            where: { id },
+            select: extensionSelect,
+        })
+        if (!extension) throw new AppError('Extension not found', 404)
+        const { number, ...rest } = extension
+        dto = { ...rest, username: number }
+        await ExtensionsCache.setExtension(id, dto)
+    }
 
-    if (!extension) throw new AppError('Extension not found', 404)
-
-    const { number, ...rest } = extension
-    const result: ExtensionDto = { ...rest, username: number }
-    await ExtensionsCache.setExtension(id, result)
-    return result
+    const synced = await checkAsteriskSync(dto.username, dto.type)
+    return { ...dto, synced }
 }
 
 export const createExtension = async (data: CreateExtensionInput) => {
@@ -184,7 +252,16 @@ export const updateExtension = async (id: string, data: UpdateExtensionInput) =>
         if (conflict) throw new AppError('Extension alias already in use for this company', 409)
     }
 
+    let provisionedPassword: string | null = null
+
     await prisma.$transaction(async (tx) => {
+        provisionedPassword = await provisionMissingAsteriskRecord(tx, {
+            number,
+            type,
+            name: existing.name,
+            context,
+        })
+
         if (aliasChanged || contextChanged) {
             await DialplanRepository.recreate(tx, context, number, effectiveContext, effectiveNumber, type as 'sip' | 'pjsip')
         }
@@ -238,21 +315,48 @@ export const updateExtension = async (id: string, data: UpdateExtensionInput) =>
 
     await ExtensionsCache.invalidateExtension(id)
     await ExtensionsCache.invalidateAllExtensions()
-    return getExtensionById(id)
+    const updated = await getExtensionById(id)
+    return provisionedPassword ? { ...updated, provisioned: true, password: provisionedPassword } : updated
 }
 
 export const resetExtensionPassword = async (id: string) => {
     const existing = await prisma.extension.findUnique({ where: { id } })
     if (!existing) throw new AppError('Extension not found', 404)
 
-    const { number, type } = existing
+    const { number, type, name, context } = existing
     const password = generatePassword()
 
-    if (type === 'pjsip') {
-        await prisma.ps_auths.update({ where: { id: number }, data: { password } })
-    } else {
-        await prisma.sip_peers.update({ where: { name: number }, data: { secret: password } })
-    }
+    await prisma.$transaction(async (tx) => {
+        if (type === 'pjsip') {
+            const exists = await tx.ps_endpoints.findUnique({ where: { id: number }, select: { id: true } })
+            if (!exists) {
+                await PjsipRepository.createExtension(tx, number, { password, name, context, extras: {} })
+                await tx.extensions.createMany({
+                    data: [
+                        { context, exten: number, priority: 1, app: 'Dial', appdata: `PJSIP/${number},20` },
+                        { context, exten: number, priority: 2, app: 'HangUp', appdata: null },
+                    ],
+                    skipDuplicates: true,
+                })
+            } else {
+                await tx.ps_auths.update({ where: { id: number }, data: { password } })
+            }
+        } else {
+            const exists = await tx.sip_peers.findUnique({ where: { name: number }, select: { id: true } })
+            if (!exists) {
+                await SipRepository.createExtension(tx, number, password, context, {})
+                await tx.extensions.createMany({
+                    data: [
+                        { context, exten: number, priority: 1, app: 'Dial', appdata: `SIP/${number},20` },
+                        { context, exten: number, priority: 2, app: 'HangUp', appdata: null },
+                    ],
+                    skipDuplicates: true,
+                })
+            } else {
+                await tx.sip_peers.update({ where: { name: number }, data: { secret: password } })
+            }
+        }
+    })
 
     await ExtensionsCache.invalidateExtension(id)
     return { password }

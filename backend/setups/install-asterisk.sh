@@ -575,6 +575,12 @@ fi
 show_header
 show_progress 12 12 "Aplicando hardening de segurança"
 
+# --- Monitor: diretório de gravações de chamadas ---
+mkdir -p /var/spool/asterisk/monitor
+chown -R asterisk:asterisk /var/spool/asterisk/monitor
+chmod 755 /var/spool/asterisk/monitor
+log "Diretório de gravações criado → /var/spool/asterisk/monitor"
+
 # --- Logger: garante gravação em disco ---
 mkdir -p /var/log/asterisk
 touch /var/log/asterisk/messages /var/log/asterisk/full

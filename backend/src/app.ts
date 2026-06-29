@@ -14,6 +14,7 @@ import { extensionsRoutes } from './modules/extensions/extensions.routes'
 import { queuesRoutes } from './modules/queues/queues.routes'
 import { queueMembersRoutes } from './modules/queue-members/queue-members.routes'
 import { trunksRoutes } from './modules/trunks/trunks.routes'
+import { outboundRoutesRoutes } from './modules/outbound-routes/outbound-routes.routes'
 
 const env = validateEnv()
 
@@ -83,6 +84,7 @@ app.register(extensionsRoutes)
 app.register(queuesRoutes)
 app.register(queueMembersRoutes)
 app.register(trunksRoutes)
+app.register(outboundRoutesRoutes)
 
 // Health check
 app.get('/health', async (req, reply) => {
