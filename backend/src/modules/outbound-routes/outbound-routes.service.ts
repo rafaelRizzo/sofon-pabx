@@ -41,7 +41,7 @@ function buildDialplanEntries(
 
     entries.push({
         context, exten, priority: p++, app: 'MixMonitor',
-        appdata: `/var/spool/asterisk/monitor/${asteriskId}/\${STRFTIME(,,%Y%m%d)}/\${UNIQUEID}.wav,b`,
+        appdata: `/var/spool/asterisk/monitor/${asteriskId}/\${STRFTIME(,,%Y%m%d)}/\${UNIQUEID}_\${CUT(CALLERID(num),_,1)}_\${EXTEN}.wav,b`,
     })
 
     for (let i = 0; i < trunkAstIds.length; i++) {
