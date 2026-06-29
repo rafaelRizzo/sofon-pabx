@@ -11,11 +11,17 @@ export const getDids = async (req: FastifyRequest, reply: FastifyReply) => {
 
         if (filter.success) {
             req.scope.assertAccess(filter.data.companyId)
-            const dids = await DidsService.getAllDids([filter.data.companyId])
+            const dids = await DidsService.getDidsByCompany(filter.data.companyId)
             return reply.send({ success: true, message: 'DIDs fetched successfully', dids })
         }
 
-        const dids = await DidsService.getAllDids(req.scope.companyIds ?? undefined)
+        const { companyIds } = req.scope
+        if (companyIds?.length === 1) {
+            const dids = await DidsService.getDidsByCompany(companyIds[0]!)
+            return reply.send({ success: true, message: 'DIDs fetched successfully', dids })
+        }
+
+        const dids = await DidsService.getAllDids(companyIds ?? undefined)
         return reply.send({ success: true, message: 'DIDs fetched successfully', dids })
     } catch (error) {
         return handleError(reply, error, req)

@@ -18,11 +18,6 @@ export const companyIdParamSchema = z.object({
     id_company: z.cuid2(),
 })
 
-export const memberIdParamSchema = z.object({
-    id: z.cuid2(),
-    memberId: z.cuid2(),
-})
-
 export const companyQuerySchema = z.object({
     companyId: z.cuid2(),
 })
@@ -69,18 +64,5 @@ export const updateQueueSchema = z.object({
     weight: z.number().int().min(0).optional(),
 })
 
-export const addMemberSchema = z.object({
-    extensionId: z.cuid2(),
-    penalty: z.number().int().min(0).max(100).default(0),
-    paused: z.boolean().default(false),
-})
-
-export const updateMemberSchema = z.object({
-    penalty: z.number().int().min(0).max(100).optional(),
-    paused: z.boolean().optional(),
-})
-
 export type CreateQueueInput = z.infer<typeof createQueueSchema>
 export type UpdateQueueInput = z.infer<typeof updateQueueSchema>
-export type AddMemberInput = z.infer<typeof addMemberSchema>
-export type UpdateMemberInput = z.infer<typeof updateMemberSchema>

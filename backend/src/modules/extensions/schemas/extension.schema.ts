@@ -124,6 +124,10 @@ const pjsipFields = {
     aor_support_path: z.boolean().optional(),
     aor_outbound_proxy: z.string().max(40).nullish(),
     aor_mailboxes: z.string().max(80).nullish(),
+    // user informs logical name(s), e.g. "suporte" or "suporte,financeiro"
+    // service prefixes with asteriskId before writing to ps_endpoints
+    namedcallgroup: z.string().max(80).optional(),
+    namedpickupgroup: z.string().max(80).optional(),
 }
 
 const baseShape = {

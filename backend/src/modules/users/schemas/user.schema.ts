@@ -14,6 +14,7 @@ export const updateUserSchema = z.object({
     name: z.string().min(1).optional(),
     username: z.email().optional(),
     password: z.string().min(6).optional(),
+    extensionId: z.cuid2().nullable().optional(),
 })
 
 export type IdParam = z.infer<typeof idParamSchema>

@@ -1,5 +1,6 @@
 import { randomBytes } from 'crypto'
 import { prisma } from '../../lib/prisma'
+import { TrunksCache } from './cache/trunks.cache'
 import type { CreateTrunkInput, UpdateTrunkInput } from './schemas/trunk.schema'
 import { PjsipRepository } from '../../asterisk/pjsip.repository'
 import { AppError } from '../../utils/errors/app.error'
@@ -27,15 +28,25 @@ const trunkSelect = {
 } as const
 
 export const getTrunks = async (companyId: string) => {
+    const cached = await TrunksCache.getByCompany(companyId)
+    if (cached) return cached
+
     const company = await prisma.company.findUnique({ where: { id: companyId } })
     if (!company) throw new AppError('Company not found', 404)
 
-    return prisma.trunk.findMany({ where: { companyId }, select: trunkSelect })
+    const trunks = await prisma.trunk.findMany({ where: { companyId }, select: trunkSelect })
+    await TrunksCache.setByCompany(companyId, trunks)
+    return trunks
 }
 
 export const getTrunkById = async (id: string) => {
+    const cached = await TrunksCache.getTrunk(id)
+    if (cached) return cached
+
     const trunk = await prisma.trunk.findUnique({ where: { id }, select: trunkSelect })
     if (!trunk) throw new AppError('Trunk not found', 404)
+
+    await TrunksCache.setTrunk(id, trunk)
     return trunk
 }
 
@@ -80,6 +91,8 @@ export const createTrunk = async (data: CreateTrunkInput) => {
         where: { name_companyId: { name: data.name, companyId: data.companyId } },
         select: trunkSelect,
     })
+    await TrunksCache.invalidateAllTrunks()
+    await TrunksCache.setTrunk(created!.id, created!)
     return created!
 }
 
@@ -102,7 +115,9 @@ export const updateTrunk = async (id: string, data: UpdateTrunkInput) => {
         await tx.trunk.update({ where: { id }, data })
     })
 
-    return prisma.trunk.findUnique({ where: { id }, select: trunkSelect })
+    await TrunksCache.invalidateTrunk(id)
+    await TrunksCache.invalidateByCompany(existing.companyId)
+    return getTrunkById(id)
 }
 
 export const deleteTrunk = async (id: string) => {
@@ -118,4 +133,6 @@ export const deleteTrunk = async (id: string) => {
         await PjsipRepository.deleteTrunk(tx, astId, existing.registrationMode)
         await tx.trunk.delete({ where: { id } })
     })
+
+    await TrunksCache.invalidateAllTrunks()
 }

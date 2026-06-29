@@ -25,11 +25,31 @@ function generateAsteriskNumber(alias: string, asteriskId: string): string {
     return `${alias}_${asteriskId}`
 }
 
+const GROUP_FIELDS = ['namedcallgroup', 'namedpickupgroup'] as const
+
+function prefixGroups(groups: string, asteriskId: string): string {
+    return groups.split(',').map((g) => `${asteriskId}-${g.trim()}`).join(',')
+}
+
+function applyGroupPrefixes(data: Record<string, any>, asteriskId: string): Record<string, any> {
+    const result = { ...data }
+    for (const field of GROUP_FIELDS) {
+        if (typeof result[field] === 'string') {
+            result[field] = prefixGroups(result[field], asteriskId)
+        }
+    }
+    return result
+}
+
 export const getAllExtensions = async (companyIds?: string[]) => {
     const singleCompanyId = companyIds?.length === 1 ? companyIds[0] : null
+    const isAll = companyIds === undefined
 
     if (singleCompanyId) {
         const cached = await ExtensionsCache.getByCompany(singleCompanyId)
+        if (cached) return cached
+    } else if (isAll) {
+        const cached = await ExtensionsCache.getAllExtensions()
         if (cached) return cached
     }
 
@@ -55,6 +75,7 @@ export const getAllExtensions = async (companyIds?: string[]) => {
     }
 
     if (singleCompanyId) await ExtensionsCache.setByCompany(singleCompanyId, grouped)
+    else if (isAll) await ExtensionsCache.setAllExtensions(grouped)
     return grouped
 }
 
@@ -116,9 +137,10 @@ export const createExtension = async (data: CreateExtensionInput) => {
 
     if (type === 'pjsip') {
         const { alias: _a, type: _t, name: _n, companyId: _c, context: _ctx, ...pjsipExtras } = data
+        const pjsipExtrasWithGroups = applyGroupPrefixes(pjsipExtras, company.asteriskId)
 
         await prisma.$transaction(async (tx) => {
-            await PjsipRepository.createExtension(tx, number, { password, name, context, extras: pjsipExtras })
+            await PjsipRepository.createExtension(tx, number, { password, name, context, extras: pjsipExtrasWithGroups })
             await DialplanRepository.create(tx, context, number, 'pjsip')
             await tx.extension.create({ data: { alias, number, type, name, context, companyId } })
         })
@@ -186,7 +208,8 @@ export const updateExtension = async (id: string, data: UpdateExtensionInput) =>
                 else endpointUpdate[key] = value
             }
 
-            await PjsipRepository.updateExtension(tx, effectiveNumber, endpointUpdate, aorUpdate)
+            const endpointUpdateWithGroups = applyGroupPrefixes(endpointUpdate, existing.company.asteriskId)
+            await PjsipRepository.updateExtension(tx, effectiveNumber, endpointUpdateWithGroups, aorUpdate)
         } else {
             if (aliasChanged) {
                 await SipRepository.renameExtension(tx, number, effectiveNumber)

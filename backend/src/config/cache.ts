@@ -1,83 +1,57 @@
-import { redisClient } from './redis'
+import NodeCache from 'node-cache'
 import { logger } from '../utils/logger'
 
 interface CacheConfig {
     ttl?: number
 }
 
+const store = new NodeCache({ stdTTL: 0, checkperiod: 600, useClones: false })
+
 class CacheManager {
-    async get<T>(namespace: string, key: string): Promise<T | null> {
+    get<T>(namespace: string, key: string): Promise<T | null> {
         try {
             const fullKey = `${namespace}:${key}`
-            const value = await redisClient.get(fullKey)
-            return value ? (JSON.parse(value) as T) : null
+            const value = store.get<T>(fullKey)
+            return Promise.resolve(value !== undefined ? value : null)
         } catch (error) {
-            logger.error({
-                event: 'cache.get.error',
-                namespace,
-                key,
-                error: error instanceof Error ? error.message : String(error),
-            })
-            return null
+            logger.error({ event: 'cache.get.error', namespace, key, error: error instanceof Error ? error.message : String(error) })
+            return Promise.resolve(null)
         }
     }
 
-    async set<T>(namespace: string, key: string, value: T, config?: CacheConfig): Promise<void> {
+    set<T>(namespace: string, key: string, value: T, config?: CacheConfig): Promise<void> {
         try {
             const fullKey = `${namespace}:${key}`
-            const serialized = JSON.stringify(value)
-            if (config?.ttl) {
-                await redisClient.setEx(fullKey, config.ttl, serialized)
-            } else {
-                await redisClient.set(fullKey, serialized)
-            }
+            store.set(fullKey, value, config?.ttl ?? 0)
         } catch (error) {
-            logger.error({
-                event: 'cache.set.error',
-                namespace,
-                key,
-                error: error instanceof Error ? error.message : String(error),
-            })
+            logger.error({ event: 'cache.set.error', namespace, key, error: error instanceof Error ? error.message : String(error) })
         }
+        return Promise.resolve()
     }
 
-    async invalidateByKey(key: string): Promise<void> {
+    invalidateByKey(key: string): Promise<void> {
         try {
-            await redisClient.del(key)
+            store.del(key)
         } catch (error) {
-            logger.error({
-                event: 'cache.invalidate.error',
-                key,
-                error: error instanceof Error ? error.message : String(error),
-            })
+            logger.error({ event: 'cache.invalidate.error', key, error: error instanceof Error ? error.message : String(error) })
         }
+        return Promise.resolve()
     }
 
-    async invalidate(namespace: string): Promise<void> {
+    invalidate(namespace: string): Promise<void> {
         try {
-            const pattern = `${namespace}:*`
-            const keys = await redisClient.keys(pattern)
-            if (keys.length > 0) {
-                await redisClient.del(keys)
-            }
+            const prefix = `${namespace}:`
+            const matched = store.keys().filter((k) => k.startsWith(prefix))
+            if (matched.length > 0) store.del(matched)
         } catch (error) {
-            logger.error({
-                event: 'cache.invalidate_namespace.error',
-                namespace,
-                error: error instanceof Error ? error.message : String(error),
-            })
+            logger.error({ event: 'cache.invalidate_namespace.error', namespace, error: error instanceof Error ? error.message : String(error) })
         }
+        return Promise.resolve()
     }
 
-    async clear(): Promise<void> {
-        try {
-            await redisClient.flushAll()
-        } catch (error) {
-            logger.error({
-                event: 'cache.clear.error',
-                error: error instanceof Error ? error.message : String(error),
-            })
-        }
+    clear(): Promise<void> {
+        store.flushAll()
+        return Promise.resolve()
     }
 }
 

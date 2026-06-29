@@ -7,6 +7,7 @@ import { companiesRoutes } from '../modules/companies/companies.routes'
 import { didsRoutes } from '../modules/dids/dids.routes'
 import { extensionsRoutes } from '../modules/extensions/extensions.routes'
 import { queuesRoutes } from '../modules/queues/queues.routes'
+import { queueMembersRoutes } from '../modules/queue-members/queue-members.routes'
 import { connectRedis } from '../config/redis'
 
 export const buildApp = async (): Promise<FastifyInstance> => {
@@ -20,6 +21,7 @@ export const buildApp = async (): Promise<FastifyInstance> => {
     await app.register(didsRoutes)
     await app.register(extensionsRoutes)
     await app.register(queuesRoutes)
+    await app.register(queueMembersRoutes)
     await app.ready()
     return app
 }

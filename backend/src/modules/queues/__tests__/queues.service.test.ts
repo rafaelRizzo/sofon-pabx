@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'bun:test'
 import { prisma } from '../../../lib/prisma'
 import { setupTestEnv, teardownTestEnv } from '../../../test/setup'
 import * as QueuesService from '../queues.service'
+import * as QueueMembersService from '../../queue-members/queue-members.service'
 
 const PREFIX = `__test_queues_svc_${Date.now()}__`
 
@@ -122,9 +123,9 @@ describe('QueuesService.getQueueById', () => {
 })
 
 // ─── addMember ────────────────────────────────────────────────────────────────
-describe('QueuesService.addMember', () => {
+describe('QueueMembersService.addMember', () => {
     it('adds extension as member and syncs to asterisk', async () => {
-        const member = await QueuesService.addMember(queueId, { extensionId, penalty: 2, paused: false }) as any
+        const member = await QueueMembersService.addMember(queueId, { extensionId, penalty: 2, paused: false }) as any
         memberId = member.id
 
         expect(member.extensionId).toBe(extensionId)
@@ -141,7 +142,7 @@ describe('QueuesService.addMember', () => {
 
     it('throws 409 when already a member', async () => {
         await expect(
-            QueuesService.addMember(queueId, { extensionId, penalty: 0, paused: false })
+            QueueMembersService.addMember(queueId, { extensionId, penalty: 0, paused: false })
         ).rejects.toMatchObject({ statusCode: 409 })
     })
 
@@ -152,7 +153,7 @@ describe('QueuesService.addMember', () => {
         })
 
         await expect(
-            QueuesService.addMember(queueId, { extensionId: otherExt.id, penalty: 0, paused: false })
+            QueueMembersService.addMember(queueId, { extensionId: otherExt.id, penalty: 0, paused: false })
         ).rejects.toMatchObject({ statusCode: 403 })
 
         await prisma.extension.delete({ where: { id: otherExt.id } })
@@ -161,22 +162,22 @@ describe('QueuesService.addMember', () => {
 
     it('throws 404 with non-existent queue', async () => {
         await expect(
-            QueuesService.addMember('clxxxxxxxxxxxxxxxxxxxxxxxxx', { extensionId, penalty: 0, paused: false })
+            QueueMembersService.addMember('clxxxxxxxxxxxxxxxxxxxxxxxxx', { extensionId, penalty: 0, paused: false })
         ).rejects.toMatchObject({ statusCode: 404 })
     })
 })
 
 // ─── getQueueMembers ──────────────────────────────────────────────────────────
-describe('QueuesService.getQueueMembers', () => {
+describe('QueueMembersService.getQueueMembers', () => {
     it('returns list of members', async () => {
-        const members = await QueuesService.getQueueMembers(queueId) as any[]
+        const members = await QueueMembersService.getQueueMembers(queueId) as any[]
         expect(Array.isArray(members)).toBe(true)
         expect(members.some((m) => m.id === memberId)).toBe(true)
     })
 
     it('throws 404 with non-existent queue', async () => {
         await expect(
-            QueuesService.getQueueMembers('clxxxxxxxxxxxxxxxxxxxxxxxxx')
+            QueueMembersService.getQueueMembers('clxxxxxxxxxxxxxxxxxxxxxxxxx')
         ).rejects.toMatchObject({ statusCode: 404 })
     })
 })
@@ -201,9 +202,9 @@ describe('QueuesService.updateQueue', () => {
 })
 
 // ─── updateMember ─────────────────────────────────────────────────────────────
-describe('QueuesService.updateMember', () => {
+describe('QueueMembersService.updateMember', () => {
     it('updates member and syncs to asterisk', async () => {
-        const member = await QueuesService.updateMember(queueId, memberId, { penalty: 10, paused: true }) as any
+        const member = await QueueMembersService.updateMember(queueId, memberId, { penalty: 10, paused: true }) as any
         expect(member.penalty).toBe(10)
         expect(member.paused).toBe(true)
 
@@ -214,15 +215,15 @@ describe('QueuesService.updateMember', () => {
 
     it('throws 404 with wrong queueId', async () => {
         await expect(
-            QueuesService.updateMember('clxxxxxxxxxxxxxxxxxxxxxxxxx', memberId, { penalty: 1 })
+            QueueMembersService.updateMember('clxxxxxxxxxxxxxxxxxxxxxxxxx', memberId, { penalty: 1 })
         ).rejects.toMatchObject({ statusCode: 404 })
     })
 })
 
 // ─── removeMember ─────────────────────────────────────────────────────────────
-describe('QueuesService.removeMember', () => {
+describe('QueueMembersService.removeMember', () => {
     it('removes member and syncs to asterisk', async () => {
-        await QueuesService.removeMember(queueId, memberId)
+        await QueueMembersService.removeMember(queueId, memberId)
 
         const check = await prisma.queueMember.findUnique({ where: { id: memberId } })
         expect(check).toBeNull()
@@ -233,7 +234,7 @@ describe('QueuesService.removeMember', () => {
 
     it('throws 404 after removal', async () => {
         await expect(
-            QueuesService.removeMember(queueId, memberId)
+            QueueMembersService.removeMember(queueId, memberId)
         ).rejects.toMatchObject({ statusCode: 404 })
     })
 })
@@ -245,7 +246,7 @@ describe('QueuesService.deleteQueue', () => {
         const tmpExt = await prisma.extension.create({
             data: { alias: 'tmp', number: '9002', type: 'sip', name: 'Tmp', companyId },
         })
-        await QueuesService.addMember(tmp.id, { extensionId: tmpExt.id, penalty: 0, paused: false })
+        await QueueMembersService.addMember(tmp.id, { extensionId: tmpExt.id, penalty: 0, paused: false })
 
         await QueuesService.deleteQueue(tmp.id)
 

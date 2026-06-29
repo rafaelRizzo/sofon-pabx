@@ -17,6 +17,7 @@ export const getAllUsers = async () => {
             username: true,
             role: true,
             status: true,
+            extensionId: true,
             createdAt: true,
             updatedAt: true,
         },
@@ -39,6 +40,7 @@ export const getUserById = async (id: string) => {
             username: true,
             role: true,
             status: true,
+            extensionId: true,
             createdAt: true,
             updatedAt: true,
         },
@@ -72,6 +74,7 @@ export const createUser = async (data: CreateUserInput) => {
             username: true,
             role: true,
             status: true,
+            extensionId: true,
             createdAt: true,
             updatedAt: true,
         },
@@ -102,6 +105,7 @@ export const updateUser = async (id: string, data: UpdateUserInput) => {
             username: true,
             role: true,
             status: true,
+            extensionId: true,
             createdAt: true,
             updatedAt: true,
         },
@@ -113,13 +117,13 @@ export const updateUser = async (id: string, data: UpdateUserInput) => {
 }
 
 export const getCompaniesByUser = async (id: string) => {
+    const cached = await CompaniesCache.getCompaniesByUser(id)
+    if (cached) return cached
+
     const user = await prisma.user.findUnique({ where: { id } })
     if (!user) {
         throw new AppError('User not found', 404)
     }
-
-    const cached = await CompaniesCache.getCompaniesByUser(id)
-    if (cached) return cached
 
     const companies = await prisma.company.findMany({
         where: { users: { some: { userId: id } } },

@@ -133,6 +133,55 @@ describe('ExtensionsService.createExtension (pjsip)', () => {
     })
 })
 
+// ----------------------------------------- createExtension PJSIP named groups
+describe('ExtensionsService.createExtension (pjsip) named groups', () => {
+    it('prefixes namedcallgroup and namedpickupgroup with asteriskId', async () => {
+        const ext = await ExtensionsService.createExtension({
+            alias: '2003',
+            type: 'pjsip',
+            name: 'PJSIP Groups',
+            companyId,
+            context: 'ramais',
+            namedcallgroup: 'suporte',
+            namedpickupgroup: 'suporte',
+        }) as any
+
+        const endpoint = await prisma.ps_endpoints.findUnique({ where: { id: ext.username } })
+        expect(endpoint?.namedcallgroup).toBe(`${asteriskId}-suporte`)
+        expect(endpoint?.namedpickupgroup).toBe(`${asteriskId}-suporte`)
+    })
+
+    it('prefixes each group in comma-separated namedcallgroup on create', async () => {
+        const ext = await ExtensionsService.createExtension({
+            alias: '2004',
+            type: 'pjsip',
+            name: 'PJSIP Multi Groups',
+            companyId,
+            context: 'ramais',
+            namedcallgroup: 'suporte,financeiro',
+            namedpickupgroup: 'suporte',
+        }) as any
+
+        const endpoint = await prisma.ps_endpoints.findUnique({ where: { id: ext.username } })
+        expect(endpoint?.namedcallgroup).toBe(`${asteriskId}-suporte,${asteriskId}-financeiro`)
+        expect(endpoint?.namedpickupgroup).toBe(`${asteriskId}-suporte`)
+    })
+
+    it('leaves namedcallgroup/namedpickupgroup null when not provided', async () => {
+        const ext = await ExtensionsService.createExtension({
+            alias: '2005',
+            type: 'pjsip',
+            name: 'PJSIP No Groups',
+            companyId,
+            context: 'ramais',
+        }) as any
+
+        const endpoint = await prisma.ps_endpoints.findUnique({ where: { id: ext.username } })
+        expect(endpoint?.namedcallgroup).toBeNull()
+        expect(endpoint?.namedpickupgroup).toBeNull()
+    })
+})
+
 // -------------------------------------------------------- getAllExtensions
 describe('ExtensionsService.getAllExtensions', () => {
     it('returns grouped sip/pjsip filtered by companyId', async () => {
@@ -180,6 +229,28 @@ describe('ExtensionsService.updateExtension (pjsip)', () => {
 
         const endpoint = await prisma.ps_endpoints.findUnique({ where: { id: ext.username } })
         expect(endpoint?.callerid).toBe(`PJSIP Renamed <${ext.username}>`)
+    })
+
+    it('prefixes namedcallgroup and namedpickupgroup with asteriskId on update', async () => {
+        await ExtensionsService.updateExtension(pjsipId, {
+            namedcallgroup: 'suporte',
+            namedpickupgroup: 'suporte',
+        })
+
+        const ext = await ExtensionsService.getExtensionById(pjsipId) as any
+        const endpoint = await prisma.ps_endpoints.findUnique({ where: { id: ext.username } })
+        expect(endpoint?.namedcallgroup).toBe(`${asteriskId}-suporte`)
+        expect(endpoint?.namedpickupgroup).toBe(`${asteriskId}-suporte`)
+    })
+
+    it('prefixes each group in comma-separated namedcallgroup', async () => {
+        await ExtensionsService.updateExtension(pjsipId, {
+            namedcallgroup: 'suporte,financeiro',
+        })
+
+        const ext = await ExtensionsService.getExtensionById(pjsipId) as any
+        const endpoint = await prisma.ps_endpoints.findUnique({ where: { id: ext.username } })
+        expect(endpoint?.namedcallgroup).toBe(`${asteriskId}-suporte,${asteriskId}-financeiro`)
     })
 })
 

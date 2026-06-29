@@ -29,11 +29,11 @@ export const getAllDids = async (companyIds?: string[]) => {
 }
 
 export const getDidsByCompany = async (companyId: string) => {
-    const company = await prisma.company.findUnique({ where: { id: companyId } })
-    if (!company) throw new AppError('Company not found', 404)
-
     const cached = await DidsCache.getDidsByCompany(companyId)
     if (cached) return cached
+
+    const company = await prisma.company.findUnique({ where: { id: companyId } })
+    if (!company) throw new AppError('Company not found', 404)
 
     const dids = await prisma.did.findMany({ where: { companyId }, select })
 

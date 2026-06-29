@@ -12,6 +12,7 @@ import { companiesRoutes } from './modules/companies/companies.routes'
 import { didsRoutes } from './modules/dids/dids.routes'
 import { extensionsRoutes } from './modules/extensions/extensions.routes'
 import { queuesRoutes } from './modules/queues/queues.routes'
+import { queueMembersRoutes } from './modules/queue-members/queue-members.routes'
 import { trunksRoutes } from './modules/trunks/trunks.routes'
 
 const env = validateEnv()
@@ -80,6 +81,7 @@ app.register(companiesRoutes)
 app.register(didsRoutes)
 app.register(extensionsRoutes)
 app.register(queuesRoutes)
+app.register(queueMembersRoutes)
 app.register(trunksRoutes)
 
 // Health check

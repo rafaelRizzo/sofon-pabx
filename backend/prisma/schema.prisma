@@ -47,6 +47,8 @@ model User {
     token       String?       @unique
     role        String        @default("user")
     status      String        @default("active")
+    extensionId String?       @unique
+    extension   Extension?    @relation(fields: [extensionId], references: [id], onDelete: SetNull)
     createdAt   DateTime      @default(now())
     updatedAt   DateTime      @updatedAt
     companies   UserCompany[]
@@ -76,6 +78,7 @@ model Extension {
     createdAt        DateTime      @default(now())
     updatedAt        DateTime      @updatedAt
     queueMemberships QueueMember[]
+    user             User?
 
     @@unique([alias, companyId])
     @@index([companyId])
@@ -237,6 +240,8 @@ model ps_endpoints {
     moh_suggest         String?  @default("default") @db.VarChar(40)
     outbound_auth       String?  @db.VarChar(200)
     rel                 String?  @default("yes") @map("100rel") @db.VarChar(40)
+    namedcallgroup      String?  @db.VarChar(256)
+    namedpickupgroup    String?  @db.VarChar(256)
 }
 
 // name é o identificador real do peer no Asterisk (chan_sip busca por name, não por id)
