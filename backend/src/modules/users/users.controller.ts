@@ -12,12 +12,11 @@ const assertSelfOrAdmin = (req: FastifyRequest, id: string) => {
 
 export const getAllUsers = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
-        const users = await UsersService.getAllUsers()
-        return reply.send({
-            success: true,
-            message: 'Users fetched successfully',
-            users
-        })
+        const { role, id } = req.user!
+        const users = await UsersService.getAllUsers(
+            role === 'reseller' ? { createdBy: id } : undefined
+        )
+        return reply.send({ success: true, message: 'Users fetched successfully', users })
     } catch (error) {
         return handleError(reply, error, req)
     }
@@ -41,14 +40,17 @@ export const getUserById = async (req: FastifyRequest, reply: FastifyReply) => {
 
 export const createUser = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
+        const { role: requesterRole, id: requesterId } = req.user!
         const data = createUserSchema.parse(req.body)
-        const user = await UsersService.createUser(data)
 
-        return reply.status(201).send({
-            success: true,
-            message: 'User created successfully',
-            userId: user.id
-        })
+        if (requesterRole === 'reseller') {
+            if (data.role !== 'user') throw new AppError('Resellers can only create users with role "user"', 403)
+        }
+
+        const createdBy = requesterRole !== 'admin' ? requesterId : undefined
+        const user = await UsersService.createUser(data, createdBy)
+
+        return reply.status(201).send({ success: true, message: 'User created successfully', user })
     } catch (error) {
         return handleError(reply, error, req)
     }

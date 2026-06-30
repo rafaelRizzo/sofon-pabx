@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { timestamp } from '../../../schemas/responses'
 
 const baseTrunkShape = {
     name: z
@@ -41,3 +42,16 @@ export const trunkQuerySchema = z.object({ companyId: z.cuid2() })
 
 export type CreateTrunkInput = z.infer<typeof createTrunkSchema>
 export type UpdateTrunkInput = z.infer<typeof updateTrunkSchema>
+
+export const TrunkSchema = z.object({
+    id: z.string(),
+    name: z.string(),
+    companyId: z.string(),
+    registrationMode: z.enum(['outbound', 'inbound']),
+    host: z.string().nullable(),
+    username: z.string().nullable(),
+    context: z.string(),
+    codecs: z.string(),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+})

@@ -64,6 +64,7 @@ afterAll(async () => {
     await prisma.user.deleteMany({ where: { username: { startsWith: PREFIX } } })
     await prisma.$disconnect()
     if (app) await app.close()
+    await disconnectRedis()
 })
 
 const auth = () => ({ authorization: `Bearer ${accessToken}` })

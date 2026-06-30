@@ -3,6 +3,9 @@ import cookiePlugin from '@fastify/cookie'
 import helmet from '@fastify/helmet'
 import cors from '@fastify/cors'
 import rateLimit from '@fastify/rate-limit'
+import swagger from '@fastify/swagger'
+import scalar from '@scalar/fastify-api-reference'
+import { validatorCompiler, serializerCompiler, jsonSchemaTransform } from 'fastify-type-provider-zod'
 import { randomUUID } from 'crypto'
 import { logger } from './utils/logger'
 import { validateEnv } from './config/env'
@@ -24,6 +27,9 @@ const app = Fastify({
     requestIdHeader: 'x-request-id',
     genReqId: () => randomUUID(),
 })
+
+app.setValidatorCompiler(validatorCompiler)
+app.setSerializerCompiler(serializerCompiler)
 
 // Adiciona logging para requests
 app.addHook('onRequest', async (request, reply) => {
@@ -47,6 +53,38 @@ app.addHook('onResponse', async (request, reply) => {
         url: request.url,
         statusCode: reply.statusCode,
     })
+})
+
+// Register swagger (must be before routes)
+app.register(swagger, {
+    openapi: {
+        openapi: '3.0.0',
+        info: {
+            title: 'Sofon PABX API',
+            description: 'API para gerenciamento de PABX IP',
+            version: '1.0.0',
+        },
+        components: {
+            securitySchemes: {
+                bearerAuth: {
+                    type: 'http',
+                    scheme: 'bearer',
+                    bearerFormat: 'JWT',
+                },
+            },
+        },
+    },
+    transform: jsonSchemaTransform,
+})
+
+app.register(scalar, {
+    routePrefix: '/docs',
+    configuration: {
+        theme: 'purple',
+        agent: {
+            disabled: true,
+        },
+    },
 })
 
 // Register plugins

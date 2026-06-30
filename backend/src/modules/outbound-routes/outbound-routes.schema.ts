@@ -1,4 +1,7 @@
 import { z } from 'zod'
+import { timestamp } from '../../schemas/responses'
+import { TrunkSchema } from '../trunks/schemas/trunk.schema'
+import { ExtensionSchema } from '../extensions/schemas/extension.schema'
 
 const patternSchema = z.object({
     pattern: z.string().min(1).max(40),
@@ -58,3 +61,24 @@ export type UpdateOutboundRouteInput = z.infer<typeof updateOutboundRouteSchema>
 export type AddPatternInput = z.infer<typeof addPatternSchema>
 export type UpdatePatternInput = z.infer<typeof updatePatternSchema>
 export type SetTrunksInput = z.infer<typeof setTrunksSchema>
+
+export const PatternSchema = z.object({
+    id: z.string(),
+    outboundRouteId: z.string(),
+    pattern: z.string(),
+    prefix: z.string().nullable(),
+    prepend: z.string().nullable(),
+    position: z.number(),
+})
+
+export const OutboundRouteSchema = z.object({
+    id: z.string(),
+    name: z.string(),
+    companyId: z.string(),
+    position: z.number(),
+    patterns: z.array(PatternSchema),
+    trunks: z.array(TrunkSchema),
+    extensions: z.array(ExtensionSchema),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+})

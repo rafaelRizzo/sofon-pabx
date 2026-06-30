@@ -1,6 +1,7 @@
 import Fastify from 'fastify'
 import cookiePlugin from '@fastify/cookie'
 import type { FastifyInstance } from 'fastify'
+import { validatorCompiler, serializerCompiler } from 'fastify-type-provider-zod'
 import { authRoutes } from '../modules/auth/auth.routes'
 import { usersRoutes } from '../modules/users/users.routes'
 import { companiesRoutes } from '../modules/companies/companies.routes'
@@ -14,6 +15,13 @@ export const buildApp = async (): Promise<FastifyInstance> => {
     await connectRedis()
 
     const app = Fastify({ logger: false })
+    app.setValidatorCompiler(validatorCompiler)
+    app.setSerializerCompiler(serializerCompiler)
+
+    app.setErrorHandler((error: any, _req, reply) => {
+        const statusCode = error.statusCode || 500
+        reply.code(statusCode).send({ success: false, message: error.message || 'Internal server error' })
+    })
     await app.register(cookiePlugin)
     await app.register(authRoutes)
     await app.register(usersRoutes)

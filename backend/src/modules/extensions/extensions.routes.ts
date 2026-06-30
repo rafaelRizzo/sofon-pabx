@@ -1,13 +1,141 @@
 import type { FastifyInstance } from 'fastify'
+import type { ZodTypeProvider } from 'fastify-type-provider-zod'
+import { z } from 'zod'
 import * as ExtensionsController from './extensions.controller'
 import { protectedRoute } from '../../middleware/scope.middleware'
+import {
+    createExtensionSchema,
+    createExtensionBatchSchema,
+    updateExtensionSchema,
+    extensionIdParamSchema,
+} from './schemas/extension.schema'
+import { errors, ok, deleted } from '../../schemas/responses'
+import { ExtensionSchema } from './schemas/extension.schema'
+
+const optionalCompanyQuery = z.object({ companyId: z.cuid2().optional() })
+
+const batchResultSchema = z.object({
+    success: z.boolean(),
+    created: z.array(ExtensionSchema),
+    errors: z.array(z.object({ alias: z.string(), error: z.string() })),
+})
 
 export const extensionsRoutes = async (app: FastifyInstance) => {
-    app.get('/extensions', { onRequest: protectedRoute }, ExtensionsController.getAllExtensions)
-    app.get('/extensions/:id', { onRequest: protectedRoute }, ExtensionsController.getExtensionById)
-    app.post('/extensions', { onRequest: protectedRoute }, ExtensionsController.createExtension)
-    app.post('/extensions/batch', { onRequest: protectedRoute }, ExtensionsController.createExtensionBatch)
-    app.put('/extensions/:id', { onRequest: protectedRoute }, ExtensionsController.updateExtension)
-    app.patch('/extensions/:id/password', { onRequest: protectedRoute }, ExtensionsController.resetExtensionPassword)
-    app.delete('/extensions/:id', { onRequest: protectedRoute }, ExtensionsController.deleteExtension)
+    const router = app.withTypeProvider<ZodTypeProvider>()
+
+    router.get('/extensions', {
+        onRequest: protectedRoute,
+        schema: {
+            tags: ['Extensions'],
+            summary: 'Listar ramais',
+            description: 'Filtra por empresa via ?companyId.',
+            security: [{ bearerAuth: [] }],
+            querystring: optionalCompanyQuery,
+            response: {
+                200: ok({ message: z.string(), extensions: z.object({ sip: z.array(ExtensionSchema), pjsip: z.array(ExtensionSchema) }) }),
+                401: errors[401],
+            },
+        },
+    }, ExtensionsController.getAllExtensions as any)
+
+    router.get('/extensions/:id', {
+        onRequest: protectedRoute,
+        schema: {
+            tags: ['Extensions'],
+            summary: 'Buscar ramal',
+            security: [{ bearerAuth: [] }],
+            params: extensionIdParamSchema,
+            response: {
+                200: ok({ message: z.string(), extension: ExtensionSchema }),
+                401: errors[401],
+                403: errors[403],
+                404: errors[404],
+            },
+        },
+    }, ExtensionsController.getExtensionById as any)
+
+    router.post('/extensions', {
+        onRequest: protectedRoute,
+        schema: {
+            tags: ['Extensions'],
+            summary: 'Criar ramal',
+            description: 'Discriminado por type: "sip" | "pjsip".',
+            security: [{ bearerAuth: [] }],
+            body: createExtensionSchema,
+            response: {
+                201: ok({ message: z.string(), extension: ExtensionSchema }),
+                400: errors[400],
+                401: errors[401],
+                403: errors[403],
+                409: errors[409],
+            },
+        },
+    }, ExtensionsController.createExtension as any)
+
+    router.post('/extensions/batch', {
+        onRequest: protectedRoute,
+        schema: {
+            tags: ['Extensions'],
+            summary: 'Criar ramais em lote',
+            description: 'Máx 50. Retorna 201 (tudo ok), 207 (parcial) ou 422 (tudo falhou).',
+            security: [{ bearerAuth: [] }],
+            body: createExtensionBatchSchema,
+            response: {
+                201: batchResultSchema,
+                207: batchResultSchema,
+                401: errors[401],
+                422: errors[422],
+            },
+        },
+    }, ExtensionsController.createExtensionBatch as any)
+
+    router.put('/extensions/:id', {
+        onRequest: protectedRoute,
+        schema: {
+            tags: ['Extensions'],
+            summary: 'Atualizar ramal',
+            security: [{ bearerAuth: [] }],
+            params: extensionIdParamSchema,
+            body: updateExtensionSchema,
+            response: {
+                200: ok({ message: z.string(), extension: ExtensionSchema }),
+                401: errors[401],
+                403: errors[403],
+                404: errors[404],
+            },
+        },
+    }, ExtensionsController.updateExtension as any)
+
+    router.patch('/extensions/:id/password', {
+        onRequest: protectedRoute,
+        schema: {
+            tags: ['Extensions'],
+            summary: 'Resetar senha do ramal',
+            description: 'Gera nova senha aleatória e a retorna.',
+            security: [{ bearerAuth: [] }],
+            params: extensionIdParamSchema,
+            response: {
+                200: ok({ message: z.string(), password: z.string() }),
+                401: errors[401],
+                403: errors[403],
+                404: errors[404],
+            },
+        },
+    }, ExtensionsController.resetExtensionPassword as any)
+
+    router.delete('/extensions/:id', {
+        onRequest: protectedRoute,
+        schema: {
+            tags: ['Extensions'],
+            summary: 'Remover ramal',
+            security: [{ bearerAuth: [] }],
+            params: extensionIdParamSchema,
+            response: {
+                200: deleted,
+                401: errors[401],
+                403: errors[403],
+                404: errors[404],
+            },
+        },
+    }, ExtensionsController.deleteExtension as any)
 }

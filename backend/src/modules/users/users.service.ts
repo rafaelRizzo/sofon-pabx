@@ -5,24 +5,31 @@ import type { CreateUserInput, UpdateUserInput } from './schemas/user.schema'
 import argon2 from 'argon2'
 import { AppError } from '../../utils/errors/app.error'
 
-export const getAllUsers = async () => {
+const userSelect = {
+    id: true,
+    webhookSlug: true,
+    name: true,
+    username: true,
+    role: true,
+    status: true,
+    extensionId: true,
+    createdBy: true,
+    createdAt: true,
+    updatedAt: true,
+} as const
+
+export const getAllUsers = async (options?: { createdBy?: string }) => {
+    if (options?.createdBy) {
+        return prisma.user.findMany({
+            where: { createdBy: options.createdBy },
+            select: userSelect,
+        })
+    }
+
     const cached = await UsersCache.getAllUsers()
     if (cached) return cached
 
-    const users = await prisma.user.findMany({
-        select: {
-            id: true,
-            webhookSlug: true,
-            name: true,
-            username: true,
-            role: true,
-            status: true,
-            extensionId: true,
-            createdAt: true,
-            updatedAt: true,
-        },
-    })
-
+    const users = await prisma.user.findMany({ select: userSelect })
     await UsersCache.setAllUsers(users)
     return users
 }
@@ -33,17 +40,7 @@ export const getUserById = async (id: string) => {
 
     const user = await prisma.user.findUnique({
         where: { id },
-        select: {
-            id: true,
-            webhookSlug: true,
-            name: true,
-            username: true,
-            role: true,
-            status: true,
-            extensionId: true,
-            createdAt: true,
-            updatedAt: true,
-        },
+        select: userSelect,
     })
 
     if (!user) {
@@ -54,7 +51,7 @@ export const getUserById = async (id: string) => {
     return user
 }
 
-export const createUser = async (data: CreateUserInput) => {
+export const createUser = async (data: CreateUserInput, createdBy?: string) => {
     const existing = await prisma.user.findUnique({ where: { username: data.username } })
     if (existing) {
         throw new AppError('Username already in use', 409)
@@ -66,18 +63,9 @@ export const createUser = async (data: CreateUserInput) => {
         data: {
             ...data,
             password: hashedPassword,
+            createdBy: createdBy ?? null,
         },
-        select: {
-            id: true,
-            webhookSlug: true,
-            name: true,
-            username: true,
-            role: true,
-            status: true,
-            extensionId: true,
-            createdAt: true,
-            updatedAt: true,
-        },
+        select: userSelect,
     })
 
     await UsersCache.invalidateAllUsers()
@@ -98,17 +86,7 @@ export const updateUser = async (id: string, data: UpdateUserInput) => {
     const user = await prisma.user.update({
         where: { id },
         data: updateData,
-        select: {
-            id: true,
-            webhookSlug: true,
-            name: true,
-            username: true,
-            role: true,
-            status: true,
-            extensionId: true,
-            createdAt: true,
-            updatedAt: true,
-        },
+        select: userSelect,
     })
 
     await UsersCache.invalidateUser(id)

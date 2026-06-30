@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { timestamp } from '../../../schemas/responses'
 
 export const QUEUE_STRATEGIES = [
     'ringall',
@@ -66,3 +67,21 @@ export const updateQueueSchema = z.object({
 
 export type CreateQueueInput = z.infer<typeof createQueueSchema>
 export type UpdateQueueInput = z.infer<typeof updateQueueSchema>
+
+export const QueueSchema = z.object({
+    id: z.string(),
+    name: z.string(),
+    number: z.string().nullable(),
+    companyId: z.string(),
+    strategy: z.string(),
+    musicOnHold: z.string(),
+    timeout: z.number(),
+    retry: z.number(),
+    maxLen: z.number(),
+    wrapupTime: z.number(),
+    weight: z.number(),
+    joinEmpty: z.boolean(),
+    leaveWhenEmpty: z.boolean(),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+})

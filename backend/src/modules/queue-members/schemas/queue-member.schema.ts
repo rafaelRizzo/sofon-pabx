@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { timestamp } from '../../../schemas/responses'
 
 export const memberIdParamSchema = z.object({
     id: z.cuid2(),
@@ -22,3 +23,11 @@ export const updateMemberSchema = z.object({
 
 export type AddMemberInput = z.infer<typeof addMemberSchema>
 export type UpdateMemberInput = z.infer<typeof updateMemberSchema>
+
+export const QueueMemberSchema = z.object({
+    id: z.string(),
+    queueId: z.string(),
+    extensionId: z.string(),
+    penalty: z.number(),
+    paused: z.boolean(),
+})

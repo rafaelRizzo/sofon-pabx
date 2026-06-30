@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { timestamp } from '../../../schemas/responses'
 
 export const idParamSchema = z.object({
     id: z.cuid2(),
@@ -25,3 +26,11 @@ export type IdParam = z.infer<typeof idParamSchema>
 export type CompanyQuery = z.infer<typeof companyQuerySchema>
 export type CreateDidInput = z.infer<typeof createDidSchema>
 export type UpdateDidInput = z.infer<typeof updateDidSchema>
+
+export const DidSchema = z.object({
+    id: z.string(),
+    number: z.string(),
+    companyId: z.string(),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+})

@@ -40,19 +40,22 @@ model Did {
 }
 
 model User {
-    id          String        @id @default(cuid())
-    webhookSlug String        @unique @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-    name        String
-    username    String        @unique
-    password    String
-    token       String?       @unique
-    role        String        @default("user")
-    status      String        @default("active")
-    extensionId String?       @unique
-    extension   Extension?    @relation(fields: [extensionId], references: [id], onDelete: SetNull)
-    createdAt   DateTime      @default(now())
-    updatedAt   DateTime      @updatedAt
-    companies   UserCompany[]
+    id           String        @id @default(cuid())
+    webhookSlug  String        @unique @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+    name         String
+    username     String        @unique
+    password     String
+    token        String?       @unique
+    role         String        @default("user")
+    status       String        @default("active")
+    extensionId  String?       @unique
+    createdBy    String?
+    creator      User?         @relation("UserCreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
+    createdUsers User[]        @relation("UserCreatedBy")
+    extension    Extension?    @relation(fields: [extensionId], references: [id], onDelete: SetNull)
+    createdAt    DateTime      @default(now())
+    updatedAt    DateTime      @updatedAt
+    companies    UserCompany[]
 
     @@map("users")
 }

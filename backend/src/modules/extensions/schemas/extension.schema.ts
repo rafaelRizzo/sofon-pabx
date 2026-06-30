@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { timestamp } from '../../../schemas/responses'
 
 const aliasSchema = z.string().regex(/^\d{2,6}$/, 'Must be 2-6 digits')
 
@@ -291,3 +292,16 @@ export type ExtensionQuery = z.infer<typeof extensionQuerySchema>
 export type CreateExtensionInput = z.infer<typeof createExtensionSchema>
 export type CreateExtensionBatchInput = z.infer<typeof createExtensionBatchSchema>
 export type UpdateExtensionInput = z.infer<typeof updateExtensionSchema>
+
+export const ExtensionSchema = z.object({
+    id: z.string(),
+    alias: z.string(),
+    username: z.string(),
+    name: z.string(),
+    type: z.enum(['sip', 'pjsip']),
+    companyId: z.string(),
+    context: z.string(),
+    allowOutbound: z.boolean(),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+})

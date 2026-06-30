@@ -116,6 +116,7 @@ export const getAllExtensions = async (companyIds?: string[]) => {
                 allowOutbound: true,
                 companyId: true,
                 createdAt: true,
+                updatedAt: true,
             },
         })
 
@@ -160,6 +161,7 @@ const extensionSelect = {
     allowOutbound: true,
     companyId: true,
     createdAt: true,
+    updatedAt: true,
 } as const
 
 type ExtensionDto = {
@@ -172,6 +174,7 @@ type ExtensionDto = {
     allowOutbound: boolean
     companyId: string
     createdAt: Date
+    updatedAt: Date
 }
 
 export const getExtensionById = async (id: string): Promise<ExtensionDto & { synced: boolean }> => {
