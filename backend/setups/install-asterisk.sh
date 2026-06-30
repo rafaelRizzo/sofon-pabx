@@ -22,6 +22,7 @@ OS_VERSION=""
 LOG_FILE="/var/log/sofon-install.log"
 PJSIP_PORT=5060
 SIP_PORT=5062
+SYSTEM_USER_AGENT="Sofon"
 
 # ============================================================
 # HELPERS
@@ -155,6 +156,11 @@ fi
 LOCAL_NET=$(detect_local_net)
 echo -e "  ${GREEN}✓${NC} Rede local detectada: ${LOCAL_NET}"
 echo ""
+echo -ne "${CYAN}→${NC} User-Agent SIP [${SYSTEM_USER_AGENT}]: "
+read -r REPLY
+[[ -n "$REPLY" ]] && SYSTEM_USER_AGENT="$REPLY"
+echo -e "  ${GREEN}✓${NC} User-Agent: ${SYSTEM_USER_AGENT} (default: Sofon)"
+echo ""
 sleep 1
 
 # ============================================================
@@ -166,6 +172,7 @@ echo ""
 echo -e "  Versão     : ${GREEN}${ASTERISK_VERSION}${NC}"
 echo -e "  IP Público : ${CYAN}${PUBLIC_ADDRESS}${NC}"
 echo -e "  Rede Local : ${CYAN}${LOCAL_NET}${NC}"
+echo -e "  User-Agent : ${CYAN}${SYSTEM_USER_AGENT}${NC}"
 if [[ "$USE_LEGACY_SIP" == true ]]; then
     echo -e "  Portas     : SIP ${CYAN}${SIP_PORT}${NC} | PJSIP ${CYAN}${PJSIP_PORT}${NC} | RTP ${CYAN}10000-20000${NC}"
 else
@@ -323,6 +330,8 @@ done
 
 sed -i 's/;runuser = asterisk/runuser = asterisk/'   /etc/asterisk/asterisk.conf
 sed -i 's/;rungroup = asterisk/rungroup = asterisk/' /etc/asterisk/asterisk.conf
+sed -i 's/;verbose = 3/verbose = 3/'                 /etc/asterisk/asterisk.conf
+sed -i 's/;debug = 3/debug = 3/'                     /etc/asterisk/asterisk.conf
 
 SERVICE_FILE=""
 for f in /lib/systemd/system/asterisk.service /etc/systemd/system/asterisk.service; do
@@ -360,6 +369,7 @@ if [[ "$USE_LEGACY_SIP" == true ]]; then
 [general]
 bindport=$SIP_PORT
 bindaddr=0.0.0.0
+useragent=$SYSTEM_USER_AGENT
 transport=udp,tcp
 tcpenable=yes
 context=default
@@ -409,6 +419,7 @@ type=global
 max_initial_qualify_time=4
 default_from_user=asterisk
 keep_alive_interval=90
+user_agent=$SYSTEM_USER_AGENT
 
 [endpoint-basic](!)
 type=endpoint
