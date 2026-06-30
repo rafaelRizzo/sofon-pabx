@@ -18,13 +18,13 @@ let sipId: string
 let pjsipId: string
 
 const cleanupAsteriskByCompany = async () => {
-    const numbers = await prisma.extension.findMany({
+    const exts = await prisma.extension.findMany({
         where: { companyId },
-        select: { number: true, context: true },
+        select: { alias: true, number: true, context: true },
     })
 
-    for (const { number, context } of numbers) {
-        await prisma.extensions.deleteMany({ where: { context, exten: number } })
+    for (const { alias, number, context } of exts) {
+        await prisma.extensions.deleteMany({ where: { context, exten: alias } })
         await prisma.$executeRaw`DELETE FROM ps_endpoints WHERE id = ${number}`
         await prisma.$executeRaw`DELETE FROM ps_auths WHERE id = ${number}`
         await prisma.$executeRaw`DELETE FROM ps_aors WHERE id = ${number}`
@@ -56,13 +56,14 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
-    await cleanupAsteriskByCompany()
-    await prisma.userCompany.deleteMany({ where: { userId } })
-    await prisma.company.deleteMany({ where: { id: companyId } })
+    if (companyId) {
+        await cleanupAsteriskByCompany()
+        await prisma.userCompany.deleteMany({ where: { userId } })
+        await prisma.company.deleteMany({ where: { id: companyId } })
+    }
     await prisma.user.deleteMany({ where: { username: { startsWith: PREFIX } } })
     await prisma.$disconnect()
-    await app.close()
-    await disconnectRedis()
+    if (app) await app.close()
 })
 
 const auth = () => ({ authorization: `Bearer ${accessToken}` })
@@ -315,6 +316,57 @@ describe('PATCH /extensions/:id/password', () => {
         })
 
         expect(res.statusCode).toBe(401)
+    })
+})
+
+// ---------------------------------------- allowOutbound
+describe('allowOutbound field', () => {
+    it('201 creates sip with allowOutbound false', async () => {
+        const res = await app.inject({
+            method: 'POST',
+            url: '/extensions',
+            headers: auth(),
+            body: { alias: '3090', type: 'sip', name: 'No Outbound SIP', companyId, allowOutbound: false },
+        })
+
+        expect(res.statusCode).toBe(201)
+        expect(res.json().extension.allowOutbound).toBe(false)
+    })
+
+    it('201 creates pjsip with allowOutbound false', async () => {
+        const res = await app.inject({
+            method: 'POST',
+            url: '/extensions',
+            headers: auth(),
+            body: { alias: '3091', type: 'pjsip', name: 'No Outbound PJSIP', companyId, allowOutbound: false },
+        })
+
+        expect(res.statusCode).toBe(201)
+        expect(res.json().extension.allowOutbound).toBe(false)
+    })
+
+    it('201 defaults allowOutbound to true when omitted', async () => {
+        const res = await app.inject({
+            method: 'POST',
+            url: '/extensions',
+            headers: auth(),
+            body: { alias: '3092', type: 'sip', name: 'Default Outbound', companyId },
+        })
+
+        expect(res.statusCode).toBe(201)
+        expect(res.json().extension.allowOutbound).toBe(true)
+    })
+
+    it('200 updates allowOutbound via PUT', async () => {
+        const res = await app.inject({
+            method: 'PUT',
+            url: `/extensions/${sipId}`,
+            headers: auth(),
+            body: { allowOutbound: false },
+        })
+
+        expect(res.statusCode).toBe(200)
+        expect(res.json().extension.allowOutbound).toBe(false)
     })
 })
 

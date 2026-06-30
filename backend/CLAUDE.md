@@ -78,9 +78,9 @@
 | DELETE | `/users/:id` | Sim | admin | Remove |
 | GET | `/users/:id/companies` | Sim | qualquer | Empresas do usuário |
 
-**User schema:** `{ id, name, username, role, status, webhookSlug (uuid), createdAt, updatedAt }`  
+**User schema:** `{ id, name, username, role, status, extensionId (nullable), webhookSlug (uuid), createdAt, updatedAt }`  
 **Create body:** `{ name, username, password }`  
-**Update body:** `{ name?, username?, password? }` (min 1 campo)
+**Update body:** `{ name?, username?, password?, extensionId? }` (min 1 campo)
 
 ---
 
@@ -128,12 +128,14 @@
 | DELETE | `/extensions/:id` | Sim | qualquer | Remove |
 
 **Create body (discriminatedUnion por `type`):**
-- `type: "sip"` → `{ alias (2-6 dígitos), name, companyId, context?, ...sipFields }`
-- `type: "pjsip"` → `{ alias (2-6 dígitos), name, companyId, context?, ...pjsipFields }`
+- `type: "sip"` → `{ alias (2-6 dígitos), name, companyId, context?, allowOutbound? (default true), ...sipFields }`
+- `type: "pjsip"` → `{ alias (2-6 dígitos), name, companyId, context?, allowOutbound? (default true), namedcallgroup?, namedpickupgroup?, ...pjsipFields }`
 
 **Batch body:** `{ extensions: CreateExtension[] }` — sem alias duplicado por empresa no mesmo lote  
-**Update body:** `{ name }`  
-**Nota:** `sip` grava em `sip_peers`; `pjsip` grava em `ps_endpoints` + `ps_aors`
+**Update body:** `{ name?, allowOutbound? }`  
+**Nota:** `sip` grava em `sip_peers`; `pjsip` grava em `ps_endpoints` + `ps_aors`  
+**PJSIP Groups:** `namedcallgroup` e `namedpickupgroup` permitem group pickup entre ramais  
+**allowOutbound:** persiste `ALLOW_OUTBOUND=1/0` em `sip_peers.setvar` / `ps_endpoints.setvar` — o dialplan de rotas de saída checa essa variável para bloquear chamadas externas
 
 ---
 
@@ -154,14 +156,15 @@
 **Create body:** `{ name (alphanum/dash/underscore), number? (só dígitos), companyId, strategy?, musicOnHold?, timeout?, retry?, maxLen?, wrapupTime?, announce?, announceFrequency?, joinEmpty?, leaveWhenEmpty?, weight? }`  
 **Strategies:** `ringall | leastrecent | fewestcalls | random | rrmemory | linear | wrandom`  
 **Add member body:** `{ extensionId, penalty? (0-100), paused? }`  
-**Update member body:** `{ penalty?, paused? }`
+**Update member body:** `{ penalty?, paused? }`  
+**Nota:** `PUT /queues/:id/members/:memberId` — não-admin só pode pause/unpause no próprio ramal (via `user.extensionId`)
 
 ---
 
 ### Trunks
 | Método | Path | Auth | Role | Desc |
 |--------|------|------|------|------|
-| GET | `/trunks` | Sim | qualquer | Lista trunks |
+| GET | `/trunks` | Sim | qualquer | Lista trunks — query obrigatória: `?companyId=` |
 | GET | `/trunks/:id` | Sim | qualquer | Busca por ID |
 | POST | `/trunks` | Sim | qualquer | Cria trunk |
 | PUT | `/trunks/:id` | Sim | qualquer | Atualiza trunk |
@@ -175,9 +178,39 @@
 
 ---
 
+### Outbound Routes
+| Método | Path | Auth | Role | Desc |
+|--------|------|------|------|------|
+| GET | `/outbound-routes` | Sim | qualquer | Lista rotas — query obrigatória: `?companyId=` |
+| GET | `/outbound-routes/:id` | Sim | qualquer | Busca por ID |
+| POST | `/outbound-routes` | Sim | qualquer | Cria rota com patterns + trunks |
+| PUT | `/outbound-routes/:id` | Sim | qualquer | Atualiza nome/posição |
+| DELETE | `/outbound-routes/:id` | Sim | qualquer | Remove + cascade patterns |
+| POST | `/outbound-routes/:id/patterns` | Sim | qualquer | Adiciona dial pattern |
+| PUT | `/outbound-routes/:id/patterns/:patternId` | Sim | qualquer | Atualiza dial pattern |
+| DELETE | `/outbound-routes/:id/patterns/:patternId` | Sim | qualquer | Remove dial pattern |
+| PUT | `/outbound-routes/:id/trunks` | Sim | qualquer | Define lista de trunks da rota |
+| POST | `/outbound-routes/:id/extensions` | Sim | qualquer | Restringe rota a um ramal |
+| DELETE | `/outbound-routes/:id/extensions/:extensionId` | Sim | qualquer | Remove restrição de ramal |
+
+**Create body:** `{ name, companyId, position?, patterns?: [{ pattern, prefix?, prepend? }], trunkIds?: string[] }`  
+**Update body:** `{ name?, position? }`  
+**Pattern body:** `{ pattern, prefix?, prepend? }`  
+**Trunks body:** `{ trunkIds: string[] }` — substitui lista completa  
+**Extension body:** `{ extensionId }`
+
+**OutboundRoute schema:** `{ id, name, companyId, position, patterns (OutboundDialPattern[]), trunks (Trunk[]), extensions (Extension[]), createdAt, updatedAt }`  
+**OutboundDialPattern schema:** `{ id, outboundRouteId, pattern, prefix, prepend }`
+
+---
+
 ## Regras de negócio críticas
 - `/auth/register` só funciona quando `COUNT(users) === 0`; o usuário criado é sempre `admin`
 - DIDs: `UNIQUE(number, companyId)` — mesmo número pode existir em empresas diferentes
 - Logout revoga via JTI no Redis, não só invalida o token localmente
 - `webhookSlug` em User é UUID gerado no create, não alterável
+- `extensionId` em User vincula usuário ao seu ramal — usado para autorização de pause/unpause em filas
 - Delete de Company é cascade para seus DIDs
+- Delete de OutboundRoute é cascade para seus OutboundDialPatterns
+- OutboundRoute `position` define prioridade de matching — menor = maior prioridade
+- PUT `/outbound-routes/:id/trunks` substitui a lista completa de trunks (não é aditivo)

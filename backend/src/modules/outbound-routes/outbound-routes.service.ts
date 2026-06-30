@@ -11,7 +11,6 @@ import type {
 
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 
-// Mirrors the trunk naming convention in trunks.service.ts
 function trunkAsteriskId(asteriskId: string, trunkName: string): string {
     return `${asteriskId}-trunk-${trunkName}`
 }
@@ -58,6 +57,7 @@ function buildDialplanEntries(
     return entries
 }
 
+// Sequential: delete then individual creates — avoids concurrent client.query() from createMany
 async function syncPatternDialplan(
     tx: Tx,
     context: string,
@@ -68,61 +68,111 @@ async function syncPatternDialplan(
     asteriskId: string,
 ) {
     await tx.extensions.deleteMany({ where: { context, exten } })
-    if (trunkAstIds.length > 0) {
-        await tx.extensions.createMany({ data: buildDialplanEntries(context, exten, trunkAstIds, prefix, prepend, asteriskId) })
+    const entries = buildDialplanEntries(context, exten, trunkAstIds, prefix, prepend, asteriskId)
+    for (const entry of entries) {
+        await tx.extensions.create({ data: entry })
     }
 }
 
-async function getRouteWithTrunks(tx: Tx, routeId: string) {
-    return tx.outboundRoute.findUnique({
+// Sequential queries inside transaction — avoids concurrent client.query() from multi-relation include
+async function getRouteContext(tx: Tx, routeId: string) {
+    const route = await tx.outboundRoute.findUnique({
         where: { id: routeId },
-        include: {
-            company: { select: { asteriskId: true } },
-            patterns: { orderBy: { position: 'asc' } },
-            trunks: {
-                include: { trunk: { select: { name: true } } },
-                orderBy: { position: 'asc' },
-            },
-        },
+        select: { company: { select: { asteriskId: true } } },
     })
+    if (!route) return null
+
+    const patterns = await tx.outboundDialPattern.findMany({
+        where: { routeId },
+        orderBy: { position: 'asc' },
+    })
+
+    // trunk is many-to-one → JOIN within findMany — single query
+    const trunks = await tx.outboundRouteTrunk.findMany({
+        where: { routeId },
+        select: { position: true, trunk: { select: { name: true } } },
+        orderBy: { position: 'asc' },
+    })
+
+    return { company: route.company, patterns, trunks }
 }
 
 async function resyncAllPatterns(tx: Tx, routeId: string) {
-    const route = await getRouteWithTrunks(tx, routeId)
-    if (!route) return
+    const ctx = await getRouteContext(tx, routeId)
+    if (!ctx) return
 
-    const trunkAstIds = route.trunks.map((rt) => trunkAsteriskId(route.company.asteriskId, rt.trunk.name))
-    for (const p of route.patterns) {
-        await syncPatternDialplan(tx, 'ramais', p.pattern, trunkAstIds, p.prefix, p.prepend, route.company.asteriskId)
+    const trunkAstIds = ctx.trunks.map((rt) => trunkAsteriskId(ctx.company.asteriskId, rt.trunk.name))
+    for (const p of ctx.patterns) {
+        await syncPatternDialplan(tx, 'ramais', p.pattern, trunkAstIds, p.prefix, p.prepend, ctx.company.asteriskId)
     }
 }
 
-const routeSelect = {
-    id: true,
-    name: true,
-    companyId: true,
-    position: true,
-    createdAt: true,
-    updatedAt: true,
-    patterns: { orderBy: { position: 'asc' as const } },
-    trunks: {
-        orderBy: { position: 'asc' as const },
+// Sequential: 4 queries (no multi-relation include) — avoids concurrent client.query()
+async function fetchRoute(id: string) {
+    const base = await prisma.outboundRoute.findUnique({
+        where: { id },
+        select: { id: true, name: true, companyId: true, position: true, createdAt: true, updatedAt: true },
+    })
+    if (!base) return null
+
+    const patterns = await prisma.outboundDialPattern.findMany({
+        where: { routeId: id },
+        orderBy: { position: 'asc' },
+    })
+    const trunks = await prisma.outboundRouteTrunk.findMany({
+        where: { routeId: id },
+        orderBy: { position: 'asc' },
         select: { id: true, trunkId: true, position: true },
-    },
-    extensions: {
+    })
+    const extensions = await prisma.outboundRouteExtension.findMany({
+        where: { routeId: id },
         select: { id: true, extensionId: true },
-    },
-} as const
+    })
+
+    return { ...base, patterns, trunks, extensions }
+}
 
 export const getOutboundRoutes = async (companyId: string) => {
     const cached = await OutboundRoutesCache.getByCompany(companyId)
     if (cached) return cached as any[]
 
-    const routes = await prisma.outboundRoute.findMany({
+    const bases = await prisma.outboundRoute.findMany({
         where: { companyId },
         orderBy: { position: 'asc' },
-        select: routeSelect,
+        select: { id: true, name: true, companyId: true, position: true, createdAt: true, updatedAt: true },
     })
+
+    if (bases.length === 0) {
+        await OutboundRoutesCache.setByCompany(companyId, [])
+        return []
+    }
+
+    const ids = bases.map((r) => r.id)
+
+    const allPatterns = await prisma.outboundDialPattern.findMany({
+        where: { routeId: { in: ids } },
+        orderBy: { position: 'asc' },
+    })
+    const allTrunks = await prisma.outboundRouteTrunk.findMany({
+        where: { routeId: { in: ids } },
+        orderBy: { position: 'asc' },
+        select: { id: true, trunkId: true, position: true, routeId: true },
+    })
+    const allExtensions = await prisma.outboundRouteExtension.findMany({
+        where: { routeId: { in: ids } },
+        select: { id: true, extensionId: true, routeId: true },
+    })
+
+    const routes = bases.map((r) => ({
+        ...r,
+        patterns: allPatterns.filter((p) => p.routeId === r.id),
+        trunks: allTrunks
+            .filter((t) => t.routeId === r.id)
+            .map(({ routeId: _, ...t }) => t),
+        extensions: allExtensions
+            .filter((e) => e.routeId === r.id)
+            .map(({ routeId: _, ...e }) => e),
+    }))
 
     await OutboundRoutesCache.setByCompany(companyId, routes)
     return routes
@@ -130,9 +180,9 @@ export const getOutboundRoutes = async (companyId: string) => {
 
 export const getOutboundRouteById = async (id: string) => {
     const cached = await OutboundRoutesCache.getRoute(id)
-    if (cached) return cached as NonNullable<typeof route>
+    if (cached) return cached as NonNullable<Awaited<ReturnType<typeof fetchRoute>>>
 
-    const route = await prisma.outboundRoute.findUnique({ where: { id }, select: routeSelect })
+    const route = await fetchRoute(id)
     if (!route) throw new AppError('Outbound route not found', 404)
 
     await OutboundRoutesCache.setRoute(id, route)
@@ -162,27 +212,29 @@ export const createOutboundRoute = async (data: CreateOutboundRouteInput) => {
 
     await prisma.$transaction(async (tx) => {
         const route = await tx.outboundRoute.create({
-            data: {
-                name: data.name,
-                companyId: data.companyId,
-                position: data.position,
-                trunks: {
-                    create: orderedTrunks.map((t) => ({ trunkId: t.id, position: t.position })),
-                },
-                patterns: {
-                    create: data.patterns.map((p) => ({
-                        pattern: p.pattern,
-                        prepend: p.prepend ?? null,
-                        prefix: p.prefix ?? null,
-                        position: p.position,
-                    })),
-                },
-                ...(data.extensionIds?.length
-                    ? { extensions: { create: data.extensionIds.map((eid) => ({ extensionId: eid })) } }
-                    : {}),
-            },
+            data: { name: data.name, companyId: data.companyId, position: data.position },
         })
         routeId = route.id
+
+        for (const t of orderedTrunks) {
+            await tx.outboundRouteTrunk.create({ data: { routeId: route.id, trunkId: t.id, position: t.position } })
+        }
+        for (const p of data.patterns) {
+            await tx.outboundDialPattern.create({
+                data: {
+                    routeId: route.id,
+                    pattern: p.pattern,
+                    prepend: p.prepend ?? null,
+                    prefix: p.prefix ?? null,
+                    position: p.position,
+                },
+            })
+        }
+        if (data.extensionIds?.length) {
+            for (const eid of data.extensionIds) {
+                await tx.outboundRouteExtension.create({ data: { routeId: route.id, extensionId: eid } })
+            }
+        }
 
         for (const p of data.patterns) {
             await syncPatternDialplan(tx, 'ramais', p.pattern, trunkAstIds, p.prefix, p.prepend, company.asteriskId)
@@ -196,11 +248,16 @@ export const createOutboundRoute = async (data: CreateOutboundRouteInput) => {
 export const updateOutboundRoute = async (id: string, data: UpdateOutboundRouteInput) => {
     const existing = await prisma.outboundRoute.findUnique({
         where: { id },
-        include: { company: { select: { asteriskId: true } }, patterns: true },
+        select: { companyId: true },
     })
     if (!existing) throw new AppError('Outbound route not found', 404)
 
     const { name, position, trunkIds, patterns } = data
+
+    // Fetch existing patterns separately (only when needed) — sequential, no multi-include
+    const existingPatterns = patterns
+        ? await prisma.outboundDialPattern.findMany({ where: { routeId: id }, select: { pattern: true } })
+        : []
 
     if (trunkIds) {
         const trunks = await prisma.trunk.findMany({
@@ -220,25 +277,27 @@ export const updateOutboundRoute = async (id: string, data: UpdateOutboundRouteI
 
         if (trunkIds) {
             await tx.outboundRouteTrunk.deleteMany({ where: { routeId: id } })
-            await tx.outboundRouteTrunk.createMany({
-                data: trunkIds.map((tid, i) => ({ routeId: id, trunkId: tid, position: i })),
-            })
+            for (const [i, tid] of trunkIds.entries()) {
+                await tx.outboundRouteTrunk.create({ data: { routeId: id, trunkId: tid, position: i } })
+            }
         }
 
         if (patterns) {
-            for (const p of existing.patterns) {
+            for (const p of existingPatterns) {
                 await tx.extensions.deleteMany({ where: { context: 'ramais', exten: p.pattern } })
             }
             await tx.outboundDialPattern.deleteMany({ where: { routeId: id } })
-            await tx.outboundDialPattern.createMany({
-                data: patterns.map((p) => ({
-                    routeId: id,
-                    pattern: p.pattern,
-                    prepend: p.prepend ?? null,
-                    prefix: p.prefix ?? null,
-                    position: p.position,
-                })),
-            })
+            for (const p of patterns) {
+                await tx.outboundDialPattern.create({
+                    data: {
+                        routeId: id,
+                        pattern: p.pattern,
+                        prepend: p.prepend ?? null,
+                        prefix: p.prefix ?? null,
+                        position: p.position,
+                    },
+                })
+            }
         }
 
         if (patterns || trunkIds) {
@@ -254,12 +313,17 @@ export const updateOutboundRoute = async (id: string, data: UpdateOutboundRouteI
 export const deleteOutboundRoute = async (id: string) => {
     const route = await prisma.outboundRoute.findUnique({
         where: { id },
-        include: { patterns: true },
+        select: { companyId: true },
     })
     if (!route) throw new AppError('Outbound route not found', 404)
 
+    const patterns = await prisma.outboundDialPattern.findMany({
+        where: { routeId: id },
+        select: { pattern: true },
+    })
+
     await prisma.$transaction(async (tx) => {
-        for (const p of route.patterns) {
+        for (const p of patterns) {
             await tx.extensions.deleteMany({ where: { context: 'ramais', exten: p.pattern } })
         }
         await tx.outboundRoute.delete({ where: { id } })
@@ -270,7 +334,10 @@ export const deleteOutboundRoute = async (id: string) => {
 }
 
 export const addPattern = async (routeId: string, data: AddPatternInput) => {
-    const route = await prisma.outboundRoute.findUnique({ where: { id: routeId } })
+    const route = await prisma.outboundRoute.findUnique({
+        where: { id: routeId },
+        select: { id: true },
+    })
     if (!route) throw new AppError('Outbound route not found', 404)
 
     let patternId: string
@@ -327,7 +394,7 @@ export const deletePattern = async (routeId: string, patternId: string) => {
 export const setTrunks = async (routeId: string, data: SetTrunksInput) => {
     const route = await prisma.outboundRoute.findUnique({
         where: { id: routeId },
-        include: { company: { select: { asteriskId: true } } },
+        select: { companyId: true },
     })
     if (!route) throw new AppError('Outbound route not found', 404)
 
@@ -339,9 +406,9 @@ export const setTrunks = async (routeId: string, data: SetTrunksInput) => {
 
     await prisma.$transaction(async (tx) => {
         await tx.outboundRouteTrunk.deleteMany({ where: { routeId } })
-        await tx.outboundRouteTrunk.createMany({
-            data: data.trunkIds.map((tid, i) => ({ routeId, trunkId: tid, position: i })),
-        })
+        for (const [i, tid] of data.trunkIds.entries()) {
+            await tx.outboundRouteTrunk.create({ data: { routeId, trunkId: tid, position: i } })
+        }
         await resyncAllPatterns(tx, routeId)
     })
 
@@ -350,18 +417,36 @@ export const setTrunks = async (routeId: string, data: SetTrunksInput) => {
 }
 
 export const addExtension = async (routeId: string, extensionId: string) => {
-    const route = await prisma.outboundRoute.findUnique({ where: { id: routeId } })
+    const route = await prisma.outboundRoute.findUnique({
+        where: { id: routeId },
+        select: { companyId: true },
+    })
     if (!route) throw new AppError('Outbound route not found', 404)
 
-    const ext = await prisma.extension.findUnique({ where: { id: extensionId } })
+    const ext = await prisma.extension.findUnique({ where: { id: extensionId }, select: { id: true } })
     if (!ext) throw new AppError('Extension not found', 404)
 
-    return prisma.outboundRouteExtension.create({ data: { routeId, extensionId } })
+    const result = await prisma.outboundRouteExtension.create({ data: { routeId, extensionId } })
+
+    await OutboundRoutesCache.invalidateRoute(routeId)
+    await OutboundRoutesCache.invalidateByCompany(route.companyId)
+    return result
 }
 
 export const removeExtension = async (routeId: string, extensionId: string) => {
-    const record = await prisma.outboundRouteExtension.findFirst({ where: { routeId, extensionId } })
+    const record = await prisma.outboundRouteExtension.findFirst({
+        where: { routeId, extensionId },
+        select: { id: true },
+    })
     if (!record) throw new AppError('Extension not found in route', 404)
 
+    const route = await prisma.outboundRoute.findUnique({
+        where: { id: routeId },
+        select: { companyId: true },
+    })
+
     await prisma.outboundRouteExtension.delete({ where: { id: record.id } })
+
+    await OutboundRoutesCache.invalidateRoute(routeId)
+    if (route) await OutboundRoutesCache.invalidateByCompany(route.companyId)
 }

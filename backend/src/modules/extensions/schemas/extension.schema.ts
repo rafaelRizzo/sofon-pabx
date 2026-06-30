@@ -135,6 +135,7 @@ const baseShape = {
     name: z.string().min(1).max(80),
     companyId: z.cuid2(),
     context: z.string().max(40).default('ramais'),
+    allowOutbound: z.boolean().default(true),
 }
 
 export const createExtensionSchema = z.discriminatedUnion('type', [
@@ -147,6 +148,7 @@ export const updateExtensionSchema = z
         name: z.string().min(1).max(80).optional(),
         alias: aliasSchema.optional(),
         context: z.string().max(40).optional(),
+        allowOutbound: z.boolean().optional(),
         ...sipFields,
         ...pjsipFields,
         // shared fields: use most permissive constraint

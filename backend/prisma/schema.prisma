@@ -74,6 +74,7 @@ model Extension {
     type             String
     name             String
     context          String        @default("ramais")
+    allowOutbound    Boolean       @default(true)
     companyId        String
     company          Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
     createdAt        DateTime      @default(now())
@@ -300,6 +301,7 @@ model ps_endpoints {
     rel                 String?  @default("yes") @map("100rel") @db.VarChar(40)
     namedcallgroup      String?  @db.VarChar(256)
     namedpickupgroup    String?  @db.VarChar(256)
+    setvar              String?  @db.VarChar(200)
 }
 
 // name é o identificador real do peer no Asterisk (chan_sip busca por name, não por id)

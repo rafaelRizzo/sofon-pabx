@@ -21,6 +21,7 @@ redisClient.on('connect', () => {
 })
 
 export const connectRedis = async () => {
+    if (redisClient.isOpen) return
     try {
         await redisClient.connect()
         logger.info({ event: 'redis.connection.success' })

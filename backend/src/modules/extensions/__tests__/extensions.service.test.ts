@@ -12,19 +12,20 @@ let sipId: string
 let pjsipId: string
 
 const cleanupAsteriskByCompany = async () => {
-    const numbers = await prisma.extension.findMany({
+    const exts = await prisma.extension.findMany({
         where: { companyId },
-        select: { number: true, context: true },
+        select: { alias: true, number: true, context: true },
     })
+    if (exts.length === 0) return
 
-    for (const { number, context } of numbers) {
-        await prisma.extensions.deleteMany({ where: { context, exten: number } })
-        await prisma.$executeRaw`DELETE FROM ps_endpoints WHERE id = ${number}`
-        await prisma.$executeRaw`DELETE FROM ps_auths WHERE id = ${number}`
-        await prisma.$executeRaw`DELETE FROM ps_aors WHERE id = ${number}`
-        await prisma.sip_peers.deleteMany({ where: { name: number } })
-    }
+    const aliases = exts.map((e) => e.alias)
+    const numbers = exts.map((e) => e.number)
 
+    await prisma.extensions.deleteMany({ where: { context: 'ramais', exten: { in: aliases } } })
+    await prisma.ps_endpoints.deleteMany({ where: { id: { in: numbers } } })
+    await prisma.ps_auths.deleteMany({ where: { id: { in: numbers } } })
+    await prisma.ps_aors.deleteMany({ where: { id: { in: numbers } } })
+    await prisma.sip_peers.deleteMany({ where: { name: { in: numbers } } })
     await prisma.extension.deleteMany({ where: { companyId } })
 }
 
@@ -48,7 +49,7 @@ afterAll(async () => {
     await prisma.userCompany.deleteMany({ where: { userId } })
     await prisma.company.deleteMany({ where: { id: companyId } })
     await teardownTestEnv(PREFIX)
-})
+}, 30000)
 
 // ----------------------------------------------------- createExtension SIP
 describe('ExtensionsService.createExtension (sip)', () => {
@@ -73,8 +74,11 @@ describe('ExtensionsService.createExtension (sip)', () => {
         expect(peer?.secret).toMatch(/^[a-zA-Z0-9]{16,30}$/)
         expect(peer?.port).toBe('5062')
 
-        const dialplan = await prisma.extensions.findMany({ where: { exten: ext.username } })
-        expect(dialplan.length).toBe(2)
+        expect(ext.allowOutbound).toBe(true)
+        expect(peer?.setvar).toBe('ALLOW_OUTBOUND=1')
+
+        const dialplan = await prisma.extensions.findMany({ where: { exten: ext.alias } })
+        expect(dialplan.length).toBe(4)
     })
 
     it('throws 409 with duplicate alias in the same company', async () => {
@@ -127,8 +131,11 @@ describe('ExtensionsService.createExtension (pjsip)', () => {
         expect(auth?.password).toMatch(/^[a-zA-Z0-9]{16,30}$/)
         expect(endpoint?.callerid).toBe(`Test PJSIP <${number}>`)
 
-        const dialplan = await prisma.extensions.findMany({ where: { exten: number } })
-        expect(dialplan.length).toBe(2)
+        expect(ext.allowOutbound).toBe(true)
+        expect(endpoint?.setvar).toBe('ALLOW_OUTBOUND=1')
+
+        const dialplan = await prisma.extensions.findMany({ where: { exten: ext.alias } })
+        expect(dialplan.length).toBe(4)
         expect(dialplan.some((d) => d.appdata?.startsWith(`PJSIP/${number}`))).toBe(true)
     })
 })
@@ -179,6 +186,68 @@ describe('ExtensionsService.createExtension (pjsip) named groups', () => {
         const endpoint = await prisma.ps_endpoints.findUnique({ where: { id: ext.username } })
         expect(endpoint?.namedcallgroup).toBeNull()
         expect(endpoint?.namedpickupgroup).toBeNull()
+    })
+})
+
+// -------------------------------------------------- allowOutbound
+describe('ExtensionsService.createExtension — allowOutbound', () => {
+    it('sip: allowOutbound false sets setvar ALLOW_OUTBOUND=0', async () => {
+        const ext = await ExtensionsService.createExtension({
+            alias: '2006',
+            type: 'sip',
+            name: 'SIP No Outbound',
+            companyId,
+            context: 'ramais',
+            allowOutbound: false,
+        }) as any
+
+        expect(ext.allowOutbound).toBe(false)
+        const peer = await prisma.sip_peers.findUnique({ where: { name: ext.username } })
+        expect(peer?.setvar).toBe('ALLOW_OUTBOUND=0')
+    })
+
+    it('pjsip: allowOutbound false sets setvar ALLOW_OUTBOUND=0', async () => {
+        const ext = await ExtensionsService.createExtension({
+            alias: '2007',
+            type: 'pjsip',
+            name: 'PJSIP No Outbound',
+            companyId,
+            context: 'ramais',
+            allowOutbound: false,
+        }) as any
+
+        expect(ext.allowOutbound).toBe(false)
+        const endpoint = await prisma.ps_endpoints.findUnique({ where: { id: ext.username } })
+        expect(endpoint?.setvar).toBe('ALLOW_OUTBOUND=0')
+    })
+})
+
+describe('ExtensionsService.updateExtension — allowOutbound', () => {
+    it('sip: toggle allowOutbound false updates setvar in sip_peers', async () => {
+        await ExtensionsService.updateExtension(sipId, { allowOutbound: false })
+
+        const ext = await ExtensionsService.getExtensionById(sipId) as any
+        expect(ext.allowOutbound).toBe(false)
+        const peer = await prisma.sip_peers.findUnique({ where: { name: ext.username } })
+        expect(peer?.setvar).toBe('ALLOW_OUTBOUND=0')
+    })
+
+    it('sip: toggle allowOutbound true restores setvar', async () => {
+        await ExtensionsService.updateExtension(sipId, { allowOutbound: true })
+
+        const ext = await ExtensionsService.getExtensionById(sipId) as any
+        expect(ext.allowOutbound).toBe(true)
+        const peer = await prisma.sip_peers.findUnique({ where: { name: ext.username } })
+        expect(peer?.setvar).toBe('ALLOW_OUTBOUND=1')
+    })
+
+    it('pjsip: toggle allowOutbound false updates setvar in ps_endpoints', async () => {
+        await ExtensionsService.updateExtension(pjsipId, { allowOutbound: false })
+
+        const ext = await ExtensionsService.getExtensionById(pjsipId) as any
+        expect(ext.allowOutbound).toBe(false)
+        const endpoint = await prisma.ps_endpoints.findUnique({ where: { id: ext.username } })
+        expect(endpoint?.setvar).toBe('ALLOW_OUTBOUND=0')
     })
 })
 
@@ -296,7 +365,7 @@ describe('ExtensionsService.deleteExtension', () => {
 
         expect(await prisma.extension.findUnique({ where: { id: ext.id } })).toBeNull()
         expect(await prisma.sip_peers.findUnique({ where: { name: ext.username } })).toBeNull()
-        expect(await prisma.extensions.findMany({ where: { exten: ext.username } })).toEqual([])
+        expect(await prisma.extensions.findMany({ where: { exten: ext.alias } })).toEqual([])
     })
 
     it('deletes pjsip + full cleanup', async () => {
