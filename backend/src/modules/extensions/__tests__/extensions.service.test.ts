@@ -142,15 +142,15 @@ describe('ExtensionsService.createExtension (pjsip)', () => {
 
 // ----------------------------------------- createExtension PJSIP named groups
 describe('ExtensionsService.createExtension (pjsip) named groups', () => {
-    it('prefixes namedcallgroup and namedpickupgroup with asteriskId', async () => {
+    it('prefixes namedCallGroup and namedPickupGroup with asteriskId', async () => {
         const ext = await ExtensionsService.createExtension({
             alias: '2003',
             type: 'pjsip',
             name: 'PJSIP Groups',
             companyId,
             context: 'ramais',
-            namedcallgroup: 'suporte',
-            namedpickupgroup: 'suporte',
+            namedCallGroup: 'suporte',
+            namedPickupGroup: 'suporte',
         }) as any
 
         const endpoint = await prisma.ps_endpoints.findUnique({ where: { id: ext.username } })
@@ -158,15 +158,15 @@ describe('ExtensionsService.createExtension (pjsip) named groups', () => {
         expect(endpoint?.namedpickupgroup).toBe(`${asteriskId}-suporte`)
     })
 
-    it('prefixes each group in comma-separated namedcallgroup on create', async () => {
+    it('prefixes each group in comma-separated namedCallGroup on create', async () => {
         const ext = await ExtensionsService.createExtension({
             alias: '2004',
             type: 'pjsip',
             name: 'PJSIP Multi Groups',
             companyId,
             context: 'ramais',
-            namedcallgroup: 'suporte,financeiro',
-            namedpickupgroup: 'suporte',
+            namedCallGroup: 'suporte,financeiro',
+            namedPickupGroup: 'suporte',
         }) as any
 
         const endpoint = await prisma.ps_endpoints.findUnique({ where: { id: ext.username } })
@@ -300,10 +300,10 @@ describe('ExtensionsService.updateExtension (pjsip)', () => {
         expect(endpoint?.callerid).toBe(`PJSIP Renamed <${ext.username}>`)
     })
 
-    it('prefixes namedcallgroup and namedpickupgroup with asteriskId on update', async () => {
+    it('prefixes namedCallGroup and namedPickupGroup with asteriskId on update', async () => {
         await ExtensionsService.updateExtension(pjsipId, {
-            namedcallgroup: 'suporte',
-            namedpickupgroup: 'suporte',
+            namedCallGroup: 'suporte',
+            namedPickupGroup: 'suporte',
         })
 
         const ext = await ExtensionsService.getExtensionById(pjsipId) as any
@@ -312,9 +312,9 @@ describe('ExtensionsService.updateExtension (pjsip)', () => {
         expect(endpoint?.namedpickupgroup).toBe(`${asteriskId}-suporte`)
     })
 
-    it('prefixes each group in comma-separated namedcallgroup', async () => {
+    it('prefixes each group in comma-separated namedCallGroup', async () => {
         await ExtensionsService.updateExtension(pjsipId, {
-            namedcallgroup: 'suporte,financeiro',
+            namedCallGroup: 'suporte,financeiro',
         })
 
         const ext = await ExtensionsService.getExtensionById(pjsipId) as any

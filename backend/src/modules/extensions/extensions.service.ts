@@ -2,7 +2,7 @@ import { randomBytes } from 'crypto'
 import { prisma } from '../../lib/prisma'
 import { ExtensionsCache } from './cache/extensions.cache'
 import type { CreateExtensionInput, UpdateExtensionInput } from './schemas/extension.schema'
-import { sipFieldKeys, pjsipFieldKeys } from './schemas/extension.schema'
+import { sipFieldKeys, pjsipFieldKeys, sipFieldMap, pjsipFieldMap } from './schemas/extension.schema'
 import { PjsipRepository } from '../../asterisk/pjsip.repository'
 import { SipRepository } from '../../asterisk/sip.repository'
 import { DialplanRepository } from '../../asterisk/dialplan.repository'
@@ -28,6 +28,24 @@ function generateAsteriskNumber(alias: string, asteriskId: string): string {
 }
 
 const GROUP_FIELDS = ['namedcallgroup', 'namedpickupgroup'] as const
+
+function toSipDbFields(data: Record<string, any>): Record<string, any> {
+    const result: Record<string, any> = {}
+    for (const [key, value] of Object.entries(data)) {
+        if (value === undefined) continue
+        result[sipFieldMap[key] ?? key] = value
+    }
+    return result
+}
+
+function toPjsipDbFields(data: Record<string, any>): Record<string, any> {
+    const result: Record<string, any> = {}
+    for (const [key, value] of Object.entries(data)) {
+        if (value === undefined) continue
+        result[pjsipFieldMap[key] ?? key] = value
+    }
+    return result
+}
 
 function prefixGroups(groups: string, asteriskId: string): string {
     return groups.split(',').map((g) => `${asteriskId}-${g.trim()}`).join(',')
@@ -199,7 +217,8 @@ export const createExtension = async (data: CreateExtensionInput) => {
 
     if (type === 'pjsip') {
         const { alias: _a, type: _t, name: _n, companyId: _c, context: _ctx, allowOutbound: _ao, ...pjsipExtras } = data
-        const pjsipExtrasWithGroups = applyGroupPrefixes({ ...pjsipExtras, setvar: allowOutboundSetvar }, company.asteriskId)
+        const mappedExtras = toPjsipDbFields(pjsipExtras)
+        const pjsipExtrasWithGroups = applyGroupPrefixes({ ...mappedExtras, setvar: allowOutboundSetvar }, company.asteriskId)
 
         await prisma.$transaction(async (tx) => {
             await PjsipRepository.createExtension(tx, number, { password, name, context, extras: pjsipExtrasWithGroups })
@@ -208,9 +227,9 @@ export const createExtension = async (data: CreateExtensionInput) => {
         })
     } else {
         const { alias: _a, type: _t, name: _n, companyId: _c, context: _ctx, allowOutbound: _ao, peerType, ...sipExtras } = data
-        const sipData: Record<string, any> = { ...sipExtras }
+        const sipData: Record<string, any> = toSipDbFields(sipExtras)
         if (peerType) sipData.type = peerType
-        sipData.setvar = sipExtras.setvar ? `${allowOutboundSetvar}\n${sipExtras.setvar}` : allowOutboundSetvar
+        sipData.setvar = sipData.setvar ? `${allowOutboundSetvar}\n${sipData.setvar}` : allowOutboundSetvar
 
         await prisma.$transaction(async (tx) => {
             await SipRepository.createExtension(tx, number, password, context, sipData)
@@ -279,8 +298,9 @@ export const updateExtension = async (id: string, data: UpdateExtensionInput) =>
             for (const key of pjsipFieldKeys) {
                 const value = (typeFields as any)[key]
                 if (value === undefined) continue
-                if (key.startsWith('aor_')) aorUpdate[key.slice(4)] = value
-                else endpointUpdate[key] = value
+                const dbKey = pjsipFieldMap[key] ?? key
+                if (dbKey.startsWith('aor_')) aorUpdate[dbKey.slice(4)] = value
+                else endpointUpdate[dbKey] = value
             }
 
             const endpointUpdateWithGroups = applyGroupPrefixes(endpointUpdate, existing.company.asteriskId)
@@ -297,7 +317,7 @@ export const updateExtension = async (id: string, data: UpdateExtensionInput) =>
 
             for (const key of sipFieldKeys) {
                 const value = (typeFields as any)[key]
-                if (value !== undefined) sipUpdate[key] = value
+                if (value !== undefined) sipUpdate[sipFieldMap[key] ?? key] = value
             }
 
             await SipRepository.updateExtension(tx, effectiveNumber, sipUpdate)
