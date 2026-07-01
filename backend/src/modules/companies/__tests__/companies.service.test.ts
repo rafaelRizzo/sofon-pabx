@@ -1,144 +1,116 @@
-import { describe, it, expect, beforeAll, afterAll } from 'bun:test'
-import { prisma } from '../../../lib/prisma'
-import { setupTestEnv, teardownTestEnv } from '../../../test/setup'
+import { mock, describe, it, expect, beforeEach } from 'bun:test'
+import { createPrismaMock, clearPrismaMock } from '../../../test/mocks/prisma.mock'
+
+const db = createPrismaMock()
+
+mock.module('../../../lib/prisma', () => ({ prisma: db }))
+mock.module('../cache/companies.cache', () => ({
+    CompaniesCache: { getAllCompanies: mock(() => null), setAllCompanies: mock(), getCompany: mock(() => null), setCompany: mock(), invalidateCompany: mock(), invalidateAllCompanies: mock(), getCompaniesByUser: mock(() => null), setCompaniesByUser: mock(), invalidateCompaniesByUser: mock() },
+}))
+mock.module('../../extensions/cache/extensions.cache', () => ({
+    ExtensionsCache: { invalidateAllExtensions: mock() },
+}))
+mock.module('../../queues/cache/queues.cache', () => ({
+    QueuesCache: { invalidateNamespace: mock() },
+}))
+mock.module('../../../asterisk/pjsip.repository', () => ({
+    PjsipRepository: { deleteManyByIds: mock(() => Promise.resolve()) },
+}))
+mock.module('../../../asterisk/sip.repository', () => ({
+    SipRepository: { deleteManyByNames: mock(() => Promise.resolve()) },
+}))
+mock.module('../../../asterisk/dialplan.repository', () => ({
+    DialplanRepository: { deleteManyByExten: mock(() => Promise.resolve()) },
+}))
+mock.module('../../../asterisk/queue.repository', () => ({
+    AsteriskQueueRepository: { removeMembersByInterfaces: mock(() => Promise.resolve()), deleteManyQueues: mock(() => Promise.resolve()) },
+}))
+
 import * as CompaniesService from '../companies.service'
 
-const PREFIX = `__test_companies_svc_${Date.now()}__`
+const COMPANY = { id: 'c1', name: 'ACME', doc: null, asteriskId: 'ast1', metadata: {}, createdAt: new Date(), updatedAt: new Date() }
+const USER = { id: 'u1', name: 'Admin', username: 'admin@test.com' }
 
-let userId: string
-let companyId: string
+beforeEach(() => clearPrismaMock(db))
 
-beforeAll(async () => {
-    await setupTestEnv()
-
-    const user = await prisma.user.create({
-        data: {
-            name: 'Test User',
-            username: `${PREFIX}@test.com`,
-            password: 'hashed',
-            role: 'admin',
-        },
+// ─── getAllCompanies ───────────────────────────────────────────────────────────
+describe('CompaniesService.getAllCompanies', () => {
+    it('returns list of companies', async () => {
+        db.company.findMany.mockResolvedValue([COMPANY])
+        const companies = await CompaniesService.getAllCompanies() as any[]
+        expect(companies[0].id).toBe('c1')
     })
-    userId = user.id
+
+    it('returns empty array when companyIds is empty', async () => {
+        const companies = await CompaniesService.getAllCompanies([])
+        expect(companies).toHaveLength(0)
+    })
 })
 
-afterAll(async () => {
-    await prisma.userCompany.deleteMany({ where: { userId } })
-    await prisma.company.deleteMany({ where: { name: { startsWith: PREFIX } } })
-    await teardownTestEnv(PREFIX)
+// ─── getCompanyById ───────────────────────────────────────────────────────────
+describe('CompaniesService.getCompanyById', () => {
+    it('returns company by id', async () => {
+        db.company.findUnique.mockResolvedValue(COMPANY)
+        const company = await CompaniesService.getCompanyById('c1') as any
+        expect(company.id).toBe('c1')
+    })
+
+    it('throws 404 with non-existent id', async () => {
+        db.company.findUnique.mockResolvedValue(null)
+        await expect(CompaniesService.getCompanyById('clxxxxxxxxxxxxxxxxxxxxxxxxx'))
+            .rejects.toMatchObject({ statusCode: 404 })
+    })
 })
 
-// -------------------------------------------------------- createCompany
+// ─── createCompany ────────────────────────────────────────────────────────────
 describe('CompaniesService.createCompany', () => {
-    it('creates company and user link', async () => {
-        const company = await CompaniesService.createCompany({
-            name: `${PREFIX} Speed SP`,
-            userId,
-            metadata: {},
-        })
-
-        companyId = company.id
-
-        expect(company.name).toBe(`${PREFIX} Speed SP`)
-        expect(company.id).toBeTruthy()
-
-        const link = await prisma.userCompany.findUnique({
-            where: { userId_companyId: { userId, companyId: company.id } },
-        })
-        expect(link).not.toBeNull()
+    it('creates company and links user', async () => {
+        db.user.findUnique.mockResolvedValue(USER)
+        db.company.create.mockResolvedValue(COMPANY)
+        db.userCompany.create.mockResolvedValue({})
+        const company = await CompaniesService.createCompany({ name: 'ACME', userId: 'u1', metadata: {} }) as any
+        expect(company.id).toBe('c1')
     })
 
     it('throws 404 with non-existent userId', async () => {
-        await expect(
-            CompaniesService.createCompany({
-                name: `${PREFIX} Fail`,
-                userId: 'clxxxxxxxxxxxxxxxxxxxxxxxxx',
-                metadata: {},
-            })
-        ).rejects.toMatchObject({ statusCode: 404 })
+        db.user.findUnique.mockResolvedValue(null)
+        await expect(CompaniesService.createCompany({ name: 'X', userId: 'clxxxxxxxxxxxxxxxxxxxxxxxxx', metadata: {} }))
+            .rejects.toMatchObject({ statusCode: 404 })
     })
 })
 
-// ------------------------------------------------------- getAllCompanies
-describe('CompaniesService.getAllCompanies', () => {
-    it('returns list with at least the created company', async () => {
-        const companies = await CompaniesService.getAllCompanies() as any[]
-
-        expect(Array.isArray(companies)).toBe(true)
-        expect(companies.some((c) => c.id === companyId)).toBe(true)
-    })
-
-    it('does not expose users field', async () => {
-        const companies = await CompaniesService.getAllCompanies() as any[]
-        const company = companies.find((c) => c.id === companyId)
-        expect(company?.users).toBeUndefined()
-    })
-})
-
-// ----------------------------------------------------- getCompanyById
-describe('CompaniesService.getCompanyById', () => {
-    it('returns company by id', async () => {
-        const company = await CompaniesService.getCompanyById(companyId) as any
-
-        expect(company.id).toBe(companyId)
-        expect(company.name).toBe(`${PREFIX} Speed SP`)
-    })
-
-    it('throws 404 with non-existent id', async () => {
-        await expect(
-            CompaniesService.getCompanyById('clxxxxxxxxxxxxxxxxxxxxxxxxx')
-        ).rejects.toMatchObject({ statusCode: 404 })
-    })
-})
-
-// ------------------------------------------------------ updateCompany
+// ─── updateCompany ────────────────────────────────────────────────────────────
 describe('CompaniesService.updateCompany', () => {
-    it('updates company name', async () => {
-        const updated = await CompaniesService.updateCompany(companyId, {
-            name: `${PREFIX} Speed RJ`,
-        })
-
-        expect(updated.name).toBe(`${PREFIX} Speed RJ`)
-    })
-
-    it('updates metadata', async () => {
-        const updated = await CompaniesService.updateCompany(companyId, {
-            metadata: { city: 'Sao Paulo' },
-        })
-
-        expect((updated.metadata as any).city).toBe('Sao Paulo')
+    it('updates company', async () => {
+        db.company.findUnique.mockResolvedValue({ ...COMPANY, users: [] })
+        db.company.update.mockResolvedValue({ ...COMPANY, name: 'Updated' })
+        const company = await CompaniesService.updateCompany('c1', { name: 'Updated' }) as any
+        expect(company.name).toBe('Updated')
     })
 
     it('throws 404 with non-existent id', async () => {
-        await expect(
-            CompaniesService.updateCompany('clxxxxxxxxxxxxxxxxxxxxxxxxx', { name: 'X' })
-        ).rejects.toMatchObject({ statusCode: 404 })
+        db.company.findUnique.mockResolvedValue(null)
+        await expect(CompaniesService.updateCompany('clxxxxxxxxxxxxxxxxxxxxxxxxx', { name: 'X' }))
+            .rejects.toMatchObject({ statusCode: 404 })
     })
 })
 
-// ------------------------------------------------------ deleteCompany
+// ─── deleteCompany ────────────────────────────────────────────────────────────
 describe('CompaniesService.deleteCompany', () => {
-    it('deletes company and link', async () => {
-        const toDelete = await CompaniesService.createCompany({
-            name: `${PREFIX} To Delete`,
-            userId,
-            metadata: {},
-        })
-
-        await CompaniesService.deleteCompany(toDelete.id)
-
-        const check = await prisma.company.findUnique({ where: { id: toDelete.id } })
-        expect(check).toBeNull()
-
-        const link = await prisma.userCompany.findUnique({
-            where: { userId_companyId: { userId, companyId: toDelete.id } },
-        })
-        expect(link).toBeNull()
+    it('deletes company', async () => {
+        db.company.findUnique.mockResolvedValue({ ...COMPANY, users: [{ userId: 'u1' }] })
+        db.extension.findMany.mockResolvedValue([])
+        db.queue.findMany.mockResolvedValue([])
+        db.trunk.findMany.mockResolvedValue([])
+        db.extension.deleteMany.mockResolvedValue({ count: 0 })
+        db.company.delete.mockResolvedValue(COMPANY)
+        await CompaniesService.deleteCompany('c1')
+        expect(db.company.delete).toHaveBeenCalled()
     })
 
     it('throws 404 with non-existent id', async () => {
-        await expect(
-            CompaniesService.deleteCompany('clxxxxxxxxxxxxxxxxxxxxxxxxx')
-        ).rejects.toMatchObject({ statusCode: 404 })
+        db.company.findUnique.mockResolvedValue(null)
+        await expect(CompaniesService.deleteCompany('clxxxxxxxxxxxxxxxxxxxxxxxxx'))
+            .rejects.toMatchObject({ statusCode: 404 })
     })
 })

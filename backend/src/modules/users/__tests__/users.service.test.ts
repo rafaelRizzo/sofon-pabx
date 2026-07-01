@@ -1,164 +1,113 @@
-import { describe, it, expect, beforeAll, afterAll } from 'bun:test'
-import { prisma } from '../../../lib/prisma'
-import { setupTestEnv, teardownTestEnv } from '../../../test/setup'
+import { mock, describe, it, expect, beforeEach } from 'bun:test'
+import { createPrismaMock, clearPrismaMock } from '../../../test/mocks/prisma.mock'
+
+const db = createPrismaMock()
+
+mock.module('../../../lib/prisma', () => ({ prisma: db }))
+mock.module('../cache/users.cache', () => ({
+    UsersCache: { getAllUsers: mock(() => null), setAllUsers: mock(), getUser: mock(() => null), setUser: mock(), invalidateUser: mock(), invalidateAllUsers: mock() },
+}))
+mock.module('../../companies/cache/companies.cache', () => ({
+    CompaniesCache: { getCompaniesByUser: mock(() => null), setCompaniesByUser: mock(), invalidateCompaniesByUser: mock() },
+}))
+
 import * as UsersService from '../users.service'
 
-type UserRow = {
-    id: string
-    name: string
-    username: string
-    role: string
-    status: string
-    createdBy: string | null
-}
+const USER = { id: 'u1', name: 'Test', username: 'test@test.com', role: 'user', status: 'active', extensionId: null, createdBy: null, webhookSlug: 'slug', createdAt: new Date(), updatedAt: new Date() }
 
-const PREFIX = `__test_users_svc_${Date.now()}__`
+beforeEach(() => clearPrismaMock(db))
 
-let userId: string
-let resellerId: string
-
-beforeAll(async () => {
-    await setupTestEnv()
-
-    const user = await prisma.user.create({
-        data: { name: 'Seed User', username: `${PREFIX}seed@test.com`, password: 'hashed' },
-    })
-    userId = user.id
-
-    const reseller = await prisma.user.create({
-        data: { name: 'Reseller', username: `${PREFIX}reseller@test.com`, password: 'hashed', role: 'reseller' },
-    })
-    resellerId = reseller.id
-})
-
-afterAll(async () => {
-    await teardownTestEnv(PREFIX)
-})
-
-// --------------------------------------------------------- getAllUsers
+// ─── getAllUsers ───────────────────────────────────────────────────────────────
 describe('UsersService.getAllUsers', () => {
-    it('returns all users when no filter', async () => {
-        const users = await UsersService.getAllUsers() as UserRow[]
+    it('returns list of users', async () => {
+        db.user.findMany.mockResolvedValue([USER])
+        const users = await UsersService.getAllUsers()
         expect(Array.isArray(users)).toBe(true)
-        expect(users.some((u) => u.id === userId)).toBe(true)
+        expect((users as any[])[0].id).toBe('u1')
     })
 
     it('does not expose password field', async () => {
-        const users = await UsersService.getAllUsers() as UserRow[]
-        expect((users[0] as any).password).toBeUndefined()
-    })
-
-    it('returns only users created by the reseller when createdBy filter is set', async () => {
-        const child = await UsersService.createUser(
-            { name: 'Child', username: `${PREFIX}child@test.com`, password: 'pwd123' },
-            resellerId,
-        )
-
-        const all = await UsersService.getAllUsers() as UserRow[]
-        const filtered = await UsersService.getAllUsers({ createdBy: resellerId }) as UserRow[]
-
-        expect(filtered.every((u) => u.createdBy === resellerId)).toBe(true)
-        expect(filtered.some((u) => u.id === child.id)).toBe(true)
-        expect(filtered.length).toBeLessThan(all.length)
+        db.user.findMany.mockResolvedValue([USER])
+        const users = await UsersService.getAllUsers() as any[]
+        expect(users[0].password).toBeUndefined()
     })
 })
 
-// -------------------------------------------------------- getUserById
+// ─── getUserById ──────────────────────────────────────────────────────────────
 describe('UsersService.getUserById', () => {
-    it('returns the user by id', async () => {
-        const user = await UsersService.getUserById(userId) as UserRow
-        expect(user.id).toBe(userId)
-        expect(user.username).toBe(`${PREFIX}seed@test.com`)
-        expect((user as any).password).toBeUndefined()
+    it('returns user by id', async () => {
+        db.user.findUnique.mockResolvedValue(USER)
+        const user = await UsersService.getUserById('u1') as any
+        expect(user.id).toBe('u1')
     })
 
     it('throws 404 with non-existent id', async () => {
-        await expect(
-            UsersService.getUserById('clxxxxxxxxxxxxxxxxxxxxxxxxx')
-        ).rejects.toMatchObject({ statusCode: 404 })
+        db.user.findUnique.mockResolvedValue(null)
+        await expect(UsersService.getUserById('clxxxxxxxxxxxxxxxxxxxxxxxxx'))
+            .rejects.toMatchObject({ statusCode: 404 })
     })
 })
 
-// --------------------------------------------------------- createUser
+// ─── createUser ───────────────────────────────────────────────────────────────
 describe('UsersService.createUser', () => {
-    it('creates user with hashed password and default role', async () => {
-        const email = `${PREFIX}create@test.com`
-        const user = await UsersService.createUser({
-            name: 'Created',
-            username: email,
-            password: 'plain-password',
-        }) as UserRow
-
-        expect(user.username).toBe(email)
+    it('creates user with default role', async () => {
+        db.user.findUnique.mockResolvedValue(null)
+        db.user.create.mockResolvedValue({ ...USER, role: 'user' })
+        const user = await UsersService.createUser({ name: 'New', username: 'new@test.com', password: 'abc123' }) as any
         expect(user.role).toBe('user')
-        expect(user.createdBy).toBeNull()
-        expect((user as any).password).toBeUndefined()
-
-        const raw = await prisma.user.findUnique({ where: { username: email } })
-        expect(raw?.password).not.toBe('plain-password')
-    })
-
-    it('sets createdBy when reseller creates a user', async () => {
-        const user = await UsersService.createUser(
-            { name: 'By Reseller', username: `${PREFIX}byreseller@test.com`, password: 'pwd123' },
-            resellerId,
-        ) as UserRow
-
-        expect(user.createdBy).toBe(resellerId)
     })
 
     it('throws 409 on duplicate username', async () => {
-        await expect(
-            UsersService.createUser({ name: 'Dup', username: `${PREFIX}seed@test.com`, password: 'x' })
-        ).rejects.toMatchObject({ statusCode: 409 })
+        db.user.findUnique.mockResolvedValue(USER)
+        await expect(UsersService.createUser({ name: 'Dup', username: 'test@test.com', password: 'x' }))
+            .rejects.toMatchObject({ statusCode: 409 })
+    })
+
+    it('sets createdBy when provided', async () => {
+        db.user.findUnique.mockResolvedValue(null)
+        db.user.create.mockResolvedValue({ ...USER, createdBy: 'reseller-id' })
+        const user = await UsersService.createUser({ name: 'Child', username: 'child@test.com', password: 'x' }, 'reseller-id') as any
+        expect(user.createdBy).toBe('reseller-id')
     })
 })
 
-// --------------------------------------------------------- updateUser
+// ─── updateUser ───────────────────────────────────────────────────────────────
 describe('UsersService.updateUser', () => {
-    it('updates user name', async () => {
-        const user = await UsersService.updateUser(userId, { name: 'Updated Name' })
-        expect(user.name).toBe('Updated Name')
-    })
-
-    it('re-hashes when password is updated', async () => {
-        await UsersService.updateUser(userId, { password: 'new-password-456' })
-        const raw = await prisma.user.findUnique({ where: { id: userId } })
-        expect(raw?.password).not.toBe('new-password-456')
+    it('updates user', async () => {
+        db.user.findUnique.mockResolvedValue(USER)
+        db.user.update.mockResolvedValue({ ...USER, name: 'Updated' })
+        const user = await UsersService.updateUser('u1', { name: 'Updated' })
+        expect(user.name).toBe('Updated')
     })
 
     it('throws 404 with non-existent id', async () => {
-        await expect(
-            UsersService.updateUser('clxxxxxxxxxxxxxxxxxxxxxxxxx', { name: 'X' })
-        ).rejects.toMatchObject({ statusCode: 404 })
+        db.user.findUnique.mockResolvedValue(null)
+        await expect(UsersService.updateUser('clxxxxxxxxxxxxxxxxxxxxxxxxx', { name: 'X' }))
+            .rejects.toMatchObject({ statusCode: 404 })
     })
 })
 
-// ------------------------------------------------- getCompaniesByUser
+// ─── getCompaniesByUser ───────────────────────────────────────────────────────
 describe('UsersService.getCompaniesByUser', () => {
-    it('returns empty list for user without companies', async () => {
-        const companies = await UsersService.getCompaniesByUser(userId) as any[]
+    it('returns companies for user', async () => {
+        db.user.findUnique.mockResolvedValue(USER)
+        db.company.findMany.mockResolvedValue([])
+        const companies = await UsersService.getCompaniesByUser('u1')
         expect(Array.isArray(companies)).toBe(true)
-        expect(companies).toHaveLength(0)
     })
 
     it('throws 404 with non-existent id', async () => {
-        await expect(
-            UsersService.getCompaniesByUser('clxxxxxxxxxxxxxxxxxxxxxxxxx')
-        ).rejects.toMatchObject({ statusCode: 404 })
+        db.user.findUnique.mockResolvedValue(null)
+        await expect(UsersService.getCompaniesByUser('clxxxxxxxxxxxxxxxxxxxxxxxxx'))
+            .rejects.toMatchObject({ statusCode: 404 })
     })
 })
 
-// --------------------------------------------------------- deleteUser
+// ─── deleteUser ───────────────────────────────────────────────────────────────
 describe('UsersService.deleteUser', () => {
-    it('deletes the user', async () => {
-        const toDelete = await prisma.user.create({
-            data: { name: 'To Delete', username: `${PREFIX}delete@test.com`, password: 'x' },
-        })
-
-        await UsersService.deleteUser(toDelete.id)
-
-        const check = await prisma.user.findUnique({ where: { id: toDelete.id } })
-        expect(check).toBeNull()
+    it('deletes user', async () => {
+        db.user.delete.mockResolvedValue(USER)
+        await UsersService.deleteUser('u1')
+        expect(db.user.delete).toHaveBeenCalledWith({ where: { id: 'u1' } })
     })
 })

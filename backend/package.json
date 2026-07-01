@@ -11,7 +11,9 @@
         "deploy": "bun run prisma deploy",
         "generate": "bun run prisma generate",
         "reset": "bun run prisma migrate reset",
-        "test": "LOG_ENABLED=false bun test"
+        "test": "LOG_ENABLED=false bun test",
+        "test:unit": "LOG_ENABLED=false bun test service.test",
+        "test:integration": "LOG_ENABLED=false bun test routes.test"
     },
     "devDependencies": {
         "@types/bun": "^1.3.14",

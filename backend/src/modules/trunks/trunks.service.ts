@@ -70,7 +70,7 @@ export const createTrunk = async (data: CreateTrunkInput) => {
             context: data.context,
             codecs: data.codecs,
             registrationMode: data.registrationMode,
-            host: data.registrationMode === 'outbound' ? data.host : undefined,
+            host: data.host,
         })
 
         await tx.trunk.create({

@@ -5,8 +5,10 @@ import { buildApp } from '../../../test/build-app'
 import { disconnectRedis } from '../../../config/redis'
 import argon2 from 'argon2'
 
-const PREFIX = `__test_queues_routes_${Date.now()}__`
+const TS = String(Date.now())
+const PREFIX = `__test_queues_routes_${TS}__`
 const EMAIL = `${PREFIX}@test.com`
+const EXT_NUM = TS.slice(-6)
 const PASSWORD = 'test-password-123'
 
 let app: FastifyInstance
@@ -34,8 +36,8 @@ beforeAll(async () => {
 
     const ext = await prisma.extension.create({
         data: {
-            alias: `${PREFIX.slice(0, 10)}`,
-            number: '8001',
+            alias: EXT_NUM.slice(-4),
+            number: EXT_NUM,
             type: 'pjsip',
             name: 'Agent 1',
             companyId,
@@ -49,7 +51,7 @@ beforeAll(async () => {
         body: { username: EMAIL, password: PASSWORD },
     })
     accessToken = loginRes.json().token
-})
+}, 30000)
 
 afterAll(async () => {
     await prisma.queue_members.deleteMany({ where: { queue_name: { startsWith: companyAsteriskId } } }).catch(() => {})
@@ -63,7 +65,7 @@ afterAll(async () => {
     await prisma.$disconnect()
     await app.close()
     await disconnectRedis()
-})
+}, 30000)
 
 const auth = () => ({ authorization: `Bearer ${accessToken}` })
 

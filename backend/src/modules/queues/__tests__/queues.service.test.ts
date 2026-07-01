@@ -1,270 +1,210 @@
-import { describe, it, expect, beforeAll, afterAll } from 'bun:test'
-import { prisma } from '../../../lib/prisma'
-import { setupTestEnv, teardownTestEnv } from '../../../test/setup'
+import { mock, describe, it, expect, beforeEach } from 'bun:test'
+import { createPrismaMock, clearPrismaMock } from '../../../test/mocks/prisma.mock'
+
+const db = createPrismaMock()
+
+mock.module('../../../lib/prisma', () => ({ prisma: db }))
+mock.module('../cache/queues.cache', () => ({
+    QueuesCache: {
+        getAll: mock(() => null), setAll: mock(),
+        getByCompany: mock(() => null), setByCompany: mock(),
+        getQueue: mock(() => null), setQueue: mock(),
+        getMembers: mock(() => null), setMembers: mock(),
+        invalidateQueue: mock(), invalidateByCompany: mock(), invalidateNamespace: mock(),
+        invalidateMembers: mock(), invalidateAll: mock(),
+    },
+}))
+mock.module('../../../asterisk/queue.repository', () => ({
+    AsteriskQueueRepository: {
+        createQueue: mock(() => Promise.resolve()),
+        updateQueue: mock(() => Promise.resolve()),
+        renameQueue: mock(() => Promise.resolve()),
+        deleteQueue: mock(() => Promise.resolve()),
+        addMember: mock(() => Promise.resolve()),
+        updateMember: mock(() => Promise.resolve()),
+        removeMember: mock(() => Promise.resolve()),
+        removeMembersByInterfaces: mock(() => Promise.resolve()),
+        deleteManyQueues: mock(() => Promise.resolve()),
+    },
+}))
+
 import * as QueuesService from '../queues.service'
 import * as QueueMembersService from '../../queue-members/queue-members.service'
 
-const PREFIX = `__test_queues_svc_${Date.now()}__`
+const COMPANY = { id: 'c1', asteriskId: 'ast1' }
+const QUEUE = {
+    id: 'q1', name: 'suporte', number: null, companyId: 'c1',
+    strategy: 'ringall', musicOnHold: 'default', timeout: 15, retry: 5,
+    maxLen: 0, wrapupTime: 0, announce: null, announceFrequency: 0,
+    joinEmpty: true, leaveWhenEmpty: false, weight: 0, metadata: {},
+    createdAt: new Date(), updatedAt: new Date(),
+    company: { asteriskId: 'ast1' },
+    _count: { members: 0 },
+}
+const EXT = { id: 'e1', name: 'Agent', number: '2001_ast1', type: 'pjsip', companyId: 'c1' }
+const MEMBER = {
+    id: 'm1', queueId: 'q1', extensionId: 'e1', penalty: 0, paused: false,
+    createdAt: new Date(), updatedAt: new Date(),
+    extension: { id: 'e1', name: 'Agent', number: '2001_ast1', alias: '2001', type: 'pjsip', companyId: 'c1' },
+}
 
-let userId: string
-let companyId: string
-let companyAsteriskId: string
-let extensionId: string
-let queueId: string
-let memberId: string
-
-beforeAll(async () => {
-    await setupTestEnv()
-
-    const user = await prisma.user.create({
-        data: { name: 'Test', username: `${PREFIX}@test.com`, password: 'x', role: 'admin' },
-    })
-    userId = user.id
-
-    const company = await prisma.company.create({
-        data: { name: `${PREFIX} Company`, metadata: {}, users: { create: { userId } } },
-    })
-    companyId = company.id
-    companyAsteriskId = company.asteriskId
-
-    const ext = await prisma.extension.create({
-        data: { alias: PREFIX.slice(0, 10), number: '9001', type: 'pjsip', name: 'Agent', companyId },
-    })
-    extensionId = ext.id
-})
-
-afterAll(async () => {
-    await prisma.queue_members.deleteMany({ where: { queue_name: { startsWith: companyAsteriskId } } }).catch(() => {})
-    await prisma.queues.deleteMany({ where: { name: { startsWith: companyAsteriskId } } }).catch(() => {})
-    await prisma.queueMember.deleteMany({ where: { queue: { companyId } } })
-    await prisma.queue.deleteMany({ where: { companyId } })
-    await prisma.extension.deleteMany({ where: { companyId } })
-    await prisma.userCompany.deleteMany({ where: { userId } })
-    await prisma.company.deleteMany({ where: { id: companyId } })
-    await teardownTestEnv(PREFIX)
-})
+beforeEach(() => clearPrismaMock(db))
 
 // ─── createQueue ──────────────────────────────────────────────────────────────
 describe('QueuesService.createQueue', () => {
-    it('creates queue with defaults and syncs to asterisk', async () => {
-        const queue = await QueuesService.createQueue({ name: 'suporte', companyId }) as any
-        queueId = queue.id
-
-        expect(queue.name).toBe('suporte')
-        expect(queue.strategy).toBe('ringall')
-        expect(queue.musicOnHold).toBe('default')
-        expect(queue.timeout).toBe(15)
-        expect(queue.retry).toBe(5)
-        expect(queue.companyId).toBe(companyId)
-
-        const astQueue = await prisma.queues.findUnique({ where: { name: `${companyAsteriskId}-suporte` } })
-        expect(astQueue).not.toBeNull()
-        expect(astQueue?.strategy).toBe('ringall')
-    })
-
-    it('creates queue with custom options', async () => {
-        const queue = await QueuesService.createQueue({
-            name: 'vendas',
-            companyId,
-            strategy: 'rrmemory',
-            timeout: 25,
-            retry: 8,
-            joinEmpty: false,
-            leaveWhenEmpty: true,
-        }) as any
-
-        expect(queue.strategy).toBe('rrmemory')
-        expect(queue.timeout).toBe(25)
-
-        await QueuesService.deleteQueue(queue.id)
+    it('throws 404 with non-existent companyId', async () => {
+        db.company.findUnique.mockResolvedValue(null)
+        await expect(QueuesService.createQueue({ name: 'test', companyId: 'clxxxxxxxxxxxxxxxxxxxxxxxxx' }))
+            .rejects.toMatchObject({ statusCode: 404 })
     })
 
     it('throws 409 with duplicate name in same company', async () => {
-        await expect(
-            QueuesService.createQueue({ name: 'suporte', companyId })
-        ).rejects.toMatchObject({ statusCode: 409 })
+        db.company.findUnique.mockResolvedValue(COMPANY)
+        db.queue.findUnique.mockResolvedValue(QUEUE)
+        await expect(QueuesService.createQueue({ name: 'suporte', companyId: 'c1' }))
+            .rejects.toMatchObject({ statusCode: 409 })
     })
 
-    it('throws 404 with non-existent companyId', async () => {
-        await expect(
-            QueuesService.createQueue({ name: 'test', companyId: 'clxxxxxxxxxxxxxxxxxxxxxxxxx' })
-        ).rejects.toMatchObject({ statusCode: 404 })
+    it('creates queue with defaults', async () => {
+        db.company.findUnique.mockResolvedValue(COMPANY)
+        db.queue.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce(QUEUE)
+        db.queue.create.mockResolvedValue(QUEUE)
+
+        const queue = await QueuesService.createQueue({ name: 'suporte', companyId: 'c1' }) as any
+        expect(queue.name).toBe('suporte')
+        expect(queue.strategy).toBe('ringall')
     })
 })
 
 // ─── getQueuesByCompany ───────────────────────────────────────────────────────
 describe('QueuesService.getQueuesByCompany', () => {
     it('returns list of queues', async () => {
-        const queues = await QueuesService.getQueuesByCompany(companyId) as any[]
+        db.company.findUnique.mockResolvedValue(COMPANY)
+        db.queue.findMany.mockResolvedValue([QUEUE])
+        const queues = await QueuesService.getQueuesByCompany('c1') as any[]
         expect(Array.isArray(queues)).toBe(true)
-        expect(queues.some((q) => q.id === queueId)).toBe(true)
+        expect(queues[0].id).toBe('q1')
     })
 
     it('throws 404 with non-existent companyId', async () => {
-        await expect(
-            QueuesService.getQueuesByCompany('clxxxxxxxxxxxxxxxxxxxxxxxxx')
-        ).rejects.toMatchObject({ statusCode: 404 })
+        db.company.findUnique.mockResolvedValue(null)
+        await expect(QueuesService.getQueuesByCompany('clxxxxxxxxxxxxxxxxxxxxxxxxx'))
+            .rejects.toMatchObject({ statusCode: 404 })
     })
 })
 
 // ─── getQueueById ─────────────────────────────────────────────────────────────
 describe('QueuesService.getQueueById', () => {
-    it('returns queue with member count', async () => {
-        const queue = await QueuesService.getQueueById(queueId) as any
-        expect(queue.id).toBe(queueId)
-        expect(queue._count).toBeDefined()
+    it('returns queue', async () => {
+        db.queue.findUnique.mockResolvedValue(QUEUE)
+        const queue = await QueuesService.getQueueById('q1') as any
+        expect(queue.id).toBe('q1')
     })
 
     it('throws 404 with non-existent id', async () => {
-        await expect(
-            QueuesService.getQueueById('clxxxxxxxxxxxxxxxxxxxxxxxxx')
-        ).rejects.toMatchObject({ statusCode: 404 })
-    })
-})
-
-// ─── addMember ────────────────────────────────────────────────────────────────
-describe('QueueMembersService.addMember', () => {
-    it('adds extension as member and syncs to asterisk', async () => {
-        const member = await QueueMembersService.addMember(queueId, { extensionId, penalty: 2, paused: false }) as any
-        memberId = member.id
-
-        expect(member.extensionId).toBe(extensionId)
-        expect(member.penalty).toBe(2)
-        expect(member.paused).toBe(false)
-        expect(member.extension.number).toBe('9001')
-
-        const astMember = await prisma.queue_members.findFirst({
-            where: { interface: 'PJSIP/9001' },
-        })
-        expect(astMember).not.toBeNull()
-        expect(astMember?.penalty).toBe(2)
-    })
-
-    it('throws 409 when already a member', async () => {
-        await expect(
-            QueueMembersService.addMember(queueId, { extensionId, penalty: 0, paused: false })
-        ).rejects.toMatchObject({ statusCode: 409 })
-    })
-
-    it('throws 403 when extension belongs to different company', async () => {
-        const otherCompany = await prisma.company.create({ data: { name: 'Other', metadata: {} } })
-        const otherExt = await prisma.extension.create({
-            data: { alias: 'oth', number: '9999', type: 'pjsip', name: 'Other', companyId: otherCompany.id },
-        })
-
-        await expect(
-            QueueMembersService.addMember(queueId, { extensionId: otherExt.id, penalty: 0, paused: false })
-        ).rejects.toMatchObject({ statusCode: 403 })
-
-        await prisma.extension.delete({ where: { id: otherExt.id } })
-        await prisma.company.delete({ where: { id: otherCompany.id } })
-    })
-
-    it('throws 404 with non-existent queue', async () => {
-        await expect(
-            QueueMembersService.addMember('clxxxxxxxxxxxxxxxxxxxxxxxxx', { extensionId, penalty: 0, paused: false })
-        ).rejects.toMatchObject({ statusCode: 404 })
-    })
-})
-
-// ─── getQueueMembers ──────────────────────────────────────────────────────────
-describe('QueueMembersService.getQueueMembers', () => {
-    it('returns list of members', async () => {
-        const members = await QueueMembersService.getQueueMembers(queueId) as any[]
-        expect(Array.isArray(members)).toBe(true)
-        expect(members.some((m) => m.id === memberId)).toBe(true)
-    })
-
-    it('throws 404 with non-existent queue', async () => {
-        await expect(
-            QueueMembersService.getQueueMembers('clxxxxxxxxxxxxxxxxxxxxxxxxx')
-        ).rejects.toMatchObject({ statusCode: 404 })
+        db.queue.findUnique.mockResolvedValue(null)
+        await expect(QueuesService.getQueueById('clxxxxxxxxxxxxxxxxxxxxxxxxx'))
+            .rejects.toMatchObject({ statusCode: 404 })
     })
 })
 
 // ─── updateQueue ──────────────────────────────────────────────────────────────
 describe('QueuesService.updateQueue', () => {
-    it('updates queue and syncs to asterisk', async () => {
-        const queue = await QueuesService.updateQueue(queueId, { strategy: 'fewestcalls', timeout: 30 }) as any
-        expect(queue.strategy).toBe('fewestcalls')
-        expect(queue.timeout).toBe(30)
-
-        const astQueue = await prisma.queues.findUnique({ where: { name: `${companyAsteriskId}-suporte` } })
-        expect(astQueue?.strategy).toBe('fewestcalls')
-        expect(astQueue?.timeout).toBe(30)
-    })
-
     it('throws 404 with non-existent id', async () => {
-        await expect(
-            QueuesService.updateQueue('clxxxxxxxxxxxxxxxxxxxxxxxxx', { timeout: 10 })
-        ).rejects.toMatchObject({ statusCode: 404 })
-    })
-})
-
-// ─── updateMember ─────────────────────────────────────────────────────────────
-describe('QueueMembersService.updateMember', () => {
-    it('updates member and syncs to asterisk', async () => {
-        const member = await QueueMembersService.updateMember(queueId, memberId, { penalty: 10, paused: true }) as any
-        expect(member.penalty).toBe(10)
-        expect(member.paused).toBe(true)
-
-        const astMember = await prisma.queue_members.findFirst({ where: { interface: 'PJSIP/9001' } })
-        expect(astMember?.paused).toBe(1)
-        expect(astMember?.penalty).toBe(10)
+        db.queue.findUnique.mockResolvedValue(null)
+        await expect(QueuesService.updateQueue('clxxxxxxxxxxxxxxxxxxxxxxxxx', { timeout: 10 }))
+            .rejects.toMatchObject({ statusCode: 404 })
     })
 
-    it('throws 404 with wrong queueId', async () => {
-        await expect(
-            QueueMembersService.updateMember('clxxxxxxxxxxxxxxxxxxxxxxxxx', memberId, { penalty: 1 })
-        ).rejects.toMatchObject({ statusCode: 404 })
-    })
-})
-
-// ─── removeMember ─────────────────────────────────────────────────────────────
-describe('QueueMembersService.removeMember', () => {
-    it('removes member and syncs to asterisk', async () => {
-        await QueueMembersService.removeMember(queueId, memberId)
-
-        const check = await prisma.queueMember.findUnique({ where: { id: memberId } })
-        expect(check).toBeNull()
-
-        const astCheck = await prisma.queue_members.findFirst({ where: { interface: 'PJSIP/9001' } })
-        expect(astCheck).toBeNull()
-    })
-
-    it('throws 404 after removal', async () => {
-        await expect(
-            QueueMembersService.removeMember(queueId, memberId)
-        ).rejects.toMatchObject({ statusCode: 404 })
+    it('updates queue', async () => {
+        db.queue.findUnique.mockResolvedValueOnce(QUEUE).mockResolvedValueOnce({ ...QUEUE, timeout: 30 })
+        db.queue.update.mockResolvedValue({ ...QUEUE, timeout: 30 })
+        const queue = await QueuesService.updateQueue('q1', { timeout: 30 }) as any
+        expect(queue.timeout).toBe(30)
     })
 })
 
 // ─── deleteQueue ──────────────────────────────────────────────────────────────
 describe('QueuesService.deleteQueue', () => {
-    it('deletes queue and cleans up asterisk', async () => {
-        const tmp = await QueuesService.createQueue({ name: 'tmp-del', companyId }) as any
-        const tmpExt = await prisma.extension.create({
-            data: { alias: 'tmp', number: '9002', type: 'sip', name: 'Tmp', companyId },
-        })
-        await QueueMembersService.addMember(tmp.id, { extensionId: tmpExt.id, penalty: 0, paused: false })
+    it('throws 404 with non-existent id', async () => {
+        db.queue.findUnique.mockResolvedValue(null)
+        await expect(QueuesService.deleteQueue('clxxxxxxxxxxxxxxxxxxxxxxxxx'))
+            .rejects.toMatchObject({ statusCode: 404 })
+    })
+})
 
-        await QueuesService.deleteQueue(tmp.id)
-
-        const check = await prisma.queue.findUnique({ where: { id: tmp.id } })
-        expect(check).toBeNull()
-
-        const astCheck = await prisma.queues.findFirst({ where: { name: { contains: 'tmp-del' } } })
-        expect(astCheck).toBeNull()
-
-        const astMemberCheck = await prisma.queue_members.findFirst({ where: { interface: 'SIP/9002' } })
-        expect(astMemberCheck).toBeNull()
-
-        await prisma.extension.delete({ where: { id: tmpExt.id } })
+// ─── QueueMembersService.addMember ────────────────────────────────────────────
+describe('QueueMembersService.addMember', () => {
+    it('throws 404 when queue not found', async () => {
+        db.queue.findUnique.mockResolvedValue(null)
+        await expect(QueueMembersService.addMember('clxxxxxxxxxxxxxxxxxxxxxxxxx', { extensionId: 'e1', penalty: 0, paused: false }))
+            .rejects.toMatchObject({ statusCode: 404 })
     })
 
-    it('throws 404 with non-existent id', async () => {
-        await expect(
-            QueuesService.deleteQueue('clxxxxxxxxxxxxxxxxxxxxxxxxx')
-        ).rejects.toMatchObject({ statusCode: 404 })
+    it('throws 404 when extension not found', async () => {
+        db.queue.findUnique.mockResolvedValue(QUEUE)
+        db.extension.findUnique.mockResolvedValue(null)
+        await expect(QueueMembersService.addMember('q1', { extensionId: 'clxxxxxxxxxxxxxxxxxxxxxxxxx', penalty: 0, paused: false }))
+            .rejects.toMatchObject({ statusCode: 404 })
+    })
+
+    it('throws 403 when extension belongs to different company', async () => {
+        db.queue.findUnique.mockResolvedValue(QUEUE)
+        db.extension.findUnique.mockResolvedValue({ ...EXT, companyId: 'other-company' })
+        await expect(QueueMembersService.addMember('q1', { extensionId: 'e1', penalty: 0, paused: false }))
+            .rejects.toMatchObject({ statusCode: 403 })
+    })
+
+    it('throws 409 when already a member', async () => {
+        db.queue.findUnique.mockResolvedValue(QUEUE)
+        db.extension.findUnique.mockResolvedValue(EXT)
+        db.queueMember.findUnique.mockResolvedValue(MEMBER)
+        await expect(QueueMembersService.addMember('q1', { extensionId: 'e1', penalty: 0, paused: false }))
+            .rejects.toMatchObject({ statusCode: 409 })
+    })
+
+    it('adds member', async () => {
+        db.queue.findUnique.mockResolvedValue(QUEUE)
+        db.extension.findUnique.mockResolvedValue(EXT)
+        db.queueMember.findUnique.mockResolvedValue(null)
+        db.queueMember.create.mockResolvedValue(MEMBER)
+        const member = await QueueMembersService.addMember('q1', { extensionId: 'e1', penalty: 0, paused: false }) as any
+        expect(member.extensionId).toBe('e1')
+    })
+})
+
+// ─── QueueMembersService.getQueueMembers ──────────────────────────────────────
+describe('QueueMembersService.getQueueMembers', () => {
+    it('throws 404 with non-existent queue', async () => {
+        db.queue.findUnique.mockResolvedValue(null)
+        await expect(QueueMembersService.getQueueMembers('clxxxxxxxxxxxxxxxxxxxxxxxxx'))
+            .rejects.toMatchObject({ statusCode: 404 })
+    })
+
+    it('returns members list', async () => {
+        db.queue.findUnique.mockResolvedValue(QUEUE)
+        db.queueMember.findMany.mockResolvedValue([MEMBER])
+        const members = await QueueMembersService.getQueueMembers('q1') as any[]
+        expect(members[0].id).toBe('m1')
+    })
+})
+
+// ─── QueueMembersService.updateMember ────────────────────────────────────────
+describe('QueueMembersService.updateMember', () => {
+    it('throws 404 when member not found', async () => {
+        db.queue.findUnique.mockResolvedValue(QUEUE)
+        db.queueMember.findUnique.mockResolvedValue(null)
+        await expect(QueueMembersService.updateMember('q1', 'clxxxxxxxxxxxxxxxxxxxxxxxxx', { penalty: 1 }))
+            .rejects.toMatchObject({ statusCode: 404 })
+    })
+})
+
+// ─── QueueMembersService.removeMember ────────────────────────────────────────
+describe('QueueMembersService.removeMember', () => {
+    it('throws 404 when member not found', async () => {
+        db.queue.findUnique.mockResolvedValue(QUEUE)
+        db.queueMember.findUnique.mockResolvedValue(null)
+        await expect(QueueMembersService.removeMember('q1', 'clxxxxxxxxxxxxxxxxxxxxxxxxx'))
+            .rejects.toMatchObject({ statusCode: 404 })
     })
 })

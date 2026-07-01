@@ -1,130 +1,109 @@
-import { describe, it, expect, beforeAll, afterAll } from 'bun:test'
-import { prisma } from '../../../lib/prisma'
-import { setupTestEnv, teardownTestEnv } from '../../../test/setup'
+import { mock, describe, it, expect, beforeEach } from 'bun:test'
+import { createPrismaMock, clearPrismaMock } from '../../../test/mocks/prisma.mock'
+
+const db = createPrismaMock()
+
+mock.module('../../../lib/prisma', () => ({ prisma: db }))
+mock.module('../cache/dids.cache', () => ({
+    DidsCache: { getAll: mock(() => null), setAll: mock(), getDid: mock(() => null), setDid: mock(), invalidateDid: mock(), getDidsByCompany: mock(() => null), setDidsByCompany: mock(), invalidateDidsByCompany: mock(), invalidateAll: mock() },
+}))
+
 import * as DidsService from '../dids.service'
 
-const PREFIX = `__test_dids_svc_${Date.now()}__`
+const COMPANY = { id: 'c1', name: 'ACME' }
+const DID = { id: 'd1', number: '551100001111', companyId: 'c1', createdAt: new Date(), updatedAt: new Date() }
 
-let userId: string
-let companyId: string
-let didId: string
+beforeEach(() => clearPrismaMock(db))
 
-beforeAll(async () => {
-    await setupTestEnv()
-
-    const user = await prisma.user.create({
-        data: { name: 'Test', username: `${PREFIX}@test.com`, password: 'x', role: 'admin' },
-    })
-    userId = user.id
-
-    const company = await prisma.company.create({
-        data: {
-            name: `${PREFIX} Company`,
-            metadata: {},
-            users: { create: { userId } },
-        },
-    })
-    companyId = company.id
-})
-
-afterAll(async () => {
-    await prisma.did.deleteMany({ where: { companyId } })
-    await prisma.userCompany.deleteMany({ where: { userId } })
-    await prisma.company.deleteMany({ where: { id: companyId } })
-    await teardownTestEnv(PREFIX)
-})
-
-// ------------------------------------------------------ createDid
+// ─── createDid ────────────────────────────────────────────────────────────────
 describe('DidsService.createDid', () => {
-    it('creates DID linked to company', async () => {
-        const did = await DidsService.createDid({ number: '551100001111', companyId })
-        didId = did.id
-
+    it('creates DID', async () => {
+        db.company.findUnique.mockResolvedValue(COMPANY)
+        db.did.findUnique.mockResolvedValue(null)
+        db.did.create.mockResolvedValue(DID)
+        const did = await DidsService.createDid({ number: '551100001111', companyId: 'c1' })
         expect(did.number).toBe('551100001111')
-        expect(did.companyId).toBe(companyId)
     })
 
-    it('throws 409 with duplicate number in the same company', async () => {
-        await expect(
-            DidsService.createDid({ number: '551100001111', companyId })
-        ).rejects.toMatchObject({ statusCode: 409 })
+    it('throws 409 with duplicate number in same company', async () => {
+        db.company.findUnique.mockResolvedValue(COMPANY)
+        db.did.findUnique.mockResolvedValue(DID)
+        await expect(DidsService.createDid({ number: '551100001111', companyId: 'c1' }))
+            .rejects.toMatchObject({ statusCode: 409 })
     })
 
     it('throws 404 with non-existent companyId', async () => {
-        await expect(
-            DidsService.createDid({ number: '999', companyId: 'clxxxxxxxxxxxxxxxxxxxxxxxxx' })
-        ).rejects.toMatchObject({ statusCode: 404 })
+        db.company.findUnique.mockResolvedValue(null)
+        await expect(DidsService.createDid({ number: '999', companyId: 'clxxxxxxxxxxxxxxxxxxxxxxxxx' }))
+            .rejects.toMatchObject({ statusCode: 404 })
     })
 })
 
-// -------------------------------------------------- getDidsByCompany
+// ─── getDidsByCompany ─────────────────────────────────────────────────────────
 describe('DidsService.getDidsByCompany', () => {
-    it('returns list of DIDs from the company', async () => {
-        const dids = await DidsService.getDidsByCompany(companyId) as any[]
-
-        expect(Array.isArray(dids)).toBe(true)
-        expect(dids.some((d) => d.id === didId)).toBe(true)
+    it('returns DIDs from company', async () => {
+        db.company.findUnique.mockResolvedValue(COMPANY)
+        db.did.findMany.mockResolvedValue([DID])
+        const dids = await DidsService.getDidsByCompany('c1') as any[]
+        expect(dids[0].id).toBe('d1')
     })
 
     it('throws 404 with non-existent companyId', async () => {
-        await expect(
-            DidsService.getDidsByCompany('clxxxxxxxxxxxxxxxxxxxxxxxxx')
-        ).rejects.toMatchObject({ statusCode: 404 })
+        db.company.findUnique.mockResolvedValue(null)
+        await expect(DidsService.getDidsByCompany('clxxxxxxxxxxxxxxxxxxxxxxxxx'))
+            .rejects.toMatchObject({ statusCode: 404 })
     })
 })
 
-// ----------------------------------------------------- getDidById
+// ─── getDidById ───────────────────────────────────────────────────────────────
 describe('DidsService.getDidById', () => {
     it('returns DID by id', async () => {
-        const did = await DidsService.getDidById(didId) as any
-        expect(did.id).toBe(didId)
-        expect(did.number).toBe('551100001111')
+        db.did.findUnique.mockResolvedValue(DID)
+        const did = await DidsService.getDidById('d1') as any
+        expect(did.id).toBe('d1')
     })
 
     it('throws 404 with non-existent id', async () => {
-        await expect(
-            DidsService.getDidById('clxxxxxxxxxxxxxxxxxxxxxxxxx')
-        ).rejects.toMatchObject({ statusCode: 404 })
+        db.did.findUnique.mockResolvedValue(null)
+        await expect(DidsService.getDidById('clxxxxxxxxxxxxxxxxxxxxxxxxx'))
+            .rejects.toMatchObject({ statusCode: 404 })
     })
 })
 
-// ------------------------------------------------------- updateDid
+// ─── updateDid ────────────────────────────────────────────────────────────────
 describe('DidsService.updateDid', () => {
     it('updates DID number', async () => {
-        const did = await DidsService.updateDid(didId, { number: '551100009999' })
+        db.did.findUnique.mockResolvedValueOnce(DID).mockResolvedValueOnce(null)
+        db.did.update.mockResolvedValue({ ...DID, number: '551100009999' })
+        const did = await DidsService.updateDid('d1', { number: '551100009999' })
         expect(did.number).toBe('551100009999')
     })
 
-    it('throws 409 with number already existing in the same company', async () => {
-        const other = await DidsService.createDid({ number: '551100002222', companyId })
-
-        await expect(
-            DidsService.updateDid(didId, { number: '551100002222' })
-        ).rejects.toMatchObject({ statusCode: 409 })
-
-        await DidsService.deleteDid(other.id)
+    it('throws 409 when number already exists in same company', async () => {
+        db.did.findUnique.mockResolvedValueOnce(DID).mockResolvedValueOnce({ id: 'd2', number: '551100002222', companyId: 'c1' })
+        await expect(DidsService.updateDid('d1', { number: '551100002222' }))
+            .rejects.toMatchObject({ statusCode: 409 })
     })
 
     it('throws 404 with non-existent id', async () => {
-        await expect(
-            DidsService.updateDid('clxxxxxxxxxxxxxxxxxxxxxxxxx', { number: '123' })
-        ).rejects.toMatchObject({ statusCode: 404 })
+        db.did.findUnique.mockResolvedValue(null)
+        await expect(DidsService.updateDid('clxxxxxxxxxxxxxxxxxxxxxxxxx', { number: '123' }))
+            .rejects.toMatchObject({ statusCode: 404 })
     })
 })
 
-// ------------------------------------------------------- deleteDid
+// ─── deleteDid ────────────────────────────────────────────────────────────────
 describe('DidsService.deleteDid', () => {
     it('deletes DID', async () => {
-        const did = await DidsService.createDid({ number: '551100003333', companyId })
-        await DidsService.deleteDid(did.id)
-
-        const check = await prisma.did.findUnique({ where: { id: did.id } })
-        expect(check).toBeNull()
+        db.did.findUnique.mockResolvedValue(DID)
+        db.did.delete.mockResolvedValue(DID)
+        await DidsService.deleteDid('d1')
+        expect(db.did.delete).toHaveBeenCalledWith({ where: { id: 'd1' } })
     })
 
     it('throws 404 with non-existent id', async () => {
-        await expect(
-            DidsService.deleteDid('clxxxxxxxxxxxxxxxxxxxxxxxxx')
-        ).rejects.toMatchObject({ statusCode: 404 })
+        db.did.findUnique.mockResolvedValue(null)
+        await expect(DidsService.deleteDid('clxxxxxxxxxxxxxxxxxxxxxxxxx'))
+            .rejects.toMatchObject({ statusCode: 404 })
     })
 })

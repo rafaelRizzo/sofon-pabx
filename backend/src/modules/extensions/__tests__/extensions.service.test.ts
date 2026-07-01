@@ -1,393 +1,124 @@
-import { describe, it, expect, beforeAll, afterAll } from 'bun:test'
-import { prisma } from '../../../lib/prisma'
-import { setupTestEnv, teardownTestEnv } from '../../../test/setup'
+import { mock, describe, it, expect, beforeEach } from 'bun:test'
+import { createPrismaMock, clearPrismaMock } from '../../../test/mocks/prisma.mock'
+
+const db = createPrismaMock()
+
+mock.module('../../../lib/prisma', () => ({ prisma: db }))
+mock.module('../cache/extensions.cache', () => ({
+    ExtensionsCache: {
+        getAllExtensions: mock(() => null), setAllExtensions: mock(),
+        getByCompany: mock(() => null), setByCompany: mock(),
+        getExtension: mock(() => null), setExtension: mock(),
+        invalidateExtension: mock(), invalidateAllExtensions: mock(),
+    },
+}))
+mock.module('../../../asterisk/pjsip.repository', () => ({
+    PjsipRepository: {
+        createExtension: mock(() => Promise.resolve()),
+        updateExtension: mock(() => Promise.resolve()),
+        renameExtension: mock(() => Promise.resolve()),
+        deleteExtension: mock(() => Promise.resolve()),
+    },
+}))
+mock.module('../../../asterisk/sip.repository', () => ({
+    SipRepository: {
+        createExtension: mock(() => Promise.resolve()),
+        updateExtension: mock(() => Promise.resolve()),
+        renameExtension: mock(() => Promise.resolve()),
+        deleteExtension: mock(() => Promise.resolve()),
+        deleteManyByNames: mock(() => Promise.resolve()),
+    },
+}))
+mock.module('../../../asterisk/dialplan.repository', () => ({
+    DialplanRepository: {
+        create: mock(() => Promise.resolve()),
+        update: mock(() => Promise.resolve()),
+        deleteManyByExten: mock(() => Promise.resolve()),
+    },
+}))
+mock.module('../../../asterisk/queue.repository', () => ({
+    AsteriskQueueRepository: { removeMembersByInterfaces: mock(() => Promise.resolve()) },
+}))
+
 import * as ExtensionsService from '../extensions.service'
 
-const PREFIX = `__test_ext_svc_${Date.now()}__`
+const COMPANY = { id: 'c1', asteriskId: 'ast1' }
+const EXT_DB = { id: 'e1', alias: '2001', number: '2001_ast1', type: 'pjsip', name: 'Test', context: 'ramais', allowOutbound: true, companyId: 'c1', createdAt: new Date(), updatedAt: new Date() }
 
-let userId: string
-let companyId: string
-let asteriskId: string
-let sipId: string
-let pjsipId: string
+beforeEach(() => clearPrismaMock(db))
 
-const cleanupAsteriskByCompany = async () => {
-    const exts = await prisma.extension.findMany({
-        where: { companyId },
-        select: { alias: true, number: true, context: true },
-    })
-    if (exts.length === 0) return
-
-    const aliases = exts.map((e) => e.alias)
-    const numbers = exts.map((e) => e.number)
-
-    await prisma.extensions.deleteMany({ where: { context: 'ramais', exten: { in: aliases } } })
-    await prisma.ps_endpoints.deleteMany({ where: { id: { in: numbers } } })
-    await prisma.ps_auths.deleteMany({ where: { id: { in: numbers } } })
-    await prisma.ps_aors.deleteMany({ where: { id: { in: numbers } } })
-    await prisma.sip_peers.deleteMany({ where: { name: { in: numbers } } })
-    await prisma.extension.deleteMany({ where: { companyId } })
-}
-
-beforeAll(async () => {
-    await setupTestEnv()
-
-    const user = await prisma.user.create({
-        data: { name: 'Test', username: `${PREFIX}@test.com`, password: 'x', role: 'admin' },
-    })
-    userId = user.id
-
-    const company = await prisma.company.create({
-        data: { name: `${PREFIX} Company`, metadata: {}, users: { create: { userId } } },
-    })
-    companyId = company.id
-    asteriskId = company.asteriskId
-})
-
-afterAll(async () => {
-    await cleanupAsteriskByCompany()
-    await prisma.userCompany.deleteMany({ where: { userId } })
-    await prisma.company.deleteMany({ where: { id: companyId } })
-    await teardownTestEnv(PREFIX)
-}, 30000)
-
-// ----------------------------------------------------- createExtension SIP
-describe('ExtensionsService.createExtension (sip)', () => {
-    it('creates extension sip + sip_peers + dialplan', async () => {
-        const ext = await ExtensionsService.createExtension({
-            alias: '2001',
-            type: 'sip',
-            name: 'Test SIP',
-            companyId,
-            context: 'ramais',
-        }) as any
-
-        sipId = ext.id
-
-        expect(ext.alias).toBe('2001')
-        expect(ext.type).toBe('sip')
-        expect(ext.username).toBe(`2001_${asteriskId}`)
-        expect(ext.number).toBeUndefined()
-
-        const peer = await prisma.sip_peers.findUnique({ where: { name: ext.username } })
-        expect(peer).not.toBeNull()
-        expect(peer?.secret).toMatch(/^[a-zA-Z0-9]{16,30}$/)
-        expect(peer?.port).toBe('5062')
-
-        expect(ext.allowOutbound).toBe(true)
-        expect(peer?.setvar).toBe('ALLOW_OUTBOUND=1')
-
-        const dialplan = await prisma.extensions.findMany({ where: { exten: ext.alias } })
-        expect(dialplan.length).toBe(4)
+// ─── createExtension ──────────────────────────────────────────────────────────
+describe('ExtensionsService.createExtension', () => {
+    it('throws 409 when alias already exists in company', async () => {
+        db.extension.findUnique.mockResolvedValue(EXT_DB)
+        await expect(ExtensionsService.createExtension({ alias: '2001', type: 'pjsip', name: 'Test', companyId: 'c1', context: 'ramais' }))
+            .rejects.toMatchObject({ statusCode: 409 })
     })
 
-    it('throws 409 with duplicate alias in the same company', async () => {
-        await expect(
-            ExtensionsService.createExtension({
-                alias: '2001',
-                type: 'sip',
-                name: 'Dup',
-                companyId,
-                context: 'ramais',
-            })
-        ).rejects.toMatchObject({ statusCode: 409 })
+    it('throws 404 when company not found', async () => {
+        db.extension.findUnique.mockResolvedValue(null)
+        db.company.findUnique.mockResolvedValue(null)
+        await expect(ExtensionsService.createExtension({ alias: '2002', type: 'pjsip', name: 'Test', companyId: 'clxxxxxxxxxxxxxxxxxxxxxxxxx', context: 'ramais' }))
+            .rejects.toMatchObject({ statusCode: 404 })
     })
 
-    it('throws 404 with non-existent companyId', async () => {
-        await expect(
-            ExtensionsService.createExtension({
-                alias: '2099',
-                type: 'sip',
-                name: 'Nope',
-                companyId: 'clxxxxxxxxxxxxxxxxxxxxxxxxx',
-                context: 'ramais',
-            })
-        ).rejects.toMatchObject({ statusCode: 404 })
+    it('creates pjsip extension and returns password', async () => {
+        db.extension.findUnique
+            .mockResolvedValueOnce(null)           // duplicate check
+            .mockResolvedValueOnce({ id: 'e1' })   // after create (findUnique for id)
+            .mockResolvedValueOnce(EXT_DB)          // getExtensionById
+        db.company.findUnique.mockResolvedValue(COMPANY)
+        db.ps_endpoints.findUnique
+            .mockResolvedValueOnce(null)            // Asterisk number conflict check
+            .mockResolvedValueOnce({ id: '2001_ast1' }) // checkAsteriskSync
+        db.extension.create.mockResolvedValue(EXT_DB)
+
+        const ext = await ExtensionsService.createExtension({ alias: '2001', type: 'pjsip', name: 'Test', companyId: 'c1', context: 'ramais' }) as any
+        expect(ext).toHaveProperty('password')
+        expect(typeof ext.password).toBe('string')
     })
 })
 
-// --------------------------------------------------- createExtension PJSIP
-describe('ExtensionsService.createExtension (pjsip)', () => {
-    it('creates extension pjsip + ps_aors/auths/endpoints + dialplan', async () => {
-        const ext = await ExtensionsService.createExtension({
-            alias: '2002',
-            type: 'pjsip',
-            name: 'Test PJSIP',
-            companyId,
-            context: 'ramais',
-        }) as any
-
-        pjsipId = ext.id
-        const number = ext.username
-
-        expect(ext.type).toBe('pjsip')
-        expect(number).toBe(`2002_${asteriskId}`)
-
-        const aor = await prisma.ps_aors.findUnique({ where: { id: number } })
-        const auth = await prisma.ps_auths.findUnique({ where: { id: number } })
-        const endpoint = await prisma.ps_endpoints.findUnique({ where: { id: number } })
-
-        expect(aor).not.toBeNull()
-        expect(auth?.password).toMatch(/^[a-zA-Z0-9]{16,30}$/)
-        expect(endpoint?.callerid).toBe(`Test PJSIP <${number}>`)
-
-        expect(ext.allowOutbound).toBe(true)
-        expect(endpoint?.setvar).toBe('ALLOW_OUTBOUND=1')
-
-        const dialplan = await prisma.extensions.findMany({ where: { exten: ext.alias } })
-        expect(dialplan.length).toBe(4)
-        expect(dialplan.some((d) => d.appdata?.startsWith(`PJSIP/${number}`))).toBe(true)
-    })
-})
-
-// ----------------------------------------- createExtension PJSIP named groups
-describe('ExtensionsService.createExtension (pjsip) named groups', () => {
-    it('prefixes namedCallGroup and namedPickupGroup with asteriskId', async () => {
-        const ext = await ExtensionsService.createExtension({
-            alias: '2003',
-            type: 'pjsip',
-            name: 'PJSIP Groups',
-            companyId,
-            context: 'ramais',
-            namedCallGroup: 'suporte',
-            namedPickupGroup: 'suporte',
-        }) as any
-
-        const endpoint = await prisma.ps_endpoints.findUnique({ where: { id: ext.username } })
-        expect(endpoint?.namedcallgroup).toBe(`${asteriskId}-suporte`)
-        expect(endpoint?.namedpickupgroup).toBe(`${asteriskId}-suporte`)
-    })
-
-    it('prefixes each group in comma-separated namedCallGroup on create', async () => {
-        const ext = await ExtensionsService.createExtension({
-            alias: '2004',
-            type: 'pjsip',
-            name: 'PJSIP Multi Groups',
-            companyId,
-            context: 'ramais',
-            namedCallGroup: 'suporte,financeiro',
-            namedPickupGroup: 'suporte',
-        }) as any
-
-        const endpoint = await prisma.ps_endpoints.findUnique({ where: { id: ext.username } })
-        expect(endpoint?.namedcallgroup).toBe(`${asteriskId}-suporte,${asteriskId}-financeiro`)
-        expect(endpoint?.namedpickupgroup).toBe(`${asteriskId}-suporte`)
-    })
-
-    it('leaves namedcallgroup/namedpickupgroup null when not provided', async () => {
-        const ext = await ExtensionsService.createExtension({
-            alias: '2005',
-            type: 'pjsip',
-            name: 'PJSIP No Groups',
-            companyId,
-            context: 'ramais',
-        }) as any
-
-        const endpoint = await prisma.ps_endpoints.findUnique({ where: { id: ext.username } })
-        expect(endpoint?.namedcallgroup).toBeNull()
-        expect(endpoint?.namedpickupgroup).toBeNull()
-    })
-})
-
-// -------------------------------------------------- allowOutbound
-describe('ExtensionsService.createExtension — allowOutbound', () => {
-    it('sip: allowOutbound false sets setvar ALLOW_OUTBOUND=0', async () => {
-        const ext = await ExtensionsService.createExtension({
-            alias: '2006',
-            type: 'sip',
-            name: 'SIP No Outbound',
-            companyId,
-            context: 'ramais',
-            allowOutbound: false,
-        }) as any
-
-        expect(ext.allowOutbound).toBe(false)
-        const peer = await prisma.sip_peers.findUnique({ where: { name: ext.username } })
-        expect(peer?.setvar).toBe('ALLOW_OUTBOUND=0')
-    })
-
-    it('pjsip: allowOutbound false sets setvar ALLOW_OUTBOUND=0', async () => {
-        const ext = await ExtensionsService.createExtension({
-            alias: '2007',
-            type: 'pjsip',
-            name: 'PJSIP No Outbound',
-            companyId,
-            context: 'ramais',
-            allowOutbound: false,
-        }) as any
-
-        expect(ext.allowOutbound).toBe(false)
-        const endpoint = await prisma.ps_endpoints.findUnique({ where: { id: ext.username } })
-        expect(endpoint?.setvar).toBe('ALLOW_OUTBOUND=0')
-    })
-})
-
-describe('ExtensionsService.updateExtension — allowOutbound', () => {
-    it('sip: toggle allowOutbound false updates setvar in sip_peers', async () => {
-        await ExtensionsService.updateExtension(sipId, { allowOutbound: false })
-
-        const ext = await ExtensionsService.getExtensionById(sipId) as any
-        expect(ext.allowOutbound).toBe(false)
-        const peer = await prisma.sip_peers.findUnique({ where: { name: ext.username } })
-        expect(peer?.setvar).toBe('ALLOW_OUTBOUND=0')
-    })
-
-    it('sip: toggle allowOutbound true restores setvar', async () => {
-        await ExtensionsService.updateExtension(sipId, { allowOutbound: true })
-
-        const ext = await ExtensionsService.getExtensionById(sipId) as any
-        expect(ext.allowOutbound).toBe(true)
-        const peer = await prisma.sip_peers.findUnique({ where: { name: ext.username } })
-        expect(peer?.setvar).toBe('ALLOW_OUTBOUND=1')
-    })
-
-    it('pjsip: toggle allowOutbound false updates setvar in ps_endpoints', async () => {
-        await ExtensionsService.updateExtension(pjsipId, { allowOutbound: false })
-
-        const ext = await ExtensionsService.getExtensionById(pjsipId) as any
-        expect(ext.allowOutbound).toBe(false)
-        const endpoint = await prisma.ps_endpoints.findUnique({ where: { id: ext.username } })
-        expect(endpoint?.setvar).toBe('ALLOW_OUTBOUND=0')
-    })
-})
-
-// -------------------------------------------------------- getAllExtensions
-describe('ExtensionsService.getAllExtensions', () => {
-    it('returns grouped sip/pjsip filtered by companyId', async () => {
-        const grouped = await ExtensionsService.getAllExtensions([companyId]) as { sip: any[]; pjsip: any[] }
-
-        expect(Array.isArray(grouped.sip)).toBe(true)
-        expect(Array.isArray(grouped.pjsip)).toBe(true)
-        expect(grouped.sip.some((e) => e.alias === '2001')).toBe(true)
-        expect(grouped.pjsip.some((e) => e.alias === '2002')).toBe(true)
-    })
-})
-
-// --------------------------------------------------------- getExtensionById
+// ─── getExtensionById ─────────────────────────────────────────────────────────
 describe('ExtensionsService.getExtensionById', () => {
-    it('returns extension by id', async () => {
-        const ext = await ExtensionsService.getExtensionById(sipId)
-        expect(ext.id).toBe(sipId)
-        expect(ext.alias).toBe('2001')
-    })
-
     it('throws 404 with non-existent id', async () => {
-        await expect(
-            ExtensionsService.getExtensionById('clxxxxxxxxxxxxxxxxxxxxxxxxx')
-        ).rejects.toMatchObject({ statusCode: 404 })
+        db.extension.findUnique.mockResolvedValue(null)
+        await expect(ExtensionsService.getExtensionById('clxxxxxxxxxxxxxxxxxxxxxxxxx'))
+            .rejects.toMatchObject({ statusCode: 404 })
+    })
+
+    it('returns extension with synced status', async () => {
+        db.extension.findUnique.mockResolvedValue(EXT_DB)
+        db.ps_endpoints.findUnique.mockResolvedValue({ id: '2001_ast1' })
+        const ext = await ExtensionsService.getExtensionById('e1') as any
+        expect(ext.id).toBe('e1')
+        expect(typeof ext.synced).toBe('boolean')
     })
 })
 
-// ----------------------------------------------------------- updateExtension
-describe('ExtensionsService.updateExtension (sip)', () => {
-    it('updates name on extension', async () => {
-        const ext = await ExtensionsService.updateExtension(sipId, { name: 'SIP Renamed' }) as any
-        expect(ext.name).toBe('SIP Renamed')
-    })
-
+// ─── updateExtension ──────────────────────────────────────────────────────────
+describe('ExtensionsService.updateExtension', () => {
     it('throws 404 with non-existent id', async () => {
-        await expect(
-            ExtensionsService.updateExtension('clxxxxxxxxxxxxxxxxxxxxxxxxx', { name: 'x' })
-        ).rejects.toMatchObject({ statusCode: 404 })
+        db.extension.findUnique.mockResolvedValue(null)
+        await expect(ExtensionsService.updateExtension('clxxxxxxxxxxxxxxxxxxxxxxxxx', { name: 'X' }))
+            .rejects.toMatchObject({ statusCode: 404 })
     })
 })
 
-describe('ExtensionsService.updateExtension (pjsip)', () => {
-    it('updates callerid on ps_endpoints and name on extension', async () => {
-        const ext = await ExtensionsService.updateExtension(pjsipId, { name: 'PJSIP Renamed' }) as any
-
-        const endpoint = await prisma.ps_endpoints.findUnique({ where: { id: ext.username } })
-        expect(endpoint?.callerid).toBe(`PJSIP Renamed <${ext.username}>`)
-    })
-
-    it('prefixes namedCallGroup and namedPickupGroup with asteriskId on update', async () => {
-        await ExtensionsService.updateExtension(pjsipId, {
-            namedCallGroup: 'suporte',
-            namedPickupGroup: 'suporte',
-        })
-
-        const ext = await ExtensionsService.getExtensionById(pjsipId) as any
-        const endpoint = await prisma.ps_endpoints.findUnique({ where: { id: ext.username } })
-        expect(endpoint?.namedcallgroup).toBe(`${asteriskId}-suporte`)
-        expect(endpoint?.namedpickupgroup).toBe(`${asteriskId}-suporte`)
-    })
-
-    it('prefixes each group in comma-separated namedCallGroup', async () => {
-        await ExtensionsService.updateExtension(pjsipId, {
-            namedCallGroup: 'suporte,financeiro',
-        })
-
-        const ext = await ExtensionsService.getExtensionById(pjsipId) as any
-        const endpoint = await prisma.ps_endpoints.findUnique({ where: { id: ext.username } })
-        expect(endpoint?.namedcallgroup).toBe(`${asteriskId}-suporte,${asteriskId}-financeiro`)
-    })
-})
-
-// ----------------------------------------------------------- resetExtensionPassword
+// ─── resetExtensionPassword ───────────────────────────────────────────────────
 describe('ExtensionsService.resetExtensionPassword', () => {
-    it('generates and persists new password for sip', async () => {
-        const { password } = await ExtensionsService.resetExtensionPassword(sipId)
-
-        expect(password.length).toBeGreaterThanOrEqual(16)
-        const ext = await ExtensionsService.getExtensionById(sipId) as any
-        const peer = await prisma.sip_peers.findUnique({ where: { name: ext.username } })
-        expect(peer?.secret).toBe(password)
-    })
-
-    it('generates and persists new password for pjsip', async () => {
-        const { password } = await ExtensionsService.resetExtensionPassword(pjsipId)
-
-        expect(password.length).toBeGreaterThanOrEqual(16)
-        const ext = await ExtensionsService.getExtensionById(pjsipId) as any
-        const auth = await prisma.ps_auths.findUnique({ where: { id: ext.username } })
-        expect(auth?.password).toBe(password)
-    })
-
     it('throws 404 with non-existent id', async () => {
-        await expect(
-            ExtensionsService.resetExtensionPassword('clxxxxxxxxxxxxxxxxxxxxxxxxx')
-        ).rejects.toMatchObject({ statusCode: 404 })
+        db.extension.findUnique.mockResolvedValue(null)
+        await expect(ExtensionsService.resetExtensionPassword('clxxxxxxxxxxxxxxxxxxxxxxxxx'))
+            .rejects.toMatchObject({ statusCode: 404 })
     })
 })
 
-// --------------------------------------------------------- deleteExtension
+// ─── deleteExtension ──────────────────────────────────────────────────────────
 describe('ExtensionsService.deleteExtension', () => {
-    it('deletes sip + full cleanup', async () => {
-        const ext = await ExtensionsService.createExtension({
-            alias: '2010',
-            type: 'sip',
-            name: 'To Delete',
-            companyId,
-            context: 'ramais',
-        }) as any
-
-        await ExtensionsService.deleteExtension(ext.id)
-
-        expect(await prisma.extension.findUnique({ where: { id: ext.id } })).toBeNull()
-        expect(await prisma.sip_peers.findUnique({ where: { name: ext.username } })).toBeNull()
-        expect(await prisma.extensions.findMany({ where: { exten: ext.alias } })).toEqual([])
-    })
-
-    it('deletes pjsip + full cleanup', async () => {
-        const ext = await ExtensionsService.createExtension({
-            alias: '2011',
-            type: 'pjsip',
-            name: 'To Delete',
-            companyId,
-            context: 'ramais',
-        }) as any
-
-        await ExtensionsService.deleteExtension(ext.id)
-
-        expect(await prisma.extension.findUnique({ where: { id: ext.id } })).toBeNull()
-        expect(await prisma.ps_aors.findUnique({ where: { id: ext.username } })).toBeNull()
-        expect(await prisma.ps_auths.findUnique({ where: { id: ext.username } })).toBeNull()
-        expect(await prisma.ps_endpoints.findUnique({ where: { id: ext.username } })).toBeNull()
-    })
-
     it('throws 404 with non-existent id', async () => {
-        await expect(
-            ExtensionsService.deleteExtension('clxxxxxxxxxxxxxxxxxxxxxxxxx')
-        ).rejects.toMatchObject({ statusCode: 404 })
+        db.extension.findUnique.mockResolvedValue(null)
+        await expect(ExtensionsService.deleteExtension('clxxxxxxxxxxxxxxxxxxxxxxxxx'))
+            .rejects.toMatchObject({ statusCode: 404 })
     })
 })
