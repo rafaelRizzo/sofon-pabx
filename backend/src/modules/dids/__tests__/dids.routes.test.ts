@@ -4,6 +4,7 @@ import { prisma } from '../../../lib/prisma'
 import { buildApp } from '../../../test/build-app'
 import { disconnectRedis } from '../../../config/redis'
 import argon2 from 'argon2'
+import { ListDidsResponse, GetDidResponse, CreateDidResponse, UpdateDidResponse } from '../schemas/did.schema'
 
 const PREFIX = `__test_dids_routes_${Date.now()}__`
 const EMAIL = `${PREFIX}@test.com`
@@ -58,7 +59,8 @@ describe('GET /dids', () => {
         const res = await app.inject({ method: 'GET', url: '/dids', headers: auth() })
 
         expect(res.statusCode).toBe(200)
-        expect(Array.isArray(res.json().dids)).toBe(true)
+        const body = ListDidsResponse.parse(res.json())
+        expect(Array.isArray(body.dids)).toBe(true)
     })
 
     it('200 admin lists DIDs filtering by companyId', async () => {
@@ -122,8 +124,7 @@ describe('POST /dids', () => {
         })
 
         expect(res.statusCode).toBe(201)
-        const body = res.json()
-        expect(body.success).toBe(true)
+        const body = CreateDidResponse.parse(res.json())
         expect(body.didId).toBeTruthy()
         didId = body.didId
     })
@@ -182,7 +183,8 @@ describe('GET /dids/:id', () => {
         })
 
         expect(res.statusCode).toBe(200)
-        expect(res.json().did.id).toBe(didId)
+        const body = GetDidResponse.parse(res.json())
+        expect(body.did.id).toBe(didId)
     })
 
     it('404 with non-existent id', async () => {
@@ -217,7 +219,7 @@ describe('PUT /dids/:id', () => {
         })
 
         expect(res.statusCode).toBe(200)
-        expect(res.json().success).toBe(true)
+        UpdateDidResponse.parse(res.json())
     })
 
     it('400 with non-numeric number', async () => {

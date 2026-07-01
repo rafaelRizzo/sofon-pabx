@@ -3,9 +3,11 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import * as DidsController from './dids.controller'
 import { protectedRoute } from '../../middleware/scope.middleware'
-import { createDidSchema, updateDidSchema, idParamSchema, companyIdParamSchema } from './schemas/did.schema'
-import { errors, ok, deleted } from '../../schemas/responses'
-import { DidSchema } from './schemas/did.schema'
+import {
+    createDidSchema, updateDidSchema, idParamSchema, companyIdParamSchema,
+    ListDidsResponse, GetDidResponse, CreateDidResponse, UpdateDidResponse,
+} from './schemas/did.schema'
+import { errors, deleted } from '../../schemas/responses'
 
 const optionalCompanyQuery = z.object({ companyId: z.cuid2().optional() })
 
@@ -21,7 +23,7 @@ export const didsRoutes = async (app: FastifyInstance) => {
             security: [{ bearerAuth: [] }],
             querystring: optionalCompanyQuery,
             response: {
-                200: ok({ message: z.string(), dids: z.array(DidSchema) }),
+                200: ListDidsResponse,
                 401: errors[401],
             },
         },
@@ -35,7 +37,7 @@ export const didsRoutes = async (app: FastifyInstance) => {
             security: [{ bearerAuth: [] }],
             params: idParamSchema,
             response: {
-                200: ok({ message: z.string(), did: DidSchema }),
+                200: GetDidResponse,
                 401: errors[401],
                 403: errors[403],
                 404: errors[404],
@@ -51,7 +53,7 @@ export const didsRoutes = async (app: FastifyInstance) => {
             security: [{ bearerAuth: [] }],
             params: companyIdParamSchema,
             response: {
-                200: ok({ message: z.string(), dids: z.array(DidSchema) }),
+                200: ListDidsResponse,
                 401: errors[401],
                 403: errors[403],
             },
@@ -67,7 +69,7 @@ export const didsRoutes = async (app: FastifyInstance) => {
             security: [{ bearerAuth: [] }],
             body: createDidSchema,
             response: {
-                201: ok({ message: z.string(), didId: z.string() }),
+                201: CreateDidResponse,
                 401: errors[401],
                 403: errors[403],
                 409: errors[409],
@@ -84,7 +86,7 @@ export const didsRoutes = async (app: FastifyInstance) => {
             params: idParamSchema,
             body: updateDidSchema,
             response: {
-                200: ok({ message: z.string() }),
+                200: UpdateDidResponse,
                 401: errors[401],
                 403: errors[403],
                 404: errors[404],

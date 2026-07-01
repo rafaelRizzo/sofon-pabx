@@ -238,7 +238,7 @@
 
 **Create body:** `{ name, companyId, trueRoute?, falseRoute?, groupIds?: string[] }`  
 **Update body:** `{ name?, trueRoute?, falseRoute? }` (min 1 campo)  
-**Route format:** `"context,exten,priority"` ex: `"from-internal,100,1"` — null = Hangup()  
+**Route format:** `{ type: "extension"|"queue"|"voicemail"|"timecondition"|"hangup", id?: string }` — omitir ou `null` = Hangup()  
 **TimeCondition schema:** `{ id, name, companyId, trueRoute, falseRoute, timeGroups ([{ timeGroup: { id, name } }]), createdAt, updatedAt }`  
 **Nota:** Ao criar/atualizar/deletar TC, gera/regenera/remove o contexto `tc-<id>` no dialplan Asterisk (`extensions` realtime) usando `GotoIfTime` por range — OR lógico entre todos os ranges de todos os TGs vinculados
 

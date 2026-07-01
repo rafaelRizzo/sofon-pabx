@@ -1,10 +1,12 @@
 import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
-import { z } from 'zod'
 import * as TimeConditionsController from './time-conditions.controller'
 import { protectedRoute } from '../../middleware/scope.middleware'
-import { createTimeConditionSchema, updateTimeConditionSchema, idParamSchema, companyQuerySchema, TimeConditionSchema } from './schemas/time-condition.schema'
-import { errors, ok, deleted } from '../../schemas/responses'
+import {
+    createTimeConditionSchema, updateTimeConditionSchema, idParamSchema, companyQuerySchema,
+    ListTimeConditionsResponse, GetTimeConditionResponse, CreateTimeConditionResponse, UpdateTimeConditionResponse,
+} from './schemas/time-condition.schema'
+import { errors, deleted } from '../../schemas/responses'
 
 export const timeConditionsRoutes = async (app: FastifyInstance) => {
     const router = app.withTypeProvider<ZodTypeProvider>()
@@ -17,7 +19,7 @@ export const timeConditionsRoutes = async (app: FastifyInstance) => {
             security: [{ bearerAuth: [] }],
             querystring: companyQuerySchema,
             response: {
-                200: ok({ message: z.string(), timeConditions: z.array(TimeConditionSchema) }),
+                200: ListTimeConditionsResponse,
                 401: errors[401],
                 403: errors[403],
                 404: errors[404],
@@ -33,7 +35,7 @@ export const timeConditionsRoutes = async (app: FastifyInstance) => {
             security: [{ bearerAuth: [] }],
             params: idParamSchema,
             response: {
-                200: ok({ message: z.string(), timeCondition: TimeConditionSchema }),
+                200: GetTimeConditionResponse,
                 401: errors[401],
                 403: errors[403],
                 404: errors[404],
@@ -49,7 +51,7 @@ export const timeConditionsRoutes = async (app: FastifyInstance) => {
             security: [{ bearerAuth: [] }],
             body: createTimeConditionSchema,
             response: {
-                201: ok({ message: z.string(), timeConditionId: z.string() }),
+                201: CreateTimeConditionResponse,
                 401: errors[401],
                 403: errors[403],
                 404: errors[404],
@@ -67,7 +69,7 @@ export const timeConditionsRoutes = async (app: FastifyInstance) => {
             params: idParamSchema,
             body: updateTimeConditionSchema,
             response: {
-                200: ok({ message: z.string() }),
+                200: UpdateTimeConditionResponse,
                 401: errors[401],
                 403: errors[403],
                 404: errors[404],

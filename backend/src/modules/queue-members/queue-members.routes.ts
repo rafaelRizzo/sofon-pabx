@@ -1,11 +1,12 @@
 import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
-import { z } from 'zod'
 import * as QueueMembersController from './queue-members.controller'
 import { protectedRoute } from '../../middleware/scope.middleware'
-import { addMemberSchema, updateMemberSchema, memberIdParamSchema, queueIdParamSchema } from './schemas/queue-member.schema'
-import { errors, ok, deleted } from '../../schemas/responses'
-import { QueueMemberSchema } from './schemas/queue-member.schema'
+import {
+    addMemberSchema, updateMemberSchema, memberIdParamSchema, queueIdParamSchema,
+    ListMembersResponse, AddMemberResponse, UpdateMemberResponse,
+} from './schemas/queue-member.schema'
+import { errors, deleted } from '../../schemas/responses'
 
 export const queueMembersRoutes = async (app: FastifyInstance) => {
     const router = app.withTypeProvider<ZodTypeProvider>()
@@ -18,7 +19,7 @@ export const queueMembersRoutes = async (app: FastifyInstance) => {
             security: [{ bearerAuth: [] }],
             params: queueIdParamSchema,
             response: {
-                200: ok({ message: z.string(), members: z.array(QueueMemberSchema) }),
+                200: ListMembersResponse,
                 401: errors[401],
                 403: errors[403],
                 404: errors[404],
@@ -35,7 +36,7 @@ export const queueMembersRoutes = async (app: FastifyInstance) => {
             params: queueIdParamSchema,
             body: addMemberSchema,
             response: {
-                201: ok({ message: z.string(), memberId: z.string() }),
+                201: AddMemberResponse,
                 401: errors[401],
                 403: errors[403],
                 404: errors[404],
@@ -54,7 +55,7 @@ export const queueMembersRoutes = async (app: FastifyInstance) => {
             params: memberIdParamSchema,
             body: updateMemberSchema,
             response: {
-                200: ok({ message: z.string() }),
+                200: UpdateMemberResponse,
                 401: errors[401],
                 403: errors[403],
                 404: errors[404],

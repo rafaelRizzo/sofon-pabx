@@ -1,13 +1,10 @@
 import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
-import { z } from 'zod'
 import * as AuthController from './auth.controller'
 import { authMiddleware } from '../../middleware/auth.middleware'
-import { loginSchema } from './schemas/auth.schema'
+import { loginSchema, TokenResponse, LogoutResponse } from './schemas/auth.schema'
 import { createUserSchema } from '../users/schemas/user.schema'
-import { errors, ok } from '../../schemas/responses'
-
-const tokenResponse = ok({ message: z.string(), token: z.string() })
+import { errors } from '../../schemas/responses'
 
 export const authRoutes = async (app: FastifyInstance) => {
     const router = app.withTypeProvider<ZodTypeProvider>()
@@ -19,7 +16,7 @@ export const authRoutes = async (app: FastifyInstance) => {
             description: 'Só funciona quando não existe nenhum usuário cadastrado. Cria automaticamente como admin.',
             body: createUserSchema,
             response: {
-                201: tokenResponse,
+                201: TokenResponse,
                 409: errors[409],
             },
         },
@@ -32,7 +29,7 @@ export const authRoutes = async (app: FastifyInstance) => {
             description: 'Retorna accessToken + refreshToken.',
             body: loginSchema,
             response: {
-                200: tokenResponse,
+                200: TokenResponse,
                 401: errors[401],
             },
         },
@@ -44,7 +41,7 @@ export const authRoutes = async (app: FastifyInstance) => {
             summary: 'Renovar access token',
             description: 'Recebe refreshToken, retorna novo accessToken.',
             response: {
-                200: tokenResponse,
+                200: TokenResponse,
                 401: errors[401],
             },
         },
@@ -58,7 +55,7 @@ export const authRoutes = async (app: FastifyInstance) => {
             description: 'Revoga tokens via JTI no Redis.',
             security: [{ bearerAuth: [] }],
             response: {
-                200: ok({ message: z.string() }),
+                200: LogoutResponse,
                 401: errors[401],
             },
         },

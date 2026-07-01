@@ -4,6 +4,7 @@ import { prisma } from '../../../lib/prisma'
 import { buildApp } from '../../../test/build-app'
 import { disconnectRedis } from '../../../config/redis'
 import argon2 from 'argon2'
+import { ListTimeGroupsResponse, GetTimeGroupResponse, CreateTimeGroupResponse } from '../schemas/time-group.schema'
 
 const TS = String(Date.now())
 const PREFIX = `__test_tg_routes_${TS}__`
@@ -58,8 +59,7 @@ describe('POST /time-groups', () => {
             body: { name: 'comercial', companyId, ranges: [RANGE] },
         })
         expect(res.statusCode).toBe(201)
-        const body = res.json()
-        expect(body.success).toBe(true)
+        const body = CreateTimeGroupResponse.parse(res.json())
         expect(body.timeGroupId).toBeTruthy()
         groupId = body.timeGroupId
     })
@@ -108,9 +108,9 @@ describe('GET /time-groups', () => {
             headers: auth(),
         })
         expect(res.statusCode).toBe(200)
-        const body = res.json()
+        const body = ListTimeGroupsResponse.parse(res.json())
         expect(Array.isArray(body.timeGroups)).toBe(true)
-        expect(body.timeGroups.some((g: any) => g.id === groupId)).toBe(true)
+        expect(body.timeGroups.some((g) => g.id === groupId)).toBe(true)
     })
 
     it('400 missing companyId query', async () => {
@@ -129,11 +129,11 @@ describe('GET /time-groups/:id', () => {
     it('200 returns group with ranges', async () => {
         const res = await app.inject({ method: 'GET', url: `/time-groups/${groupId}`, headers: auth() })
         expect(res.statusCode).toBe(200)
-        const group = res.json().timeGroup
-        expect(group.id).toBe(groupId)
-        expect(group.name).toBe('comercial')
-        expect(Array.isArray(group.ranges)).toBe(true)
-        expect(group.ranges[0].startTime).toBe('08:00')
+        const { timeGroup } = GetTimeGroupResponse.parse(res.json())
+        expect(timeGroup.id).toBe(groupId)
+        expect(timeGroup.name).toBe('comercial')
+        expect(Array.isArray(timeGroup.ranges)).toBe(true)
+        expect(timeGroup.ranges[0].startTime).toBe('08:00')
     })
 
     it('404 non-existent id', async () => {

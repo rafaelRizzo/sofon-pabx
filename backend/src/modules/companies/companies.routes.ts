@@ -1,11 +1,12 @@
 import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
-import { z } from 'zod'
 import * as CompaniesController from './companies.controller'
 import { protectedRoute } from '../../middleware/scope.middleware'
-import { createCompanySchema, updateCompanySchema, idParamSchema, userIdParamSchema } from './schemas/company.schema'
-import { errors, ok, deleted } from '../../schemas/responses'
-import { CompanySchema } from './schemas/company.schema'
+import {
+    createCompanySchema, updateCompanySchema, idParamSchema, userIdParamSchema,
+    ListCompaniesResponse, GetCompanyResponse, CreateCompanyResponse, UpdateCompanyResponse,
+} from './schemas/company.schema'
+import { errors, deleted } from '../../schemas/responses'
 
 export const companiesRoutes = async (app: FastifyInstance) => {
     const router = app.withTypeProvider<ZodTypeProvider>()
@@ -18,7 +19,7 @@ export const companiesRoutes = async (app: FastifyInstance) => {
             description: 'Admin retorna todas; outros retornam apenas as próprias.',
             security: [{ bearerAuth: [] }],
             response: {
-                200: ok({ message: z.string(), companies: z.array(CompanySchema) }),
+                200: ListCompaniesResponse,
                 401: errors[401],
             },
         },
@@ -32,7 +33,7 @@ export const companiesRoutes = async (app: FastifyInstance) => {
             security: [{ bearerAuth: [] }],
             params: idParamSchema,
             response: {
-                200: ok({ message: z.string(), company: CompanySchema }),
+                200: GetCompanyResponse,
                 401: errors[401],
                 403: errors[403],
                 404: errors[404],
@@ -48,7 +49,7 @@ export const companiesRoutes = async (app: FastifyInstance) => {
             security: [{ bearerAuth: [] }],
             params: userIdParamSchema,
             response: {
-                200: ok({ message: z.string(), companies: z.array(CompanySchema) }),
+                200: ListCompaniesResponse,
                 401: errors[401],
                 403: errors[403],
             },
@@ -64,7 +65,7 @@ export const companiesRoutes = async (app: FastifyInstance) => {
             security: [{ bearerAuth: [] }],
             body: createCompanySchema,
             response: {
-                201: ok({ message: z.string(), companyId: z.string() }),
+                201: CreateCompanyResponse,
                 401: errors[401],
                 409: errors[409],
             },
@@ -81,7 +82,7 @@ export const companiesRoutes = async (app: FastifyInstance) => {
             params: idParamSchema,
             body: updateCompanySchema,
             response: {
-                200: ok({ message: z.string() }),
+                200: UpdateCompanyResponse,
                 401: errors[401],
                 403: errors[403],
                 404: errors[404],

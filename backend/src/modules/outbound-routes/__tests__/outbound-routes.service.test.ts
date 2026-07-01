@@ -60,7 +60,7 @@ describe('Service.createOutboundRoute', () => {
         db.outboundDialPattern.create.mockResolvedValue(PATTERN)
         db.outboundRouteTrunk.create.mockResolvedValue({})
         db.extensions.deleteMany.mockResolvedValue({ count: 0 })
-        db.extensions.create.mockResolvedValue({})
+        db.extensions.createMany.mockResolvedValue({ count: 1 })
         db.outboundRoute.findUnique.mockResolvedValue(ROUTE)
 
         const route = await Service.createOutboundRoute({

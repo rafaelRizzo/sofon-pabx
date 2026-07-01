@@ -13,6 +13,7 @@ import { trunksRoutes } from '../modules/trunks/trunks.routes'
 import { outboundRoutesRoutes } from '../modules/outbound-routes/outbound-routes.routes'
 import { timeGroupsRoutes } from '../modules/time-groups/time-groups.routes'
 import { timeConditionsRoutes } from '../modules/time-conditions/time-conditions.routes'
+import { inboundRoutesRoutes } from '../modules/inbound-routes/inbound-routes.routes'
 import { connectRedis } from '../config/redis'
 
 export const buildApp = async (): Promise<FastifyInstance> => {
@@ -38,6 +39,7 @@ export const buildApp = async (): Promise<FastifyInstance> => {
     await app.register(outboundRoutesRoutes)
     await app.register(timeGroupsRoutes)
     await app.register(timeConditionsRoutes)
+    await app.register(inboundRoutesRoutes)
     await app.ready()
     return app
 }

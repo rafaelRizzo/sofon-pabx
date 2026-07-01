@@ -4,21 +4,13 @@ import { z } from 'zod'
 import * as ExtensionsController from './extensions.controller'
 import { protectedRoute } from '../../middleware/scope.middleware'
 import {
-    createExtensionSchema,
-    createExtensionBatchSchema,
-    updateExtensionSchema,
-    extensionIdParamSchema,
+    createExtensionSchema, createExtensionBatchSchema, updateExtensionSchema, extensionIdParamSchema,
+    BatchResultSchema, ListExtensionsResponse, GetExtensionResponse,
+    CreateExtensionResponse, UpdateExtensionResponse, ResetPasswordResponse,
 } from './schemas/extension.schema'
-import { errors, ok, deleted } from '../../schemas/responses'
-import { ExtensionSchema } from './schemas/extension.schema'
+import { errors, deleted } from '../../schemas/responses'
 
 const optionalCompanyQuery = z.object({ companyId: z.cuid2().optional() })
-
-const batchResultSchema = z.object({
-    success: z.boolean(),
-    created: z.array(ExtensionSchema),
-    errors: z.array(z.object({ alias: z.string(), error: z.string() })),
-})
 
 export const extensionsRoutes = async (app: FastifyInstance) => {
     const router = app.withTypeProvider<ZodTypeProvider>()
@@ -32,7 +24,7 @@ export const extensionsRoutes = async (app: FastifyInstance) => {
             security: [{ bearerAuth: [] }],
             querystring: optionalCompanyQuery,
             response: {
-                200: ok({ message: z.string(), extensions: z.object({ sip: z.array(ExtensionSchema), pjsip: z.array(ExtensionSchema) }) }),
+                200: ListExtensionsResponse,
                 401: errors[401],
             },
         },
@@ -46,7 +38,7 @@ export const extensionsRoutes = async (app: FastifyInstance) => {
             security: [{ bearerAuth: [] }],
             params: extensionIdParamSchema,
             response: {
-                200: ok({ message: z.string(), extension: ExtensionSchema }),
+                200: GetExtensionResponse,
                 401: errors[401],
                 403: errors[403],
                 404: errors[404],
@@ -63,7 +55,7 @@ export const extensionsRoutes = async (app: FastifyInstance) => {
             security: [{ bearerAuth: [] }],
             body: createExtensionSchema,
             response: {
-                201: ok({ message: z.string(), extension: ExtensionSchema }),
+                201: CreateExtensionResponse,
                 400: errors[400],
                 401: errors[401],
                 403: errors[403],
@@ -81,8 +73,8 @@ export const extensionsRoutes = async (app: FastifyInstance) => {
             security: [{ bearerAuth: [] }],
             body: createExtensionBatchSchema,
             response: {
-                201: batchResultSchema,
-                207: batchResultSchema,
+                201: BatchResultSchema,
+                207: BatchResultSchema,
                 401: errors[401],
                 422: errors[422],
             },
@@ -98,7 +90,7 @@ export const extensionsRoutes = async (app: FastifyInstance) => {
             params: extensionIdParamSchema,
             body: updateExtensionSchema,
             response: {
-                200: ok({ message: z.string(), extension: ExtensionSchema }),
+                200: UpdateExtensionResponse,
                 401: errors[401],
                 403: errors[403],
                 404: errors[404],
@@ -115,7 +107,7 @@ export const extensionsRoutes = async (app: FastifyInstance) => {
             security: [{ bearerAuth: [] }],
             params: extensionIdParamSchema,
             response: {
-                200: ok({ message: z.string(), password: z.string() }),
+                200: ResetPasswordResponse,
                 401: errors[401],
                 403: errors[403],
                 404: errors[404],

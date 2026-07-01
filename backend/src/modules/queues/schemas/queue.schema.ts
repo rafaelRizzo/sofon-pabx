@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { timestamp } from '../../../schemas/responses'
+import { timestamp, ok } from '../../../schemas/responses'
 
 export const QUEUE_STRATEGIES = [
     'ringall',
@@ -85,3 +85,8 @@ export const QueueSchema = z.object({
     createdAt: timestamp,
     updatedAt: timestamp,
 })
+
+export const ListQueuesResponse = ok({ message: z.string(), queues: z.array(QueueSchema) })
+export const GetQueueResponse = ok({ message: z.string(), queue: QueueSchema })
+export const CreateQueueResponse = ok({ message: z.string(), queueId: z.string() })
+export const UpdateQueueResponse = ok({ message: z.string() })

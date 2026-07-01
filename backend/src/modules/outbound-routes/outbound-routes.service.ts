@@ -57,7 +57,6 @@ function buildDialplanEntries(
     return entries
 }
 
-// Sequential: delete then individual creates — avoids concurrent client.query() from createMany
 async function syncPatternDialplan(
     tx: Tx,
     context: string,
@@ -69,9 +68,7 @@ async function syncPatternDialplan(
 ) {
     await tx.extensions.deleteMany({ where: { context, exten } })
     const entries = buildDialplanEntries(context, exten, trunkAstIds, prefix, prepend, asteriskId)
-    for (const entry of entries) {
-        await tx.extensions.create({ data: entry })
-    }
+    await tx.extensions.createMany({ data: entries })
 }
 
 // Sequential queries inside transaction — avoids concurrent client.query() from multi-relation include
@@ -115,19 +112,21 @@ async function fetchRoute(id: string) {
     })
     if (!base) return null
 
-    const patterns = await prisma.outboundDialPattern.findMany({
-        where: { routeId: id },
-        orderBy: { position: 'asc' },
-    })
-    const trunks = await prisma.outboundRouteTrunk.findMany({
-        where: { routeId: id },
-        orderBy: { position: 'asc' },
-        select: { id: true, trunkId: true, position: true },
-    })
-    const extensions = await prisma.outboundRouteExtension.findMany({
-        where: { routeId: id },
-        select: { id: true, extensionId: true },
-    })
+    const [patterns, trunks, extensions] = await Promise.all([
+        prisma.outboundDialPattern.findMany({
+            where: { routeId: id },
+            orderBy: { position: 'asc' },
+        }),
+        prisma.outboundRouteTrunk.findMany({
+            where: { routeId: id },
+            orderBy: { position: 'asc' },
+            select: { id: true, trunkId: true, position: true },
+        }),
+        prisma.outboundRouteExtension.findMany({
+            where: { routeId: id },
+            select: { id: true, extensionId: true },
+        }),
+    ])
 
     return { ...base, patterns, trunks, extensions }
 }
@@ -242,7 +241,7 @@ export const createOutboundRoute = async (data: CreateOutboundRouteInput) => {
     })
 
     await OutboundRoutesCache.invalidateByCompany(data.companyId)
-    return getOutboundRouteById(routeId!)
+    return routeId!
 }
 
 export const updateOutboundRoute = async (id: string, data: UpdateOutboundRouteInput) => {
@@ -305,9 +304,12 @@ export const updateOutboundRoute = async (id: string, data: UpdateOutboundRouteI
         }
     })
 
-    await OutboundRoutesCache.invalidateRoute(id)
-    await OutboundRoutesCache.invalidateByCompany(existing.companyId)
-    return getOutboundRouteById(id)
+    const route = await fetchRoute(id)
+    await Promise.all([
+        OutboundRoutesCache.setRoute(id, route),
+        OutboundRoutesCache.invalidateByCompany(existing.companyId),
+    ])
+    return route!
 }
 
 export const deleteOutboundRoute = async (id: string) => {
@@ -358,7 +360,7 @@ export const addPattern = async (routeId: string, data: AddPatternInput) => {
 
     await OutboundRoutesCache.invalidateRoute(routeId)
     await OutboundRoutesCache.invalidateAll()
-    return prisma.outboundDialPattern.findUnique({ where: { id: patternId! } })
+    return patternId!
 }
 
 export const updatePattern = async (routeId: string, patternId: string, data: UpdatePatternInput) => {
@@ -375,7 +377,7 @@ export const updatePattern = async (routeId: string, patternId: string, data: Up
 
     await OutboundRoutesCache.invalidateRoute(routeId)
     await OutboundRoutesCache.invalidateAll()
-    return prisma.outboundDialPattern.findUnique({ where: { id: patternId } })
+    return patternId
 }
 
 export const deletePattern = async (routeId: string, patternId: string) => {

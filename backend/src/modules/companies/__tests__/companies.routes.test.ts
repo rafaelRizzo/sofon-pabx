@@ -4,6 +4,7 @@ import { prisma } from '../../../lib/prisma'
 import { buildApp } from '../../../test/build-app'
 import { disconnectRedis } from '../../../config/redis'
 import argon2 from 'argon2'
+import { ListCompaniesResponse, GetCompanyResponse, CreateCompanyResponse, UpdateCompanyResponse } from '../schemas/company.schema'
 
 const PREFIX = `__test_companies_routes_${Date.now()}__`
 const EMAIL = `${PREFIX}@test.com`
@@ -52,8 +53,8 @@ describe('GET /companies', () => {
         const res = await app.inject({ method: 'GET', url: '/companies', headers: auth() })
 
         expect(res.statusCode).toBe(200)
-        expect(res.json().success).toBe(true)
-        expect(Array.isArray(res.json().companies)).toBe(true)
+        const body = ListCompaniesResponse.parse(res.json())
+        expect(Array.isArray(body.companies)).toBe(true)
     })
 
     it('401 without token', async () => {
@@ -73,8 +74,7 @@ describe('POST /companies', () => {
         })
 
         expect(res.statusCode).toBe(201)
-        const body = res.json()
-        expect(body.success).toBe(true)
+        const body = CreateCompanyResponse.parse(res.json())
         expect(body.companyId).toBeTruthy()
         companyId = body.companyId
     })
@@ -130,7 +130,8 @@ describe('GET /companies/:id', () => {
         })
 
         expect(res.statusCode).toBe(200)
-        expect(res.json().company.id).toBe(companyId)
+        const body = GetCompanyResponse.parse(res.json())
+        expect(body.company.id).toBe(companyId)
     })
 
     it('404 with non-existent id', async () => {
@@ -165,7 +166,7 @@ describe('PUT /companies/:id', () => {
         })
 
         expect(res.statusCode).toBe(200)
-        expect(res.json().success).toBe(true)
+        UpdateCompanyResponse.parse(res.json())
     })
 
     it('404 with non-existent id', async () => {

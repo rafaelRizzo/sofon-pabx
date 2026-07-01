@@ -33,6 +33,7 @@ export function createPrismaMock() {
         timeRange: model(),
         timeCondition: model(),
         timeConditionTimeGroup: model(),
+        inboundRoute: model(),
         // Asterisk realtime
         ps_endpoints: model(),
         ps_auths: model(),

@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { timestamp } from '../../../schemas/responses'
+import { timestamp, ok } from '../../../schemas/responses'
 
 const aliasSchema = z.string().regex(/^\d{2,6}$/, 'Must be 2-6 digits')
 
@@ -305,3 +305,18 @@ export const ExtensionSchema = z.object({
     createdAt: timestamp,
     updatedAt: timestamp,
 })
+
+export const BatchResultSchema = z.object({
+    success: z.boolean(),
+    created: z.array(ExtensionSchema),
+    errors: z.array(z.object({ alias: z.string(), error: z.string() })),
+})
+
+export const ListExtensionsResponse = ok({
+    message: z.string(),
+    extensions: z.object({ sip: z.array(ExtensionSchema), pjsip: z.array(ExtensionSchema) }),
+})
+export const GetExtensionResponse = ok({ message: z.string(), extension: ExtensionSchema })
+export const CreateExtensionResponse = ok({ message: z.string(), extension: ExtensionSchema })
+export const UpdateExtensionResponse = ok({ message: z.string(), extension: ExtensionSchema })
+export const ResetPasswordResponse = ok({ message: z.string(), password: z.string() })

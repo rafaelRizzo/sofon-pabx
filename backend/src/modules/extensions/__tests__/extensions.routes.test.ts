@@ -4,6 +4,7 @@ import { prisma } from '../../../lib/prisma'
 import { buildApp } from '../../../test/build-app'
 import { disconnectRedis } from '../../../config/redis'
 import argon2 from 'argon2'
+import { ListExtensionsResponse, GetExtensionResponse, CreateExtensionResponse, UpdateExtensionResponse, ResetPasswordResponse } from '../schemas/extension.schema'
 
 const PREFIX = `__test_ext_routes_${Date.now()}__`
 const EMAIL = `${PREFIX}@test.com`
@@ -80,7 +81,7 @@ describe('POST /extensions', () => {
         })
 
         expect(res.statusCode).toBe(201)
-        const body = res.json()
+        const body = CreateExtensionResponse.parse(res.json())
         expect(body.extension.type).toBe('sip')
         sipId = body.extension.id
     })
@@ -94,7 +95,7 @@ describe('POST /extensions', () => {
         })
 
         expect(res.statusCode).toBe(201)
-        const body = res.json()
+        const body = CreateExtensionResponse.parse(res.json())
         expect(body.extension.type).toBe('pjsip')
         pjsipId = body.extension.id
     })
@@ -164,10 +165,10 @@ describe('GET /extensions', () => {
         })
 
         expect(res.statusCode).toBe(200)
-        const grouped = res.json().extensions
-        expect(Array.isArray(grouped.sip)).toBe(true)
-        expect(Array.isArray(grouped.pjsip)).toBe(true)
-        expect(grouped.sip.length + grouped.pjsip.length).toBeGreaterThanOrEqual(2)
+        const { extensions } = ListExtensionsResponse.parse(res.json())
+        expect(Array.isArray(extensions.sip)).toBe(true)
+        expect(Array.isArray(extensions.pjsip)).toBe(true)
+        expect(extensions.sip.length + extensions.pjsip.length).toBeGreaterThanOrEqual(2)
     })
 
     it('401 without token', async () => {
@@ -186,7 +187,8 @@ describe('GET /extensions/:id', () => {
         })
 
         expect(res.statusCode).toBe(200)
-        expect(res.json().extension.id).toBe(sipId)
+        const body = GetExtensionResponse.parse(res.json())
+        expect(body.extension.id).toBe(sipId)
     })
 
     it('200 returns extension pjsip by id', async () => {
@@ -197,7 +199,8 @@ describe('GET /extensions/:id', () => {
         })
 
         expect(res.statusCode).toBe(200)
-        expect(res.json().extension.type).toBe('pjsip')
+        const body = GetExtensionResponse.parse(res.json())
+        expect(body.extension.type).toBe('pjsip')
     })
 
     it('404 with non-existent id', async () => {
@@ -232,7 +235,8 @@ describe('PUT /extensions/:id', () => {
         })
 
         expect(res.statusCode).toBe(200)
-        expect(res.json().extension.name).toBe('SIP Updated')
+        const body1 = UpdateExtensionResponse.parse(res.json())
+        expect(body1.extension.name).toBe('SIP Updated')
     })
 
     it('200 updates extension pjsip', async () => {
@@ -244,7 +248,8 @@ describe('PUT /extensions/:id', () => {
         })
 
         expect(res.statusCode).toBe(200)
-        expect(res.json().extension.name).toBe('PJSIP Updated')
+        const body2 = UpdateExtensionResponse.parse(res.json())
+        expect(body2.extension.name).toBe('PJSIP Updated')
     })
 
     it('400 with empty body', async () => {
@@ -280,8 +285,7 @@ describe('PATCH /extensions/:id/password', () => {
         })
 
         expect(res.statusCode).toBe(200)
-        const body = res.json()
-        expect(body.success).toBe(true)
+        const body = ResetPasswordResponse.parse(res.json())
         expect(typeof body.password).toBe('string')
         expect(body.password.length).toBeGreaterThanOrEqual(16)
     })
@@ -294,10 +298,9 @@ describe('PATCH /extensions/:id/password', () => {
         })
 
         expect(res.statusCode).toBe(200)
-        const body = res.json()
-        expect(body.success).toBe(true)
-        expect(typeof body.password).toBe('string')
-        expect(body.password.length).toBeGreaterThanOrEqual(16)
+        const body2 = ResetPasswordResponse.parse(res.json())
+        expect(typeof body2.password).toBe('string')
+        expect(body2.password.length).toBeGreaterThanOrEqual(16)
     })
 
     it('404 with non-existent id', async () => {

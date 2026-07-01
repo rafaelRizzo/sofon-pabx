@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { timestamp, cuidParam } from '../../../schemas/responses'
+import { timestamp, cuidParam, ok } from '../../../schemas/responses'
 
 export const WEEKDAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const
 
@@ -48,3 +48,8 @@ export const TimeGroupSchema = z.object({
     createdAt: timestamp,
     updatedAt: timestamp,
 })
+
+export const ListTimeGroupsResponse = ok({ message: z.string(), timeGroups: z.array(TimeGroupSchema) })
+export const GetTimeGroupResponse = ok({ message: z.string(), timeGroup: TimeGroupSchema })
+export const CreateTimeGroupResponse = ok({ message: z.string(), timeGroupId: z.string() })
+export const UpdateTimeGroupResponse = ok({ message: z.string() })

@@ -1,11 +1,12 @@
 import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
-import { z } from 'zod'
 import * as TrunksController from './trunks.controller'
 import { protectedRoute } from '../../middleware/scope.middleware'
-import { createTrunkSchema, updateTrunkSchema, trunkIdParamSchema, trunkQuerySchema } from './schemas/trunk.schema'
-import { errors, ok, deleted } from '../../schemas/responses'
-import { TrunkSchema } from './schemas/trunk.schema'
+import {
+    createTrunkSchema, updateTrunkSchema, trunkIdParamSchema, trunkQuerySchema,
+    ListTrunksResponse, GetTrunkResponse, CreateTrunkResponse, UpdateTrunkResponse,
+} from './schemas/trunk.schema'
+import { errors, deleted } from '../../schemas/responses'
 
 export const trunksRoutes = async (app: FastifyInstance) => {
     const router = app.withTypeProvider<ZodTypeProvider>()
@@ -19,7 +20,7 @@ export const trunksRoutes = async (app: FastifyInstance) => {
             security: [{ bearerAuth: [] }],
             querystring: trunkQuerySchema,
             response: {
-                200: ok({ message: z.string(), trunks: z.array(TrunkSchema) }),
+                200: ListTrunksResponse,
                 401: errors[401],
                 403: errors[403],
             },
@@ -34,7 +35,7 @@ export const trunksRoutes = async (app: FastifyInstance) => {
             security: [{ bearerAuth: [] }],
             params: trunkIdParamSchema,
             response: {
-                200: ok({ message: z.string(), trunk: TrunkSchema }),
+                200: GetTrunkResponse,
                 401: errors[401],
                 403: errors[403],
                 404: errors[404],
@@ -51,7 +52,7 @@ export const trunksRoutes = async (app: FastifyInstance) => {
             security: [{ bearerAuth: [] }],
             body: createTrunkSchema,
             response: {
-                201: ok({ message: z.string(), trunk: TrunkSchema }),
+                201: CreateTrunkResponse,
                 401: errors[401],
                 403: errors[403],
                 409: errors[409],
@@ -68,7 +69,7 @@ export const trunksRoutes = async (app: FastifyInstance) => {
             params: trunkIdParamSchema,
             body: updateTrunkSchema,
             response: {
-                200: ok({ message: z.string(), trunk: TrunkSchema }),
+                200: UpdateTrunkResponse,
                 401: errors[401],
                 403: errors[403],
                 404: errors[404],

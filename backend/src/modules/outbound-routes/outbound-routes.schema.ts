@@ -1,7 +1,5 @@
 import { z } from 'zod'
-import { timestamp } from '../../schemas/responses'
-import { TrunkSchema } from '../trunks/schemas/trunk.schema'
-import { ExtensionSchema } from '../extensions/schemas/extension.schema'
+import { timestamp, ok } from '../../schemas/responses'
 
 const patternSchema = z.object({
     pattern: z.string().min(1).max(40),
@@ -64,7 +62,7 @@ export type SetTrunksInput = z.infer<typeof setTrunksSchema>
 
 export const PatternSchema = z.object({
     id: z.string(),
-    outboundRouteId: z.string(),
+    routeId: z.string(),
     pattern: z.string(),
     prefix: z.string().nullable(),
     prepend: z.string().nullable(),
@@ -77,8 +75,17 @@ export const OutboundRouteSchema = z.object({
     companyId: z.string(),
     position: z.number(),
     patterns: z.array(PatternSchema),
-    trunks: z.array(TrunkSchema),
-    extensions: z.array(ExtensionSchema),
+    trunks: z.array(z.object({ id: z.string(), trunkId: z.string(), position: z.number() })),
+    extensions: z.array(z.object({ id: z.string(), extensionId: z.string() })),
     createdAt: timestamp,
     updatedAt: timestamp,
 })
+
+export const ListOutboundRoutesResponse = ok({ routes: z.array(OutboundRouteSchema) })
+export const GetOutboundRouteResponse = ok({ route: OutboundRouteSchema })
+export const CreateOutboundRouteResponse = ok({ message: z.string(), outboundRouteId: z.string() })
+export const UpdateOutboundRouteResponse = ok({ route: OutboundRouteSchema })
+export const SetTrunksResponse = ok({ route: OutboundRouteSchema })
+export const AddPatternResponse = ok({ message: z.string(), patternId: z.string() })
+export const UpdatePatternResponse = ok({ message: z.string() })
+export const AddExtensionResponse = ok({ message: z.string(), outboundRouteExtensionId: z.string() })

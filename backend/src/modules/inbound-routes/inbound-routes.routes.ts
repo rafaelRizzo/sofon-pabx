@@ -1,88 +1,88 @@
 import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
-import * as TimeGroupsController from './time-groups.controller'
+import * as InboundRoutesController from './inbound-routes.controller'
 import { protectedRoute } from '../../middleware/scope.middleware'
 import {
-    createTimeGroupSchema, updateTimeGroupSchema, idParamSchema, companyQuerySchema,
-    ListTimeGroupsResponse, GetTimeGroupResponse, CreateTimeGroupResponse, UpdateTimeGroupResponse,
-} from './schemas/time-group.schema'
+    createInboundRouteSchema, updateInboundRouteSchema, idParamSchema, companyQuerySchema,
+    ListInboundRoutesResponse, GetInboundRouteResponse, CreateInboundRouteResponse, UpdateInboundRouteResponse,
+} from './schemas/inbound-route.schema'
 import { errors, deleted } from '../../schemas/responses'
 
-export const timeGroupsRoutes = async (app: FastifyInstance) => {
+export const inboundRoutesRoutes = async (app: FastifyInstance) => {
     const router = app.withTypeProvider<ZodTypeProvider>()
 
-    router.get('/time-groups', {
+    router.get('/inbound-routes', {
         onRequest: protectedRoute,
         schema: {
-            tags: ['Time Groups'],
-            summary: 'Listar grupos de horário por empresa',
+            tags: ['Inbound Routes'],
+            summary: 'Listar rotas de entrada por empresa',
             security: [{ bearerAuth: [] }],
             querystring: companyQuerySchema,
             response: {
-                200: ListTimeGroupsResponse,
+                200: ListInboundRoutesResponse,
                 401: errors[401],
                 403: errors[403],
                 404: errors[404],
             },
         },
-    }, TimeGroupsController.getTimeGroupsByCompanyId as any)
+    }, InboundRoutesController.getInboundRoutesByCompanyId as any)
 
-    router.get('/time-groups/:id', {
+    router.get('/inbound-routes/:id', {
         onRequest: protectedRoute,
         schema: {
-            tags: ['Time Groups'],
-            summary: 'Buscar grupo de horário',
+            tags: ['Inbound Routes'],
+            summary: 'Buscar rota de entrada',
             security: [{ bearerAuth: [] }],
             params: idParamSchema,
             response: {
-                200: GetTimeGroupResponse,
+                200: GetInboundRouteResponse,
                 401: errors[401],
                 403: errors[403],
                 404: errors[404],
             },
         },
-    }, TimeGroupsController.getTimeGroupById as any)
+    }, InboundRoutesController.getInboundRouteById as any)
 
-    router.post('/time-groups', {
+    router.post('/inbound-routes', {
         onRequest: protectedRoute,
         schema: {
-            tags: ['Time Groups'],
-            summary: 'Criar grupo de horário',
+            tags: ['Inbound Routes'],
+            summary: 'Criar rota de entrada',
             security: [{ bearerAuth: [] }],
-            body: createTimeGroupSchema,
+            body: createInboundRouteSchema,
             response: {
-                201: CreateTimeGroupResponse,
+                201: CreateInboundRouteResponse,
                 401: errors[401],
                 403: errors[403],
                 404: errors[404],
                 409: errors[409],
             },
         },
-    }, TimeGroupsController.createTimeGroup as any)
+    }, InboundRoutesController.createInboundRoute as any)
 
-    router.put('/time-groups/:id', {
+    router.put('/inbound-routes/:id', {
         onRequest: protectedRoute,
         schema: {
-            tags: ['Time Groups'],
-            summary: 'Atualizar grupo de horário',
+            tags: ['Inbound Routes'],
+            summary: 'Atualizar rota de entrada',
             security: [{ bearerAuth: [] }],
             params: idParamSchema,
-            body: updateTimeGroupSchema,
+            body: updateInboundRouteSchema,
             response: {
-                200: UpdateTimeGroupResponse,
+                200: UpdateInboundRouteResponse,
                 401: errors[401],
                 403: errors[403],
                 404: errors[404],
                 409: errors[409],
             },
         },
-    }, TimeGroupsController.updateTimeGroup as any)
+    }, InboundRoutesController.updateInboundRoute as any)
 
-    router.delete('/time-groups/:id', {
+    router.delete('/inbound-routes/:id', {
         onRequest: protectedRoute,
         schema: {
-            tags: ['Time Groups'],
-            summary: 'Remover grupo de horário',
+            tags: ['Inbound Routes'],
+            summary: 'Remover rota de entrada',
             security: [{ bearerAuth: [] }],
             params: idParamSchema,
             response: {
@@ -92,5 +92,5 @@ export const timeGroupsRoutes = async (app: FastifyInstance) => {
                 404: errors[404],
             },
         },
-    }, TimeGroupsController.deleteTimeGroup as any)
+    }, InboundRoutesController.deleteInboundRoute as any)
 }

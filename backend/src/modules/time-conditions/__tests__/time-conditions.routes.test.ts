@@ -4,6 +4,7 @@ import { prisma } from '../../../lib/prisma'
 import { buildApp } from '../../../test/build-app'
 import { disconnectRedis } from '../../../config/redis'
 import argon2 from 'argon2'
+import { ListTimeConditionsResponse, GetTimeConditionResponse, CreateTimeConditionResponse } from '../schemas/time-condition.schema'
 
 const TS = String(Date.now())
 const PREFIX = `__test_tc_routes_${TS}__`
@@ -74,8 +75,7 @@ describe('POST /time-conditions', () => {
             },
         })
         expect(res.statusCode).toBe(201)
-        const body = res.json()
-        expect(body.success).toBe(true)
+        const body = CreateTimeConditionResponse.parse(res.json())
         expect(body.timeConditionId).toBeTruthy()
         conditionId = body.timeConditionId
     })
@@ -145,9 +145,9 @@ describe('GET /time-conditions', () => {
             headers: auth(),
         })
         expect(res.statusCode).toBe(200)
-        const body = res.json()
+        const body = ListTimeConditionsResponse.parse(res.json())
         expect(Array.isArray(body.timeConditions)).toBe(true)
-        expect(body.timeConditions.some((tc: any) => tc.id === conditionId)).toBe(true)
+        expect(body.timeConditions.some((tc) => tc.id === conditionId)).toBe(true)
     })
 
     it('400 missing companyId query', async () => {
@@ -166,12 +166,12 @@ describe('GET /time-conditions/:id', () => {
     it('200 returns condition with time groups', async () => {
         const res = await app.inject({ method: 'GET', url: `/time-conditions/${conditionId}`, headers: auth() })
         expect(res.statusCode).toBe(200)
-        const tc = res.json().timeCondition
-        expect(tc.id).toBe(conditionId)
-        expect(tc.name).toBe('horario-comercial')
-        expect((tc.trueRoute as any).type).toBe('hangup')
-        expect(Array.isArray(tc.timeGroups)).toBe(true)
-        expect(tc.timeGroups[0].timeGroup.id).toBe(groupId)
+        const { timeCondition } = GetTimeConditionResponse.parse(res.json())
+        expect(timeCondition.id).toBe(conditionId)
+        expect(timeCondition.name).toBe('horario-comercial')
+        expect(timeCondition.trueRoute?.type).toBe('hangup')
+        expect(Array.isArray(timeCondition.timeGroups)).toBe(true)
+        expect(timeCondition.timeGroups[0].timeGroup.id).toBe(groupId)
     })
 
     it('404 non-existent id', async () => {

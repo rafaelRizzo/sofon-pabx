@@ -1,5 +1,6 @@
 import { z } from 'zod'
-import { timestamp } from '../../../schemas/responses'
+import { timestamp, ok } from '../../../schemas/responses'
+import { CompanySchema } from '../../companies/schemas/company.schema'
 
 export const idParamSchema = z.object({
     id: z.cuid2(),
@@ -35,3 +36,9 @@ export const UserSchema = z.object({
     createdAt: timestamp,
     updatedAt: timestamp,
 })
+
+export const ListUsersResponse = ok({ message: z.string(), users: z.array(UserSchema) })
+export const GetUserResponse = ok({ message: z.string(), user: UserSchema })
+export const GetUserCompaniesResponse = ok({ message: z.string(), companies: z.array(CompanySchema) })
+export const CreateUserResponse = ok({ message: z.string(), userId: z.string() })
+export const UpdateUserResponse = ok({ message: z.string() })

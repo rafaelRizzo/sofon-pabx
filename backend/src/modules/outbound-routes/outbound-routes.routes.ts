@@ -1,22 +1,16 @@
 import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
-import { z } from 'zod'
 import * as Controller from './outbound-routes.controller'
 import { protectedRoute } from '../../middleware/scope.middleware'
 import {
-    createOutboundRouteSchema,
-    updateOutboundRouteSchema,
-    addPatternSchema,
-    updatePatternSchema,
-    setTrunksSchema,
-    addExtensionSchema,
-    routeIdParamSchema,
-    patternIdParamSchema,
-    extensionParamSchema,
-    companyQuerySchema,
+    createOutboundRouteSchema, updateOutboundRouteSchema, addPatternSchema, updatePatternSchema,
+    setTrunksSchema, addExtensionSchema, routeIdParamSchema, patternIdParamSchema,
+    extensionParamSchema, companyQuerySchema,
+    ListOutboundRoutesResponse, GetOutboundRouteResponse, CreateOutboundRouteResponse,
+    UpdateOutboundRouteResponse, SetTrunksResponse, AddPatternResponse, UpdatePatternResponse,
+    AddExtensionResponse,
 } from './outbound-routes.schema'
-import { errors, ok, deleted } from '../../schemas/responses'
-import { OutboundRouteSchema, PatternSchema } from './outbound-routes.schema'
+import { errors, deleted } from '../../schemas/responses'
 
 export const outboundRoutesRoutes = async (app: FastifyInstance) => {
     const router = app.withTypeProvider<ZodTypeProvider>()
@@ -30,7 +24,7 @@ export const outboundRoutesRoutes = async (app: FastifyInstance) => {
             security: [{ bearerAuth: [] }],
             querystring: companyQuerySchema,
             response: {
-                200: z.object({ success: z.literal(true), routes: z.array(OutboundRouteSchema) }),
+                200: ListOutboundRoutesResponse,
                 401: errors[401],
                 403: errors[403],
             },
@@ -45,7 +39,7 @@ export const outboundRoutesRoutes = async (app: FastifyInstance) => {
             security: [{ bearerAuth: [] }],
             params: routeIdParamSchema,
             response: {
-                200: z.object({ success: z.literal(true), route: OutboundRouteSchema }),
+                200: GetOutboundRouteResponse,
                 401: errors[401],
                 403: errors[403],
                 404: errors[404],
@@ -62,9 +56,10 @@ export const outboundRoutesRoutes = async (app: FastifyInstance) => {
             security: [{ bearerAuth: [] }],
             body: createOutboundRouteSchema,
             response: {
-                201: z.object({ success: z.literal(true), route: OutboundRouteSchema }),
+                201: CreateOutboundRouteResponse,
                 401: errors[401],
                 403: errors[403],
+                404: errors[404],
                 409: errors[409],
             },
         },
@@ -79,7 +74,7 @@ export const outboundRoutesRoutes = async (app: FastifyInstance) => {
             params: routeIdParamSchema,
             body: updateOutboundRouteSchema,
             response: {
-                200: z.object({ success: z.literal(true), route: OutboundRouteSchema }),
+                200: UpdateOutboundRouteResponse,
                 401: errors[401],
                 403: errors[403],
                 404: errors[404],
@@ -113,7 +108,7 @@ export const outboundRoutesRoutes = async (app: FastifyInstance) => {
             params: routeIdParamSchema,
             body: addPatternSchema,
             response: {
-                201: z.object({ success: z.literal(true), pattern: PatternSchema }),
+                201: AddPatternResponse,
                 401: errors[401],
                 403: errors[403],
                 404: errors[404],
@@ -130,7 +125,7 @@ export const outboundRoutesRoutes = async (app: FastifyInstance) => {
             params: patternIdParamSchema,
             body: updatePatternSchema,
             response: {
-                200: z.object({ success: z.literal(true), pattern: PatternSchema }),
+                200: UpdatePatternResponse,
                 401: errors[401],
                 403: errors[403],
                 404: errors[404],
@@ -164,7 +159,7 @@ export const outboundRoutesRoutes = async (app: FastifyInstance) => {
             params: routeIdParamSchema,
             body: setTrunksSchema,
             response: {
-                200: z.object({ success: z.literal(true), route: OutboundRouteSchema }),
+                200: SetTrunksResponse,
                 401: errors[401],
                 403: errors[403],
                 404: errors[404],
@@ -181,7 +176,7 @@ export const outboundRoutesRoutes = async (app: FastifyInstance) => {
             params: routeIdParamSchema,
             body: addExtensionSchema,
             response: {
-                201: z.object({ success: z.literal(true), record: z.object({ id: z.string(), outboundRouteId: z.string(), extensionId: z.string() }) }),
+                201: AddExtensionResponse,
                 401: errors[401],
                 403: errors[403],
                 404: errors[404],

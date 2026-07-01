@@ -4,6 +4,8 @@ import { prisma } from '../../../lib/prisma'
 import { buildApp } from '../../../test/build-app'
 import { disconnectRedis } from '../../../config/redis'
 import argon2 from 'argon2'
+import { ListQueuesResponse, GetQueueResponse, CreateQueueResponse } from '../schemas/queue.schema'
+import { ListMembersResponse, AddMemberResponse } from '../../queue-members/schemas/queue-member.schema'
 
 const TS = String(Date.now())
 const PREFIX = `__test_queues_routes_${TS}__`
@@ -79,8 +81,7 @@ describe('POST /queues', () => {
             body: { name: 'suporte', companyId },
         })
         expect(res.statusCode).toBe(201)
-        const body = res.json()
-        expect(body.success).toBe(true)
+        const body = CreateQueueResponse.parse(res.json())
         expect(body.queueId).toBeTruthy()
         queueId = body.queueId
     })
@@ -154,13 +155,15 @@ describe('GET /queues', () => {
     it('200 lists all queues', async () => {
         const res = await app.inject({ method: 'GET', url: '/queues', headers: auth() })
         expect(res.statusCode).toBe(200)
-        expect(Array.isArray(res.json().queues)).toBe(true)
+        const body = ListQueuesResponse.parse(res.json())
+        expect(Array.isArray(body.queues)).toBe(true)
     })
 
     it('200 filters by companyId', async () => {
         const res = await app.inject({ method: 'GET', url: `/queues?companyId=${companyId}`, headers: auth() })
         expect(res.statusCode).toBe(200)
-        expect(Array.isArray(res.json().queues)).toBe(true)
+        const body = ListQueuesResponse.parse(res.json())
+        expect(Array.isArray(body.queues)).toBe(true)
     })
 
     it('401 without token', async () => {
@@ -195,7 +198,7 @@ describe('GET /queues/:id', () => {
     it('200 returns queue by id', async () => {
         const res = await app.inject({ method: 'GET', url: `/queues/${queueId}`, headers: auth() })
         expect(res.statusCode).toBe(200)
-        const queue = res.json().queue
+        const { queue } = GetQueueResponse.parse(res.json())
         expect(queue.id).toBe(queueId)
         expect(queue.name).toBe('suporte')
         expect(queue.strategy).toBe('ringall')
@@ -256,8 +259,7 @@ describe('POST /queues/:id/members', () => {
             body: { extensionId, penalty: 0 },
         })
         expect(res.statusCode).toBe(201)
-        const body = res.json()
-        expect(body.success).toBe(true)
+        const body = AddMemberResponse.parse(res.json())
         expect(body.memberId).toBeTruthy()
         memberId = body.memberId
     })
@@ -303,9 +305,9 @@ describe('GET /queues/:id/members', () => {
     it('200 returns queue members', async () => {
         const res = await app.inject({ method: 'GET', url: `/queues/${queueId}/members`, headers: auth() })
         expect(res.statusCode).toBe(200)
-        const members = res.json().members
+        const { members } = ListMembersResponse.parse(res.json())
         expect(Array.isArray(members)).toBe(true)
-        expect(members.some((m: any) => m.id === memberId)).toBe(true)
+        expect(members.some((m) => m.id === memberId)).toBe(true)
     })
 
     it('404 non-existent queue', async () => {

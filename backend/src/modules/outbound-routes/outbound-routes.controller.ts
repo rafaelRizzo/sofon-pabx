@@ -36,7 +36,8 @@ export const createRoute = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
         const data = createOutboundRouteSchema.parse(req.body)
         req.scope.assertAccess(data.companyId)
-        return reply.status(201).send({ success: true, route: await Service.createOutboundRoute(data) })
+        const outboundRouteId = await Service.createOutboundRoute(data)
+        return reply.status(201).send({ success: true, message: 'Outbound route created successfully', outboundRouteId })
     } catch (e) { return handleError(reply, e, req) }
 }
 
@@ -66,7 +67,8 @@ export const addPattern = async (req: FastifyRequest, reply: FastifyReply) => {
         const data = addPatternSchema.parse(req.body)
         const existing = await Service.getOutboundRouteById(id)
         req.scope.assertAccess(existing.companyId)
-        return reply.status(201).send({ success: true, pattern: await Service.addPattern(id, data) })
+        const patternId = await Service.addPattern(id, data)
+        return reply.status(201).send({ success: true, message: 'Pattern added successfully', patternId })
     } catch (e) { return handleError(reply, e, req) }
 }
 
@@ -76,7 +78,8 @@ export const updatePattern = async (req: FastifyRequest, reply: FastifyReply) =>
         const data = updatePatternSchema.parse(req.body)
         const existing = await Service.getOutboundRouteById(id)
         req.scope.assertAccess(existing.companyId)
-        return reply.send({ success: true, pattern: await Service.updatePattern(id, patternId, data) })
+        await Service.updatePattern(id, patternId, data)
+        return reply.send({ success: true, message: 'Pattern updated successfully' })
     } catch (e) { return handleError(reply, e, req) }
 }
 
@@ -107,7 +110,8 @@ export const addExtension = async (req: FastifyRequest, reply: FastifyReply) => 
         const { extensionId } = addExtensionSchema.parse(req.body)
         const existing = await Service.getOutboundRouteById(id)
         req.scope.assertAccess(existing.companyId)
-        return reply.status(201).send({ success: true, record: await Service.addExtension(id, extensionId) })
+        const record = await Service.addExtension(id, extensionId)
+        return reply.status(201).send({ success: true, message: 'Extension added to route', outboundRouteExtensionId: record.id })
     } catch (e) { return handleError(reply, e, req) }
 }
 

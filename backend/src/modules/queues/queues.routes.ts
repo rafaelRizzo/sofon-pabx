@@ -3,9 +3,11 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import * as QueuesController from './queues.controller'
 import { protectedRoute } from '../../middleware/scope.middleware'
-import { createQueueSchema, updateQueueSchema, idParamSchema, companyIdParamSchema } from './schemas/queue.schema'
-import { errors, ok, deleted } from '../../schemas/responses'
-import { QueueSchema } from './schemas/queue.schema'
+import {
+    createQueueSchema, updateQueueSchema, idParamSchema, companyIdParamSchema,
+    ListQueuesResponse, GetQueueResponse, CreateQueueResponse, UpdateQueueResponse,
+} from './schemas/queue.schema'
+import { errors, deleted } from '../../schemas/responses'
 
 const optionalCompanyQuery = z.object({ companyId: z.cuid2().optional() })
 
@@ -21,7 +23,7 @@ export const queuesRoutes = async (app: FastifyInstance) => {
             security: [{ bearerAuth: [] }],
             querystring: optionalCompanyQuery,
             response: {
-                200: ok({ message: z.string(), queues: z.array(QueueSchema) }),
+                200: ListQueuesResponse,
                 401: errors[401],
             },
         },
@@ -35,7 +37,7 @@ export const queuesRoutes = async (app: FastifyInstance) => {
             security: [{ bearerAuth: [] }],
             params: companyIdParamSchema,
             response: {
-                200: ok({ message: z.string(), queues: z.array(QueueSchema) }),
+                200: ListQueuesResponse,
                 401: errors[401],
                 403: errors[403],
             },
@@ -50,7 +52,7 @@ export const queuesRoutes = async (app: FastifyInstance) => {
             security: [{ bearerAuth: [] }],
             params: idParamSchema,
             response: {
-                200: ok({ message: z.string(), queue: QueueSchema }),
+                200: GetQueueResponse,
                 401: errors[401],
                 403: errors[403],
                 404: errors[404],
@@ -66,7 +68,7 @@ export const queuesRoutes = async (app: FastifyInstance) => {
             security: [{ bearerAuth: [] }],
             body: createQueueSchema,
             response: {
-                201: ok({ message: z.string(), queueId: z.string() }),
+                201: CreateQueueResponse,
                 401: errors[401],
                 403: errors[403],
                 409: errors[409],
@@ -83,7 +85,7 @@ export const queuesRoutes = async (app: FastifyInstance) => {
             params: idParamSchema,
             body: updateQueueSchema,
             response: {
-                200: ok({ message: z.string() }),
+                200: UpdateQueueResponse,
                 401: errors[401],
                 403: errors[403],
                 404: errors[404],

@@ -4,6 +4,7 @@ import { prisma } from '../../../lib/prisma'
 import { buildApp } from '../../../test/build-app'
 import { disconnectRedis } from '../../../config/redis'
 import argon2 from 'argon2'
+import { TokenResponse, LogoutResponse } from '../schemas/auth.schema'
 
 const PREFIX = `__test_auth_routes_${Date.now()}__`
 const EMAIL = `${PREFIX}@test.com`
@@ -51,8 +52,7 @@ describe('POST /auth/login', () => {
         })
 
         expect(res.statusCode).toBe(200)
-        const body = res.json()
-        expect(body.success).toBe(true)
+        const body = TokenResponse.parse(res.json())
         expect(body.token).toBeTruthy()
         const cookies = res.headers['set-cookie'] as string[]
         expect(cookies.some((c) => c.startsWith('refreshToken='))).toBe(true)
@@ -113,8 +113,7 @@ describe('POST /auth/refresh', () => {
         })
 
         expect(res.statusCode).toBe(200)
-        const body = res.json()
-        expect(body.success).toBe(true)
+        const body = TokenResponse.parse(res.json())
         expect(body.token).toBeTruthy()
     })
 
@@ -135,7 +134,7 @@ describe('POST /auth/logout', () => {
         })
 
         expect(res.statusCode).toBe(200)
-        expect(res.json().success).toBe(true)
+        LogoutResponse.parse(res.json())
     })
 
     it('401 without token', async () => {

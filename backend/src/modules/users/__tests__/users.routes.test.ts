@@ -4,6 +4,7 @@ import { prisma } from '../../../lib/prisma'
 import { buildApp } from '../../../test/build-app'
 import { disconnectRedis } from '../../../config/redis'
 import argon2 from 'argon2'
+import { ListUsersResponse, GetUserResponse, GetUserCompaniesResponse, CreateUserResponse } from '../schemas/user.schema'
 
 const PREFIX = `__test_users_routes_${Date.now()}__`
 const EMAIL = `${PREFIX}@test.com`
@@ -68,8 +69,7 @@ describe('GET /users', () => {
     it('200 admin sees all users', async () => {
         const res = await app.inject({ method: 'GET', url: '/users', headers: auth() })
         expect(res.statusCode).toBe(200)
-        const body = res.json()
-        expect(body.success).toBe(true)
+        const body = ListUsersResponse.parse(res.json())
         expect(Array.isArray(body.users)).toBe(true)
     })
 
@@ -83,8 +83,8 @@ describe('GET /users', () => {
 
         const res = await app.inject({ method: 'GET', url: '/users', headers: resellerAuth() })
         expect(res.statusCode).toBe(200)
-        const users = res.json().users
-        expect(users.every((u: any) => u.createdBy === resellerId)).toBe(true)
+        const { users } = ListUsersResponse.parse(res.json())
+        expect(users.every((u) => u.createdBy === resellerId)).toBe(true)
     })
 
     it('401 without token', async () => {
@@ -98,7 +98,8 @@ describe('GET /users/:id', () => {
     it('200 returns user by id', async () => {
         const res = await app.inject({ method: 'GET', url: `/users/${userId}`, headers: auth() })
         expect(res.statusCode).toBe(200)
-        expect(res.json().user.id).toBe(userId)
+        const body = GetUserResponse.parse(res.json())
+        expect(body.user.id).toBe(userId)
     })
 
     it('404 with non-existent id', async () => {
@@ -228,7 +229,8 @@ describe('GET /users/:id/companies', () => {
             headers: auth(),
         })
         expect(res.statusCode).toBe(200)
-        expect(Array.isArray(res.json().companies)).toBe(true)
+        const { companies } = GetUserCompaniesResponse.parse(res.json())
+        expect(Array.isArray(companies)).toBe(true)
     })
 
     it('403 when accessing another user companies without admin permission', async () => {

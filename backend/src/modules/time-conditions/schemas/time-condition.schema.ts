@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { timestamp, cuidParam } from '../../../schemas/responses'
+import { timestamp, cuidParam, ok } from '../../../schemas/responses'
 
 export const ROUTE_TYPES = ['extension', 'queue', 'voicemail', 'timecondition', 'hangup'] as const
 
@@ -56,3 +56,8 @@ export const TimeConditionSchema = z.object({
     createdAt:  timestamp,
     updatedAt:  timestamp,
 })
+
+export const ListTimeConditionsResponse = ok({ message: z.string(), timeConditions: z.array(TimeConditionSchema) })
+export const GetTimeConditionResponse = ok({ message: z.string(), timeCondition: TimeConditionSchema })
+export const CreateTimeConditionResponse = ok({ message: z.string(), timeConditionId: z.string() })
+export const UpdateTimeConditionResponse = ok({ message: z.string() })

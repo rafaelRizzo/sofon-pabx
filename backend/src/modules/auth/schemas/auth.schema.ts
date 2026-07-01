@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { ok } from '../../../schemas/responses'
 
 export const loginSchema = z.object({
     username: z.email(),
@@ -6,3 +7,6 @@ export const loginSchema = z.object({
 })
 
 export type LoginInput = z.infer<typeof loginSchema>
+
+export const TokenResponse = ok({ message: z.string(), token: z.string() })
+export const LogoutResponse = ok({ message: z.string() })

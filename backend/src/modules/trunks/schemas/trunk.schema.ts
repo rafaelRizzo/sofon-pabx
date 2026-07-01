@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { timestamp } from '../../../schemas/responses'
+import { timestamp, ok } from '../../../schemas/responses'
 
 const baseTrunkShape = {
     name: z
@@ -55,3 +55,8 @@ export const TrunkSchema = z.object({
     createdAt: timestamp,
     updatedAt: timestamp,
 })
+
+export const ListTrunksResponse = ok({ message: z.string(), trunks: z.array(TrunkSchema) })
+export const GetTrunkResponse = ok({ message: z.string(), trunk: TrunkSchema })
+export const CreateTrunkResponse = ok({ message: z.string(), trunk: TrunkSchema })
+export const UpdateTrunkResponse = ok({ message: z.string(), trunk: TrunkSchema })
