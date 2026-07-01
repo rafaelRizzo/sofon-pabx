@@ -15,14 +15,16 @@ model Company {
     name       String
     doc        String?
     metadata   Json          @default("{}")
-    createdAt  DateTime      @default(now())
-    updatedAt  DateTime      @updatedAt
+    createdAt  DateTime      @default(now()) @db.Timestamptz(3)
+    updatedAt  DateTime      @updatedAt @db.Timestamptz(3)
     users      UserCompany[]
     dids       Did[]
-    extensions     Extension[]
-    queues         Queue[]
-    trunks         Trunk[]
-    outboundRoutes OutboundRoute[]
+    extensions      Extension[]
+    queues          Queue[]
+    trunks          Trunk[]
+    outboundRoutes  OutboundRoute[]
+    timeGroups      TimeGroup[]
+    timeConditions  TimeCondition[]
 
     @@map("companies")
 }
@@ -32,10 +34,11 @@ model Did {
     number    String
     companyId String
     company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+    createdAt DateTime @default(now()) @db.Timestamptz(3)
+    updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
     @@unique([number, companyId])
+    @@index([companyId])
     @@map("dids")
 }
 
@@ -53,8 +56,8 @@ model User {
     creator      User?         @relation("UserCreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
     createdUsers User[]        @relation("UserCreatedBy")
     extension    Extension?    @relation(fields: [extensionId], references: [id], onDelete: SetNull)
-    createdAt    DateTime      @default(now())
-    updatedAt    DateTime      @updatedAt
+    createdAt    DateTime      @default(now()) @db.Timestamptz(3)
+    updatedAt    DateTime      @updatedAt @db.Timestamptz(3)
     companies    UserCompany[]
 
     @@map("users")
@@ -67,6 +70,7 @@ model UserCompany {
     company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
     @@id([userId, companyId])
+    @@index([companyId])
     @@map("user_companies")
 }
 
@@ -80,8 +84,8 @@ model Extension {
     allowOutbound    Boolean       @default(true)
     companyId        String
     company          Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
-    createdAt        DateTime      @default(now())
-    updatedAt        DateTime      @updatedAt
+    createdAt        DateTime      @default(now()) @db.Timestamptz(3)
+    updatedAt        DateTime      @updatedAt @db.Timestamptz(3)
     queueMemberships  QueueMember[]
     user              User?
     outboundRoutes    OutboundRouteExtension[]
@@ -109,8 +113,8 @@ model Queue {
     leaveWhenEmpty    Boolean       @default(false)
     weight            Int           @default(0)
     metadata          Json          @default("{}")
-    createdAt         DateTime      @default(now())
-    updatedAt         DateTime      @updatedAt
+    createdAt         DateTime      @default(now()) @db.Timestamptz(3)
+    updatedAt         DateTime      @updatedAt @db.Timestamptz(3)
     members           QueueMember[]
 
     @@unique([name, companyId])
@@ -127,10 +131,11 @@ model QueueMember {
     extension   Extension @relation(fields: [extensionId], references: [id], onDelete: Cascade)
     penalty     Int       @default(0)
     paused      Boolean   @default(false)
-    createdAt   DateTime  @default(now())
-    updatedAt   DateTime  @updatedAt
+    createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+    updatedAt   DateTime  @updatedAt @db.Timestamptz(3)
 
     @@unique([queueId, extensionId])
+    @@index([extensionId])
     @@map("queue_members_app")
 }
 
@@ -146,8 +151,8 @@ model Trunk {
     context          String               @default("from-trunk") @db.VarChar(40)
     codecs           String               @default("ulaw,alaw") @db.VarChar(200)
     metadata         Json                 @default("{}")
-    createdAt        DateTime             @default(now())
-    updatedAt        DateTime             @updatedAt
+    createdAt        DateTime             @default(now()) @db.Timestamptz(3)
+    updatedAt        DateTime             @updatedAt @db.Timestamptz(3)
     outboundRoutes   OutboundRouteTrunk[]
 
     @@unique([name, companyId])
@@ -164,8 +169,8 @@ model OutboundRoute {
     patterns   OutboundDialPattern[]
     trunks     OutboundRouteTrunk[]
     extensions OutboundRouteExtension[]
-    createdAt  DateTime                 @default(now())
-    updatedAt  DateTime                 @updatedAt
+    createdAt  DateTime                 @default(now()) @db.Timestamptz(3)
+    updatedAt  DateTime                 @updatedAt @db.Timestamptz(3)
 
     @@index([companyId])
     @@map("outbound_routes")
@@ -179,7 +184,7 @@ model OutboundDialPattern {
     prepend   String?       @db.VarChar(40)
     prefix    String?       @db.VarChar(40)
     position  Int           @default(0)
-    createdAt DateTime      @default(now())
+    createdAt DateTime      @default(now()) @db.Timestamptz(3)
 
     @@index([routeId])
     @@map("outbound_dial_patterns")
@@ -190,7 +195,7 @@ model OutboundRouteTrunk {
     routeId   String
     route     OutboundRoute @relation(fields: [routeId], references: [id], onDelete: Cascade)
     trunkId   String
-    trunk     Trunk         @relation(fields: [trunkId], references: [id])
+    trunk     Trunk         @relation(fields: [trunkId], references: [id], onDelete: Cascade)
     position  Int           @default(0)
 
     @@unique([routeId, trunkId])
@@ -208,6 +213,63 @@ model OutboundRouteExtension {
     @@unique([routeId, extensionId])
     @@index([routeId])
     @@map("outbound_route_extensions")
+}
+
+model TimeGroup {
+    id        String                   @id @default(cuid())
+    name      String                   @db.VarChar(80)
+    companyId String
+    company   Company                  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+    ranges    TimeRange[]
+    conditions TimeConditionTimeGroup[]
+    createdAt DateTime                 @default(now()) @db.Timestamptz(3)
+    updatedAt DateTime                 @updatedAt @db.Timestamptz(3)
+
+    @@unique([name, companyId])
+    @@index([companyId])
+    @@map("time_groups")
+}
+
+model TimeRange {
+    id          String    @id @default(cuid())
+    timeGroupId String
+    timeGroup   TimeGroup @relation(fields: [timeGroupId], references: [id], onDelete: Cascade)
+    startTime   String    @db.VarChar(5)
+    endTime     String    @db.VarChar(5)
+    weekdays    String[]
+    monthdays   String    @default("*") @db.VarChar(20)
+    months      String    @default("*") @db.VarChar(40)
+    createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+
+    @@index([timeGroupId])
+    @@map("time_ranges")
+}
+
+model TimeCondition {
+    id         String                   @id @default(cuid())
+    name       String                   @db.VarChar(80)
+    companyId  String
+    company    Company                  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+    trueRoute  Json?
+    falseRoute Json?
+    timeGroups TimeConditionTimeGroup[]
+    createdAt  DateTime                 @default(now()) @db.Timestamptz(3)
+    updatedAt  DateTime                 @updatedAt @db.Timestamptz(3)
+
+    @@unique([name, companyId])
+    @@index([companyId])
+    @@map("time_conditions")
+}
+
+model TimeConditionTimeGroup {
+    timeConditionId String
+    timeGroupId     String
+    timeCondition   TimeCondition @relation(fields: [timeConditionId], references: [id], onDelete: Cascade)
+    timeGroup       TimeGroup     @relation(fields: [timeGroupId], references: [id], onDelete: Cascade)
+
+    @@id([timeConditionId, timeGroupId])
+    @@index([timeGroupId])
+    @@map("time_condition_time_groups")
 }
 
 // ─── Asterisk Realtime Models ─────────────────────────────────────────────────

@@ -65,7 +65,7 @@ export const usersRoutes = async (app: FastifyInstance) => {
             security: [{ bearerAuth: [] }],
             body: createUserSchema,
             response: {
-                201: ok({ message: z.string(), user: UserSchema }),
+                201: ok({ message: z.string(), userId: z.string() }),
                 401: errors[401],
                 403: errors[403],
                 409: errors[409],

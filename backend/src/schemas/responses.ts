@@ -1,5 +1,8 @@
 import { z } from 'zod'
 
+// Zod v4 cuid2 regex lacks minimum length — use explicit pattern to reject short strings like 'invalid'
+export const cuidParam = z.string().regex(/^[0-9a-z]{24,}$/)
+
 // safeEncode roda direction:"backward" — ZodTransform lança ZodEncodeError nessa direção,
 // então timestamp precisa aceitar Date (Prisma) e string (Redis cache) sem transform
 export const timestamp = z.union([z.date(), z.string()])

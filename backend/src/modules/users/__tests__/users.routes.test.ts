@@ -118,7 +118,7 @@ describe('GET /users/:id', () => {
 
 // ------------------------------------------------- POST /users
 describe('POST /users', () => {
-    it('201 admin creates user and returns full user object', async () => {
+    it('201 admin creates user and returns userId', async () => {
         const res = await app.inject({
             method: 'POST',
             url: '/users',
@@ -129,12 +129,10 @@ describe('POST /users', () => {
         expect(res.statusCode).toBe(201)
         const body = res.json()
         expect(body.success).toBe(true)
-        expect(body.user.id).toBeTruthy()
-        expect(body.user.role).toBe('user')
-        expect(body.user.createdBy).toBeNull()
+        expect(body.userId).toBeTruthy()
     })
 
-    it('201 reseller creates user with role user and sets createdBy', async () => {
+    it('201 reseller creates user with role user', async () => {
         const res = await app.inject({
             method: 'POST',
             url: '/users',
@@ -143,9 +141,7 @@ describe('POST /users', () => {
         })
 
         expect(res.statusCode).toBe(201)
-        const body = res.json()
-        expect(body.user.role).toBe('user')
-        expect(body.user.createdBy).toBe(resellerId)
+        expect(res.json().userId).toBeTruthy()
     })
 
     it('403 reseller cannot create admin role', async () => {
@@ -275,7 +271,7 @@ describe('DELETE /users/:id', () => {
             headers: auth(),
             body: { name: 'To Delete', username: `${PREFIX}todelete@test.com`, password: PASSWORD },
         })
-        const idToDelete = created.json().user.id
+        const idToDelete = created.json().userId
 
         const res = await app.inject({
             method: 'DELETE',

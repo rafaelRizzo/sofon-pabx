@@ -129,7 +129,8 @@ Testes: **ausentes** — criar `trunks/__tests__/trunks.routes.test.ts` e `trunk
 ## Setup SQL (Asterisk DB)
 
 ```sql
--- docker exec -it postgres_rafael psql -U postgres
+-- docker exec -it postgres_sofon psql -U postgres
+
 -- \c asterisk
 
 ALTER TABLE extensions OWNER TO asterisk;
@@ -143,4 +144,10 @@ ALTER TABLE queues OWNER TO asterisk;
 ALTER TABLE queue_members OWNER TO asterisk;
 ALTER TABLE ps_identifies    OWNER TO asterisk;
 ALTER TABLE ps_registrations OWNER TO asterisk;
+```
+
+```sql docker exec -it postgres_sofon psql -U postgres -d asterisk -c "
+GRANT USAGE ON SCHEMA public TO asterisk;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO asterisk;
+"
 ```

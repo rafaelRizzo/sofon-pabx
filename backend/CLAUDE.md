@@ -7,7 +7,7 @@
 - Cache: Redis (JTI revogação)
 - Auth: JWT RS256 — access 15min, refresh 7d
 - Validação: Zod
-- Testes: `bun run test`
+- Testes: `bun run test` (todos) | `bun run test:unit` (serviços, sem DB) | `bun run test:integration` (rotas, com DB)
 
 ## Auth & RBAC
 - Roles: `admin` | `reseller` | `user`
@@ -21,6 +21,14 @@
 - Validação apenas em boundaries (input do usuário, APIs externas)
 - Zod para validação de request body/params
 - Nunca rodar DELETE/migrate/drop sem confirmação explícita
+
+## Testes
+- **Unit** (`*.service.test.ts`): Prisma mockado via `src/test/mocks/prisma.mock.ts` — sem DB, sem rede
+  - `createPrismaMock()` retorna o mock; `clearPrismaMock(db)` usa `mockReset()` + restaura `$transaction`
+  - Mocks de módulos com `mock.module()` no topo do arquivo (antes dos imports)
+- **Integration** (`*.routes.test.ts`): sobe Fastify completo contra DB real
+  - `beforeAll`/`afterAll` com timeout de 30s; usar sufixo `Date.now()` para dados únicos por run
+- Nunca usar `expect(...).resolves.not.toThrow()` no Bun — usar `await service.method()` + `toHaveBeenCalled()`
 
 ---
 
@@ -79,7 +87,7 @@
 | GET | `/users/:id/companies` | Sim | qualquer | Empresas do usuário |
 
 **User schema:** `{ id, name, username, role, status, extensionId (nullable), webhookSlug (uuid), createdAt, updatedAt }`  
-**Create body:** `{ name, username, password }`  
+**Create body:** `{ name, username, password }` → retorna `{ userId }`  
 **Update body:** `{ name?, username?, password?, extensionId? }` (min 1 campo)
 
 ---
@@ -201,6 +209,38 @@
 
 **OutboundRoute schema:** `{ id, name, companyId, position, patterns (OutboundDialPattern[]), trunks (Trunk[]), extensions (Extension[]), createdAt, updatedAt }`  
 **OutboundDialPattern schema:** `{ id, outboundRouteId, pattern, prefix, prepend }`
+
+---
+
+### Time Groups
+| Método | Path | Auth | Role | Desc |
+|--------|------|------|------|------|
+| GET | `/time-groups` | Sim | qualquer | Lista grupos — query obrigatória: `?companyId=` |
+| GET | `/time-groups/:id` | Sim | qualquer | Busca por ID |
+| POST | `/time-groups` | Sim | qualquer | Cria grupo com ranges |
+| PUT | `/time-groups/:id` | Sim | qualquer | Atualiza nome e/ou ranges |
+| DELETE | `/time-groups/:id` | Sim | qualquer | Remove |
+
+**Create body:** `{ name, companyId, ranges: [{ startTime (HH:MM), endTime (HH:MM), weekdays (mon-sun[]), monthdays? ("*" ou "1-31"), months? ("*" ou "jan-dec") }] }`  
+**Update body:** `{ name?, ranges? }` (min 1 campo) — ranges substitui a lista completa  
+**TimeGroup schema:** `{ id, name, companyId, ranges (TimeRange[]), createdAt, updatedAt }`
+
+---
+
+### Time Conditions
+| Método | Path | Auth | Role | Desc |
+|--------|------|------|------|------|
+| GET | `/time-conditions` | Sim | qualquer | Lista condições — query obrigatória: `?companyId=` |
+| GET | `/time-conditions/:id` | Sim | qualquer | Busca por ID |
+| POST | `/time-conditions` | Sim | qualquer | Cria condição |
+| PUT | `/time-conditions/:id` | Sim | qualquer | Atualiza nome/rotas |
+| DELETE | `/time-conditions/:id` | Sim | qualquer | Remove + limpa dialplan |
+
+**Create body:** `{ name, companyId, trueRoute?, falseRoute?, groupIds?: string[] }`  
+**Update body:** `{ name?, trueRoute?, falseRoute? }` (min 1 campo)  
+**Route format:** `"context,exten,priority"` ex: `"from-internal,100,1"` — null = Hangup()  
+**TimeCondition schema:** `{ id, name, companyId, trueRoute, falseRoute, timeGroups ([{ timeGroup: { id, name } }]), createdAt, updatedAt }`  
+**Nota:** Ao criar/atualizar/deletar TC, gera/regenera/remove o contexto `tc-<id>` no dialplan Asterisk (`extensions` realtime) usando `GotoIfTime` por range — OR lógico entre todos os ranges de todos os TGs vinculados
 
 ---
 

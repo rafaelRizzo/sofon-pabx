@@ -50,7 +50,7 @@ export const createUser = async (req: FastifyRequest, reply: FastifyReply) => {
         const createdBy = requesterRole !== 'admin' ? requesterId : undefined
         const user = await UsersService.createUser(data, createdBy)
 
-        return reply.status(201).send({ success: true, message: 'User created successfully', user })
+        return reply.status(201).send({ success: true, message: 'User created successfully', userId: user.id })
     } catch (error) {
         return handleError(reply, error, req)
     }

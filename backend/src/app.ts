@@ -18,6 +18,8 @@ import { queuesRoutes } from './modules/queues/queues.routes'
 import { queueMembersRoutes } from './modules/queue-members/queue-members.routes'
 import { trunksRoutes } from './modules/trunks/trunks.routes'
 import { outboundRoutesRoutes } from './modules/outbound-routes/outbound-routes.routes'
+import { timeGroupsRoutes } from './modules/time-groups/time-groups.routes'
+import { timeConditionsRoutes } from './modules/time-conditions/time-conditions.routes'
 
 const env = validateEnv()
 
@@ -123,6 +125,8 @@ app.register(queuesRoutes)
 app.register(queueMembersRoutes)
 app.register(trunksRoutes)
 app.register(outboundRoutesRoutes)
+app.register(timeGroupsRoutes)
+app.register(timeConditionsRoutes)
 
 // Health check
 app.get('/health', async (req, reply) => {

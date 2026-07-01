@@ -6,6 +6,7 @@ function model() {
         findFirst: mock(),
         findMany: mock(() => Promise.resolve([])),
         create: mock(),
+        createMany: mock(() => Promise.resolve({ count: 0 })),
         update: mock(),
         delete: mock(),
         deleteMany: mock(() => Promise.resolve({ count: 0 })),
@@ -28,6 +29,10 @@ export function createPrismaMock() {
         outboundDialPattern: model(),
         outboundRouteTrunk: model(),
         outboundRouteExtension: model(),
+        timeGroup: model(),
+        timeRange: model(),
+        timeCondition: model(),
+        timeConditionTimeGroup: model(),
         // Asterisk realtime
         ps_endpoints: model(),
         ps_auths: model(),

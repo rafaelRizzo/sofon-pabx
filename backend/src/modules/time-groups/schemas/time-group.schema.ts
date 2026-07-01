@@ -1,0 +1,50 @@
+import { z } from 'zod'
+import { timestamp, cuidParam } from '../../../schemas/responses'
+
+export const WEEKDAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const
+
+const timeRegex = /^([01]\d|2[0-3]):[0-5]\d$/
+
+const timeRangeSchema = z.object({
+    startTime: z.string().regex(timeRegex, 'Invalid time format HH:MM'),
+    endTime:   z.string().regex(timeRegex, 'Invalid time format HH:MM'),
+    weekdays:  z.array(z.enum(WEEKDAYS)).min(1),
+    monthdays: z.string().regex(/^(\*|([1-9]|[12]\d|3[01])(-([1-9]|[12]\d|3[01]))?)$/).default('*'),
+    months:    z.string().regex(/^(\*|(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)(-[a-z]{3})?)$/).default('*'),
+})
+
+export const idParamSchema = z.object({ id: cuidParam })
+export const companyQuerySchema = z.object({ companyId: z.cuid2() })
+
+export const createTimeGroupSchema = z.object({
+    name:      z.string().min(1).max(80),
+    companyId: z.cuid2(),
+    ranges:    z.array(timeRangeSchema).min(1).max(20),
+})
+
+export const updateTimeGroupSchema = z.object({
+    name:   z.string().min(1).max(80).optional(),
+    ranges: z.array(timeRangeSchema).min(1).max(20).optional(),
+}).refine((d) => Object.keys(d).length > 0, { message: 'At least one field required' })
+
+export type CreateTimeGroupInput = z.infer<typeof createTimeGroupSchema>
+export type UpdateTimeGroupInput = z.infer<typeof updateTimeGroupSchema>
+
+const TimeRangeSchema = z.object({
+    id:         z.string(),
+    startTime:  z.string(),
+    endTime:    z.string(),
+    weekdays:   z.array(z.string()),
+    monthdays:  z.string(),
+    months:     z.string(),
+    createdAt:  timestamp,
+})
+
+export const TimeGroupSchema = z.object({
+    id:        z.string(),
+    name:      z.string(),
+    companyId: z.string(),
+    ranges:    z.array(TimeRangeSchema),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+})
