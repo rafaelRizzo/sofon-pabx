@@ -23,7 +23,7 @@ async function resolveDestination(tx: Tx, dest: InboundDest): Promise<{ app: str
 }
 
 // context per-trunk garante que 2 trunks diferentes recebam o mesmo DID sem conflito
-function trunkContext(trunkId: string) {
+export function trunkContext(trunkId: string) {
     return `from-trunk-${trunkId}`
 }
 

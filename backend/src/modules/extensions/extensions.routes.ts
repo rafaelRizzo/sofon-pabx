@@ -56,7 +56,6 @@ export const extensionsRoutes = async (app: FastifyInstance) => {
             body: createExtensionSchema,
             response: {
                 201: CreateExtensionResponse,
-                400: errors[400],
                 401: errors[401],
                 403: errors[403],
                 409: errors[409],

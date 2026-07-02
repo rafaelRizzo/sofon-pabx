@@ -18,6 +18,7 @@ const envSchema = z.object({
     RATE_LIMIT_WINDOW: z.string().default('1 second'),
     DATABASE_POOL_SIZE: z.coerce.number().default(10),
     REDIS_URL: z.string().default('redis://localhost:6379'),
+    TZ: z.string().default('America/Sao_Paulo'),
 })
 
 export type Env = z.infer<typeof envSchema>

@@ -5,9 +5,11 @@ import cors from '@fastify/cors'
 import rateLimit from '@fastify/rate-limit'
 import swagger from '@fastify/swagger'
 import scalar from '@scalar/fastify-api-reference'
-import { validatorCompiler, serializerCompiler, jsonSchemaTransform } from 'fastify-type-provider-zod'
+import { serializerCompiler, jsonSchemaTransform } from 'fastify-type-provider-zod'
+import { ZodError, type ZodType } from 'zod'
 import { randomUUID } from 'crypto'
 import { logger } from './utils/logger'
+import { formatDatesDeep } from './utils/timezone'
 import { validateEnv } from './config/env'
 import { usersRoutes } from './modules/users/users.routes'
 import { authRoutes } from './modules/auth/auth.routes'
@@ -31,8 +33,18 @@ const app = Fastify({
     genReqId: () => randomUUID(),
 })
 
-app.setValidatorCompiler(validatorCompiler)
+// Compiler próprio: deixa o ZodError bruto passar (fastify-type-provider-zod embrulha em array e perde .issues)
+app.setValidatorCompiler(({ schema }: { schema: ZodType }) => (data: unknown) => {
+    const result = schema.safeParse(data)
+    if (!result.success) return { error: result.error }
+    return { value: result.data }
+})
 app.setSerializerCompiler(serializerCompiler)
+
+// Formata todo Date da resposta com o offset de env.TZ em vez de UTC/Z
+app.addHook('preSerialization', async (request, reply, payload) => {
+    return formatDatesDeep(payload, env.TZ)
+})
 
 // Adiciona logging para requests
 app.addHook('onRequest', async (request, reply) => {
@@ -106,6 +118,15 @@ app.register(cookiePlugin)
 
 // Error handler
 app.setErrorHandler((error: any, request, reply) => {
+    if (error instanceof ZodError) {
+        return reply.code(400).send({
+            success: false,
+            reqId: request.id,
+            message: 'Validation error',
+            errors: error.issues,
+        })
+    }
+
     const statusCode = error.statusCode || 500
     const message = error.message || 'Internal server error'
 

@@ -8,7 +8,6 @@ const baseTrunkShape = {
         .max(20)
         .regex(/^[a-z0-9_-]+$/i, 'Only alphanumeric, dash and underscore allowed'),
     companyId: z.cuid2(),
-    context: z.string().max(40).default('from-trunk'),
     codecs: z.string().max(200).default('ulaw,alaw'),
 }
 
@@ -33,7 +32,6 @@ export const updateTrunkSchema = z.object({
     host: z.string().min(1).max(255).optional(),
     username: z.string().min(1).max(80).optional(),
     password: z.string().min(1).max(80).optional(),
-    context: z.string().max(40).optional(),
     codecs: z.string().max(200).optional(),
 })
 

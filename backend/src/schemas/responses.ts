@@ -7,7 +7,11 @@ export const cuidParam = z.string().regex(/^[0-9a-z]{24,}$/)
 // então timestamp precisa aceitar Date (Prisma) e string (Redis cache) sem transform
 export const timestamp = z.union([z.date(), z.string()])
 
-const errorBody = z.object({ success: z.literal(false), message: z.string() })
+const errorBody = z.object({
+    success: z.literal(false),
+    message: z.string(),
+    errors: z.array(z.record(z.string(), z.unknown())).optional(),
+})
 
 export const errors = {
     400: errorBody,

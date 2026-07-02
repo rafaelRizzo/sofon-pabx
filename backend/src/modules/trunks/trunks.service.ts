@@ -3,6 +3,7 @@ import { prisma } from '../../lib/prisma'
 import { TrunksCache } from './cache/trunks.cache'
 import type { CreateTrunkInput, UpdateTrunkInput } from './schemas/trunk.schema'
 import { PjsipRepository } from '../../asterisk/pjsip.repository'
+import { trunkContext } from '../../asterisk/inboundroute.repository'
 import { AppError } from '../../utils/errors/app.error'
 
 const CHARSET = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
@@ -64,16 +65,7 @@ export const createTrunk = async (data: CreateTrunkInput) => {
     const username = data.username ?? astId
 
     await prisma.$transaction(async (tx) => {
-        await PjsipRepository.createTrunk(tx, astId, {
-            username,
-            password,
-            context: data.context,
-            codecs: data.codecs,
-            registrationMode: data.registrationMode,
-            host: data.host,
-        })
-
-        await tx.trunk.create({
+        const created = await tx.trunk.create({
             data: {
                 name: data.name,
                 companyId: data.companyId,
@@ -81,9 +73,21 @@ export const createTrunk = async (data: CreateTrunkInput) => {
                 host: data.registrationMode === 'outbound' ? data.host : (data.host ?? null),
                 username,
                 password,
-                context: data.context,
                 codecs: data.codecs,
             },
+        })
+
+        // context é derivado do id do trunk para casar com o dialplan gravado por InboundRouteRepository
+        const context = trunkContext(created.id)
+        await tx.trunk.update({ where: { id: created.id }, data: { context } })
+
+        await PjsipRepository.createTrunk(tx, astId, {
+            username,
+            password,
+            context,
+            codecs: data.codecs,
+            registrationMode: data.registrationMode,
+            host: data.host,
         })
     })
 

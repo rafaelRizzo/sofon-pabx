@@ -12,6 +12,7 @@
 - Validação só em boundaries; Zod para body/params
 - Nunca rodar DELETE/migrate/drop sem confirmação explícita do usuário
 - Nunca editar schema.prisma e mandar rodar migration — orientar o usuário a rodar ele mesmo
+- Ao validar mudanças, rodar só `bun run test:unit` — nunca `test:integration` (lento, sobe app+Redis) a menos que o usuário peça explicitamente
 
 ---
 
