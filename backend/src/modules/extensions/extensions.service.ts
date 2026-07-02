@@ -221,7 +221,11 @@ export const createExtension = async (data: CreateExtensionInput) => {
     if (type === 'pjsip') {
         const { alias: _a, type: _t, name: _n, companyId: _c, context: _ctx, allowOutbound: _ao, ...pjsipExtras } = data
         const mappedExtras = toPjsipDbFields(pjsipExtras)
-        const pjsipExtrasWithGroups = applyGroupPrefixes({ ...mappedExtras, setvar: allowOutboundSetvar }, company.asteriskId)
+        // accountcode sempre = asteriskId da empresa — isola CDR por empresa, sobrepõe accountCode enviado pelo cliente
+        const pjsipExtrasWithGroups = applyGroupPrefixes(
+            { ...mappedExtras, setvar: allowOutboundSetvar, accountcode: company.asteriskId },
+            company.asteriskId,
+        )
 
         await prisma.$transaction(async (tx) => {
             await PjsipRepository.createExtension(tx, number, { password, name, context, extras: pjsipExtrasWithGroups })
@@ -234,6 +238,8 @@ export const createExtension = async (data: CreateExtensionInput) => {
         const sipData: Record<string, any> = toSipDbFields(sipExtras)
         if (peerType) sipData.type = peerType
         sipData.setvar = sipData.setvar ? `${allowOutboundSetvar}\n${sipData.setvar}` : allowOutboundSetvar
+        // accountcode sempre = asteriskId da empresa — isola CDR por empresa, sobrepõe accountCode enviado pelo cliente
+        sipData.accountcode = company.asteriskId
 
         await prisma.$transaction(async (tx) => {
             await SipRepository.createExtension(tx, number, password, context, sipData)

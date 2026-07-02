@@ -322,6 +322,11 @@ sleep 1
 # ============================================================
 show_header
 show_progress 8 12 "Configurando usuário asterisk"
+
+# Timezone do sistema — sem isso o CDR e os logs gravam em UTC, difícil de ler no dia a dia
+timedatectl set-timezone America/Sao_Paulo >> "$LOG_FILE" 2>&1 || warn "Falha ao ajustar timezone"
+log "Timezone configurado: America/Sao_Paulo"
+
 id -u asterisk &>/dev/null || useradd -r -d /var/lib/asterisk -s /usr/sbin/nologin asterisk
 
 for dir in /etc/asterisk /var/lib/asterisk /var/log/asterisk /var/spool/asterisk /usr/lib/asterisk; do
@@ -888,7 +893,7 @@ echo -e "${GREEN}═════════════════════
 echo -e "  ${BOLD}✓ INSTALAÇÃO CONCLUÍDA!${NC}"
 echo -e "${GREEN}════════════════════════════════════════════════════════${NC}"
 echo ""
-asterisk -rx "core show version" 2>/dev/null | head -1
+asterisk -rx "core show version" 2>/dev/null | head -1 || true
 echo ""
 echo -e "  Sistema    : ${CYAN}${OS_NAME} ${OS_VERSION}${NC}"
 echo -e "  IP Público : ${CYAN}${PUBLIC_ADDRESS}${NC}"

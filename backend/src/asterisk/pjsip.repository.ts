@@ -17,6 +17,7 @@ type TrunkCreateOpts = {
     registrationMode: string
     host?: string
     setvar?: string
+    accountcode: string
 }
 
 type TrunkUpdateOpts = {
@@ -72,6 +73,7 @@ export const PjsipRepository = {
                     disallow: 'all',
                     allow: opts.codecs,
                     setvar: opts.setvar,
+                    accountcode: opts.accountcode,
                 } as any,
             })
             await tx.ps_registrations.create({
@@ -95,6 +97,7 @@ export const PjsipRepository = {
                 data: {
                     id, aors: id, auth: id, context: opts.context,
                     disallow: 'all', allow: opts.codecs, setvar: opts.setvar,
+                    accountcode: opts.accountcode,
                 } as any,
             })
             if (opts.host) {

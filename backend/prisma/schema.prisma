@@ -392,6 +392,34 @@ model ps_endpoints {
     namedcallgroup      String?  @map("named_call_group") @db.VarChar(256)
     namedpickupgroup    String?  @map("named_pickup_group") @db.VarChar(256)
     setvar              String?  @map("set_var") @db.VarChar(200)
+    // sempre = Company.asteriskId — isola CDR por empresa via account_code, sem depender de parsing de canal/contexto
+    accountcode         String?  @db.VarChar(40)
+}
+
+// CDR nativo do Asterisk (cdr_adaptive_odbc) — account_code = Company.asteriskId, setado em todo ps_endpoints/sip_peers
+model cdr {
+    id           BigInt    @id @default(autoincrement())
+    src          String?   @db.VarChar(80)
+    dst          String?   @db.VarChar(80)
+    context      String?   @db.VarChar(80) @map("dcontext")
+    callerid     String?   @db.VarChar(80) @map("clid")
+    srcChannel   String?   @db.VarChar(80) @map("channel")
+    dstChannel   String?   @db.VarChar(80) @map("dstchannel")
+    lastApp      String?   @db.VarChar(80) @map("lastapp")
+    lastData     String?   @db.VarChar(200) @map("lastdata")
+    startTime    DateTime? @map("start")
+    answerTime   DateTime? @map("answer")
+    // "end" é palavra reservada no Postgres (CASE...END) — INSERT sem aspas quebra a sintaxe, por isso o @map difere do nome real do CDR
+    endTime      DateTime? @map("endtime")
+    duration     Int?
+    billsec      Int?
+    disposition  String?   @db.VarChar(45)
+    amaflags     Int?
+    accountcode  String?   @db.VarChar(80)
+    uniqueid     String?   @db.VarChar(150)
+
+    // composto: toda query filtra por accountcode e ordena por startTime desc — cobre WHERE+ORDER BY num único index scan
+    @@index([accountcode, startTime(sort: Desc)])
 }
 
 // name é o identificador real do peer no Asterisk (chan_sip busca por name, não por id)

@@ -90,6 +90,7 @@ export const createTrunk = async (data: CreateTrunkInput) => {
             registrationMode: data.registrationMode,
             host: data.host,
             setvar: `TRUNKID=${created.id}`,
+            accountcode: company.asteriskId,
         })
     })
 

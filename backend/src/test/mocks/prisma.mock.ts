@@ -44,6 +44,7 @@ export function createPrismaMock() {
         extensions: model(),
         queues: model(),
         queue_members: model(),
+        cdr: model(),
         $transaction: mock((fn: (tx: any) => any) => fn(db)),
         $disconnect: mock(() => Promise.resolve()),
     }

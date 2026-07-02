@@ -261,6 +261,7 @@ export const pjsipFieldMap: Record<string, string> = {
     aorMailboxes: 'aor_mailboxes',
     namedCallGroup: 'namedcallgroup',
     namedPickupGroup: 'namedpickupgroup',
+    accountCode: 'accountcode',
 }
 
 export const sipFieldKeys = Object.keys(sipFields)

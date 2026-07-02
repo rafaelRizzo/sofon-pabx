@@ -123,6 +123,12 @@ pg_admin_db -c "ALTER SCHEMA public OWNER TO ${PG_USER};"    >> "$LOG_FILE" 2>&1
 # tabela derruba os grants do asterisk e exige correção manual de novo
 pg_admin_db -c "ALTER DEFAULT PRIVILEGES FOR ROLE ${PG_ADMIN} IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO ${PG_USER};" >> "$LOG_FILE" 2>&1 || true
 
+# FIX: sequences (colunas @default(autoincrement()), ex: cdr.id) não são cobertas pelo
+# default privilege de TABLES acima — sem isso, INSERT falha com "permission denied for
+# sequence" mesmo com a tabela já liberada
+pg_admin_db -c "ALTER DEFAULT PRIVILEGES FOR ROLE ${PG_ADMIN} IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO ${PG_USER};" >> "$LOG_FILE" 2>&1 || true
+pg_admin_db -c "GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO ${PG_USER};" >> "$LOG_FILE" 2>&1 || true
+
 log "Privilégios concedidos"
 
 # ============================================================
@@ -237,6 +243,25 @@ object_lifetime_maximum=60
 expire_on_reload=yes
 EOF
 
+# CDR direto no Postgres via ODBC — tabela cdr usa os nomes de coluna nativos do Asterisk
+# (dcontext, clid, channel, dstchannel, lastapp, lastdata, start, answer, accountcode), exceto
+# "end", que é palavra reservada no Postgres (CASE...END) e quebra o INSERT sem aspas — por isso
+# a coluna física é "endtime" e precisa do alias abaixo.
+cat > /etc/asterisk/cdr.conf << 'EOF'
+[general]
+enable=yes
+unanswered=yes
+congestion=yes
+endbeforehexten=no
+EOF
+
+cat > /etc/asterisk/cdr_adaptive_odbc.conf << 'EOF'
+[asterisk]
+connection=asterisk
+table=cdr
+alias end => endtime
+EOF
+
 # Garante que res_odbc e res_config_odbc carregam antes do res_pjsip no startup
 # Sem isso, o sorcery 'identify' (ps_identifies) falha ao inicializar
 MODULES_CONF="/etc/asterisk/modules.conf"
@@ -251,12 +276,16 @@ chown asterisk:asterisk \
     /etc/asterisk/res_odbc.conf \
     /etc/asterisk/extconfig.conf \
     /etc/asterisk/sorcery.conf \
-    /etc/asterisk/sorcery_memory_cache.conf
+    /etc/asterisk/sorcery_memory_cache.conf \
+    /etc/asterisk/cdr.conf \
+    /etc/asterisk/cdr_adaptive_odbc.conf
 chmod 640 \
     /etc/asterisk/res_odbc.conf \
     /etc/asterisk/extconfig.conf \
     /etc/asterisk/sorcery.conf \
-    /etc/asterisk/sorcery_memory_cache.conf
+    /etc/asterisk/sorcery_memory_cache.conf \
+    /etc/asterisk/cdr.conf \
+    /etc/asterisk/cdr_adaptive_odbc.conf
 
 log "Configurações Asterisk criadas"
 
@@ -315,19 +344,23 @@ ENDSQL2
     log "Aplicando GRANT nas tabelas existentes..."
     pg_admin_db -c "GRANT USAGE ON SCHEMA public TO ${PG_USER};" >> "$LOG_FILE" 2>&1 || true
     pg_admin_db -c "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO ${PG_USER};" >> "$LOG_FILE" 2>&1 || true
+    pg_admin_db -c "GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO ${PG_USER};" >> "$LOG_FILE" 2>&1 || true
     log "Grants aplicados"
-
-    systemctl restart asterisk >> "$LOG_FILE" 2>&1 || err "Falha ao reiniciar Asterisk"
-    sleep 4
-    asterisk -rx 'module reload res_odbc.so'        >> "$LOG_FILE" 2>&1 || true
-    asterisk -rx 'module reload res_config_odbc.so' >> "$LOG_FILE" 2>&1 || true
-    asterisk -rx 'module reload res_pjsip.so'       >> "$LOG_FILE" 2>&1 || true
-    sleep 2
-    log "Asterisk recarregado"
-
-    ENDPOINTS=$(asterisk -rx 'pjsip show endpoints' 2>/dev/null | grep -c 'Endpoint:' || echo "0")
-    log "Endpoints PJSIP detectados: ${ENDPOINTS}"
 fi
+
+# Restart incondicional — cdr.conf, cdr_adaptive_odbc.conf, sorcery.conf, extconfig.conf e
+# res_odbc.conf foram escritos no STEP 4 independente da resposta acima, e um simples
+# "module reload" não é suficiente pra ativar o subsistema de CDR pela primeira vez.
+systemctl restart asterisk >> "$LOG_FILE" 2>&1 || err "Falha ao reiniciar Asterisk"
+sleep 4
+asterisk -rx 'module reload res_odbc.so'        >> "$LOG_FILE" 2>&1 || true
+asterisk -rx 'module reload res_config_odbc.so' >> "$LOG_FILE" 2>&1 || true
+asterisk -rx 'module reload res_pjsip.so'       >> "$LOG_FILE" 2>&1 || true
+sleep 2
+log "Asterisk recarregado"
+
+ENDPOINTS=$(asterisk -rx 'pjsip show endpoints' 2>/dev/null | grep -c 'Endpoint:' || echo "0")
+log "Endpoints PJSIP detectados: ${ENDPOINTS}"
 
 # ============================================================
 # SUMÁRIO
