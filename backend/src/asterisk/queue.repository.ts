@@ -2,6 +2,11 @@ import { prisma } from '../lib/prisma'
 
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 
+const QUEUE_APP_CONTEXT = 'queues-app'
+
+export const toAsteriskQueueName = (asteriskId: string, queueName: string) => `${asteriskId}-${queueName}`
+export const queueAppExten = (asteriskId: string, number: string) => `${asteriskId}-${number}`
+
 type AsteriskQueueData = {
     strategy?: string
     musicOnHold?: string
@@ -99,5 +104,19 @@ export const AsteriskQueueRepository = {
             where: { interface: oldIface },
             data: { interface: newIface, state_interface: newIface },
         })
+    },
+
+    async syncQueueAppEntry(tx: Tx, exten: string, asteriskName: string) {
+        await tx.extensions.deleteMany({ where: { context: QUEUE_APP_CONTEXT, exten } })
+        await tx.extensions.createMany({
+            data: [
+                { context: QUEUE_APP_CONTEXT, exten, priority: 1, app: 'Queue', appdata: asteriskName },
+                { context: QUEUE_APP_CONTEXT, exten, priority: 2, app: 'Hangup', appdata: null },
+            ],
+        })
+    },
+
+    async removeQueueAppEntry(tx: Tx, exten: string) {
+        await tx.extensions.deleteMany({ where: { context: QUEUE_APP_CONTEXT, exten } })
     },
 }

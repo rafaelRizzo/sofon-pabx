@@ -140,6 +140,7 @@ Vars: `DATABASE_URL`, `JWT_SECRET`, `REFRESH_SECRET`, `JWT_EXPIRES_IN` (15m), `R
 - `PUT /outbound-routes/:id/trunks`: substitui lista completa (não aditivo)
 - `allowOutbound` em Extension: persiste `ALLOW_OUTBOUND=1/0` em `sip_peers.setvar` / `ps_endpoints.setvar`
 - Time Conditions: ao criar/atualizar/deletar, regenera contexto `tc-<id>` no dialplan Asterisk via `GotoIfTime` — OR lógico entre todos os ranges de todos os TGs vinculados
+- `context` de Extension: default `"ramais"`, compartilhado entre todas as empresas — isolamento entre empresas é feito via sufixo `asteriskId` no `number`/`exten` (ex: `2002_a9e2463c8f`), não por contexto Asterisk separado. Contextos dinâmicos por empresa (`ramais-<asteriskId>`) **não funcionam** nesse setup: o Asterisk só resolve realtime dialplan pra contextos declarados estaticamente em `extensions.conf` com `switch => Realtime/<contexto>@extensions` — tentativa de escopar por empresa quebra a resolução de chamadas. Isolamento de verdade entre empresas exigiria uma reformulação maior (contexto único + AGI/`func_odbc` decidindo rota em tempo de chamada, ao estilo MagnusBilling) — não implementado
 
 ## API — schemas de input/output por módulo
 
@@ -166,7 +167,8 @@ Vars: `DATABASE_URL`, `JWT_SECRET`, `REFRESH_SECRET`, `JWT_EXPIRES_IN` (15m), `R
 - Batch: `{ extensions: CreateExtension[] }` (max 50, sem alias duplicado por empresa)
 - Update: `{ name?, allowOutbound? }`; `PATCH /:id/password` reseta senha
 
-**Queues** — `{ name(alphanum/dash/_), number?, companyId, strategy?, musicOnHold?, timeout?, retry?, maxLen?, wrapupTime?, announce?, announceFrequency?, joinEmpty?, leaveWhenEmpty?, weight? }`
+**Queues** — `{ name(alphanum/dash/_), number(^\d+$), companyId, strategy?, musicOnHold?, timeout?, retry?, maxLen?, wrapupTime?, announce?, announceFrequency?, joinEmpty?, leaveWhenEmpty?, weight? }`
+- `number` obrigatório no create, único por empresa (`UNIQUE(number, companyId)`) — usado como destino de inbound routes/time conditions (`Goto(queues-app,<asteriskId>-<number>,1)`)
 - strategies: `ringall|leastrecent|fewestcalls|random|rrmemory|linear|wrandom`
 - Member add: `{ extensionId, penalty?(0-100), paused? }`; update: `{ penalty?, paused? }`
 

@@ -28,7 +28,7 @@ export const updateTimeConditionSchema = z.object({
     name:       z.string().min(1).max(80).optional(),
     trueRoute:  routeDestSchema.optional(),
     falseRoute: routeDestSchema.optional(),
-}).refine((d) => Object.keys(d).length > 0, { message: 'At least one field required' })
+}).refine((d) => Object.keys(d).length > 0, { message: 'At least one field is required: name, trueRoute, falseRoute' })
 
 export type CreateTimeConditionInput = z.infer<typeof createTimeConditionSchema>
 export type UpdateTimeConditionInput = z.infer<typeof updateTimeConditionSchema>

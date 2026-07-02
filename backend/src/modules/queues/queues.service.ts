@@ -1,7 +1,7 @@
 import { prisma } from '../../lib/prisma'
 import { QueuesCache } from './cache/queues.cache'
 import type { CreateQueueInput, UpdateQueueInput } from './schemas/queue.schema'
-import { AsteriskQueueRepository } from '../../asterisk/queue.repository'
+import { AsteriskQueueRepository, queueAppExten, toAsteriskQueueName } from '../../asterisk/queue.repository'
 import { AppError } from '../../utils/errors/app.error'
 
 const queueSelect = {
@@ -26,8 +26,6 @@ const queueSelect = {
     company: { select: { asteriskId: true } },
     _count: { select: { members: true } },
 } as const
-
-const toAsteriskQueueName = (asteriskId: string, queueName: string) => `${asteriskId}-${queueName}`
 
 export const getAllQueues = async (companyIds?: string[]) => {
     if (companyIds && companyIds.length === 0) return []
@@ -81,11 +79,17 @@ export const createQueue = async (data: CreateQueueInput) => {
     })
     if (existing) throw new AppError('Queue already exists for this company', 409)
 
+    const duplicateNumber = await prisma.queue.findUnique({
+        where: { number_companyId: { number: data.number, companyId: data.companyId } },
+    })
+    if (duplicateNumber) throw new AppError('Queue number already in use for this company', 409)
+
     const asteriskName = toAsteriskQueueName(company.asteriskId, data.name)
 
     const queue = await prisma.$transaction(async (tx) => {
         const q = await tx.queue.create({ data, select: queueSelect })
         await AsteriskQueueRepository.createQueue(tx, asteriskName, data)
+        await AsteriskQueueRepository.syncQueueAppEntry(tx, queueAppExten(company.asteriskId, data.number), asteriskName)
         return q
     })
 
@@ -114,7 +118,7 @@ export const updateQueue = async (id: string, data: UpdateQueueInput) => {
         if (duplicate) throw new AppError('Queue name already in use for this company', 409)
     }
 
-    if (data.number !== undefined && data.number !== null && data.number !== existing.number) {
+    if (data.number !== undefined && data.number !== existing.number) {
         const duplicate = await prisma.queue.findFirst({
             where: { number: data.number, companyId: existing.companyId, NOT: { id } },
         })
@@ -139,9 +143,18 @@ export const updateQueue = async (id: string, data: UpdateQueueInput) => {
     if (name !== undefined) appUpdate.name = name
     if (number !== undefined) appUpdate.number = number
 
+    const newNumber = data.number === undefined ? existing.number : data.number
+    const numberChanged = newNumber !== existing.number
+
     const queue = await prisma.$transaction(async (tx) => {
         if (nameChanged) await AsteriskQueueRepository.renameQueue(tx, oldAsteriskName, newAsteriskName)
         await AsteriskQueueRepository.updateQueue(tx, newAsteriskName, asteriskUpdate)
+
+        if (existing.number && (numberChanged || nameChanged))
+            await AsteriskQueueRepository.removeQueueAppEntry(tx, queueAppExten(existing.company.asteriskId, existing.number))
+        if (newNumber && (numberChanged || nameChanged))
+            await AsteriskQueueRepository.syncQueueAppEntry(tx, queueAppExten(existing.company.asteriskId, newNumber), newAsteriskName)
+
         return tx.queue.update({ where: { id }, data: appUpdate, select: queueSelect })
     })
 
@@ -162,6 +175,7 @@ export const deleteQueue = async (id: string) => {
 
     await prisma.$transaction(async (tx) => {
         await AsteriskQueueRepository.deleteQueue(tx, asteriskName)
+        if (existing.number) await AsteriskQueueRepository.removeQueueAppEntry(tx, queueAppExten(existing.company.asteriskId, existing.number))
         await tx.queue.delete({ where: { id } })
     })
 

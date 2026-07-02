@@ -34,6 +34,7 @@ mock.module('../../../asterisk/dialplan.repository', () => ({
         create: mock(() => Promise.resolve()),
         update: mock(() => Promise.resolve()),
         deleteManyByExten: mock(() => Promise.resolve()),
+        ensureFallback: mock(() => Promise.resolve()),
     },
 }))
 mock.module('../../../asterisk/queue.repository', () => ({

@@ -164,7 +164,7 @@ export const updateExtensionSchema = z
         allowSubscribe: z.union([z.string().max(10), z.boolean()]).optional(),
     })
     .refine((data) => Object.values(data).some((v) => v !== undefined), {
-        message: 'At least one field is required',
+        message: 'At least one field is required: name, alias, context, allowOutbound, or type-specific SIP/PJSIP fields',
     })
 
 // ─── Mapping: camelCase API → Asterisk DB column names ───────────────────────
@@ -306,9 +306,11 @@ export const ExtensionSchema = z.object({
     updatedAt: timestamp,
 })
 
+const ExtensionWithPasswordSchema = ExtensionSchema.extend({ password: z.string() })
+
 export const BatchResultSchema = z.object({
     success: z.boolean(),
-    created: z.array(ExtensionSchema),
+    created: z.array(ExtensionWithPasswordSchema),
     errors: z.array(z.object({ alias: z.string(), error: z.string() })),
 })
 
@@ -317,6 +319,6 @@ export const ListExtensionsResponse = ok({
     extensions: z.object({ sip: z.array(ExtensionSchema), pjsip: z.array(ExtensionSchema) }),
 })
 export const GetExtensionResponse = ok({ message: z.string(), extension: ExtensionSchema })
-export const CreateExtensionResponse = ok({ message: z.string(), extension: ExtensionSchema })
+export const CreateExtensionResponse = ok({ message: z.string(), extension: ExtensionWithPasswordSchema })
 export const UpdateExtensionResponse = ok({ message: z.string(), extension: ExtensionSchema })
 export const ResetPasswordResponse = ok({ message: z.string(), password: z.string() })

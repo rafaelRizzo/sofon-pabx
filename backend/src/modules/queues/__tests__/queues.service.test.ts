@@ -25,7 +25,11 @@ mock.module('../../../asterisk/queue.repository', () => ({
         removeMember: mock(() => Promise.resolve()),
         removeMembersByInterfaces: mock(() => Promise.resolve()),
         deleteManyQueues: mock(() => Promise.resolve()),
+        syncQueueAppEntry: mock(() => Promise.resolve()),
+        removeQueueAppEntry: mock(() => Promise.resolve()),
     },
+    toAsteriskQueueName: (asteriskId: string, queueName: string) => `${asteriskId}-${queueName}`,
+    queueAppExten: (asteriskId: string, number: string) => `${asteriskId}-${number}`,
 }))
 
 import * as QueuesService from '../queues.service'
@@ -67,12 +71,19 @@ describe('QueuesService.createQueue', () => {
 
     it('creates queue with defaults', async () => {
         db.company.findUnique.mockResolvedValue(COMPANY)
-        db.queue.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce(QUEUE)
+        db.queue.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce(null)
         db.queue.create.mockResolvedValue(QUEUE)
 
-        const queue = await QueuesService.createQueue({ name: 'suporte', companyId: 'c1' }) as any
+        const queue = await QueuesService.createQueue({ name: 'suporte', companyId: 'c1', number: '8001' } as any) as any
         expect(queue.name).toBe('suporte')
         expect(queue.strategy).toBe('ringall')
+    })
+
+    it('throws 409 with duplicate number in same company', async () => {
+        db.company.findUnique.mockResolvedValue(COMPANY)
+        db.queue.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce(QUEUE)
+        await expect(QueuesService.createQueue({ name: 'suporte2', companyId: 'c1', number: '8001' } as any))
+            .rejects.toMatchObject({ statusCode: 409 })
     })
 })
 

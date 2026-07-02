@@ -25,7 +25,7 @@ export const updateOutboundRouteSchema = z
         patterns: z.array(patternSchema).min(1).optional(),
     })
     .refine((d) => Object.values(d).some((v) => v !== undefined), {
-        message: 'At least one field is required',
+        message: 'At least one field is required: name, position, trunkIds, patterns',
     })
 
 export const addPatternSchema = patternSchema
@@ -38,7 +38,7 @@ export const updatePatternSchema = z
         position: z.number().int().min(0).optional(),
     })
     .refine((d) => Object.values(d).some((v) => v !== undefined), {
-        message: 'At least one field is required',
+        message: 'At least one field is required: pattern, prepend, prefix, position',
     })
 
 export const setTrunksSchema = z.object({

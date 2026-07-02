@@ -1,5 +1,6 @@
 import { prisma } from '../lib/prisma'
 import type { InboundDest } from '../modules/inbound-routes/schemas/inbound-route.schema'
+import { queueAppExten } from './queue.repository'
 
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 
@@ -12,8 +13,10 @@ async function resolveDestination(tx: Tx, dest: InboundDest): Promise<{ app: str
             return ext ? { app: 'Goto', appdata: `${ext.context},${ext.number},1` } : { app: 'Hangup', appdata: null }
         }
         case 'queue': {
-            const q = await tx.queue.findUnique({ where: { id: dest.id }, select: { number: true } })
-            return q?.number ? { app: 'Goto', appdata: `queues-app,${q.number},1` } : { app: 'Hangup', appdata: null }
+            const q = await tx.queue.findUnique({ where: { id: dest.id }, select: { number: true, company: { select: { asteriskId: true } } } })
+            return q?.number
+                ? { app: 'Goto', appdata: `queues-app,${queueAppExten(q.company.asteriskId, q.number)},1` }
+                : { app: 'Hangup', appdata: null }
         }
         case 'voicemail':
             return { app: 'Goto', appdata: `vm,${dest.id},1` }

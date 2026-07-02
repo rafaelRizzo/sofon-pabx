@@ -138,12 +138,12 @@ ALTER TABLE ps_aors OWNER TO asterisk;
 ALTER TABLE ps_auths OWNER TO asterisk;
 ALTER TABLE ps_contacts OWNER TO asterisk;
 ALTER TABLE ps_endpoints OWNER TO asterisk;
+ALTER TABLE ps_registrations OWNER TO asterisk;
+ALTER TABLE ps_identifies    OWNER TO asterisk;
 ALTER TABLE sip_peers OWNER TO asterisk;
 ALTER TABLE voicemail_users OWNER TO asterisk;
 ALTER TABLE queues OWNER TO asterisk;
 ALTER TABLE queue_members OWNER TO asterisk;
-ALTER TABLE ps_identifies    OWNER TO asterisk;
-ALTER TABLE ps_registrations OWNER TO asterisk;
 ```
 
 ```sql docker exec -it postgres_sofon psql -U postgres -d asterisk -c "

@@ -34,4 +34,14 @@ export const DialplanRepository = {
         if (extens.length > 0)
             await tx.extensions.deleteMany({ where: { exten: { in: extens } } })
     },
+
+    async ensureFallback(tx: Tx, context: string) {
+        await tx.extensions.createMany({
+            data: [
+                { context, exten: '_X.', priority: 1, app: 'NoOp', appdata: 'Destino nao encontrado: ${EXTEN}' },
+                { context, exten: '_X.', priority: 2, app: 'Congestion', appdata: null },
+            ],
+            skipDuplicates: true,
+        })
+    },
 }

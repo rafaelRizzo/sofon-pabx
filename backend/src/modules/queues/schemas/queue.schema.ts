@@ -29,7 +29,7 @@ export const createQueueSchema = z.object({
         .min(1)
         .max(80)
         .regex(/^[a-z0-9_-]+$/i, 'Only alphanumeric, dash and underscore allowed'),
-    number: z.string().min(1).max(20).regex(/^\d+$/, 'Only digits allowed').optional(),
+    number: z.coerce.string().min(1).max(20).regex(/^\d+$/, 'Only digits allowed'),
     companyId: z.cuid2(),
     strategy: z.enum(QUEUE_STRATEGIES).default('ringall'),
     musicOnHold: z.string().min(1).max(128).default('default'),
@@ -51,7 +51,7 @@ export const updateQueueSchema = z.object({
         .max(80)
         .regex(/^[a-z0-9_-]+$/i, 'Only alphanumeric, dash and underscore allowed')
         .optional(),
-    number: z.string().min(1).max(20).regex(/^\d+$/, 'Only digits allowed').optional().nullable(),
+    number: z.coerce.string().min(1).max(20).regex(/^\d+$/, 'Only digits allowed').optional(),
     strategy: z.enum(QUEUE_STRATEGIES).optional(),
     musicOnHold: z.string().min(1).max(128).optional(),
     timeout: z.number().int().min(1).max(300).optional(),
@@ -71,7 +71,7 @@ export type UpdateQueueInput = z.infer<typeof updateQueueSchema>
 export const QueueSchema = z.object({
     id: z.string(),
     name: z.string(),
-    number: z.string().nullable(),
+    number: z.string(),
     companyId: z.string(),
     strategy: z.string(),
     musicOnHold: z.string(),

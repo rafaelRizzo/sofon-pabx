@@ -1,5 +1,6 @@
 import { prisma } from '../lib/prisma'
 import type { RouteDest } from '../modules/time-conditions/schemas/time-condition.schema'
+import { queueAppExten } from './queue.repository'
 
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 
@@ -25,9 +26,9 @@ async function resolveRoute(tx: Tx, route: RouteDest): Promise<string | null> {
         case 'queue': {
             const q = await tx.queue.findUnique({
                 where: { id: route.id },
-                select: { number: true },
+                select: { number: true, company: { select: { asteriskId: true } } },
             })
-            return q?.number ? `queues-app,${q.number},1` : null
+            return q?.number ? `queues-app,${queueAppExten(q.company.asteriskId, q.number)},1` : null
         }
         case 'voicemail':
             return `vm,${route.id},1`

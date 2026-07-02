@@ -226,6 +226,7 @@ export const createExtension = async (data: CreateExtensionInput) => {
         await prisma.$transaction(async (tx) => {
             await PjsipRepository.createExtension(tx, number, { password, name, context, extras: pjsipExtrasWithGroups })
             await DialplanRepository.create(tx, context, alias, number, 'pjsip')
+            await DialplanRepository.ensureFallback(tx, context)
             await tx.extension.create({ data: { alias, number, type, name, context, allowOutbound, companyId } })
         })
     } else {
@@ -237,6 +238,7 @@ export const createExtension = async (data: CreateExtensionInput) => {
         await prisma.$transaction(async (tx) => {
             await SipRepository.createExtension(tx, number, password, context, sipData)
             await DialplanRepository.create(tx, context, alias, number, 'sip')
+            await DialplanRepository.ensureFallback(tx, context)
             await tx.extension.create({ data: { alias, number, type, name, context, allowOutbound, companyId } })
         })
     }

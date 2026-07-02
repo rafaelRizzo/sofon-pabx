@@ -25,7 +25,7 @@ export const createInboundRouteSchema = z.object({
 export const updateInboundRouteSchema = z.object({
     name:        z.string().min(1).max(80).optional(),
     destination: destinationSchema.optional(),
-}).refine((d) => Object.keys(d).length > 0, { message: 'At least one field required' })
+}).refine((d) => Object.keys(d).length > 0, { message: 'At least one field is required: name, destination' })
 
 export type CreateInboundRouteInput = z.infer<typeof createInboundRouteSchema>
 export type UpdateInboundRouteInput = z.infer<typeof updateInboundRouteSchema>

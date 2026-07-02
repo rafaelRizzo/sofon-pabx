@@ -25,7 +25,7 @@ export const createTimeGroupSchema = z.object({
 export const updateTimeGroupSchema = z.object({
     name:   z.string().min(1).max(80).optional(),
     ranges: z.array(timeRangeSchema).min(1).max(20).optional(),
-}).refine((d) => Object.keys(d).length > 0, { message: 'At least one field required' })
+}).refine((d) => Object.keys(d).length > 0, { message: 'At least one field is required: name, ranges' })
 
 export type CreateTimeGroupInput = z.infer<typeof createTimeGroupSchema>
 export type UpdateTimeGroupInput = z.infer<typeof updateTimeGroupSchema>

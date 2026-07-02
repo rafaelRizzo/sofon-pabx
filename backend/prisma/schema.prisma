@@ -101,7 +101,7 @@ model Extension {
 model Queue {
     id                String        @id @default(cuid())
     name              String        @db.VarChar(80)
-    number            String?       @db.VarChar(20)
+    number            String        @db.VarChar(20)
     companyId         String
     company           Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
     strategy          String        @default("ringall")
