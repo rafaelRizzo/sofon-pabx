@@ -388,9 +388,10 @@ model ps_endpoints {
     moh_suggest         String?  @default("default") @db.VarChar(40)
     outbound_auth       String?  @db.VarChar(200)
     rel                 String?  @default("yes") @map("100rel") @db.VarChar(40)
-    namedcallgroup      String?  @db.VarChar(256)
-    namedpickupgroup    String?  @db.VarChar(256)
-    setvar              String?  @db.VarChar(200)
+    // Asterisk lê a opção pjsip real com underscore — coluna física precisa bater exatamente
+    namedcallgroup      String?  @map("named_call_group") @db.VarChar(256)
+    namedpickupgroup    String?  @map("named_pickup_group") @db.VarChar(256)
+    setvar              String?  @map("set_var") @db.VarChar(200)
 }
 
 // name é o identificador real do peer no Asterisk (chan_sip busca por name, não por id)

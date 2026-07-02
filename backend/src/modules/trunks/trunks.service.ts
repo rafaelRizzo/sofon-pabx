@@ -3,7 +3,7 @@ import { prisma } from '../../lib/prisma'
 import { TrunksCache } from './cache/trunks.cache'
 import type { CreateTrunkInput, UpdateTrunkInput } from './schemas/trunk.schema'
 import { PjsipRepository } from '../../asterisk/pjsip.repository'
-import { InboundRouteRepository, trunkContext } from '../../asterisk/inboundroute.repository'
+import { InboundRouteRepository, TRUNK_ENTRY_CONTEXT } from '../../asterisk/inboundroute.repository'
 import { resyncAllPatterns } from '../outbound-routes/outbound-routes.service'
 import { OutboundRoutesCache } from '../outbound-routes/cache/outbound-routes.cache'
 import { AppError } from '../../utils/errors/app.error'
@@ -79,17 +79,17 @@ export const createTrunk = async (data: CreateTrunkInput) => {
             },
         })
 
-        // context é derivado do id do trunk para casar com o dialplan gravado por InboundRouteRepository
-        const context = trunkContext(created.id)
-        await tx.trunk.update({ where: { id: created.id }, data: { context } })
+        // contexto único (from-trunk) — TRUNKID via setvar isola o dialplan por trunk no from-trunk-routed
+        await tx.trunk.update({ where: { id: created.id }, data: { context: TRUNK_ENTRY_CONTEXT } })
 
         await PjsipRepository.createTrunk(tx, astId, {
             username,
             password,
-            context,
+            context: TRUNK_ENTRY_CONTEXT,
             codecs: data.codecs,
             registrationMode: data.registrationMode,
             host: data.host,
+            setvar: `TRUNKID=${created.id}`,
         })
     })
 

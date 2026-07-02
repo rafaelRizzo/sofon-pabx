@@ -5,6 +5,7 @@ import { buildApp } from '../../../test/build-app'
 import { disconnectRedis } from '../../../config/redis'
 import argon2 from 'argon2'
 import { ListInboundRoutesResponse, GetInboundRouteResponse, CreateInboundRouteResponse } from '../schemas/inbound-route.schema'
+import { TRUNK_ROUTED_CONTEXT } from '../../../asterisk/inboundroute.repository'
 
 const TS = String(Date.now())
 const PREFIX = `__test_ir_routes_${TS}__`
@@ -16,6 +17,7 @@ let accessToken: string
 let userId: string
 let companyId: string
 let didId: string
+let didNumber: string
 let trunkId: string
 let routeId: string
 
@@ -36,6 +38,7 @@ beforeAll(async () => {
         data: { number: `55119${TS.slice(-8)}`, companyId },
     })
     didId = did.id
+    didNumber = did.number
 
     const trunk = await prisma.trunk.create({
         data: { name: `tk${TS.slice(-8)}`, companyId, registrationMode: 'inbound' },
@@ -77,7 +80,7 @@ describe('POST /inbound-routes', () => {
         routeId = body.inboundRouteId
 
         const dialplan = await prisma.extensions.findFirst({
-            where: { context: `from-trunk-${trunkId}`, exten: expect.any(String) },
+            where: { context: TRUNK_ROUTED_CONTEXT, exten: `${didNumber}_${trunkId}` },
         })
         expect(dialplan).not.toBeNull()
         expect(dialplan?.app).toBe('Hangup')
@@ -210,7 +213,7 @@ describe('PUT /inbound-routes/:id', () => {
         expect(res.statusCode).toBe(200)
 
         const dialplan = await prisma.extensions.findFirst({
-            where: { context: `from-trunk-${trunkId}` },
+            where: { context: TRUNK_ROUTED_CONTEXT, exten: `${didNumber}_${trunkId}` },
         })
         expect(dialplan?.app).toBe('Hangup')
     })
@@ -256,7 +259,7 @@ describe('DELETE /inbound-routes/:id', () => {
         expect(res.statusCode).toBe(200)
 
         const dialplan = await prisma.extensions.findFirst({
-            where: { context: `from-trunk-${trunkId}` },
+            where: { context: TRUNK_ROUTED_CONTEXT, exten: `${didNumber}_${trunkId}` },
         })
         expect(dialplan).toBeNull()
     })

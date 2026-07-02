@@ -25,27 +25,34 @@ async function resolveDestination(tx: Tx, dest: InboundDest): Promise<{ app: str
     }
 }
 
-// context per-trunk garante que 2 trunks diferentes recebam o mesmo DID sem conflito
-export function trunkContext(trunkId: string) {
-    return `from-trunk-${trunkId}`
+// contexto único compartilhado por todas as trunks — ps_endpoints.context de toda trunk inbound
+export const TRUNK_ENTRY_CONTEXT = 'from-trunk'
+// contexto onde o dialplan real é resolvido, já com TRUNKID (setvar do endpoint) embutido no exten —
+// isola trunks/empresas diferentes mesmo quando o mesmo número de DID é reusado entre elas
+export const TRUNK_ROUTED_CONTEXT = 'from-trunk-routed'
+
+function routedExten(trunkId: string, didNumber: string) {
+    return `${didNumber}_${trunkId}`
 }
 
 export const InboundRouteRepository = {
     async create(tx: Tx, trunkId: string, didNumber: string, dest: InboundDest) {
         const { app, appdata } = await resolveDestination(tx, dest)
         await tx.extensions.create({
-            data: { context: trunkContext(trunkId), exten: didNumber, priority: 1, app, appdata },
+            data: { context: TRUNK_ROUTED_CONTEXT, exten: routedExten(trunkId, didNumber), priority: 1, app, appdata },
         })
     },
 
     async update(tx: Tx, trunkId: string, didNumber: string, dest: InboundDest) {
-        const context = trunkContext(trunkId)
-        await tx.extensions.deleteMany({ where: { context, exten: didNumber } })
+        const exten = routedExten(trunkId, didNumber)
+        await tx.extensions.deleteMany({ where: { context: TRUNK_ROUTED_CONTEXT, exten } })
         const { app, appdata } = await resolveDestination(tx, dest)
-        await tx.extensions.create({ data: { context, exten: didNumber, priority: 1, app, appdata } })
+        await tx.extensions.create({ data: { context: TRUNK_ROUTED_CONTEXT, exten, priority: 1, app, appdata } })
     },
 
     async delete(tx: Tx, trunkId: string, didNumber: string) {
-        await tx.extensions.deleteMany({ where: { context: trunkContext(trunkId), exten: didNumber } })
+        await tx.extensions.deleteMany({
+            where: { context: TRUNK_ROUTED_CONTEXT, exten: routedExten(trunkId, didNumber) },
+        })
     },
 }

@@ -16,6 +16,7 @@ type TrunkCreateOpts = {
     codecs: string
     registrationMode: string
     host?: string
+    setvar?: string
 }
 
 type TrunkUpdateOpts = {
@@ -70,6 +71,7 @@ export const PjsipRepository = {
                     from_domain: opts.host,
                     disallow: 'all',
                     allow: opts.codecs,
+                    setvar: opts.setvar,
                 } as any,
             })
             await tx.ps_registrations.create({
@@ -90,7 +92,10 @@ export const PjsipRepository = {
         } else {
             await tx.ps_aors.create({ data: { id, max_contacts: 5, remove_existing: false } })
             await tx.ps_endpoints.create({
-                data: { id, aors: id, auth: id, context: opts.context, disallow: 'all', allow: opts.codecs } as any,
+                data: {
+                    id, aors: id, auth: id, context: opts.context,
+                    disallow: 'all', allow: opts.codecs, setvar: opts.setvar,
+                } as any,
             })
             if (opts.host) {
                 await tx.ps_identifies.create({

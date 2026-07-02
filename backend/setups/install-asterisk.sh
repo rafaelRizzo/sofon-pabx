@@ -459,6 +459,16 @@ exten => *60,1,Answer()
 
 [default]
 exten => s,1,Hangup()
+
+[from-trunk]
+; Todas as trunks inbound compartilham esse contexto (ps_endpoints.context=from-trunk).
+; TRUNKID vem do setvar do endpoint — isola o dialplan por trunk mesmo com DID duplicado entre empresas.
+exten => _X.,1,Goto(from-trunk-routed,${EXTEN}_${TRUNKID},1)
+
+[from-trunk-routed]
+; Delega lookup de rotas de entrada para Realtime (tabela extensions no PostgreSQL)
+; exten gravado como <didNumber>_<trunkId> por InboundRouteRepository
+switch => Realtime/from-trunk-routed@extensions
 EOF
 
 # modules.conf — garante chan_sip carregado se necessário

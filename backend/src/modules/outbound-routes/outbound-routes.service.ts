@@ -207,6 +207,14 @@ export const createOutboundRoute = async (data: CreateOutboundRouteInput) => {
     })
     const trunkAstIds = orderedTrunks.map((t) => trunkAsteriskId(company.asteriskId, t.name))
 
+    if (data.extensionIds?.length) {
+        const extensions = await prisma.extension.findMany({
+            where: { id: { in: data.extensionIds }, companyId: data.companyId },
+            select: { id: true },
+        })
+        if (extensions.length !== data.extensionIds.length) throw new AppError('One or more extensions not found', 404)
+    }
+
     let routeId: string
 
     await prisma.$transaction(async (tx) => {
