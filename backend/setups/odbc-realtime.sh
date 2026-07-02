@@ -118,6 +118,11 @@ pg_admin -c "GRANT ALL PRIVILEGES ON DATABASE ${PG_DB} TO ${PG_USER};" >> "$LOG_
 pg_admin_db -c "GRANT ALL ON SCHEMA public TO ${PG_USER};"   >> "$LOG_FILE" 2>&1 || true
 pg_admin_db -c "ALTER SCHEMA public OWNER TO ${PG_USER};"    >> "$LOG_FILE" 2>&1 || true
 
+# FIX: ALTER DEFAULT PRIVILEGES faz o grant persistir pra tabelas FUTURAS criadas
+# pelo ${PG_ADMIN} (usuário do Prisma) — sem isso, toda migration que recria uma
+# tabela derruba os grants do asterisk e exige correção manual de novo
+pg_admin_db -c "ALTER DEFAULT PRIVILEGES FOR ROLE ${PG_ADMIN} IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO ${PG_USER};" >> "$LOG_FILE" 2>&1 || true
+
 log "Privilégios concedidos"
 
 # ============================================================
@@ -304,6 +309,13 @@ ALTER TABLE IF EXISTS ps_registrations OWNER TO ${PG_USER};
 
 ENDSQL2
     log "Owner das tabelas corrigido"
+
+    # GRANT explícito nas tabelas que já existem agora (default privileges só
+    # cobre tabelas criadas DEPOIS deste ponto)
+    log "Aplicando GRANT nas tabelas existentes..."
+    pg_admin_db -c "GRANT USAGE ON SCHEMA public TO ${PG_USER};" >> "$LOG_FILE" 2>&1 || true
+    pg_admin_db -c "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO ${PG_USER};" >> "$LOG_FILE" 2>&1 || true
+    log "Grants aplicados"
 
     systemctl restart asterisk >> "$LOG_FILE" 2>&1 || err "Falha ao reiniciar Asterisk"
     sleep 4
