@@ -170,7 +170,8 @@ Vars: `DATABASE_URL`, `JWT_SECRET`, `REFRESH_SECRET`, `JWT_EXPIRES_IN` (15m), `R
 **Queues** — `{ name(alphanum/dash/_), number(^\d+$), companyId, strategy?, musicOnHold?, timeout?, retry?, maxLen?, wrapupTime?, announce?, announceFrequency?, joinEmpty?, leaveWhenEmpty?, weight? }`
 - `number` obrigatório no create, único por empresa (`UNIQUE(number, companyId)`) — usado como destino de inbound routes/time conditions (`Goto(queues-app,<asteriskId>-<number>,1)`)
 - strategies: `ringall|leastrecent|fewestcalls|random|rrmemory|linear|wrandom`
-- Member add: `{ extensionId, penalty?(0-100), paused? }`; update: `{ penalty?, paused? }`
+- Member add: `{ extensionId, penalty?(0-100), paused? }`; update: `{ penalty?, paused?, pauseReason? }`
+- `pauseReason`: persiste em `queue_members.reason_paused` (realtime) só enquanto `paused=true`; some ao despausar
 
 **Trunks** — discriminatedUnion por `registrationMode: "outbound"|"inbound"`
 - outbound: `{ name, companyId, type(sip|pjsip), host, username, password, context?, codecs? }`

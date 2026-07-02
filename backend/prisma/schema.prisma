@@ -134,6 +134,7 @@ model QueueMember {
     extension   Extension @relation(fields: [extensionId], references: [id], onDelete: Cascade)
     penalty     Int       @default(0)
     paused      Boolean   @default(false)
+    pauseReason String?   @db.VarChar(80)
     createdAt   DateTime  @default(now()) @db.Timestamptz(3)
     updatedAt   DateTime  @updatedAt @db.Timestamptz(3)
 
@@ -508,6 +509,7 @@ model queue_members {
     state_interface String? @db.VarChar(128)
     penalty         Int?    @default(0)
     paused          Int?    @default(0)
+    reason_paused   String? @db.VarChar(80)
     wrapuptime      Int?    @default(0)
 
     @@unique([queue_name, interface])

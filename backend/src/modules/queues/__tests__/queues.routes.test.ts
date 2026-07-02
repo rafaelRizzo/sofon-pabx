@@ -78,7 +78,7 @@ describe('POST /queues', () => {
             method: 'POST',
             url: '/queues',
             headers: auth(),
-            body: { name: 'suporte', companyId },
+            body: { name: 'suporte', companyId, number: '100' },
         })
         expect(res.statusCode).toBe(201)
         const body = CreateQueueResponse.parse(res.json())
@@ -94,6 +94,7 @@ describe('POST /queues', () => {
             body: {
                 name: 'vendas',
                 companyId,
+                number: '200',
                 strategy: 'leastrecent',
                 musicOnHold: 'jazz',
                 timeout: 30,
@@ -119,7 +120,7 @@ describe('POST /queues', () => {
             method: 'POST',
             url: '/queues',
             headers: auth(),
-            body: { name: 'suporte', companyId },
+            body: { name: 'suporte', companyId, number: '101' },
         })
         expect(res.statusCode).toBe(409)
     })
@@ -369,7 +370,7 @@ describe('DELETE /queues/:id', () => {
             method: 'POST',
             url: '/queues',
             headers: auth(),
-            body: { name: 'to-delete', companyId },
+            body: { name: 'to-delete', companyId, number: '300' },
         })
         const idToDelete = created.json().queueId
 

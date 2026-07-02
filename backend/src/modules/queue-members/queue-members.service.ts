@@ -11,6 +11,7 @@ const memberSelect = {
     extensionId: true,
     penalty: true,
     paused: true,
+    pauseReason: true,
     createdAt: true,
     updatedAt: true,
     extension: {

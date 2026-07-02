@@ -79,10 +79,15 @@ export const AsteriskQueueRepository = {
         })
     },
 
-    async updateMember(tx: Tx, asteriskQueueName: string, iface: string, data: { penalty?: number, paused?: boolean }) {
+    async updateMember(tx: Tx, asteriskQueueName: string, iface: string, data: { penalty?: number, paused?: boolean, pauseReason?: string | null }) {
         const update: Record<string, any> = {}
         if (data.penalty !== undefined) update.penalty = data.penalty
-        if (data.paused !== undefined) update.paused = data.paused ? 1 : 0
+        if (data.paused !== undefined) {
+            update.paused = data.paused ? 1 : 0
+            update.reason_paused = data.paused ? (data.pauseReason ?? null) : null
+        } else if (data.pauseReason !== undefined) {
+            update.reason_paused = data.pauseReason
+        }
         if (Object.keys(update).length > 0)
             await tx.queue_members.update({
                 where: { queue_name_interface: { queue_name: asteriskQueueName, interface: iface } },

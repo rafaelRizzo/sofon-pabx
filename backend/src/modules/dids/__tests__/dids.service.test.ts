@@ -7,6 +7,12 @@ mock.module('../../../lib/prisma', () => ({ prisma: db }))
 mock.module('../cache/dids.cache', () => ({
     DidsCache: { getAll: mock(() => null), setAll: mock(), getDid: mock(() => null), setDid: mock(), invalidateDid: mock(), getDidsByCompany: mock(() => null), setDidsByCompany: mock(), invalidateDidsByCompany: mock(), invalidateAll: mock() },
 }))
+mock.module('../../../asterisk/inboundroute.repository', () => ({
+    InboundRouteRepository: { create: mock(() => Promise.resolve()), update: mock(() => Promise.resolve()), delete: mock(() => Promise.resolve()) },
+}))
+mock.module('../../inbound-routes/cache/inbound-routes.cache', () => ({
+    InboundRoutesCache: { invalidateRoute: mock(() => Promise.resolve()), invalidateByCompany: mock(() => Promise.resolve()) },
+}))
 
 import * as DidsService from '../dids.service'
 
@@ -97,6 +103,7 @@ describe('DidsService.deleteDid', () => {
     it('deletes DID', async () => {
         db.did.findUnique.mockResolvedValue(DID)
         db.did.delete.mockResolvedValue(DID)
+        db.inboundRoute.findMany.mockResolvedValue([])
         await DidsService.deleteDid('d1')
         expect(db.did.delete).toHaveBeenCalledWith({ where: { id: 'd1' } })
     })

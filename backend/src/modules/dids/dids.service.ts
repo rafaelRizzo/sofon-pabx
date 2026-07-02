@@ -1,6 +1,8 @@
 import { prisma } from '../../lib/prisma'
 import { DidsCache } from './cache/dids.cache'
 import type { CreateDidInput, UpdateDidInput } from './schemas/did.schema'
+import { InboundRouteRepository } from '../../asterisk/inboundroute.repository'
+import { InboundRoutesCache } from '../inbound-routes/cache/inbound-routes.cache'
 import { AppError } from '../../utils/errors/app.error'
 
 const select = {
@@ -91,8 +93,22 @@ export const deleteDid = async (id: string) => {
     const existing = await prisma.did.findUnique({ where: { id } })
     if (!existing) throw new AppError('DID not found', 404)
 
-    await prisma.did.delete({ where: { id } })
+    const inboundRoutes = await prisma.inboundRoute.findMany({
+        where: { didId: id },
+        select: { id: true, trunkId: true },
+    })
 
+    await prisma.$transaction(async (tx) => {
+        for (const ir of inboundRoutes) {
+            await InboundRouteRepository.delete(tx, ir.trunkId, existing.number)
+        }
+        await tx.did.delete({ where: { id } })
+    })
+
+    for (const ir of inboundRoutes) {
+        await InboundRoutesCache.invalidateRoute(ir.id)
+    }
+    await InboundRoutesCache.invalidateByCompany(existing.companyId)
     await DidsCache.invalidateDid(id)
     await DidsCache.invalidateDidsByCompany(existing.companyId)
     await DidsCache.invalidateAll()

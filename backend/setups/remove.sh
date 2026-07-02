@@ -166,7 +166,8 @@ if [[ $REMOVE_FW =~ ^[SsYy]$ ]]; then
     log "Removendo configurações Fail2Ban do Asterisk..."
     for f in \
         /etc/fail2ban/jail.d/asterisk.conf \
-        /etc/fail2ban/filter.d/asterisk.conf; do
+        /etc/fail2ban/filter.d/asterisk.conf \
+        /etc/fail2ban/action.d/nftables-asterisk.conf; do
         [[ -f "$f" ]] && rm -f "$f" && log "  Removido: $f"
     done
 
@@ -186,9 +187,17 @@ if [[ $REMOVE_FW =~ ^[SsYy]$ ]]; then
     log "Resetando firewall (nftables)..."
     if command -v nft &>/dev/null; then
         nft delete table inet filter >> "$LOG_FILE" 2>&1 || true
+        nft delete table inet f2b-asterisk >> "$LOG_FILE" 2>&1 || true
+        nft delete table inet f2b-table >> "$LOG_FILE" 2>&1 || true
         printf '#!/usr/sbin/nft -f\n\nadd table inet filter\nflush table inet filter\n' > /etc/nftables.conf
         systemctl disable nftables >> "$LOG_FILE" 2>&1 || true
-        log "nftables resetado — tabela inet filter removida, Docker preservado"
+        log "nftables resetado — tabela inet filter e f2b-asterisk removidas, Docker preservado"
+
+        # Reload/delete de tabelas nftables derruba as regras de NAT/MASQUERADE do Docker
+        if systemctl is-active --quiet docker 2>/dev/null; then
+            systemctl restart docker >> "$LOG_FILE" 2>&1 || warn "Docker não reiniciou"
+            log "Docker reiniciado (recria regras de NAT/MASQUERADE)"
+        fi
     else
         warn "nft não encontrado — firewall não resetado"
     fi

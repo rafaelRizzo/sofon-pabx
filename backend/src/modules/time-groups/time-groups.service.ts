@@ -1,7 +1,17 @@
 import { prisma } from '../../lib/prisma'
 import { TimeGroupsCache } from './cache/time-groups.cache'
 import type { CreateTimeGroupInput, UpdateTimeGroupInput } from './schemas/time-group.schema'
+import { resyncTimeConditionDialplan } from '../time-conditions/time-conditions.service'
+import { TimeConditionsCache } from '../time-conditions/cache/time-conditions.cache'
 import { AppError } from '../../utils/errors/app.error'
+
+async function affectedTimeConditionIds(timeGroupId: string) {
+    const rows = await prisma.timeConditionTimeGroup.findMany({
+        where: { timeGroupId },
+        select: { timeConditionId: true },
+    })
+    return rows.map((r) => r.timeConditionId)
+}
 
 const timeGroupSelect = {
     id: true,
@@ -74,10 +84,15 @@ export const updateTimeGroup = async (id: string, data: UpdateTimeGroupInput) =>
         if (dup) throw new AppError('Time group name already in use for this company', 409)
     }
 
+    const affectedIds = data.ranges ? await affectedTimeConditionIds(id) : []
+
     const group = await prisma.$transaction(async (tx) => {
         if (data.ranges) {
             await tx.timeRange.deleteMany({ where: { timeGroupId: id } })
             await tx.timeRange.createMany({ data: data.ranges.map((r) => ({ ...r, timeGroupId: id })) })
+            for (const tcId of affectedIds) {
+                await resyncTimeConditionDialplan(tx, tcId)
+            }
         }
         return tx.timeGroup.update({
             where: { id },
@@ -86,6 +101,7 @@ export const updateTimeGroup = async (id: string, data: UpdateTimeGroupInput) =>
         })
     })
 
+    for (const tcId of affectedIds) await TimeConditionsCache.invalidateTimeCondition(tcId)
     await TimeGroupsCache.invalidateTimeGroup(id)
     await TimeGroupsCache.invalidateByCompany(existing.companyId)
     await TimeGroupsCache.invalidateAll()
@@ -96,8 +112,17 @@ export const deleteTimeGroup = async (id: string) => {
     const existing = await prisma.timeGroup.findUnique({ where: { id } })
     if (!existing) throw new AppError('Time group not found', 404)
 
-    await prisma.timeGroup.delete({ where: { id } })
+    const affectedIds = await affectedTimeConditionIds(id)
 
+    await prisma.$transaction(async (tx) => {
+        await tx.timeGroup.delete({ where: { id } })
+        for (const tcId of affectedIds) {
+            await resyncTimeConditionDialplan(tx, tcId)
+        }
+    })
+
+    for (const tcId of affectedIds) await TimeConditionsCache.invalidateTimeCondition(tcId)
+    await TimeConditionsCache.invalidateByCompany(existing.companyId)
     await TimeGroupsCache.invalidateTimeGroup(id)
     await TimeGroupsCache.invalidateByCompany(existing.companyId)
     await TimeGroupsCache.invalidateAll()

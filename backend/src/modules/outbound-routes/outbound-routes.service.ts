@@ -94,7 +94,7 @@ async function getRouteContext(tx: Tx, routeId: string) {
     return { company: route.company, patterns, trunks }
 }
 
-async function resyncAllPatterns(tx: Tx, routeId: string) {
+export async function resyncAllPatterns(tx: Tx, routeId: string) {
     const ctx = await getRouteContext(tx, routeId)
     if (!ctx) return
 

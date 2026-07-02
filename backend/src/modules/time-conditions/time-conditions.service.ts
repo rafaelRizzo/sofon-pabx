@@ -60,6 +60,24 @@ async function loadRangesForCondition(tcId: string) {
     return groups.flatMap((g) => g.timeGroup.ranges)
 }
 
+type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
+
+export async function resyncTimeConditionDialplan(tx: Tx, tcId: string) {
+    const tc = await tx.timeCondition.findUnique({
+        where: { id: tcId },
+        select: { name: true, trueRoute: true, falseRoute: true },
+    })
+    if (!tc) return
+
+    const groups = await tx.timeConditionTimeGroup.findMany({
+        where: { timeConditionId: tcId },
+        include: { timeGroup: { include: { ranges: true } } },
+    })
+    const ranges = groups.flatMap((g) => g.timeGroup.ranges)
+
+    await TimeConditionRepository.update(tx, tcId, tc.name, ranges, tc.trueRoute as RouteDest, tc.falseRoute as RouteDest)
+}
+
 export const getTimeConditionsByCompany = async (companyId: string) => {
     const cached = await TimeConditionsCache.getByCompany(companyId)
     if (cached) return cached

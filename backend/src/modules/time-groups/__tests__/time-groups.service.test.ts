@@ -13,6 +13,12 @@ mock.module('../cache/time-groups.cache', () => ({
         invalidateAll: mock(), invalidateNamespace: mock(),
     },
 }))
+mock.module('../../time-conditions/time-conditions.service', () => ({
+    resyncTimeConditionDialplan: mock(() => Promise.resolve()),
+}))
+mock.module('../../time-conditions/cache/time-conditions.cache', () => ({
+    TimeConditionsCache: { invalidateTimeCondition: mock(() => Promise.resolve()), invalidateByCompany: mock(() => Promise.resolve()) },
+}))
 
 import * as TimeGroupsService from '../time-groups.service'
 
@@ -106,6 +112,7 @@ describe('TimeGroupsService.deleteTimeGroup', () => {
     it('deletes group', async () => {
         db.timeGroup.findUnique.mockResolvedValue(GROUP)
         db.timeGroup.delete.mockResolvedValue(GROUP)
+        db.timeConditionTimeGroup.findMany.mockResolvedValue([])
         await TimeGroupsService.deleteTimeGroup('g1')
         expect(db.timeGroup.delete).toHaveBeenCalledWith({ where: { id: 'g1' } })
     })

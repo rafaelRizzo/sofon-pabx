@@ -182,20 +182,22 @@ pre-connect => yes
 EOF
 
 # FIX: adicionado "extensions" para suportar switch => Realtime/ no dialplan
+# FIX: ps_endpoint_id_ips é o nome de família que res_pjsip_endpoint_identifier_ip espera —
+#      mapeado pra nossa tabela real ps_identifies via 3º argumento
 cat > /etc/asterisk/extconfig.conf << 'EOF'
 [settings]
-ps_endpoints     => odbc,asterisk,ps_endpoints
-ps_auths         => odbc,asterisk,ps_auths
-ps_aors          => odbc,asterisk,ps_aors
-ps_contacts      => odbc,asterisk,ps_contacts
-ps_identifies    => odbc,asterisk,ps_identifies
-ps_registrations => odbc,asterisk,ps_registrations
-sippeers         => odbc,asterisk,sip_peers
-sipregs          => odbc,asterisk,sip_peers
-voicemail        => odbc,asterisk,voicemail_users
-extensions       => odbc,asterisk,extensions
-queues           => odbc,asterisk,queues
-queue_members    => odbc,asterisk,queue_members
+ps_endpoints       => odbc,asterisk,ps_endpoints
+ps_auths           => odbc,asterisk,ps_auths
+ps_aors            => odbc,asterisk,ps_aors
+ps_contacts        => odbc,asterisk,ps_contacts
+ps_endpoint_id_ips => odbc,asterisk,ps_identifies
+ps_registrations   => odbc,asterisk,ps_registrations
+sippeers           => odbc,asterisk,sip_peers
+sipregs            => odbc,asterisk,sip_peers
+voicemail          => odbc,asterisk,voicemail_users
+extensions         => odbc,asterisk,extensions
+queues             => odbc,asterisk,queues
+queue_members      => odbc,asterisk,queue_members
 EOF
 
 cat > /etc/asterisk/sorcery.conf << 'EOF'
@@ -204,7 +206,9 @@ endpoint => realtime,ps_endpoints
 auth => realtime,ps_auths
 aor => realtime,ps_aors
 contact => realtime,ps_contacts
-identify => realtime,ps_identifies
+
+[res_pjsip_endpoint_identifier_ip]
+identify = realtime,ps_endpoint_id_ips
 
 [res_pjsip_outbound_registration]
 registration => realtime,ps_registrations

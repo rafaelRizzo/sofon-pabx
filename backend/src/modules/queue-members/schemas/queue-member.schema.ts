@@ -19,6 +19,7 @@ export const addMemberSchema = z.object({
 export const updateMemberSchema = z.object({
     penalty: z.number().int().min(0).max(100).optional(),
     paused: z.boolean().optional(),
+    pauseReason: z.string().max(80).nullable().optional(),
 })
 
 export type AddMemberInput = z.infer<typeof addMemberSchema>
@@ -30,6 +31,7 @@ export const QueueMemberSchema = z.object({
     extensionId: z.string(),
     penalty: z.number(),
     paused: z.boolean(),
+    pauseReason: z.string().nullable(),
 })
 
 export const ListMembersResponse = ok({ message: z.string(), members: z.array(QueueMemberSchema) })

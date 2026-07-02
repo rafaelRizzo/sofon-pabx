@@ -504,7 +504,7 @@ if command -v ufw &>/dev/null; then
     log "UFW desativado"
 fi
 
-DEBIAN_FRONTEND=noninteractive apt-get install -y nftables >> "$LOG_FILE" 2>&1 || err "Falha ao instalar nftables"
+DEBIAN_FRONTEND=noninteractive apt-get install -y nftables conntrack >> "$LOG_FILE" 2>&1 || err "Falha ao instalar nftables"
 
 mkdir -p /etc/fail2ban
 [[ -f /etc/fail2ban/ip.whitelist ]] || touch /etc/fail2ban/ip.whitelist
@@ -616,7 +616,7 @@ log "Logger configurado → /var/log/asterisk/messages"
 
 # --- Fail2Ban ---
 DEBIAN_FRONTEND=noninteractive apt-get install -y fail2ban >> "$LOG_FILE" 2>&1 || warn "Fail2Ban não instalado"
-mkdir -p /etc/fail2ban/filter.d /etc/fail2ban/jail.d
+mkdir -p /etc/fail2ban/filter.d /etc/fail2ban/jail.d /etc/fail2ban/action.d
 
 cat > /etc/fail2ban/filter.d/asterisk.conf << 'EOF'
 [Definition]
@@ -624,6 +624,28 @@ failregex = NOTICE\[\d+\].*failed for '?<HOST>:\d+'?.*(No matching endpoint|Fail
             NOTICE\[\d+\].*Registration from.*failed for '?<HOST>:\d+'?
 
 ignoreregex =
+EOF
+
+# FIX: a action nftables-allports de fábrica só bloqueia TCP (meta l4proto tcp),
+# ignorando UDP mesmo com protocol=udp,tcp no jail — SIP é majoritariamente UDP.
+# Action própria: bloqueia por IP sem restrição de protocolo.
+cat > /etc/fail2ban/action.d/nftables-asterisk.conf << 'EOF'
+[Definition]
+actionstart = nft add table inet f2b-<name>
+              nft add set inet f2b-<name> addr-set-<name> { type ipv4_addr\; }
+              nft add chain inet f2b-<name> f2b-chain { type filter hook input priority filter - 1\; }
+              nft add rule inet f2b-<name> f2b-chain ip saddr @addr-set-<name> drop
+
+actionstop = nft delete table inet f2b-<name>
+
+actioncheck = nft list table inet f2b-<name> >/dev/null 2>&1
+
+actionban = nft add element inet f2b-<name> addr-set-<name> { <ip> }
+
+actionunban = nft delete element inet f2b-<name> addr-set-<name> { <ip> }
+
+[Init]
+name = default
 EOF
 
 WHITELIST_F2B=$(grep -v '^#\|^$' /etc/fail2ban/ip.whitelist 2>/dev/null | tr '\n' ' ' || true)
@@ -639,7 +661,7 @@ maxretry  = 3
 findtime  = 300
 bantime   = 86400
 ignoreip  = 127.0.0.1/8 ::1 ${WHITELIST_F2B}
-action    = nftables-allports[name=asterisk]
+action    = nftables-asterisk[name=asterisk]
 EOF
 
 systemctl enable fail2ban >> "$LOG_FILE" 2>&1 || true
@@ -770,6 +792,14 @@ cmd_remove() {
     nft delete element inet filter whitelist { $ip } 2>/dev/null || true
     rebuild_nft_whitelist
     reload_fail2ban
+
+    # Sem isso, conexões UDP já estabelecidas (conntrack ASSURED) continuam passando
+    # pela regra "ct state established,related accept" mesmo depois do IP sair da whitelist
+    if command -v conntrack &>/dev/null; then
+        conntrack -D -s "$ip" &>/dev/null || true
+        conntrack -D -d "$ip" &>/dev/null || true
+        log "Conntrack limpo para $ip"
+    fi
 
     echo ""
     echo -e "${GREEN}✓ $ip removido — acesso bloqueado${NC}"

@@ -3,7 +3,9 @@ import { prisma } from '../../lib/prisma'
 import { TrunksCache } from './cache/trunks.cache'
 import type { CreateTrunkInput, UpdateTrunkInput } from './schemas/trunk.schema'
 import { PjsipRepository } from '../../asterisk/pjsip.repository'
-import { trunkContext } from '../../asterisk/inboundroute.repository'
+import { InboundRouteRepository, trunkContext } from '../../asterisk/inboundroute.repository'
+import { resyncAllPatterns } from '../outbound-routes/outbound-routes.service'
+import { OutboundRoutesCache } from '../outbound-routes/cache/outbound-routes.cache'
 import { AppError } from '../../utils/errors/app.error'
 
 const CHARSET = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
@@ -133,10 +135,28 @@ export const deleteTrunk = async (id: string) => {
 
     const astId = toAsteriskId(existing.company.asteriskId, existing.name)
 
+    const inboundRoutes = await prisma.inboundRoute.findMany({
+        where: { trunkId: id },
+        select: { did: { select: { number: true } } },
+    })
+    const affectedOutboundRouteIds = (
+        await prisma.outboundRouteTrunk.findMany({ where: { trunkId: id }, select: { routeId: true } })
+    ).map((rt) => rt.routeId)
+
     await prisma.$transaction(async (tx) => {
+        for (const ir of inboundRoutes) {
+            await InboundRouteRepository.delete(tx, id, ir.did.number)
+        }
         await PjsipRepository.deleteTrunk(tx, astId, existing.registrationMode)
         await tx.trunk.delete({ where: { id } })
+        for (const routeId of affectedOutboundRouteIds) {
+            await resyncAllPatterns(tx, routeId)
+        }
     })
 
+    for (const routeId of affectedOutboundRouteIds) {
+        await OutboundRoutesCache.invalidateRoute(routeId)
+    }
+    await OutboundRoutesCache.invalidateByCompany(existing.companyId)
     await TrunksCache.invalidateAllTrunks()
 }
