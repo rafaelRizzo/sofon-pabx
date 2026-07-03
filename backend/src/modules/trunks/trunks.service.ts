@@ -24,6 +24,7 @@ const trunkSelect = {
     registrationMode: true,
     host: true,
     username: true,
+    password: true,
     context: true,
     codecs: true,
     metadata: true,

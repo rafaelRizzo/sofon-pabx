@@ -13,7 +13,7 @@ export const cdrRoutes = async (app: FastifyInstance) => {
         schema: {
             tags: ['CDR'],
             summary: 'Listar registros de chamadas (CDR)',
-            description: 'Query obrigatória: ?companyId. Filtros opcionais: startDate, endDate, src, dst, disposition, limit, offset.',
+            description: 'Query obrigatória: ?companyId. Filtros opcionais: startDate, endDate (YYYY-MM-DD, cobrem o dia inteiro 00:00–23:59:59), src, dst, callStatus, limit (max 200), order (asc|desc, default desc).',
             security: [{ bearerAuth: [] }],
             querystring: cdrQuerySchema,
             response: {

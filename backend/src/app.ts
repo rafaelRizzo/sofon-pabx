@@ -9,7 +9,8 @@ import { serializerCompiler, jsonSchemaTransform } from 'fastify-type-provider-z
 import { ZodError, type ZodType } from 'zod'
 import { randomUUID } from 'crypto'
 import { logger } from './utils/logger'
-import { formatDatesDeep } from './utils/timezone'
+import { formatDatesDeep, collectCompanyIds } from './utils/timezone'
+import { getCompanyById } from './modules/companies/companies.service'
 import { validateEnv } from './config/env'
 import { usersRoutes } from './modules/users/users.routes'
 import { authRoutes } from './modules/auth/auth.routes'
@@ -42,9 +43,21 @@ app.setValidatorCompiler(({ schema }: { schema: ZodType }) => (data: unknown) =>
 })
 app.setSerializerCompiler(serializerCompiler)
 
-// Formata todo Date da resposta com o offset de env.TZ em vez de UTC/Z
+// Formata cada Date da resposta com o offset da empresa dona do registro (via companyId), caindo em env.TZ quando não há empresa no contexto
 app.addHook('preSerialization', async (request, reply, payload) => {
-    return formatDatesDeep(payload, env.TZ)
+    const companyIds = collectCompanyIds(payload)
+    const tzByCompanyId = new Map<string, string>()
+
+    await Promise.all([...companyIds].map(async (companyId) => {
+        try {
+            const company = await getCompanyById(companyId)
+            tzByCompanyId.set(companyId, company.timezone)
+        } catch {
+            // companyId sumiu (delete concorrente) — cai no fallback env.TZ em vez de derrubar a resposta inteira
+        }
+    }))
+
+    return formatDatesDeep(payload, env.TZ, tzByCompanyId)
 })
 
 // Adiciona logging para requests

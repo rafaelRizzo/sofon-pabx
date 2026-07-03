@@ -19,16 +19,13 @@ mock.module('../../../asterisk/pjsip.repository', () => ({
 mock.module('../../../asterisk/sip.repository', () => ({
     SipRepository: { deleteManyByNames: mock(() => Promise.resolve()) },
 }))
-mock.module('../../../asterisk/dialplan.repository', () => ({
-    DialplanRepository: { deleteManyByExten: mock(() => Promise.resolve()) },
-}))
 mock.module('../../../asterisk/queue.repository', () => ({
     AsteriskQueueRepository: { removeMembersByInterfaces: mock(() => Promise.resolve()), deleteManyQueues: mock(() => Promise.resolve()) },
 }))
 
 import * as CompaniesService from '../companies.service'
 
-const COMPANY = { id: 'c1', name: 'ACME', doc: null, asteriskId: 'ast1', metadata: {}, createdAt: new Date(), updatedAt: new Date() }
+const COMPANY = { id: 'c1', name: 'ACME', doc: null, asteriskId: 'ast1', timezone: 'America/Sao_Paulo', metadata: {}, createdAt: new Date(), updatedAt: new Date() }
 const USER = { id: 'u1', name: 'Admin', username: 'admin@test.com' }
 
 beforeEach(() => clearPrismaMock(db))
@@ -77,6 +74,16 @@ describe('CompaniesService.createCompany', () => {
         await expect(CompaniesService.createCompany({ name: 'X', userId: 'clxxxxxxxxxxxxxxxxxxxxxxxxx', metadata: {} }))
             .rejects.toMatchObject({ statusCode: 404 })
     })
+
+    it('passes timezone through to prisma when provided', async () => {
+        db.user.findUnique.mockResolvedValue(USER)
+        db.company.create.mockResolvedValue({ ...COMPANY, timezone: 'Europe/Lisbon' })
+        db.userCompany.create.mockResolvedValue({})
+        await CompaniesService.createCompany({ name: 'ACME', userId: 'u1', metadata: {}, timezone: 'Europe/Lisbon' })
+        expect(db.company.create).toHaveBeenCalledWith(expect.objectContaining({
+            data: expect.objectContaining({ timezone: 'Europe/Lisbon' }),
+        }))
+    })
 })
 
 // ─── updateCompany ────────────────────────────────────────────────────────────
@@ -92,6 +99,16 @@ describe('CompaniesService.updateCompany', () => {
         db.company.findUnique.mockResolvedValue(null)
         await expect(CompaniesService.updateCompany('clxxxxxxxxxxxxxxxxxxxxxxxxx', { name: 'X' }))
             .rejects.toMatchObject({ statusCode: 404 })
+    })
+
+    it('updates timezone', async () => {
+        db.company.findUnique.mockResolvedValue({ ...COMPANY, users: [] })
+        db.company.update.mockResolvedValue({ ...COMPANY, timezone: 'Europe/Lisbon' })
+        const company = await CompaniesService.updateCompany('c1', { timezone: 'Europe/Lisbon' }) as any
+        expect(company.timezone).toBe('Europe/Lisbon')
+        expect(db.company.update).toHaveBeenCalledWith(expect.objectContaining({
+            data: { timezone: 'Europe/Lisbon' },
+        }))
     })
 })
 

@@ -2,37 +2,26 @@ import { prisma } from '../lib/prisma'
 
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 
+// Bate com aliasSchema (/^\d{2,6}$/) — um padrão de dialplan por tamanho de alias
+const RAMAL_ALIAS_LENGTHS = [2, 3, 4, 5, 6]
+
 export const DialplanRepository = {
-    async create(tx: Tx, context: string, exten: string, number: string, type: 'sip' | 'pjsip') {
-        await tx.extensions.createMany({
-            data: [
+    // Padrão genérico compartilhado entre TODAS as empresas no mesmo contexto (idempotente, mesmo esquema de
+    // ensureFallback) — em vez de 1 linha de dialplan por ramal (que colidia entre empresas com o mesmo alias,
+    // já que o context é global). Usa CHANNEL(accountcode) — já setado em todo ps_endpoints/sip_peers como o
+    // asteriskId da empresa de quem está discando — pra montar o alvo real (<alias>_<asteriskId>) e tenta as
+    // duas tecnologias em paralelo no Dial: só a que existir de fato toca, a outra falha rápido (device not found).
+    async ensureGenericRoutingPattern(tx: Tx, context: string) {
+        const data = RAMAL_ALIAS_LENGTHS.flatMap((len) => {
+            const exten = `_${'X'.repeat(len)}`
+            return [
                 { context, exten, priority: 1, app: 'Set', appdata: 'MIXMONITOR_FILENAME=/var/spool/asterisk/monitor/${STRFTIME(${EPOCH},,${YEAR}-%m-%d)}_${CALLERID(num)}_${EXTEN}.wav' },
                 { context, exten, priority: 2, app: 'MixMonitor', appdata: '${MIXMONITOR_FILENAME},b' },
-                { context, exten, priority: 3, app: 'Dial', appdata: `${type.toUpperCase()}/${number},20` },
+                { context, exten, priority: 3, app: 'Dial', appdata: 'PJSIP/${EXTEN}_${CHANNEL(accountcode)}&SIP/${EXTEN}_${CHANNEL(accountcode)},20' },
                 { context, exten, priority: 4, app: 'HangUp', appdata: null },
-            ],
+            ]
         })
-    },
-
-    async delete(tx: Tx, context: string, exten: string) {
-        await tx.extensions.deleteMany({ where: { context, exten } })
-    },
-
-    async recreate(tx: Tx, oldExten: string, oldContext: string, newContext: string, newExten: string, newNumber: string, type: 'sip' | 'pjsip') {
-        await tx.extensions.deleteMany({ where: { context: oldContext, exten: oldExten } })
-        await tx.extensions.createMany({
-            data: [
-                { context: newContext, exten: newExten, priority: 1, app: 'Set', appdata: 'MIXMONITOR_FILENAME=/var/spool/asterisk/monitor/${STRFTIME(${EPOCH},,${YEAR}-%m-%d)}_${CALLERID(num)}_${EXTEN}.wav' },
-                { context: newContext, exten: newExten, priority: 2, app: 'MixMonitor', appdata: '${MIXMONITOR_FILENAME},b' },
-                { context: newContext, exten: newExten, priority: 3, app: 'Dial', appdata: `${type.toUpperCase()}/${newNumber},20` },
-                { context: newContext, exten: newExten, priority: 4, app: 'HangUp', appdata: null },
-            ],
-        })
-    },
-
-    async deleteManyByExten(tx: Tx, extens: string[]) {
-        if (extens.length > 0)
-            await tx.extensions.deleteMany({ where: { exten: { in: extens } } })
+        await tx.extensions.createMany({ data, skipDuplicates: true })
     },
 
     async ensureFallback(tx: Tx, context: string) {

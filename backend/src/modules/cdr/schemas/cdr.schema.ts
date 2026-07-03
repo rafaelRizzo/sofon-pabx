@@ -6,13 +6,13 @@ export const MAX_LIMIT = 200
 
 export const cdrQuerySchema = z.object({
     companyId: z.cuid2(),
-    startDate: z.iso.datetime({ offset: true }).optional(),
-    endDate: z.iso.datetime({ offset: true }).optional(),
+    startDate: z.iso.date().optional(),
+    endDate: z.iso.date().optional(),
     src: z.string().max(80).optional(),
     dst: z.string().max(80).optional(),
-    disposition: z.enum(['ANSWERED', 'NO ANSWER', 'BUSY', 'FAILED', 'CONGESTION']).optional(),
+    callStatus: z.enum(['ANSWERED', 'NO ANSWER', 'BUSY', 'FAILED', 'CONGESTION']).optional(),
     limit: z.coerce.number().int().min(1).max(MAX_LIMIT).default(DEFAULT_LIMIT),
-    offset: z.coerce.number().int().min(0).default(0),
+    order: z.enum(['asc', 'desc']).default('desc'),
 })
 
 export type CdrQueryInput = z.infer<typeof cdrQuerySchema>
@@ -32,7 +32,7 @@ export const CdrSchema = z.object({
     endTime: timestamp.nullable(),
     duration: z.number().nullable(),
     billsec: z.number().nullable(),
-    disposition: z.string().nullable(),
+    callStatus: z.string().nullable(),
     uniqueid: z.string().nullable(),
 })
 
@@ -40,5 +40,4 @@ export const ListCdrResponse = ok({
     records: z.array(CdrSchema),
     total: z.number(),
     limit: z.number(),
-    offset: z.number(),
 })

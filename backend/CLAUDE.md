@@ -26,7 +26,7 @@ src/modules/<name>/
   schemas/<name>.schema.ts  # Zod schemas de input/output + response types
   cache/<name>.cache.ts     # wrapper de CacheManager para o módulo
 ```
-Módulos: auth, users, companies, dids, extensions, queues, queue-members, trunks, outbound-routes, inbound-routes, time-groups, time-conditions
+Módulos: auth, users, companies, dids, extensions, queues, queue-members, trunks, outbound-routes, inbound-routes, time-groups, time-conditions, cdr
 
 ## Repositórios Asterisk (`src/asterisk/`)
 Cada repositório escreve direto nas tabelas realtime do Asterisk via Prisma:
@@ -99,6 +99,21 @@ onRequest: [...protectedRoute, requireAdmin]
 
 ---
 
+## Timezone (`src/utils/timezone.ts`)
+
+Storage é sempre UTC (`@db.Timestamptz`) exceto CDR (ver abaixo). Exibição na API é convertida por empresa.
+
+- `Company.timezone` — string IANA, default `"America/Sao_Paulo"`, só define fuso de exibição (storage continua UTC)
+- Hook `preSerialization` em `app.ts`: `collectCompanyIds(payload)` varre a resposta, resolve timezone de cada `companyId` via `getCompanyById` (cacheado), e `formatDatesDeep(payload, env.TZ, tzByCompanyId)` converte todo `Date` pra ISO com offset fixo (`toTzISOString`) — usa `env.TZ` como fallback quando não há empresa no contexto
+- Um registro que carrega seu próprio campo `timezone` (ex: a própria Company) vira fonte pra si e pros filhos aninhados, sem precisar de lookup
+
+**CDR é exceção:** `cdr.start/answer/endtime` são `TIMESTAMP` **sem timezone** — o Asterisk grava a hora LOCAL do SO (`America/Sao_Paulo`, setado em `setups/install-asterisk.sh`), não UTC. O driver pg lê esses dígitos como se fossem UTC, então tratar como instante UTC real (como o resto do schema) causa erro de 3h na exibição.
+- Filtro por `startDate`/`endDate` (CDR) usa data solta `YYYY-MM-DD`, sem offset — os dígitos já batem 1:1 com o storage naive local, então dá pra construir `new Date(`${data}T00:00:00.000Z`)`/`T23:59:59.999Z` direto, sem conversão de tz
+- `formatNaiveLocalISOString(date, tz)` — usar pra formatar `startTime`/`answerTime`/`endTime` na saída do service (retorna string, não `Date`, então o hook genérico não reconverte)
+- Nunca aplicar `toTzISOString`/`formatDatesDeep` diretamente nesses três campos do CDR
+
+---
+
 ## Testes
 
 **Unit (`*.service.test.ts`):**
@@ -125,7 +140,7 @@ import { buildApp } from 'src/test/build-app'
 ---
 
 ## Config (`src/config/env.ts`)
-Vars: `DATABASE_URL`, `JWT_SECRET`, `REFRESH_SECRET`, `JWT_EXPIRES_IN` (15m), `REFRESH_TOKEN_EXPIRES_IN` (7d), `REDIS_URL`, `CORS_ORIGIN`, `RATE_LIMIT_MAX` (1000), `RATE_LIMIT_WINDOW` ("1 second"), `PORT` (3333), `HOST`, `LOG_LEVEL`, `LOG_ENABLED`
+Vars: `DATABASE_URL`, `JWT_SECRET`, `REFRESH_SECRET`, `JWT_EXPIRES_IN` (15m), `REFRESH_TOKEN_EXPIRES_IN` (7d), `REDIS_URL`, `CORS_ORIGIN`, `RATE_LIMIT_MAX` (1000), `RATE_LIMIT_WINDOW` ("1 second"), `PORT` (3333), `HOST`, `LOG_LEVEL`, `LOG_ENABLED`, `TZ` (America/Sao_Paulo — fallback de exibição, ver seção Timezone)
 
 ---
 
@@ -195,3 +210,10 @@ Vars: `DATABASE_URL`, `JWT_SECRET`, `REFRESH_SECRET`, `JWT_EXPIRES_IN` (15m), `R
 - Create: `{ name, companyId, trueRoute?, falseRoute?, groupIds?[] }`
 - Update: `{ name?, trueRoute?, falseRoute? }` (min 1)
 - Route format: `{ type: "extension"|"queue"|"voicemail"|"timecondition"|"hangup", id?: cuid2 } | null` (null = Hangup)
+
+**CDR** — `GET /cdr` — `{ records[], total, limit }`
+- Query obrigatória: `companyId`; opcionais: `startDate`/`endDate` (`YYYY-MM-DD`, cobrem o dia inteiro 00:00:00–23:59:59.999, sem offset/hora), `src`, `dst`, `callStatus` (enum disposition), `limit`(max 200), `order`(asc|desc, default desc — aplica em startTime+id)
+- Sem paginação por cursor — só `limit`/`order`, sem navegação por página
+- Isolamento por empresa via `accountcode = Company.asteriskId` (não por FK)
+- `callStatus` na query mapeia pra coluna `disposition` no banco; na resposta o campo também sai como `callStatus` (não `disposition`) — nome escolhido por ser mais intuitivo pro consumidor da API
+- `startTime`/`answerTime`/`endTime`: ver seção Timezone — são hora local naive do CDR nativo do Asterisk, formatados na saída via `formatNaiveLocalISOString`, nunca como UTC direto. Filtro por data não precisa de conversão de tz: os dígitos de `startDate`/`endDate` já batem 1:1 com o storage naive local

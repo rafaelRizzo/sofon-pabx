@@ -4,7 +4,6 @@ import { ExtensionsCache } from '../extensions/cache/extensions.cache'
 import { QueuesCache } from '../queues/cache/queues.cache'
 import { PjsipRepository } from '../../asterisk/pjsip.repository'
 import { SipRepository } from '../../asterisk/sip.repository'
-import { DialplanRepository } from '../../asterisk/dialplan.repository'
 import { AsteriskQueueRepository } from '../../asterisk/queue.repository'
 import type { CreateCompanyInput, UpdateCompanyInput } from './schemas/company.schema'
 import { AppError } from '../../utils/errors/app.error'
@@ -14,6 +13,7 @@ const companySelect = {
     name: true,
     doc: true,
     asteriskId: true,
+    timezone: true,
     metadata: true,
     createdAt: true,
     updatedAt: true,
@@ -65,14 +65,7 @@ export const createCompany = async ({ userId, ...data }: Omit<CreateCompanyInput
     const company = await prisma.$transaction(async (tx) => {
         const created = await tx.company.create({
             data,
-            select: {
-                id: true,
-                name: true,
-                doc: true,
-                metadata: true,
-                createdAt: true,
-                updatedAt: true,
-            },
+            select: companySelect,
         })
 
         await tx.userCompany.create({
@@ -99,15 +92,7 @@ export const updateCompany = async (id: string, data: UpdateCompanyInput) => {
     const company = await prisma.company.update({
         where: { id },
         data,
-        select: {
-            id: true,
-            name: true,
-            doc: true,
-            asteriskId: true,
-            metadata: true,
-            createdAt: true,
-            updatedAt: true,
-        },
+        select: companySelect,
     })
 
     await CompaniesCache.invalidateCompany(id)
@@ -128,7 +113,7 @@ export const deleteCompany = async (id: string) => {
     const [extensions, queues, trunks] = await Promise.all([
         prisma.extension.findMany({
             where: { companyId: id },
-            select: { number: true, context: true, type: true },
+            select: { number: true, type: true },
         }),
         prisma.queue.findMany({
             where: { companyId: id },
@@ -140,7 +125,6 @@ export const deleteCompany = async (id: string) => {
         }),
     ])
 
-    const numbers = extensions.map((e) => e.number)
     const pjsipNumbers = extensions.filter((e) => e.type === 'pjsip').map((e) => e.number)
     const sipNumbers = extensions.filter((e) => e.type === 'sip').map((e) => e.number)
     const asteriskInterfaces = extensions.map((e) => `${e.type.toUpperCase()}/${e.number}`)
@@ -154,7 +138,6 @@ export const deleteCompany = async (id: string) => {
     await prisma.$transaction(async (tx) => {
         await AsteriskQueueRepository.removeMembersByInterfaces(tx, asteriskInterfaces)
         await AsteriskQueueRepository.deleteManyQueues(tx, asteriskQueueNames)
-        await DialplanRepository.deleteManyByExten(tx, numbers)
         await PjsipRepository.deleteManyByIds(tx, [...pjsipNumbers, ...trunkIds], trunkOutboundIds)
         await SipRepository.deleteManyByNames(tx, sipNumbers)
         await tx.extension.deleteMany({ where: { companyId: id } })

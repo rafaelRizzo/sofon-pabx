@@ -48,6 +48,7 @@ export const TrunkSchema = z.object({
     registrationMode: z.enum(['outbound', 'inbound']),
     host: z.string().nullable(),
     username: z.string().nullable(),
+    password: z.string().nullable(),
     context: z.string(),
     codecs: z.string(),
     createdAt: timestamp,

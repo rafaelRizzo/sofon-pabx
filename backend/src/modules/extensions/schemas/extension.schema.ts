@@ -294,6 +294,8 @@ export type CreateExtensionInput = z.infer<typeof createExtensionSchema>
 export type CreateExtensionBatchInput = z.infer<typeof createExtensionBatchSchema>
 export type UpdateExtensionInput = z.infer<typeof updateExtensionSchema>
 
+// GET expõe todos os campos crus do sip_peers/ps_endpoints+ps_aors (menos senha — secret/md5secret/remotesecret
+// não entram em sipFields, e o password do pjsip vive só em ps_auths, nunca consultado pra esse merge)
 export const ExtensionSchema = z.object({
     id: z.string(),
     alias: z.string(),
@@ -305,6 +307,11 @@ export const ExtensionSchema = z.object({
     allowOutbound: z.boolean(),
     createdAt: timestamp,
     updatedAt: timestamp,
+    ...sipFields,
+    ...pjsipFields,
+    // sipFields/pjsipFields divergem de tipo nessas duas chaves — mesmo tratamento do updateExtensionSchema
+    directMedia: z.union([z.string().max(10), z.boolean()]).optional(),
+    allowSubscribe: z.union([z.string().max(10), z.boolean()]).optional(),
 })
 
 const ExtensionWithPasswordSchema = ExtensionSchema.extend({ password: z.string() })

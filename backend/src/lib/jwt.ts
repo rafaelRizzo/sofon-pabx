@@ -4,7 +4,7 @@ import { jtiManager } from './jti'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production'
 const REFRESH_SECRET = process.env.REFRESH_SECRET || 'your-refresh-secret-change-in-production'
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '15m'
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h'
 const REFRESH_TOKEN_EXPIRES_IN = process.env.REFRESH_TOKEN_EXPIRES_IN || '7d'
 
 export interface TokenPayload {

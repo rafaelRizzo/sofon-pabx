@@ -14,6 +14,8 @@ model Company {
     asteriskId     String          @unique @default(dbgenerated("substring(replace(gen_random_uuid()::text, '-', ''), 1, 10)")) @db.VarChar(10)
     name           String
     doc            String?
+    // padrão de storage é sempre UTC (Timestamptz) — este campo só define o fuso de exibição na API
+    timezone       String          @default("America/Sao_Paulo") @db.VarChar(64)
     metadata       Json            @default("{}")
     createdAt      DateTime        @default(now()) @db.Timestamptz(3)
     updatedAt      DateTime        @updatedAt @db.Timestamptz(3)
@@ -370,8 +372,10 @@ model ps_endpoints {
     dtmf_mode           String?  @default("rfc4733") @db.VarChar(40)
     force_rport         Boolean? @default(true)
     ice_support         Boolean? @default(false)
-    rewrite_contact     Boolean? @default(false)
-    rtp_symmetric       Boolean? @default(false)
+    // NAT: sem RTP simétrico o áudio tenta ir pro IP anunciado no SDP (privado, atrás de NAT) em vez do IP real de
+    // onde chega — causa "sem áudio" só em pjsip (chan_sip já tem nat=force_rport,comedia fixo no sip.conf global)
+    rewrite_contact     Boolean? @default(true)
+    rtp_symmetric       Boolean? @default(true)
     send_diversion      Boolean? @default(true)
     timers              String?  @default("yes") @db.VarChar(40)
     timers_min_se       Int?     @default(90)
@@ -407,6 +411,10 @@ model cdr {
     dstChannel   String?   @db.VarChar(80) @map("dstchannel")
     lastApp      String?   @db.VarChar(80) @map("lastapp")
     lastData     String?   @db.VarChar(200) @map("lastdata")
+    // sem @db.Timestamptz de propósito: o Asterisk grava esses campos com a hora LOCAL do SO (America/Sao_Paulo,
+    // ver setups/install-asterisk.sh), não UTC. O driver pg lê os dígitos como se fossem UTC — qualquer código que
+    // ler/filtrar por esses campos precisa compensar isso via parseNaiveLocalDate/formatNaiveLocalISOString
+    // (src/utils/timezone.ts), nunca tratar como instante UTC real como os outros DateTime deste schema.
     startTime    DateTime? @map("start")
     answerTime   DateTime? @map("answer")
     // "end" é palavra reservada no Postgres (CASE...END) — INSERT sem aspas quebra a sintaxe, por isso o @map difere do nome real do CDR

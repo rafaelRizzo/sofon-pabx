@@ -109,6 +109,17 @@ describe('POST /companies', () => {
         expect(res.statusCode).toBe(400)
     })
 
+    it('400 with invalid IANA timezone', async () => {
+        const res = await app.inject({
+            method: 'POST',
+            url: '/companies',
+            headers: auth(),
+            body: { name: `${PREFIX} Bad TZ`, metadata: {}, timezone: 'Not/A_Timezone' },
+        })
+
+        expect(res.statusCode).toBe(400)
+    })
+
     it('401 without token', async () => {
         const res = await app.inject({
             method: 'POST',

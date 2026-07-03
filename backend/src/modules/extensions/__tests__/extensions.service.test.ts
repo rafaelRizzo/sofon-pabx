@@ -34,9 +34,7 @@ mock.module('../../../asterisk/sip.repository', () => ({
 }))
 mock.module('../../../asterisk/dialplan.repository', () => ({
     DialplanRepository: {
-        create: mock(() => Promise.resolve()),
-        update: mock(() => Promise.resolve()),
-        deleteManyByExten: mock(() => Promise.resolve()),
+        ensureGenericRoutingPattern: mock(() => Promise.resolve()),
         ensureFallback: mock(() => Promise.resolve()),
     },
 }))

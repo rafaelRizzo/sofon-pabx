@@ -19,7 +19,7 @@ const CDR_ROW = {
     duration: 30, billsec: 25, disposition: 'ANSWERED', uniqueid: '1234.5',
 }
 
-const BASE_QUERY = { companyId: 'c1', limit: 50, offset: 0 } as any
+const BASE_QUERY = { companyId: 'c1', limit: 50, order: 'desc' } as any
 
 beforeEach(() => clearPrismaMock(db))
 
@@ -31,7 +31,7 @@ describe('CdrService.getCdrByCompany', () => {
             .rejects.toMatchObject({ statusCode: 404 })
     })
 
-    it('returns records scoped by accountcode with total/limit/offset', async () => {
+    it('returns records scoped by accountcode with total/limit', async () => {
         db.company.findUnique.mockResolvedValue(COMPANY)
         db.cdr.findMany.mockResolvedValue([CDR_ROW])
         db.cdr.count.mockResolvedValue(1)
@@ -40,22 +40,24 @@ describe('CdrService.getCdrByCompany', () => {
 
         expect(db.cdr.findMany).toHaveBeenCalledWith(expect.objectContaining({
             where: expect.objectContaining({ accountcode: 'ast1' }),
+            orderBy: [{ startTime: 'desc' }, { id: 'desc' }],
         }))
+        expect(db.cdr.count).toHaveBeenCalledWith({ where: expect.objectContaining({ accountcode: 'ast1' }) })
         expect(result.records[0].id).toBe('1')
+        expect(result.records[0].callStatus).toBe('ANSWERED')
         expect(result.total).toBe(1)
         expect(result.limit).toBe(50)
-        expect(result.offset).toBe(0)
     })
 
-    it('applies src/dst/disposition/date filters', async () => {
+    it('applies src/dst/callStatus/date filters and honors order=asc', async () => {
         db.company.findUnique.mockResolvedValue(COMPANY)
         db.cdr.findMany.mockResolvedValue([])
         db.cdr.count.mockResolvedValue(0)
 
         await CdrService.getCdrByCompany({
             ...BASE_QUERY,
-            src: '2001', dst: '2002', disposition: 'ANSWERED',
-            startDate: '2026-01-01T00:00:00Z', endDate: '2026-01-31T23:59:59Z',
+            src: '2001', dst: '2002', callStatus: 'ANSWERED', order: 'asc',
+            startDate: '2026-01-01', endDate: '2026-01-31',
         })
 
         expect(db.cdr.findMany).toHaveBeenCalledWith(expect.objectContaining({
@@ -64,8 +66,11 @@ describe('CdrService.getCdrByCompany', () => {
                 src: { contains: '2001' },
                 dst: { contains: '2002' },
                 disposition: 'ANSWERED',
-                startTime: { gte: new Date('2026-01-01T00:00:00Z'), lte: new Date('2026-01-31T23:59:59Z') },
+                // startDate/endDate cobrem o dia inteiro; sem conversão de tz — os dígitos já batem com o storage naive local
+                startTime: { gte: new Date('2026-01-01T00:00:00.000Z'), lte: new Date('2026-01-31T23:59:59.999Z') },
             }),
+            orderBy: [{ startTime: 'asc' }, { id: 'asc' }],
         }))
     })
+
 })
