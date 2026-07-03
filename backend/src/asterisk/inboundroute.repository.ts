@@ -55,4 +55,11 @@ export const InboundRouteRepository = {
             where: { context: TRUNK_ROUTED_CONTEXT, exten: routedExten(trunkId, didNumber) },
         })
     },
+
+    async deleteMany(tx: Tx, routes: { trunkId: string; didNumber: string }[]) {
+        if (routes.length === 0) return
+        await tx.extensions.deleteMany({
+            where: { context: TRUNK_ROUTED_CONTEXT, exten: { in: routes.map((r) => routedExten(r.trunkId, r.didNumber)) } },
+        })
+    },
 }

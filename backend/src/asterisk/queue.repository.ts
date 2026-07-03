@@ -124,4 +124,9 @@ export const AsteriskQueueRepository = {
     async removeQueueAppEntry(tx: Tx, exten: string) {
         await tx.extensions.deleteMany({ where: { context: QUEUE_APP_CONTEXT, exten } })
     },
+
+    async removeManyQueueAppEntries(tx: Tx, extens: string[]) {
+        if (extens.length > 0)
+            await tx.extensions.deleteMany({ where: { context: QUEUE_APP_CONTEXT, exten: { in: extens } } })
+    },
 }

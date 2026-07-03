@@ -4,7 +4,9 @@ import { ExtensionsCache } from '../extensions/cache/extensions.cache'
 import { QueuesCache } from '../queues/cache/queues.cache'
 import { PjsipRepository } from '../../asterisk/pjsip.repository'
 import { SipRepository } from '../../asterisk/sip.repository'
-import { AsteriskQueueRepository } from '../../asterisk/queue.repository'
+import { AsteriskQueueRepository, queueAppExten } from '../../asterisk/queue.repository'
+import { InboundRouteRepository } from '../../asterisk/inboundroute.repository'
+import { TimeConditionRepository } from '../../asterisk/timecondition.repository'
 import type { CreateCompanyInput, UpdateCompanyInput } from './schemas/company.schema'
 import { AppError } from '../../utils/errors/app.error'
 
@@ -110,18 +112,30 @@ export const deleteCompany = async (id: string) => {
         throw new AppError('Company not found', 404)
     }
 
-    const [extensions, queues, trunks] = await Promise.all([
+    const [extensions, queues, trunks, inboundRoutes, timeConditions, outboundPatterns] = await Promise.all([
         prisma.extension.findMany({
             where: { companyId: id },
             select: { number: true, type: true },
         }),
         prisma.queue.findMany({
             where: { companyId: id },
-            select: { name: true },
+            select: { name: true, number: true },
         }),
         prisma.trunk.findMany({
             where: { companyId: id },
             select: { name: true, registrationMode: true },
+        }),
+        prisma.inboundRoute.findMany({
+            where: { companyId: id },
+            select: { trunkId: true, did: { select: { number: true } } },
+        }),
+        prisma.timeCondition.findMany({
+            where: { companyId: id },
+            select: { id: true },
+        }),
+        prisma.outboundDialPattern.findMany({
+            where: { route: { companyId: id } },
+            select: { pattern: true },
         }),
     ])
 
@@ -129,15 +143,25 @@ export const deleteCompany = async (id: string) => {
     const sipNumbers = extensions.filter((e) => e.type === 'sip').map((e) => e.number)
     const asteriskInterfaces = extensions.map((e) => `${e.type.toUpperCase()}/${e.number}`)
     const asteriskQueueNames = queues.map((q) => `${existing.asteriskId}-${q.name}`)
+    const queueAppExtens = queues.map((q) => queueAppExten(existing.asteriskId, q.number))
 
     const trunkIds = trunks.map((t) => `${existing.asteriskId}-trunk-${t.name}`)
     const trunkOutboundIds = trunks
         .filter((t) => t.registrationMode === 'outbound')
         .map((t) => `${existing.asteriskId}-trunk-${t.name}`)
 
+    const inboundRoutesForCleanup = inboundRoutes.map((r) => ({ trunkId: r.trunkId, didNumber: r.did.number }))
+    const timeConditionIds = timeConditions.map((tc) => tc.id)
+    const outboundPatternValues = outboundPatterns.map((p) => p.pattern)
+
     await prisma.$transaction(async (tx) => {
         await AsteriskQueueRepository.removeMembersByInterfaces(tx, asteriskInterfaces)
         await AsteriskQueueRepository.deleteManyQueues(tx, asteriskQueueNames)
+        await AsteriskQueueRepository.removeManyQueueAppEntries(tx, queueAppExtens)
+        await InboundRouteRepository.deleteMany(tx, inboundRoutesForCleanup)
+        await TimeConditionRepository.deleteManyByIds(tx, timeConditionIds)
+        if (outboundPatternValues.length > 0)
+            await tx.extensions.deleteMany({ where: { context: 'ramais', exten: { in: outboundPatternValues } } })
         await PjsipRepository.deleteManyByIds(tx, [...pjsipNumbers, ...trunkIds], trunkOutboundIds)
         await SipRepository.deleteManyByNames(tx, sipNumbers)
         await tx.extension.deleteMany({ where: { companyId: id } })

@@ -15,10 +15,13 @@ export const DialplanRepository = {
         const data = RAMAL_ALIAS_LENGTHS.flatMap((len) => {
             const exten = `_${'X'.repeat(len)}`
             return [
-                { context, exten, priority: 1, app: 'Set', appdata: 'MIXMONITOR_FILENAME=/var/spool/asterisk/monitor/${STRFTIME(${EPOCH},,${YEAR}-%m-%d)}_${CALLERID(num)}_${EXTEN}.wav' },
+                { context, exten, priority: 1, app: 'Set', appdata: 'MIXMONITOR_FILENAME=/var/spool/asterisk/monitor/${CHANNEL(accountcode)}/${STRFTIME(${EPOCH},,%Y/%m/%d)}/${STRFTIME(${EPOCH},,%Y-%m-%d_%H-%M-%S)}_${UNIQUEID}_${CALLERID(num)}_${EXTEN}.wav' },
                 { context, exten, priority: 2, app: 'MixMonitor', appdata: '${MIXMONITOR_FILENAME},b' },
                 { context, exten, priority: 3, app: 'Dial', appdata: 'PJSIP/${EXTEN}_${CHANNEL(accountcode)}&SIP/${EXTEN}_${CHANNEL(accountcode)},20' },
-                { context, exten, priority: 4, app: 'HangUp', appdata: null },
+                // CHANNEL(hangupsource) só vem preenchido depois que o Dial retorna — identifica o canal exato
+                // que mandou o BYE/CANCEL; DIALSTATUS cobre os casos sem hangupsource (ex: BUSY, NOANSWER)
+                { context, exten, priority: 4, app: 'NoOp', appdata: 'Chamada ${EXTEN} encerrada — status=${DIALSTATUS}, por=${CHANNEL(hangupsource)}' },
+                { context, exten, priority: 5, app: 'HangUp', appdata: null },
             ]
         })
         await tx.extensions.createMany({ data, skipDuplicates: true })
