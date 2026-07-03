@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { timestamp, ok } from '../../schemas/responses'
+import { timestamp, ok } from '../../../schemas/responses'
 
 const patternSchema = z.object({
     pattern: z.string().min(1).max(40),

@@ -4,6 +4,9 @@ import { createPrismaMock, clearPrismaMock } from '../../../test/mocks/prisma.mo
 const db = createPrismaMock()
 
 mock.module('../../../lib/prisma', () => ({ prisma: db }))
+mock.module('../../companies/cache/companies.cache', () => ({
+    CompaniesCache: { getCompany: mock(() => null), setCompany: mock() },
+}))
 mock.module('../cache/extensions.cache', () => ({
     ExtensionsCache: {
         getAllExtensions: mock(() => null), setAllExtensions: mock(),
@@ -52,14 +55,14 @@ beforeEach(() => clearPrismaMock(db))
 describe('ExtensionsService.createExtension', () => {
     it('throws 409 when alias already exists in company', async () => {
         db.extension.findUnique.mockResolvedValue(EXT_DB)
-        await expect(ExtensionsService.createExtension({ alias: '2001', type: 'pjsip', name: 'Test', companyId: 'c1', context: 'ramais' }))
+        await expect(ExtensionsService.createExtension({ alias: '2001', type: 'pjsip', name: 'Test', companyId: 'c1', context: 'ramais', allowOutbound: true }))
             .rejects.toMatchObject({ statusCode: 409 })
     })
 
     it('throws 404 when company not found', async () => {
         db.extension.findUnique.mockResolvedValue(null)
         db.company.findUnique.mockResolvedValue(null)
-        await expect(ExtensionsService.createExtension({ alias: '2002', type: 'pjsip', name: 'Test', companyId: 'clxxxxxxxxxxxxxxxxxxxxxxxxx', context: 'ramais' }))
+        await expect(ExtensionsService.createExtension({ alias: '2002', type: 'pjsip', name: 'Test', companyId: 'clxxxxxxxxxxxxxxxxxxxxxxxxx', context: 'ramais', allowOutbound: true }))
             .rejects.toMatchObject({ statusCode: 404 })
     })
 
@@ -74,7 +77,7 @@ describe('ExtensionsService.createExtension', () => {
             .mockResolvedValueOnce({ id: '2001_ast1' }) // checkAsteriskSync
         db.extension.create.mockResolvedValue(EXT_DB)
 
-        const ext = await ExtensionsService.createExtension({ alias: '2001', type: 'pjsip', name: 'Test', companyId: 'c1', context: 'ramais' }) as any
+        const ext = await ExtensionsService.createExtension({ alias: '2001', type: 'pjsip', name: 'Test', companyId: 'c1', context: 'ramais', allowOutbound: true }) as any
         expect(ext).toHaveProperty('password')
         expect(typeof ext.password).toBe('string')
     })

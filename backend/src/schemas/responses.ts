@@ -22,7 +22,7 @@ export const errors = {
     422: errorBody,
 }
 
-export const ok = (shape: z.ZodRawShape) =>
+export const ok = <T extends z.ZodRawShape>(shape: T) =>
     z.object({ success: z.literal(true), ...shape })
 
 export const deleted = ok({ message: z.string() })

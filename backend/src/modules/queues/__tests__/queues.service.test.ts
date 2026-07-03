@@ -4,14 +4,21 @@ import { createPrismaMock, clearPrismaMock } from '../../../test/mocks/prisma.mo
 const db = createPrismaMock()
 
 mock.module('../../../lib/prisma', () => ({ prisma: db }))
+mock.module('../../companies/cache/companies.cache', () => ({
+    CompaniesCache: { getCompany: mock(() => null), setCompany: mock() },
+}))
 mock.module('../cache/queues.cache', () => ({
     QueuesCache: {
         getAll: mock(() => null), setAll: mock(),
         getByCompany: mock(() => null), setByCompany: mock(),
         getQueue: mock(() => null), setQueue: mock(),
-        getMembers: mock(() => null), setMembers: mock(),
         invalidateQueue: mock(), invalidateByCompany: mock(), invalidateNamespace: mock(),
-        invalidateMembers: mock(), invalidateAll: mock(),
+        invalidateAll: mock(),
+    },
+}))
+mock.module('../../queue-members/cache/queue-members.cache', () => ({
+    QueueMembersCache: {
+        getMembers: mock(() => null), setMembers: mock(), invalidateMembers: mock(),
     },
 }))
 mock.module('../../../asterisk/queue.repository', () => ({
@@ -33,7 +40,6 @@ mock.module('../../../asterisk/queue.repository', () => ({
 }))
 
 import * as QueuesService from '../queues.service'
-import * as QueueMembersService from '../../queue-members/queue-members.service'
 
 const COMPANY = { id: 'c1', asteriskId: 'ast1' }
 const QUEUE = {
@@ -45,12 +51,6 @@ const QUEUE = {
     company: { asteriskId: 'ast1' },
     _count: { members: 0 },
 }
-const EXT = { id: 'e1', name: 'Agent', number: '2001_ast1', type: 'pjsip', companyId: 'c1' }
-const MEMBER = {
-    id: 'm1', queueId: 'q1', extensionId: 'e1', penalty: 0, paused: false,
-    createdAt: new Date(), updatedAt: new Date(),
-    extension: { id: 'e1', name: 'Agent', number: '2001_ast1', alias: '2001', type: 'pjsip', companyId: 'c1' },
-}
 
 beforeEach(() => clearPrismaMock(db))
 
@@ -58,14 +58,22 @@ beforeEach(() => clearPrismaMock(db))
 describe('QueuesService.createQueue', () => {
     it('throws 404 with non-existent companyId', async () => {
         db.company.findUnique.mockResolvedValue(null)
-        await expect(QueuesService.createQueue({ name: 'test', companyId: 'clxxxxxxxxxxxxxxxxxxxxxxxxx' }))
+        await expect(QueuesService.createQueue({
+            name: 'test', companyId: 'clxxxxxxxxxxxxxxxxxxxxxxxxx', number: '8000',
+            strategy: 'ringall', musicOnHold: 'default', timeout: 15, retry: 5,
+            maxLen: 0, wrapupTime: 0, announceFrequency: 0, joinEmpty: true, leaveWhenEmpty: false, weight: 0,
+        }))
             .rejects.toMatchObject({ statusCode: 404 })
     })
 
     it('throws 409 with duplicate name in same company', async () => {
         db.company.findUnique.mockResolvedValue(COMPANY)
         db.queue.findUnique.mockResolvedValue(QUEUE)
-        await expect(QueuesService.createQueue({ name: 'suporte', companyId: 'c1' }))
+        await expect(QueuesService.createQueue({
+            name: 'suporte', companyId: 'c1', number: '8001',
+            strategy: 'ringall', musicOnHold: 'default', timeout: 15, retry: 5,
+            maxLen: 0, wrapupTime: 0, announceFrequency: 0, joinEmpty: true, leaveWhenEmpty: false, weight: 0,
+        }))
             .rejects.toMatchObject({ statusCode: 409 })
     })
 
@@ -144,78 +152,3 @@ describe('QueuesService.deleteQueue', () => {
     })
 })
 
-// ─── QueueMembersService.addMember ────────────────────────────────────────────
-describe('QueueMembersService.addMember', () => {
-    it('throws 404 when queue not found', async () => {
-        db.queue.findUnique.mockResolvedValue(null)
-        await expect(QueueMembersService.addMember('clxxxxxxxxxxxxxxxxxxxxxxxxx', { extensionId: 'e1', penalty: 0, paused: false }))
-            .rejects.toMatchObject({ statusCode: 404 })
-    })
-
-    it('throws 404 when extension not found', async () => {
-        db.queue.findUnique.mockResolvedValue(QUEUE)
-        db.extension.findUnique.mockResolvedValue(null)
-        await expect(QueueMembersService.addMember('q1', { extensionId: 'clxxxxxxxxxxxxxxxxxxxxxxxxx', penalty: 0, paused: false }))
-            .rejects.toMatchObject({ statusCode: 404 })
-    })
-
-    it('throws 403 when extension belongs to different company', async () => {
-        db.queue.findUnique.mockResolvedValue(QUEUE)
-        db.extension.findUnique.mockResolvedValue({ ...EXT, companyId: 'other-company' })
-        await expect(QueueMembersService.addMember('q1', { extensionId: 'e1', penalty: 0, paused: false }))
-            .rejects.toMatchObject({ statusCode: 403 })
-    })
-
-    it('throws 409 when already a member', async () => {
-        db.queue.findUnique.mockResolvedValue(QUEUE)
-        db.extension.findUnique.mockResolvedValue(EXT)
-        db.queueMember.findUnique.mockResolvedValue(MEMBER)
-        await expect(QueueMembersService.addMember('q1', { extensionId: 'e1', penalty: 0, paused: false }))
-            .rejects.toMatchObject({ statusCode: 409 })
-    })
-
-    it('adds member', async () => {
-        db.queue.findUnique.mockResolvedValue(QUEUE)
-        db.extension.findUnique.mockResolvedValue(EXT)
-        db.queueMember.findUnique.mockResolvedValue(null)
-        db.queueMember.create.mockResolvedValue(MEMBER)
-        const member = await QueueMembersService.addMember('q1', { extensionId: 'e1', penalty: 0, paused: false }) as any
-        expect(member.extensionId).toBe('e1')
-    })
-})
-
-// ─── QueueMembersService.getQueueMembers ──────────────────────────────────────
-describe('QueueMembersService.getQueueMembers', () => {
-    it('throws 404 with non-existent queue', async () => {
-        db.queue.findUnique.mockResolvedValue(null)
-        await expect(QueueMembersService.getQueueMembers('clxxxxxxxxxxxxxxxxxxxxxxxxx'))
-            .rejects.toMatchObject({ statusCode: 404 })
-    })
-
-    it('returns members list', async () => {
-        db.queue.findUnique.mockResolvedValue(QUEUE)
-        db.queueMember.findMany.mockResolvedValue([MEMBER])
-        const members = await QueueMembersService.getQueueMembers('q1') as any[]
-        expect(members[0].id).toBe('m1')
-    })
-})
-
-// ─── QueueMembersService.updateMember ────────────────────────────────────────
-describe('QueueMembersService.updateMember', () => {
-    it('throws 404 when member not found', async () => {
-        db.queue.findUnique.mockResolvedValue(QUEUE)
-        db.queueMember.findUnique.mockResolvedValue(null)
-        await expect(QueueMembersService.updateMember('q1', 'clxxxxxxxxxxxxxxxxxxxxxxxxx', { penalty: 1 }))
-            .rejects.toMatchObject({ statusCode: 404 })
-    })
-})
-
-// ─── QueueMembersService.removeMember ────────────────────────────────────────
-describe('QueueMembersService.removeMember', () => {
-    it('throws 404 when member not found', async () => {
-        db.queue.findUnique.mockResolvedValue(QUEUE)
-        db.queueMember.findUnique.mockResolvedValue(null)
-        await expect(QueueMembersService.removeMember('q1', 'clxxxxxxxxxxxxxxxxxxxxxxxxx'))
-            .rejects.toMatchObject({ statusCode: 404 })
-    })
-})

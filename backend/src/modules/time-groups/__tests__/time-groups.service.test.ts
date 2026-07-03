@@ -4,6 +4,9 @@ import { createPrismaMock, clearPrismaMock } from '../../../test/mocks/prisma.mo
 const db = createPrismaMock()
 
 mock.module('../../../lib/prisma', () => ({ prisma: db }))
+mock.module('../../companies/cache/companies.cache', () => ({
+    CompaniesCache: { getCompany: mock(() => null), setCompany: mock() },
+}))
 mock.module('../cache/time-groups.cache', () => ({
     TimeGroupsCache: {
         getByCompany: mock(() => null), setByCompany: mock(),

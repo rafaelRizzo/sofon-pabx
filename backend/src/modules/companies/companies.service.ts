@@ -9,6 +9,19 @@ import { AsteriskQueueRepository } from '../../asterisk/queue.repository'
 import type { CreateCompanyInput, UpdateCompanyInput } from './schemas/company.schema'
 import { AppError } from '../../utils/errors/app.error'
 
+const companySelect = {
+    id: true,
+    name: true,
+    doc: true,
+    asteriskId: true,
+    metadata: true,
+    createdAt: true,
+    updatedAt: true,
+} as const
+
+const _byId = () => prisma.company.findUnique({ where: { id: '' }, select: companySelect })
+export type CompanyDto = NonNullable<Awaited<ReturnType<typeof _byId>>>
+
 export const getAllCompanies = async (companyIds?: string[]) => {
     if (companyIds && companyIds.length === 0) return []
 
@@ -19,36 +32,20 @@ export const getAllCompanies = async (companyIds?: string[]) => {
 
     const companies = await prisma.company.findMany({
         where: companyIds ? { id: { in: companyIds } } : undefined,
-        select: {
-            id: true,
-            name: true,
-            doc: true,
-            asteriskId: true,
-            metadata: true,
-            createdAt: true,
-            updatedAt: true,
-        },
+        select: companySelect,
     })
 
     if (!companyIds) await CompaniesCache.setAllCompanies(companies)
     return companies
 }
 
-export const getCompanyById = async (id: string) => {
-    const cached = await CompaniesCache.getCompany(id)
+export const getCompanyById = async (id: string): Promise<CompanyDto> => {
+    const cached = await CompaniesCache.getCompany<CompanyDto>(id)
     if (cached) return cached
 
     const company = await prisma.company.findUnique({
         where: { id },
-        select: {
-            id: true,
-            name: true,
-            doc: true,
-            asteriskId: true,
-            metadata: true,
-            createdAt: true,
-            updatedAt: true,
-        },
+        select: companySelect,
     })
 
     if (!company) {

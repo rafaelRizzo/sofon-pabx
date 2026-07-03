@@ -9,7 +9,7 @@ import {
     ListOutboundRoutesResponse, GetOutboundRouteResponse, CreateOutboundRouteResponse,
     UpdateOutboundRouteResponse, SetTrunksResponse, AddPatternResponse, UpdatePatternResponse,
     AddExtensionResponse,
-} from './outbound-routes.schema'
+} from './schemas/outbound-route.schema'
 import { errors, deleted } from '../../schemas/responses'
 
 export const outboundRoutesRoutes = async (app: FastifyInstance) => {

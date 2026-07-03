@@ -1,5 +1,6 @@
 import { randomBytes } from 'crypto'
 import { prisma } from '../../lib/prisma'
+import { getCompanyById } from '../companies/companies.service'
 import { TrunksCache } from './cache/trunks.cache'
 import type { CreateTrunkInput, UpdateTrunkInput } from './schemas/trunk.schema'
 import { PjsipRepository } from '../../asterisk/pjsip.repository'
@@ -34,8 +35,7 @@ export const getTrunks = async (companyId: string) => {
     const cached = await TrunksCache.getByCompany(companyId)
     if (cached) return cached
 
-    const company = await prisma.company.findUnique({ where: { id: companyId } })
-    if (!company) throw new AppError('Company not found', 404)
+    await getCompanyById(companyId)
 
     const trunks = await prisma.trunk.findMany({ where: { companyId }, select: trunkSelect })
     await TrunksCache.setByCompany(companyId, trunks)
@@ -54,8 +54,7 @@ export const getTrunkById = async (id: string) => {
 }
 
 export const createTrunk = async (data: CreateTrunkInput) => {
-    const company = await prisma.company.findUnique({ where: { id: data.companyId }, select: { asteriskId: true } })
-    if (!company) throw new AppError('Company not found', 404)
+    const company = await getCompanyById(data.companyId)
 
     const existing = await prisma.trunk.findUnique({
         where: { name_companyId: { name: data.name, companyId: data.companyId } },

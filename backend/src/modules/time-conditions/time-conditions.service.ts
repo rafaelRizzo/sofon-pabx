@@ -1,4 +1,6 @@
+import { Prisma } from '../../../generated/prisma/client'
 import { prisma } from '../../lib/prisma'
+import { getCompanyById } from '../companies/companies.service'
 import { TimeConditionsCache } from './cache/time-conditions.cache'
 import type { CreateTimeConditionInput, UpdateTimeConditionInput, RouteDest } from './schemas/time-condition.schema'
 import { TimeConditionRepository } from '../../asterisk/timecondition.repository'
@@ -82,8 +84,7 @@ export const getTimeConditionsByCompany = async (companyId: string) => {
     const cached = await TimeConditionsCache.getByCompany(companyId)
     if (cached) return cached
 
-    const company = await prisma.company.findUnique({ where: { id: companyId } })
-    if (!company) throw new AppError('Company not found', 404)
+    await getCompanyById(companyId)
 
     const conditions = await prisma.timeCondition.findMany({ where: { companyId }, select: timeConditionSelect })
     await TimeConditionsCache.setByCompany(companyId, conditions)
@@ -102,8 +103,7 @@ export const getTimeConditionById = async (id: string): Promise<TimeConditionDto
 }
 
 export const createTimeCondition = async (data: CreateTimeConditionInput) => {
-    const company = await prisma.company.findUnique({ where: { id: data.companyId } })
-    if (!company) throw new AppError('Company not found', 404)
+    await getCompanyById(data.companyId)
 
     const existing = await prisma.timeCondition.findUnique({
         where: { name_companyId: { name: data.name, companyId: data.companyId } },
@@ -171,8 +171,8 @@ export const updateTimeCondition = async (id: string, data: UpdateTimeConditionI
             where: { id },
             data: {
                 name: data.name,
-                trueRoute: data.trueRoute === undefined ? undefined : (data.trueRoute ?? null),
-                falseRoute: data.falseRoute === undefined ? undefined : (data.falseRoute ?? null),
+                trueRoute: data.trueRoute === undefined ? undefined : (data.trueRoute ?? Prisma.JsonNull),
+                falseRoute: data.falseRoute === undefined ? undefined : (data.falseRoute ?? Prisma.JsonNull),
             },
             select: timeConditionSelect,
         })

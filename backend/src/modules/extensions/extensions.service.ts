@@ -1,5 +1,6 @@
 import { randomBytes } from 'crypto'
 import { prisma } from '../../lib/prisma'
+import { getCompanyById } from '../companies/companies.service'
 import { ExtensionsCache } from './cache/extensions.cache'
 import type { CreateExtensionInput, UpdateExtensionInput } from './schemas/extension.schema'
 import { sipFieldKeys, pjsipFieldKeys, sipFieldMap, pjsipFieldMap } from './schemas/extension.schema'
@@ -207,8 +208,7 @@ export const createExtension = async (data: CreateExtensionInput) => {
     })
     if (existing) throw new AppError('Extension already exists for this company', 409)
 
-    const company = await prisma.company.findUnique({ where: { id: companyId }, select: { asteriskId: true } })
-    if (!company) throw new AppError('Company not found', 404)
+    const company = await getCompanyById(companyId)
 
     const number = generateAsteriskNumber(alias, company.asteriskId)
 

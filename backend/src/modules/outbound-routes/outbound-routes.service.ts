@@ -1,4 +1,5 @@
 import { prisma } from '../../lib/prisma'
+import { getCompanyById } from '../companies/companies.service'
 import { AppError } from '../../utils/errors/app.error'
 import { OutboundRoutesCache } from './cache/outbound-routes.cache'
 import type {
@@ -7,7 +8,7 @@ import type {
     AddPatternInput,
     UpdatePatternInput,
     SetTrunksInput,
-} from './outbound-routes.schema'
+} from './schemas/outbound-route.schema'
 
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 
@@ -189,11 +190,7 @@ export const getOutboundRouteById = async (id: string) => {
 }
 
 export const createOutboundRoute = async (data: CreateOutboundRouteInput) => {
-    const company = await prisma.company.findUnique({
-        where: { id: data.companyId },
-        select: { asteriskId: true },
-    })
-    if (!company) throw new AppError('Company not found', 404)
+    const company = await getCompanyById(data.companyId)
 
     const trunks = await prisma.trunk.findMany({
         where: { id: { in: data.trunkIds }, companyId: data.companyId },

@@ -4,12 +4,15 @@ import { createPrismaMock, clearPrismaMock } from '../../../test/mocks/prisma.mo
 const db = createPrismaMock()
 
 mock.module('../../../lib/prisma', () => ({ prisma: db }))
+mock.module('../../companies/cache/companies.cache', () => ({
+    CompaniesCache: { getCompany: mock(() => null), setCompany: mock() },
+}))
 mock.module('../cache/inbound-routes.cache', () => ({
     InboundRoutesCache: {
-        getByCompany:       mock(() => null), setByCompany:       mock(),
+        getByCompany: mock(() => null), setByCompany: mock(),
         invalidateByCompany: mock(),
-        getRoute:           mock(() => null), setRoute:           mock(),
-        invalidateRoute:    mock(),
+        getRoute: mock(() => null), setRoute: mock(),
+        invalidateRoute: mock(),
         invalidateNamespace: mock(),
     },
 }))
@@ -23,12 +26,12 @@ mock.module('../../../asterisk/inboundroute.repository', () => ({
 
 import * as InboundRoutesService from '../inbound-routes.service'
 
-const COMPANY  = { id: 'c1', name: 'ACME' }
-const DID      = { id: 'd1', number: '5511999990001', companyId: 'c1' }
-const TRUNK    = { id: 't1', name: 'trunk-vivo', companyId: 'c1' }
-const EXT      = { id: 'e1', companyId: 'c1', context: 'ramais', number: '1001' }
-const QUEUE    = { id: 'q1', companyId: 'c1', number: '5000' }
-const TC       = { id: 'tc1', companyId: 'c1' }
+const COMPANY = { id: 'c1', name: 'ACME' }
+const DID = { id: 'd1', number: '5511999990001', companyId: 'c1' }
+const TRUNK = { id: 't1', name: 'trunk-vivo', companyId: 'c1' }
+const EXT = { id: 'e1', companyId: 'c1', context: 'ramais', number: '1001' }
+const QUEUE = { id: 'q1', companyId: 'c1', number: '5000' }
+const TC = { id: 'tc1', companyId: 'c1' }
 
 const ROUTE = {
     id: 'r1', name: 'entrada-principal', companyId: 'c1',

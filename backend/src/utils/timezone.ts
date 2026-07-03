@@ -11,7 +11,7 @@ export function toTzISOString(date: Date, timeZone: string): string {
     const map: Record<string, string> = {}
     for (const part of parts) map[part.type] = part.value
 
-    const asUTC = Date.UTC(+map.year, +map.month - 1, +map.day, +map.hour, +map.minute, +map.second)
+    const asUTC = Date.UTC(+map.year!, +map.month! - 1, +map.day!, +map.hour!, +map.minute!, +map.second!)
     const offsetMin = Math.round((asUTC - date.getTime()) / 60000)
 
     const sign = offsetMin < 0 ? '-' : '+'

@@ -30,7 +30,7 @@ export const CompanySchema = z.object({
     id: z.string(),
     name: z.string(),
     doc: z.string().nullable(),
-    metadata: z.record(z.unknown()),
+    metadata: z.record(z.string(), z.unknown()),
     createdAt: timestamp,
     updatedAt: timestamp,
 })

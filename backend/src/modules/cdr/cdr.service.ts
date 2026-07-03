@@ -1,13 +1,9 @@
 import { prisma } from '../../lib/prisma'
-import { AppError } from '../../utils/errors/app.error'
+import { getCompanyById } from '../companies/companies.service'
 import type { CdrQueryInput } from './schemas/cdr.schema'
 
 export const getCdrByCompany = async (query: CdrQueryInput) => {
-    const company = await prisma.company.findUnique({
-        where: { id: query.companyId },
-        select: { asteriskId: true },
-    })
-    if (!company) throw new AppError('Company not found', 404)
+    const company = await getCompanyById(query.companyId)
 
     const where = {
         accountcode: company.asteriskId,

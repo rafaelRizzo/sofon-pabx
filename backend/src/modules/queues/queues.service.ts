@@ -1,5 +1,7 @@
 import { prisma } from '../../lib/prisma'
+import { getCompanyById } from '../companies/companies.service'
 import { QueuesCache } from './cache/queues.cache'
+import { QueueMembersCache } from '../queue-members/cache/queue-members.cache'
 import type { CreateQueueInput, UpdateQueueInput } from './schemas/queue.schema'
 import { AsteriskQueueRepository, queueAppExten, toAsteriskQueueName } from '../../asterisk/queue.repository'
 import { AppError } from '../../utils/errors/app.error'
@@ -48,8 +50,7 @@ export const getQueuesByCompany = async (companyId: string) => {
     const cached = await QueuesCache.getByCompany(companyId)
     if (cached) return cached
 
-    const company = await prisma.company.findUnique({ where: { id: companyId } })
-    if (!company) throw new AppError('Company not found', 404)
+    await getCompanyById(companyId)
 
     const queues = await prisma.queue.findMany({ where: { companyId }, select: queueSelect })
     await QueuesCache.setByCompany(companyId, queues)
@@ -71,8 +72,7 @@ export const getQueueById = async (id: string): Promise<QueueDto> => {
 }
 
 export const createQueue = async (data: CreateQueueInput) => {
-    const company = await prisma.company.findUnique({ where: { id: data.companyId } })
-    if (!company) throw new AppError('Company not found', 404)
+    const company = await getCompanyById(data.companyId)
 
     const existing = await prisma.queue.findUnique({
         where: { name_companyId: { name: data.name, companyId: data.companyId } },
@@ -180,7 +180,7 @@ export const deleteQueue = async (id: string) => {
     })
 
     await QueuesCache.invalidateQueue(id)
-    await QueuesCache.invalidateMembers(id)
+    await QueueMembersCache.invalidateMembers(id)
     await QueuesCache.invalidateByCompany(existing.companyId)
     await QueuesCache.invalidateAll()
 }

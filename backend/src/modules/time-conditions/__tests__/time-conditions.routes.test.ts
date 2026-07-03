@@ -171,7 +171,7 @@ describe('GET /time-conditions/:id', () => {
         expect(timeCondition.name).toBe('horario-comercial')
         expect(timeCondition.trueRoute?.type).toBe('hangup')
         expect(Array.isArray(timeCondition.timeGroups)).toBe(true)
-        expect(timeCondition.timeGroups[0].timeGroup.id).toBe(groupId)
+        expect(timeCondition.timeGroups[0]?.timeGroup.id).toBe(groupId)
     })
 
     it('404 non-existent id', async () => {

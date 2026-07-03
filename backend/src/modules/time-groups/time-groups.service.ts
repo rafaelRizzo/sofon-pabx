@@ -1,4 +1,5 @@
 import { prisma } from '../../lib/prisma'
+import { getCompanyById } from '../companies/companies.service'
 import { TimeGroupsCache } from './cache/time-groups.cache'
 import type { CreateTimeGroupInput, UpdateTimeGroupInput } from './schemas/time-group.schema'
 import { resyncTimeConditionDialplan } from '../time-conditions/time-conditions.service'
@@ -31,8 +32,7 @@ export const getTimeGroupsByCompany = async (companyId: string) => {
     const cached = await TimeGroupsCache.getByCompany(companyId)
     if (cached) return cached
 
-    const company = await prisma.company.findUnique({ where: { id: companyId } })
-    if (!company) throw new AppError('Company not found', 404)
+    await getCompanyById(companyId)
 
     const groups = await prisma.timeGroup.findMany({ where: { companyId }, select: timeGroupSelect })
     await TimeGroupsCache.setByCompany(companyId, groups)
@@ -51,8 +51,7 @@ export const getTimeGroupById = async (id: string): Promise<TimeGroupDto> => {
 }
 
 export const createTimeGroup = async (data: CreateTimeGroupInput) => {
-    const company = await prisma.company.findUnique({ where: { id: data.companyId } })
-    if (!company) throw new AppError('Company not found', 404)
+    await getCompanyById(data.companyId)
 
     const existing = await prisma.timeGroup.findUnique({
         where: { name_companyId: { name: data.name, companyId: data.companyId } },

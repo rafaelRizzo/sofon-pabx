@@ -4,6 +4,9 @@ import { createPrismaMock, clearPrismaMock } from '../../../test/mocks/prisma.mo
 const db = createPrismaMock()
 
 mock.module('../../../lib/prisma', () => ({ prisma: db }))
+mock.module('../../companies/cache/companies.cache', () => ({
+    CompaniesCache: { getCompany: mock(() => null), setCompany: mock() },
+}))
 mock.module('../cache/outbound-routes.cache', () => ({
     OutboundRoutesCache: {
         getByCompany: mock(() => null), setByCompany: mock(),
@@ -40,7 +43,10 @@ describe('Service.getOutboundRouteById', () => {
 describe('Service.createOutboundRoute', () => {
     it('throws 404 when company not found', async () => {
         db.company.findUnique.mockResolvedValue(null)
-        await expect(Service.createOutboundRoute({ name: 'X', companyId: 'clxxxxxxxxxxxxxxxxxxxxxxxxx' }))
+        await expect(Service.createOutboundRoute({
+            name: 'X', companyId: 'clxxxxxxxxxxxxxxxxxxxxxxxxx',
+            position: 0, trunkIds: ['t1'], patterns: [{ pattern: '_X.', position: 0 }],
+        }))
             .rejects.toMatchObject({ statusCode: 404 })
     })
 
@@ -48,7 +54,10 @@ describe('Service.createOutboundRoute', () => {
         db.company.findUnique.mockResolvedValue(COMPANY)
         db.outboundRoute.findMany.mockResolvedValue([])
         db.trunk.findMany.mockResolvedValue([])
-        await expect(Service.createOutboundRoute({ name: 'X', companyId: 'c1', trunkIds: ['clxxxxxxxxxxxxxxxxxxxxxxxxx'] }))
+        await expect(Service.createOutboundRoute({
+            name: 'X', companyId: 'c1',
+            position: 0, trunkIds: ['clxxxxxxxxxxxxxxxxxxxxxxxxx'], patterns: [{ pattern: '_X.', position: 0 }],
+        }))
             .rejects.toMatchObject({ statusCode: 404 })
     })
 
@@ -66,8 +75,9 @@ describe('Service.createOutboundRoute', () => {
         const route = await Service.createOutboundRoute({
             name: 'Saídas',
             companyId: 'c1',
+            position: 0,
             trunkIds: ['t1'],
-            patterns: [{ pattern: '_0XXXXXXXX', prefix: null, prepend: null }],
+            patterns: [{ pattern: '_0XXXXXXXX', prefix: null, prepend: null, position: 0 }],
         }) as any
         expect(route).toBeDefined()
     })
@@ -95,7 +105,7 @@ describe('Service.deleteOutboundRoute', () => {
 describe('Service.addPattern', () => {
     it('throws 404 when route not found', async () => {
         db.outboundRoute.findUnique.mockResolvedValue(null)
-        await expect(Service.addPattern('clxxxxxxxxxxxxxxxxxxxxxxxxx', { pattern: '_0XXXXXXXX' }))
+        await expect(Service.addPattern('clxxxxxxxxxxxxxxxxxxxxxxxxx', { pattern: '_0XXXXXXXX', position: 0 }))
             .rejects.toMatchObject({ statusCode: 404 })
     })
 })

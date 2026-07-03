@@ -1,4 +1,5 @@
 import { prisma } from '../../lib/prisma'
+import { getCompanyById } from '../companies/companies.service'
 import { DidsCache } from './cache/dids.cache'
 import type { CreateDidInput, UpdateDidInput } from './schemas/did.schema'
 import { InboundRouteRepository } from '../../asterisk/inboundroute.repository'
@@ -34,8 +35,7 @@ export const getDidsByCompany = async (companyId: string) => {
     const cached = await DidsCache.getDidsByCompany(companyId)
     if (cached) return cached
 
-    const company = await prisma.company.findUnique({ where: { id: companyId } })
-    if (!company) throw new AppError('Company not found', 404)
+    await getCompanyById(companyId)
 
     const dids = await prisma.did.findMany({ where: { companyId }, select })
 
@@ -55,8 +55,7 @@ export const getDidById = async (id: string) => {
 }
 
 export const createDid = async (data: CreateDidInput) => {
-    const company = await prisma.company.findUnique({ where: { id: data.companyId } })
-    if (!company) throw new AppError('Company not found', 404)
+    await getCompanyById(data.companyId)
 
     const existing = await prisma.did.findUnique({
         where: { number_companyId: { number: data.number, companyId: data.companyId } },

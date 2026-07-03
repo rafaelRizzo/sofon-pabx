@@ -4,8 +4,8 @@ import { logger } from '../../../utils/logger'
 const NAMESPACE = 'companies'
 
 export class CompaniesCache {
-    static async getCompany(id: string) {
-        const cached = await cacheManager.get(`${NAMESPACE}:company`, id)
+    static async getCompany<T = unknown>(id: string) {
+        const cached = await cacheManager.get<T>(`${NAMESPACE}:company`, id)
         logger.info({
             event: cached ? 'cache.hit' : 'cache.miss',
             namespace: NAMESPACE,

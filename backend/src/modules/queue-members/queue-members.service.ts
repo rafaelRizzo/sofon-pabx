@@ -1,5 +1,6 @@
 import { prisma } from '../../lib/prisma'
 import { QueuesCache } from '../queues/cache/queues.cache'
+import { QueueMembersCache } from './cache/queue-members.cache'
 import { getQueueById, type QueueDto } from '../queues/queues.service'
 import { AsteriskQueueRepository } from '../../asterisk/queue.repository'
 import type { AddMemberInput, UpdateMemberInput } from './schemas/queue-member.schema'
@@ -23,14 +24,14 @@ const toAsteriskQueueName = (asteriskId: string, queueName: string) => `${asteri
 const toAsteriskInterface = (type: string, number: string) => `${type.toUpperCase()}/${number}`
 
 export const getQueueMembers = async (queueId: string) => {
-    const cached = await QueuesCache.getMembers(queueId)
+    const cached = await QueueMembersCache.getMembers(queueId)
     if (cached) return cached
 
     const queue = await prisma.queue.findUnique({ where: { id: queueId } })
     if (!queue) throw new AppError('Queue not found', 404)
 
     const members = await prisma.queueMember.findMany({ where: { queueId }, select: memberSelect })
-    await QueuesCache.setMembers(queueId, members)
+    await QueueMembersCache.setMembers(queueId, members)
     return members
 }
 
@@ -63,7 +64,7 @@ export const addMember = async (queueId: string, data: AddMemberInput) => {
         return m
     })
 
-    await QueuesCache.invalidateMembers(queueId)
+    await QueueMembersCache.invalidateMembers(queueId)
     await QueuesCache.invalidateQueue(queueId)
     await QueuesCache.invalidateByCompany(queue.companyId)
     await QueuesCache.invalidateAll()
@@ -89,7 +90,7 @@ export const updateMember = async (queueId: string, memberId: string, data: Upda
         return m
     })
 
-    await QueuesCache.invalidateMembers(queueId)
+    await QueueMembersCache.invalidateMembers(queueId)
     await QueuesCache.invalidateQueue(queueId)
     return updated
 }
@@ -112,7 +113,7 @@ export const removeMember = async (queueId: string, memberId: string) => {
         await AsteriskQueueRepository.removeMember(tx, asteriskName, iface)
     })
 
-    await QueuesCache.invalidateMembers(queueId)
+    await QueueMembersCache.invalidateMembers(queueId)
     await QueuesCache.invalidateQueue(queueId)
     await QueuesCache.invalidateByCompany(member.queue.companyId)
     await QueuesCache.invalidateAll()

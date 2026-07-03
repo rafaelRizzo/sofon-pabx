@@ -11,7 +11,7 @@ import {
     patternIdParamSchema,
     extensionParamSchema,
     companyQuerySchema,
-} from './outbound-routes.schema'
+} from './schemas/outbound-route.schema'
 import { handleError } from '../../utils/errors/handler.error'
 import { AppError } from '../../utils/errors/app.error'
 

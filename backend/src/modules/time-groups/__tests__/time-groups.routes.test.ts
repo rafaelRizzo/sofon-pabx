@@ -133,7 +133,7 @@ describe('GET /time-groups/:id', () => {
         expect(timeGroup.id).toBe(groupId)
         expect(timeGroup.name).toBe('comercial')
         expect(Array.isArray(timeGroup.ranges)).toBe(true)
-        expect(timeGroup.ranges[0].startTime).toBe('08:00')
+        expect(timeGroup.ranges[0]?.startTime).toBe('08:00')
     })
 
     it('404 non-existent id', async () => {

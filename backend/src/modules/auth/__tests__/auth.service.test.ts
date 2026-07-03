@@ -74,7 +74,7 @@ describe('AuthService.refreshAccessToken', () => {
 
     it('throws 401 with invalid refresh token', async () => {
         const { verifyRefreshToken } = await import('../../../lib/jwt')
-        ;(verifyRefreshToken as any).mockImplementationOnce(() => { throw new Error('invalid') })
+            ; (verifyRefreshToken as any).mockImplementationOnce(() => { throw new Error('invalid') })
         await expect(AuthService.refreshAccessToken('bad-token'))
             .rejects.toMatchObject({ statusCode: 401 })
     })

@@ -1,20 +1,22 @@
+import { Prisma } from '../../../generated/prisma/client'
 import { prisma } from '../../lib/prisma'
+import { getCompanyById } from '../companies/companies.service'
 import { InboundRoutesCache } from './cache/inbound-routes.cache'
 import { InboundRouteRepository } from '../../asterisk/inboundroute.repository'
 import type { CreateInboundRouteInput, UpdateInboundRouteInput, InboundDest } from './schemas/inbound-route.schema'
 import { AppError } from '../../utils/errors/app.error'
 
 const inboundRouteSelect = {
-    id:          true,
-    name:        true,
-    companyId:   true,
-    didId:       true,
-    trunkId:     true,
-    did:         { select: { id: true, number: true } },
-    trunk:       { select: { id: true, name: true } },
+    id: true,
+    name: true,
+    companyId: true,
+    didId: true,
+    trunkId: true,
+    did: { select: { id: true, number: true } },
+    trunk: { select: { id: true, name: true } },
     destination: true,
-    createdAt:   true,
-    updatedAt:   true,
+    createdAt: true,
+    updatedAt: true,
 } as const
 
 const _byId = () => prisma.inboundRoute.findUnique({ where: { id: '' }, select: inboundRouteSelect })
@@ -52,8 +54,7 @@ export const getInboundRoutesByCompany = async (companyId: string) => {
     const cached = await InboundRoutesCache.getByCompany(companyId)
     if (cached) return cached
 
-    const company = await prisma.company.findUnique({ where: { id: companyId } })
-    if (!company) throw new AppError('Company not found', 404)
+    await getCompanyById(companyId)
 
     const routes = await prisma.inboundRoute.findMany({ where: { companyId }, select: inboundRouteSelect })
     await InboundRoutesCache.setByCompany(companyId, routes)
@@ -72,13 +73,12 @@ export const getInboundRouteById = async (id: string): Promise<InboundRouteDto> 
 }
 
 export const createInboundRoute = async (data: CreateInboundRouteInput) => {
-    const [company, did, trunk] = await Promise.all([
-        prisma.company.findUnique({ where: { id: data.companyId } }),
+    const [, did, trunk] = await Promise.all([
+        getCompanyById(data.companyId),
         prisma.did.findUnique({ where: { id: data.didId }, select: { id: true, number: true, companyId: true } }),
         prisma.trunk.findUnique({ where: { id: data.trunkId }, select: { id: true, companyId: true } }),
     ])
 
-    if (!company) throw new AppError('Company not found', 404)
     if (!did) throw new AppError('DID not found', 404)
     if (!trunk) throw new AppError('Trunk not found', 404)
     if (did.companyId !== data.companyId) throw new AppError('DID belongs to different company', 403)
@@ -94,10 +94,10 @@ export const createInboundRoute = async (data: CreateInboundRouteInput) => {
     const route = await prisma.$transaction(async (tx) => {
         const created = await tx.inboundRoute.create({
             data: {
-                name:        data.name,
-                companyId:   data.companyId,
-                didId:       data.didId,
-                trunkId:     data.trunkId,
+                name: data.name,
+                companyId: data.companyId,
+                didId: data.didId,
+                trunkId: data.trunkId,
                 destination: data.destination ?? undefined,
             },
             select: inboundRouteSelect,
@@ -128,8 +128,8 @@ export const updateInboundRoute = async (id: string, data: UpdateInboundRouteInp
         const updated = await tx.inboundRoute.update({
             where: { id },
             data: {
-                name:        data.name,
-                destination: data.destination === undefined ? undefined : (data.destination ?? null),
+                name: data.name,
+                destination: data.destination === undefined ? undefined : (data.destination ?? Prisma.JsonNull),
             },
             select: inboundRouteSelect,
         })
