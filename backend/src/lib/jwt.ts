@@ -20,7 +20,8 @@ export const generateTokens = async (payload: TokenPayload) => {
     const token = jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN as jwt.SignOptions['expiresIn'] })
     const refreshToken = jwt.sign(tokenPayload, REFRESH_SECRET, { expiresIn: REFRESH_TOKEN_EXPIRES_IN as jwt.SignOptions['expiresIn'] })
 
-    await jtiManager.add(jti, payload.id, 15 * 60)
+    const { exp } = jwt.decode(token) as { exp: number }
+    await jtiManager.add(jti, payload.id, exp - Math.floor(Date.now() / 1000))
 
     return { token, refreshToken }
 }

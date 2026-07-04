@@ -16,6 +16,9 @@ mock.module('../cache/time-conditions.cache', () => ({
         invalidateNamespace: mock(),
     },
 }))
+mock.module('../../extensions/cache/extensions.cache', () => ({
+    ExtensionsCache: { getExtension: mock(() => null), setExtension: mock() },
+}))
 mock.module('../../../asterisk/timecondition.repository', () => ({
     TimeConditionRepository: {
         create: mock(() => Promise.resolve()),

@@ -1,5 +1,6 @@
 import { prisma } from '../../lib/prisma'
 import { getCompanyById } from '../companies/companies.service'
+import { getExtensionDto } from '../extensions/extensions.service'
 import { AppError } from '../../utils/errors/app.error'
 import { OutboundRoutesCache } from './cache/outbound-routes.cache'
 import type {
@@ -430,8 +431,7 @@ export const addExtension = async (routeId: string, extensionId: string) => {
     })
     if (!route) throw new AppError('Outbound route not found', 404)
 
-    const ext = await prisma.extension.findUnique({ where: { id: extensionId }, select: { id: true } })
-    if (!ext) throw new AppError('Extension not found', 404)
+    await getExtensionDto(extensionId)
 
     const result = await prisma.outboundRouteExtension.create({ data: { routeId, extensionId } })
 

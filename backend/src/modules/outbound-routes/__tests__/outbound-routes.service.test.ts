@@ -7,6 +7,9 @@ mock.module('../../../lib/prisma', () => ({ prisma: db }))
 mock.module('../../companies/cache/companies.cache', () => ({
     CompaniesCache: { getCompany: mock(() => null), setCompany: mock() },
 }))
+mock.module('../../extensions/cache/extensions.cache', () => ({
+    ExtensionsCache: { getExtension: mock(() => null), setExtension: mock() },
+}))
 mock.module('../cache/outbound-routes.cache', () => ({
     OutboundRoutesCache: {
         getByCompany: mock(() => null), setByCompany: mock(),

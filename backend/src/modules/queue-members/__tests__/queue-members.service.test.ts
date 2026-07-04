@@ -15,6 +15,9 @@ mock.module('../cache/queue-members.cache', () => ({
         getMembers: mock(() => null), setMembers: mock(), invalidateMembers: mock(),
     },
 }))
+mock.module('../../extensions/cache/extensions.cache', () => ({
+    ExtensionsCache: { getExtension: mock(() => null), setExtension: mock() },
+}))
 mock.module('../../../asterisk/queue.repository', () => ({
     AsteriskQueueRepository: {
         addMember: mock(() => Promise.resolve()),

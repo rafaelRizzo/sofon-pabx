@@ -1,6 +1,7 @@
 import { Prisma } from '../../../generated/prisma/client'
 import { prisma } from '../../lib/prisma'
 import { getCompanyById } from '../companies/companies.service'
+import { getExtensionDto } from '../extensions/extensions.service'
 import { TimeConditionsCache } from './cache/time-conditions.cache'
 import type { CreateTimeConditionInput, UpdateTimeConditionInput, RouteDest } from './schemas/time-condition.schema'
 import { TimeConditionRepository } from '../../asterisk/timecondition.repository'
@@ -29,8 +30,9 @@ async function validateRoute(route: RouteDest | undefined | null, companyId: str
 
     switch (route.type) {
         case 'extension': {
-            const ext = await prisma.extension.findUnique({ where: { id: route.id }, select: { companyId: true } })
-            if (!ext) throw new AppError(`${label}: Extension not found`, 404)
+            const ext = await getExtensionDto(route.id).catch(() => {
+                throw new AppError(`${label}: Extension not found`, 404)
+            })
             if (ext.companyId !== companyId) throw new AppError(`${label}: Extension belongs to different company`, 403)
             break
         }

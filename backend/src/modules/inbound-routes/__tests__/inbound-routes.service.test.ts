@@ -16,6 +16,9 @@ mock.module('../cache/inbound-routes.cache', () => ({
         invalidateNamespace: mock(),
     },
 }))
+mock.module('../../extensions/cache/extensions.cache', () => ({
+    ExtensionsCache: { getExtension: mock(() => null), setExtension: mock() },
+}))
 mock.module('../../../asterisk/inboundroute.repository', () => ({
     InboundRouteRepository: {
         create: mock(() => Promise.resolve()),

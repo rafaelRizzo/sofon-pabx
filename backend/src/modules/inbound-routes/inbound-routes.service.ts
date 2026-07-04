@@ -1,6 +1,7 @@
 import { Prisma } from '../../../generated/prisma/client'
 import { prisma } from '../../lib/prisma'
 import { getCompanyById } from '../companies/companies.service'
+import { getExtensionDto } from '../extensions/extensions.service'
 import { InboundRoutesCache } from './cache/inbound-routes.cache'
 import { InboundRouteRepository } from '../../asterisk/inboundroute.repository'
 import type { CreateInboundRouteInput, UpdateInboundRouteInput, InboundDest } from './schemas/inbound-route.schema'
@@ -27,8 +28,7 @@ async function validateDestination(dest: InboundDest | undefined | null, company
 
     switch (dest.type) {
         case 'extension': {
-            const ext = await prisma.extension.findUnique({ where: { id: dest.id }, select: { companyId: true } })
-            if (!ext) throw new AppError('Extension not found', 404)
+            const ext = await getExtensionDto(dest.id)
             if (ext.companyId !== companyId) throw new AppError('Extension belongs to different company', 403)
             break
         }

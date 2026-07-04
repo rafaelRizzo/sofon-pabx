@@ -2,8 +2,6 @@ import type { FastifyRequest, FastifyReply } from 'fastify'
 import * as ExtensionsService from './extensions.service'
 import { createExtensionSchema, createExtensionBatchSchema, updateExtensionSchema, extensionIdParamSchema, extensionQuerySchema, BATCH_LIMIT } from './schemas/extension.schema'
 import { handleError } from '../../utils/errors/handler.error'
-import { AppError } from '../../utils/errors/app.error'
-import { prisma } from '../../lib/prisma'
 
 export const getAllExtensions = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
@@ -25,8 +23,7 @@ export const getAllExtensions = async (req: FastifyRequest, reply: FastifyReply)
 export const getExtensionById = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
         const { id } = extensionIdParamSchema.parse(req.params)
-        const owner = await prisma.extension.findUnique({ where: { id }, select: { companyId: true } })
-        if (!owner) throw new AppError('Extension not found', 404)
+        const owner = await ExtensionsService.getExtensionDto(id)
         req.scope.assertAccess(owner.companyId)
         const extension = await ExtensionsService.getExtensionById(id)
         return reply.send({ success: true, message: 'Extension fetched successfully', extension })
@@ -67,8 +64,7 @@ export const updateExtension = async (req: FastifyRequest, reply: FastifyReply) 
         const { id } = extensionIdParamSchema.parse(req.params)
         const data = updateExtensionSchema.parse(req.body)
 
-        const existing = await prisma.extension.findUnique({ where: { id }, select: { companyId: true } })
-        if (!existing) throw new AppError('Extension not found', 404)
+        const existing = await ExtensionsService.getExtensionDto(id)
 
         req.scope.assertAccess(existing.companyId)
         const extension = await ExtensionsService.updateExtension(id, data)
@@ -82,8 +78,7 @@ export const deleteExtension = async (req: FastifyRequest, reply: FastifyReply) 
     try {
         const { id } = extensionIdParamSchema.parse(req.params)
 
-        const extension = await prisma.extension.findUnique({ where: { id }, select: { companyId: true } })
-        if (!extension) throw new AppError('Extension not found', 404)
+        const extension = await ExtensionsService.getExtensionDto(id)
 
         req.scope.assertAccess(extension.companyId)
         await ExtensionsService.deleteExtension(id)
@@ -97,8 +92,7 @@ export const resetExtensionPassword = async (req: FastifyRequest, reply: Fastify
     try {
         const { id } = extensionIdParamSchema.parse(req.params)
 
-        const extension = await prisma.extension.findUnique({ where: { id }, select: { companyId: true } })
-        if (!extension) throw new AppError('Extension not found', 404)
+        const extension = await ExtensionsService.getExtensionDto(id)
 
         req.scope.assertAccess(extension.companyId)
         const result = await ExtensionsService.resetExtensionPassword(id)

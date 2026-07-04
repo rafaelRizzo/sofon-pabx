@@ -2,6 +2,7 @@ import { prisma } from '../../lib/prisma'
 import { QueuesCache } from '../queues/cache/queues.cache'
 import { QueueMembersCache } from './cache/queue-members.cache'
 import { getQueueById, type QueueDto } from '../queues/queues.service'
+import { getExtensionDto } from '../extensions/extensions.service'
 import { AsteriskQueueRepository } from '../../asterisk/queue.repository'
 import type { AddMemberInput, UpdateMemberInput } from './schemas/queue-member.schema'
 import { AppError } from '../../utils/errors/app.error'
@@ -38,11 +39,7 @@ export const getQueueMembers = async (queueId: string) => {
 export const addMember = async (queueId: string, data: AddMemberInput) => {
     const queue = await getQueueById(queueId)
 
-    const extension = await prisma.extension.findUnique({
-        where: { id: data.extensionId },
-        select: { id: true, name: true, number: true, type: true, companyId: true },
-    })
-    if (!extension) throw new AppError('Extension not found', 404)
+    const extension = await getExtensionDto(data.extensionId)
     if (extension.companyId !== queue.companyId)
         throw new AppError('Extension does not belong to the same company as the queue', 403)
 
@@ -52,7 +49,7 @@ export const addMember = async (queueId: string, data: AddMemberInput) => {
     if (alreadyMember) throw new AppError('Extension is already a member of this queue', 409)
 
     const asteriskName = toAsteriskQueueName(queue.company.asteriskId, queue.name)
-    const iface = toAsteriskInterface(extension.type, extension.number)
+    const iface = toAsteriskInterface(extension.type, extension.username)
 
     const member = await prisma.$transaction(async (tx) => {
         const m = await tx.queueMember.create({ data: { queueId, ...data }, select: memberSelect })

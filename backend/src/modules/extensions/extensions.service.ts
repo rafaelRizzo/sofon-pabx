@@ -222,22 +222,26 @@ type ExtensionDto = {
     updatedAt: Date
 }
 
-export const getExtensionById = async (id: string): Promise<ExtensionDto & { synced: boolean }> => {
+// Lookup cacheado usado por outros módulos que só precisam de companyId/type/username pra
+// checagem de ownership ou validação de destino (ex: time-conditions, inbound-routes,
+// outbound-routes, queue-members) — evita repetir prisma.extension.findUnique em cada um
+export const getExtensionDto = async (id: string): Promise<ExtensionDto> => {
     const cached = await ExtensionsCache.getExtension<ExtensionDto>(id)
+    if (cached) return cached
 
-    let dto: ExtensionDto
-    if (cached) {
-        dto = cached
-    } else {
-        const extension = await prisma.extension.findUnique({
-            where: { id },
-            select: extensionSelect,
-        })
-        if (!extension) throw new AppError('Extension not found', 404)
-        const { number, allowOutbound, ...rest } = extension
-        dto = { ...rest, allowOutbound, username: number }
-        await ExtensionsCache.setExtension(id, dto)
-    }
+    const extension = await prisma.extension.findUnique({
+        where: { id },
+        select: extensionSelect,
+    })
+    if (!extension) throw new AppError('Extension not found', 404)
+    const { number, allowOutbound, ...rest } = extension
+    const dto: ExtensionDto = { ...rest, allowOutbound, username: number }
+    await ExtensionsCache.setExtension(id, dto)
+    return dto
+}
+
+export const getExtensionById = async (id: string): Promise<ExtensionDto & { synced: boolean }> => {
+    const dto = await getExtensionDto(id)
 
     const [synced, details] = await Promise.all([
         checkAsteriskSync(dto.username, dto.type),
