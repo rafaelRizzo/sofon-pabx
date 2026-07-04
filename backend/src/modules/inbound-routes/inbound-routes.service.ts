@@ -1,9 +1,9 @@
 import { Prisma } from '../../../generated/prisma/client'
 import { prisma } from '../../lib/prisma'
 import { getCompanyById } from '../companies/companies.service'
-import { getExtensionDto } from '../extensions/extensions.service'
 import { InboundRoutesCache } from './cache/inbound-routes.cache'
 import { InboundRouteRepository } from '../../asterisk/inboundroute.repository'
+import { validateRouteDestination } from '../../schemas/route-destination.validate'
 import type { CreateInboundRouteInput, UpdateInboundRouteInput, InboundDest } from './schemas/inbound-route.schema'
 import { AppError } from '../../utils/errors/app.error'
 
@@ -23,32 +23,8 @@ const inboundRouteSelect = {
 const _byId = () => prisma.inboundRoute.findUnique({ where: { id: '' }, select: inboundRouteSelect })
 export type InboundRouteDto = NonNullable<Awaited<ReturnType<typeof _byId>>>
 
-async function validateDestination(dest: InboundDest | undefined | null, companyId: string) {
-    if (!dest || dest.type === 'hangup') return
-
-    switch (dest.type) {
-        case 'extension': {
-            const ext = await getExtensionDto(dest.id)
-            if (ext.companyId !== companyId) throw new AppError('Extension belongs to different company', 403)
-            break
-        }
-        case 'queue': {
-            const q = await prisma.queue.findUnique({ where: { id: dest.id }, select: { companyId: true, number: true } })
-            if (!q) throw new AppError('Queue not found', 404)
-            if (q.companyId !== companyId) throw new AppError('Queue belongs to different company', 403)
-            if (!q.number) throw new AppError('Queue has no number — cannot use as inbound destination', 400)
-            break
-        }
-        case 'voicemail':
-            break
-        case 'timecondition': {
-            const tc = await prisma.timeCondition.findUnique({ where: { id: dest.id }, select: { companyId: true } })
-            if (!tc) throw new AppError('Time condition not found', 404)
-            if (tc.companyId !== companyId) throw new AppError('Time condition belongs to different company', 403)
-            break
-        }
-    }
-}
+const validateDestination = (dest: InboundDest | undefined | null, companyId: string) =>
+    validateRouteDestination(dest ?? null, companyId)
 
 export const getInboundRoutesByCompany = async (companyId: string) => {
     const cached = await InboundRoutesCache.getByCompany(companyId)

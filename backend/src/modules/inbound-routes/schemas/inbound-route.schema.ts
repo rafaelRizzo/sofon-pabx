@@ -1,16 +1,11 @@
 import { z } from 'zod'
 import { timestamp, cuidParam, ok } from '../../../schemas/responses'
+import { routeDestinationSchema, routeDestinationResponseSchema } from '../../../schemas/route-destination.schema'
 
 export const idParamSchema = z.object({ id: cuidParam })
 export const companyQuerySchema = z.object({ companyId: z.cuid2() })
 
-export const destinationSchema = z.discriminatedUnion('type', [
-    z.object({ type: z.literal('extension'), id: z.cuid2() }),
-    z.object({ type: z.literal('queue'), id: z.cuid2() }),
-    z.object({ type: z.literal('voicemail'), id: z.cuid2() }),
-    z.object({ type: z.literal('timecondition'), id: z.cuid2() }),
-    z.object({ type: z.literal('hangup') }),
-]).nullable()
+export const destinationSchema = routeDestinationSchema
 
 export type InboundDest = z.infer<typeof destinationSchema>
 
@@ -30,14 +25,6 @@ export const updateInboundRouteSchema = z.object({
 export type CreateInboundRouteInput = z.infer<typeof createInboundRouteSchema>
 export type UpdateInboundRouteInput = z.infer<typeof updateInboundRouteSchema>
 
-const DestinationResponseSchema = z.union([
-    z.object({ type: z.literal('extension'), id: z.string() }),
-    z.object({ type: z.literal('queue'), id: z.string() }),
-    z.object({ type: z.literal('voicemail'), id: z.string() }),
-    z.object({ type: z.literal('timecondition'), id: z.string() }),
-    z.object({ type: z.literal('hangup') }),
-]).nullable()
-
 export const InboundRouteSchema = z.object({
     id: z.string(),
     name: z.string(),
@@ -46,7 +33,7 @@ export const InboundRouteSchema = z.object({
     trunkId: z.string(),
     did: z.object({ id: z.string(), number: z.string() }),
     trunk: z.object({ id: z.string(), name: z.string() }),
-    destination: DestinationResponseSchema,
+    destination: routeDestinationResponseSchema,
     createdAt: timestamp,
     updatedAt: timestamp,
 })

@@ -26,7 +26,7 @@ src/modules/<name>/
   schemas/<name>.schema.ts  # Zod schemas de input/output + response types
   cache/<name>.cache.ts     # wrapper de CacheManager para o módulo
 ```
-Módulos: auth, users, companies, dids, extensions, queues, queue-members, trunks, outbound-routes, inbound-routes, time-groups, time-conditions, cdr
+Módulos: auth, users, companies, dids, extensions, queues, queue-members, trunks, outbound-routes, inbound-routes, time-groups, time-conditions, cdr, announcements
 
 ## Repositórios Asterisk (`src/asterisk/`)
 Cada repositório escreve direto nas tabelas realtime do Asterisk via Prisma:
@@ -34,8 +34,9 @@ Cada repositório escreve direto nas tabelas realtime do Asterisk via Prisma:
 - `pjsip.repository.ts` → `ps_endpoints`, `ps_auths`, `ps_aors`, `ps_identifies`, `ps_registrations`
 - `queue.repository.ts` → `queues`, `queue_members`
 - `dialplan.repository.ts` → `extensions` (dialplan realtime)
-- `timecondition.repository.ts` → dialplan para contextos `tc-<id>`
+- `timecondition.repository.ts` → dialplan no contexto fixo `timeconditions` (exten `tc-<tcId>`/`tc-<tcId>-matched`)
 - `inboundroute.repository.ts` → dialplan para rotas de entrada
+- `announcement.repository.ts` → dialplan no contexto fixo `announcements` (exten `ann-<id>`, Playback+Hangup) + paths de áudio (`/var/lib/asterisk/sounds/<asteriskId>/<id>.wav`)
 
 ---
 
@@ -155,7 +156,9 @@ Vars: `DATABASE_URL`, `JWT_SECRET`, `REFRESH_SECRET`, `JWT_EXPIRES_IN` (15m), `R
 - `position` em OutboundRoute: menor = maior prioridade
 - `PUT /outbound-routes/:id/trunks`: substitui lista completa (não aditivo)
 - `allowOutbound` em Extension: persiste `ALLOW_OUTBOUND=1/0` em `sip_peers.setvar` / `ps_endpoints.setvar`
-- Time Conditions: ao criar/atualizar/deletar, regenera contexto `tc-<id>` no dialplan Asterisk via `GotoIfTime` — OR lógico entre todos os ranges de todos os TGs vinculados
+- Time Conditions: ao criar/atualizar/deletar, regenera dialplan no contexto fixo compartilhado `timeconditions` (exten `tc-<tcId>`/`tc-<tcId>-matched`) via `GotoIfTime` — OR lógico entre todos os ranges de todos os TGs vinculados. Contexto dinâmico por entidade (`tc-<id>`) não é usado — mesma limitação de `ramais-<asteriskId>` (ver seção acima): Asterisk só resolve realtime pra contextos declarados estaticamente em `extensions.conf`
+- **Route destination** (`src/schemas/route-destination.schema.ts`) — shape compartilhado por Inbound Routes (`destination`) e Time Conditions (`trueRoute`/`falseRoute`): `{ type: "extension"|"queue"|"voicemail"|"timecondition"|"announcement"|"hangup", id?: cuid2 } | null` (`id` obrigatório exceto hangup; `null`/omitido = hangup). Validação de existência/posse centralizada em `validateRouteDestination()` (`src/schemas/route-destination.validate.ts`), usada pelos dois services — não duplicar esse switch-case ao adicionar novo tipo
+- Announcements: cria só o registro; áudio é enviado depois via `POST /announcements/:id/audio` (multipart) e convertido automaticamente pra WAV PCM 16-bit mono 8kHz (slin) via `sox` — qualidade sem perdas, compatível com os codecs das trunks (ulaw/alaw) sem resample na chamada. Só grava o dialplan (`Playback`+`Hangup` no contexto `announcements`) e marca `audioUploadedAt` depois da conversão — usar como destino de rota exige áudio já enviado (senão 400)
 - `context` de Extension: default `"ramais"`, compartilhado entre todas as empresas — isolamento entre empresas é feito via sufixo `asteriskId` no `number`/`exten` (ex: `2002_a9e2463c8f`), não por contexto Asterisk separado. Contextos dinâmicos por empresa (`ramais-<asteriskId>`) **não funcionam** nesse setup: o Asterisk só resolve realtime dialplan pra contextos declarados estaticamente em `extensions.conf` com `switch => Realtime/<contexto>@extensions` — tentativa de escopar por empresa quebra a resolução de chamadas. Isolamento de verdade entre empresas exigiria uma reformulação maior (contexto único + AGI/`func_odbc` decidindo rota em tempo de chamada, ao estilo MagnusBilling) — não implementado
 
 ## API — schemas de input/output por módulo
@@ -201,7 +204,7 @@ Vars: `DATABASE_URL`, `JWT_SECRET`, `REFRESH_SECRET`, `JWT_EXPIRES_IN` (15m), `R
 **Inbound Routes** — `{ id, name, companyId, didId, trunkId, did{id,number}, trunk{id,name}, destination, createdAt, updatedAt }`
 - Create: `{ name, companyId, didId, trunkId, destination? }`
 - Update: `{ name?, destination? }` (min 1)
-- `destination`: `{ type: "extension"|"queue"|"voicemail"|"timecondition"|"hangup", id?: cuid2 } | null`
+- `destination`: route destination compartilhado (ver seção "Route destination" acima)
 
 **Time Groups** — `{ id, name, companyId, ranges[{startTime(HH:MM), endTime(HH:MM), weekdays(mon-sun[]), monthdays?, months?}], createdAt, updatedAt }`
 - Update: `{ name?, ranges? }` — ranges substitui lista completa
@@ -209,7 +212,14 @@ Vars: `DATABASE_URL`, `JWT_SECRET`, `REFRESH_SECRET`, `JWT_EXPIRES_IN` (15m), `R
 **Time Conditions** — `{ id, name, companyId, trueRoute, falseRoute, timeGroups[{timeGroup:{id,name}}], createdAt, updatedAt }`
 - Create: `{ name, companyId, trueRoute?, falseRoute?, groupIds?[] }`
 - Update: `{ name?, trueRoute?, falseRoute? }` (min 1)
-- Route format: `{ type: "extension"|"queue"|"voicemail"|"timecondition"|"hangup", id?: cuid2 } | null` (null = Hangup)
+- Route format: route destination compartilhado (ver seção "Route destination" acima)
+
+**Announcements** — `{ id, name, companyId, hasAudio, createdAt, updatedAt }`
+- Create: `{ name, companyId }` → `{ announcementId }` (sem áudio ainda)
+- Update: `{ name }`
+- `POST /:id/audio` — multipart/form-data, 1 arquivo, até 15MB. Converte pra WAV slin 8kHz mono 16-bit via `sox`; sobrescreve áudio anterior; seta `audioUploadedAt`
+- Delete: remove registro, dialplan (`announcements`/`ann-<id>`) e o `.wav` em disco
+- Delete Company → cascade Announcements (dialplan + pasta `/var/lib/asterisk/sounds/<asteriskId>/` inteira)
 
 **CDR** — `GET /cdr` — `{ records[], total, limit }`
 - Query obrigatória: `companyId`; opcionais: `startDate`/`endDate` (`YYYY-MM-DD`, cobrem o dia inteiro 00:00:00–23:59:59.999, sem offset/hora), `src`, `dst`, `callStatus` (enum disposition), `limit`(max 200), `order`(asc|desc, default desc — aplica em startTime+id)

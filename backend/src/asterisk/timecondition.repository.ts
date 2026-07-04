@@ -1,8 +1,16 @@
 import { prisma } from '../lib/prisma'
 import type { RouteDest } from '../modules/time-conditions/schemas/time-condition.schema'
 import { queueAppExten } from './queue.repository'
+import { ANNOUNCEMENT_CONTEXT, announcementExten } from './announcement.repository'
 
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
+
+// contexto único compartilhado por todas as time conditions — contexto dinâmico por
+// entidade (tc-<id>) não funciona nesse setup: Asterisk só resolve realtime pra
+// contextos declarados estaticamente em extensions.conf (mesmo problema de ramais-<asteriskId>)
+export const TC_CONTEXT = 'timeconditions'
+export const tcEntry = (tcId: string) => `tc-${tcId}`
+const tcMatched = (tcId: string) => `tc-${tcId}-matched`
 
 type TimeRange = {
     startTime: string
@@ -33,7 +41,9 @@ async function resolveRoute(tx: Tx, route: RouteDest): Promise<string | null> {
         case 'voicemail':
             return `vm,${route.id},1`
         case 'timecondition':
-            return `tc-${route.id},s,1`
+            return `${TC_CONTEXT},${tcEntry(route.id)},1`
+        case 'announcement':
+            return `${ANNOUNCEMENT_CONTEXT},${announcementExten(route.id)},1`
         case 'hangup':
             return null
     }
@@ -46,30 +56,32 @@ function buildDialplan(
     trueAsterisk: string | null,
     falseAsterisk: string | null,
 ) {
-    const context = `tc-${tcId}`
+    const context = TC_CONTEXT
+    const entry = tcEntry(tcId)
+    const matched = tcMatched(tcId)
     const entries: { context: string; exten: string; priority: number; app: string; appdata: string | null }[] = []
 
-    entries.push({ context, exten: 's', priority: 1, app: 'NoOp', appdata: `TimeCondition: ${name}` })
+    entries.push({ context, exten: entry, priority: 1, app: 'NoOp', appdata: `TimeCondition: ${name}` })
 
     let priority = 2
     for (const range of ranges) {
         const weekSpec = range.weekdays.length > 0 ? range.weekdays.join('&') : '*'
         entries.push({
-            context, exten: 's', priority,
+            context, exten: entry, priority,
             app: 'GotoIfTime',
-            appdata: `${range.startTime}-${range.endTime},${weekSpec},${range.monthdays},${range.months}?matched,1`,
+            appdata: `${range.startTime}-${range.endTime},${weekSpec},${range.monthdays},${range.months}?${matched},1`,
         })
         priority++
     }
 
     entries.push({
-        context, exten: 's', priority,
+        context, exten: entry, priority,
         app: falseAsterisk ? 'Goto' : 'Hangup',
         appdata: falseAsterisk,
     })
 
     entries.push({
-        context, exten: 'matched', priority: 1,
+        context, exten: matched, priority: 1,
         app: trueAsterisk ? 'Goto' : 'Hangup',
         appdata: trueAsterisk,
     })
@@ -88,7 +100,7 @@ export const TimeConditionRepository = {
     },
 
     async update(tx: Tx, tcId: string, name: string, ranges: TimeRange[], trueRoute: RouteDest, falseRoute: RouteDest) {
-        await tx.extensions.deleteMany({ where: { context: `tc-${tcId}` } })
+        await tx.extensions.deleteMany({ where: { context: TC_CONTEXT, exten: { in: [tcEntry(tcId), tcMatched(tcId)] } } })
         const [trueAsterisk, falseAsterisk] = await Promise.all([
             resolveRoute(tx, trueRoute),
             resolveRoute(tx, falseRoute),
@@ -98,11 +110,12 @@ export const TimeConditionRepository = {
     },
 
     async delete(tx: Tx, tcId: string) {
-        await tx.extensions.deleteMany({ where: { context: `tc-${tcId}` } })
+        await tx.extensions.deleteMany({ where: { context: TC_CONTEXT, exten: { in: [tcEntry(tcId), tcMatched(tcId)] } } })
     },
 
     async deleteManyByIds(tx: Tx, tcIds: string[]) {
         if (tcIds.length === 0) return
-        await tx.extensions.deleteMany({ where: { context: { in: tcIds.map((id) => `tc-${id}`) } } })
+        const extens = tcIds.flatMap((id) => [tcEntry(id), tcMatched(id)])
+        await tx.extensions.deleteMany({ where: { context: TC_CONTEXT, exten: { in: extens } } })
     },
 }

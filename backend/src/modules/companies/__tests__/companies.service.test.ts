@@ -33,11 +33,20 @@ mock.module('../../../asterisk/inboundroute.repository', () => ({
 mock.module('../../../asterisk/timecondition.repository', () => ({
     TimeConditionRepository: { deleteManyByIds: mock(() => Promise.resolve()) },
 }))
+mock.module('../../../asterisk/announcement.repository', () => ({
+    AnnouncementRepository: { removeManyByIds: mock(() => Promise.resolve()) },
+    announcementSoundDir: (asteriskId: string) => `/var/lib/asterisk/sounds/${asteriskId}`,
+}))
+mock.module('../../announcements/cache/announcements.cache', () => ({
+    AnnouncementsCache: { invalidateNamespace: mock() },
+}))
+mock.module('fs/promises', () => ({ rm: mock(() => Promise.resolve()) }))
 
 import * as CompaniesService from '../companies.service'
 import { AsteriskQueueRepository } from '../../../asterisk/queue.repository'
 import { InboundRouteRepository } from '../../../asterisk/inboundroute.repository'
 import { TimeConditionRepository } from '../../../asterisk/timecondition.repository'
+import { AnnouncementRepository } from '../../../asterisk/announcement.repository'
 
 const COMPANY = { id: 'c1', name: 'ACME', doc: null, asteriskId: 'ast1', timezone: 'America/Sao_Paulo', metadata: {}, createdAt: new Date(), updatedAt: new Date() }
 const USER = { id: 'u1', name: 'Admin', username: 'admin@test.com' }
@@ -136,6 +145,7 @@ describe('CompaniesService.deleteCompany', () => {
         db.inboundRoute.findMany.mockResolvedValue([])
         db.timeCondition.findMany.mockResolvedValue([])
         db.outboundDialPattern.findMany.mockResolvedValue([])
+        db.announcement.findMany.mockResolvedValue([])
         db.extension.deleteMany.mockResolvedValue({ count: 0 })
         db.company.delete.mockResolvedValue(COMPANY)
         await CompaniesService.deleteCompany('c1')
@@ -150,6 +160,7 @@ describe('CompaniesService.deleteCompany', () => {
         db.inboundRoute.findMany.mockResolvedValue([{ trunkId: 't1', did: { number: '5511999998888' } }])
         db.timeCondition.findMany.mockResolvedValue([{ id: 'tc1' }])
         db.outboundDialPattern.findMany.mockResolvedValue([{ pattern: '_0.' }])
+        db.announcement.findMany.mockResolvedValue([{ id: 'ann1' }])
         db.extension.deleteMany.mockResolvedValue({ count: 0 })
         db.extensions.deleteMany.mockResolvedValue({ count: 0 })
         db.company.delete.mockResolvedValue(COMPANY)
@@ -159,6 +170,7 @@ describe('CompaniesService.deleteCompany', () => {
         expect(AsteriskQueueRepository.removeManyQueueAppEntries).toHaveBeenCalledWith(expect.anything(), ['ast1-100'])
         expect(InboundRouteRepository.deleteMany).toHaveBeenCalledWith(expect.anything(), [{ trunkId: 't1', didNumber: '5511999998888' }])
         expect(TimeConditionRepository.deleteManyByIds).toHaveBeenCalledWith(expect.anything(), ['tc1'])
+        expect(AnnouncementRepository.removeManyByIds).toHaveBeenCalledWith(expect.anything(), ['ann1'])
         expect(db.extensions.deleteMany).toHaveBeenCalledWith({ where: { context: 'ramais', exten: { in: ['_0.'] } } })
     })
 

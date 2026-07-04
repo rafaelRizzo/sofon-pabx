@@ -225,7 +225,7 @@ describe('DELETE /time-conditions/:id', () => {
         const res = await app.inject({ method: 'DELETE', url: `/time-conditions/${idToDelete}`, headers: auth() })
         expect(res.statusCode).toBe(200)
 
-        const dialplan = await prisma.extensions.findFirst({ where: { context: `tc-${idToDelete}` } })
+        const dialplan = await prisma.extensions.findFirst({ where: { context: 'timeconditions', exten: { contains: idToDelete } } })
         expect(dialplan).toBeNull()
     })
 

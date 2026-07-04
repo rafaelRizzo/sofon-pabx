@@ -1,6 +1,8 @@
 import { prisma } from '../lib/prisma'
 import type { InboundDest } from '../modules/inbound-routes/schemas/inbound-route.schema'
 import { queueAppExten } from './queue.repository'
+import { TC_CONTEXT, tcEntry } from './timecondition.repository'
+import { ANNOUNCEMENT_CONTEXT, announcementExten } from './announcement.repository'
 
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 
@@ -21,7 +23,9 @@ async function resolveDestination(tx: Tx, dest: InboundDest): Promise<{ app: str
         case 'voicemail':
             return { app: 'Goto', appdata: `vm,${dest.id},1` }
         case 'timecondition':
-            return { app: 'Goto', appdata: `tc-${dest.id},s,1` }
+            return { app: 'Goto', appdata: `${TC_CONTEXT},${tcEntry(dest.id)},1` }
+        case 'announcement':
+            return { app: 'Goto', appdata: `${ANNOUNCEMENT_CONTEXT},${announcementExten(dest.id)},1` }
     }
 }
 

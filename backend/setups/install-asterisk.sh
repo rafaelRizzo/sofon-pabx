@@ -205,7 +205,7 @@ DEPS=(
     libspeex-dev libspeexdsp-dev libopus-dev
     unixodbc-dev libnewt-dev libpq-dev
     libiksemel-dev libgmime-3.0-dev libradcli-dev
-    libcurl4-openssl-dev libpopt-dev sox mpg123
+    libcurl4-openssl-dev libpopt-dev sox mpg123 libsox-fmt-all
 )
 [[ "$USE_LEGACY_SIP" == true ]] && DEPS+=(python3 python3-dev libsrtp2-dev)
 
@@ -474,6 +474,33 @@ exten => _X.,1,Goto(from-trunk-routed,${EXTEN}_${TRUNKID},1)
 ; Delega lookup de rotas de entrada para Realtime (tabela extensions no PostgreSQL)
 ; exten gravado como <didNumber>_<trunkId> por InboundRouteRepository
 switch => Realtime/from-trunk-routed@extensions
+
+; DID sem rota cadastrada — cause 1 (Unallocated number) -> PJSIP responde 404 Not Found
+; HANGUPCAUSE é função read-only (${HANGUPCAUSE}); a cause real só é setada via argumento do Hangup()
+; FIX: NÃO declarar um catch-all _X. estático aqui — padrão estático tem prioridade
+; sobre "switch => Realtime/..." no mesmo contexto, então _X. bloquearia TODA rota
+; realtime válida (qualquer exten <didNumber>_<trunkId> começa com dígito). O "i"
+; já cobre o caso de nenhuma rota (estática ou realtime) ser encontrada.
+exten => i,1,Noop(DID sem rota: ${EXTEN})
+ same => n,Hangup(1)
+
+[queues-app]
+; Contexto único compartilhado por todas as filas — exten gravado como <asteriskId>-<number>
+; por AsteriskQueueRepository.syncQueueAppEntry
+switch => Realtime/queues-app@extensions
+
+[timeconditions]
+; Contexto único compartilhado por todas as time conditions — exten gravado como
+; tc-<tcId> (entrada) / tc-<tcId>-matched (branch true) por TimeConditionRepository.
+; Contexto dinâmico por entidade NÃO funciona nesse setup pelo mesmo motivo de
+; ramais-<asteriskId>: Asterisk só resolve realtime pra contextos declarados
+; estaticamente aqui com switch => Realtime/<contexto>@extensions.
+switch => Realtime/timeconditions@extensions
+
+[announcements]
+; Contexto único compartilhado por todos os anúncios — exten gravado como ann-<id>
+; por AnnouncementRepository (Playback + Hangup). Áudio em /var/lib/asterisk/sounds/<asteriskId>/<id>.wav
+switch => Realtime/announcements@extensions
 EOF
 
 # modules.conf — garante chan_sip carregado se necessário
@@ -606,6 +633,12 @@ mkdir -p /var/spool/asterisk/monitor
 chown -R asterisk:asterisk /var/spool/asterisk/monitor
 chmod 755 /var/spool/asterisk/monitor
 log "Diretório de gravações criado → /var/spool/asterisk/monitor"
+
+# --- Announcements: diretório de áudios custom (subpastas por asteriskId criadas pela API) ---
+mkdir -p /var/lib/asterisk/sounds
+chown -R asterisk:asterisk /var/lib/asterisk/sounds
+chmod 755 /var/lib/asterisk/sounds
+log "Diretório de anúncios criado → /var/lib/asterisk/sounds"
 
 # --- Logger: garante gravação em disco ---
 mkdir -p /var/log/asterisk

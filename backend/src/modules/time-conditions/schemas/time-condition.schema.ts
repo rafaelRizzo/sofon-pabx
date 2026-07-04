@@ -1,15 +1,10 @@
 import { z } from 'zod'
 import { timestamp, cuidParam, ok } from '../../../schemas/responses'
+import { ROUTE_DEST_TYPES, routeDestinationSchema, routeDestinationResponseSchema } from '../../../schemas/route-destination.schema'
 
-export const ROUTE_TYPES = ['extension', 'queue', 'voicemail', 'timecondition', 'hangup'] as const
+export const ROUTE_TYPES = ROUTE_DEST_TYPES
 
-export const routeDestSchema = z.discriminatedUnion('type', [
-    z.object({ type: z.literal('extension'),     id: z.cuid2() }),
-    z.object({ type: z.literal('queue'),         id: z.cuid2() }),
-    z.object({ type: z.literal('voicemail'),     id: z.cuid2() }),
-    z.object({ type: z.literal('timecondition'), id: z.cuid2() }),
-    z.object({ type: z.literal('hangup') }),
-]).nullable()
+export const routeDestSchema = routeDestinationSchema
 
 export type RouteDest = z.infer<typeof routeDestSchema>
 
@@ -33,14 +28,6 @@ export const updateTimeConditionSchema = z.object({
 export type CreateTimeConditionInput = z.infer<typeof createTimeConditionSchema>
 export type UpdateTimeConditionInput = z.infer<typeof updateTimeConditionSchema>
 
-const RouteDestResponseSchema = z.union([
-    z.object({ type: z.literal('extension'),     id: z.string() }),
-    z.object({ type: z.literal('queue'),         id: z.string() }),
-    z.object({ type: z.literal('voicemail'),     id: z.string() }),
-    z.object({ type: z.literal('timecondition'), id: z.string() }),
-    z.object({ type: z.literal('hangup') }),
-]).nullable()
-
 const TimeGroupRefSchema = z.object({
     id:   z.string(),
     name: z.string(),
@@ -50,8 +37,8 @@ export const TimeConditionSchema = z.object({
     id:         z.string(),
     name:       z.string(),
     companyId:  z.string(),
-    trueRoute:  RouteDestResponseSchema,
-    falseRoute: RouteDestResponseSchema,
+    trueRoute:  routeDestinationResponseSchema,
+    falseRoute: routeDestinationResponseSchema,
     timeGroups: z.array(z.object({ timeGroup: TimeGroupRefSchema })),
     createdAt:  timestamp,
     updatedAt:  timestamp,

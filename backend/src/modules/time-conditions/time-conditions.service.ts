@@ -1,10 +1,10 @@
 import { Prisma } from '../../../generated/prisma/client'
 import { prisma } from '../../lib/prisma'
 import { getCompanyById } from '../companies/companies.service'
-import { getExtensionDto } from '../extensions/extensions.service'
 import { TimeConditionsCache } from './cache/time-conditions.cache'
 import type { CreateTimeConditionInput, UpdateTimeConditionInput, RouteDest } from './schemas/time-condition.schema'
 import { TimeConditionRepository } from '../../asterisk/timecondition.repository'
+import { validateRouteDestination } from '../../schemas/route-destination.validate'
 import { AppError } from '../../utils/errors/app.error'
 
 const timeConditionSelect = {
@@ -25,36 +25,8 @@ const timeConditionSelect = {
 const _byId = () => prisma.timeCondition.findUnique({ where: { id: '' }, select: timeConditionSelect })
 export type TimeConditionDto = NonNullable<Awaited<ReturnType<typeof _byId>>>
 
-async function validateRoute(route: RouteDest | undefined | null, companyId: string, label: string) {
-    if (!route || route.type === 'hangup') return
-
-    switch (route.type) {
-        case 'extension': {
-            const ext = await getExtensionDto(route.id).catch(() => {
-                throw new AppError(`${label}: Extension not found`, 404)
-            })
-            if (ext.companyId !== companyId) throw new AppError(`${label}: Extension belongs to different company`, 403)
-            break
-        }
-        case 'queue': {
-            const q = await prisma.queue.findUnique({ where: { id: route.id }, select: { companyId: true, number: true } })
-            if (!q) throw new AppError(`${label}: Queue not found`, 404)
-            if (q.companyId !== companyId) throw new AppError(`${label}: Queue belongs to different company`, 403)
-            if (!q.number) throw new AppError(`${label}: Queue has no number — cannot use as route destination`, 400)
-            break
-        }
-        case 'voicemail': {
-            // voicemail id is free-form (extension number or user id) — no FK to validate
-            break
-        }
-        case 'timecondition': {
-            const tc = await prisma.timeCondition.findUnique({ where: { id: route.id }, select: { companyId: true } })
-            if (!tc) throw new AppError(`${label}: Time condition not found`, 404)
-            if (tc.companyId !== companyId) throw new AppError(`${label}: Time condition belongs to different company`, 403)
-            break
-        }
-    }
-}
+const validateRoute = (route: RouteDest | undefined | null, companyId: string, label: string) =>
+    validateRouteDestination(route ?? null, companyId, label)
 
 async function loadRangesForCondition(tcId: string) {
     const groups = await prisma.timeConditionTimeGroup.findMany({

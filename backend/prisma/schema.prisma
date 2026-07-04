@@ -28,6 +28,7 @@ model Company {
     timeGroups     TimeGroup[]
     timeConditions TimeCondition[]
     inboundRoutes  InboundRoute[]
+    announcements  Announcement[]
 
     @@map("companies")
 }
@@ -295,6 +296,21 @@ model InboundRoute {
     @@unique([trunkId, didId])
     @@index([companyId])
     @@map("inbound_routes")
+}
+
+model Announcement {
+    id              String    @id @default(cuid())
+    name            String    @db.VarChar(80)
+    companyId       String
+    company         Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+    // null até o upload de áudio ser feito — só então o Playback existe no dialplan (ver AnnouncementRepository)
+    audioUploadedAt DateTime? @db.Timestamptz(3)
+    createdAt       DateTime  @default(now()) @db.Timestamptz(3)
+    updatedAt       DateTime  @updatedAt @db.Timestamptz(3)
+
+    @@unique([name, companyId])
+    @@index([companyId])
+    @@map("announcements")
 }
 
 // ─── Asterisk Realtime Models ─────────────────────────────────────────────────

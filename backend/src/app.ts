@@ -3,6 +3,7 @@ import cookiePlugin from '@fastify/cookie'
 import helmet from '@fastify/helmet'
 import cors from '@fastify/cors'
 import rateLimit from '@fastify/rate-limit'
+import multipart from '@fastify/multipart'
 import swagger from '@fastify/swagger'
 import scalar from '@scalar/fastify-api-reference'
 import { serializerCompiler, jsonSchemaTransform } from 'fastify-type-provider-zod'
@@ -25,6 +26,7 @@ import { timeGroupsRoutes } from './modules/time-groups/time-groups.routes'
 import { timeConditionsRoutes } from './modules/time-conditions/time-conditions.routes'
 import { inboundRoutesRoutes } from './modules/inbound-routes/inbound-routes.routes'
 import { cdrRoutes } from './modules/cdr/cdr.routes'
+import { announcementsRoutes } from './modules/announcements/announcements.routes'
 
 const env = validateEnv()
 
@@ -129,6 +131,9 @@ app.register(rateLimit, {
     timeWindow: env.RATE_LIMIT_WINDOW,
 })
 app.register(cookiePlugin)
+app.register(multipart, {
+    limits: { fileSize: 15 * 1024 * 1024, files: 1 },
+})
 
 // Error handler
 app.setErrorHandler((error: any, request, reply) => {
@@ -165,6 +170,7 @@ app.register(timeGroupsRoutes)
 app.register(timeConditionsRoutes)
 app.register(inboundRoutesRoutes)
 app.register(cdrRoutes)
+app.register(announcementsRoutes)
 
 // Health check
 app.get('/health', async (req, reply) => {

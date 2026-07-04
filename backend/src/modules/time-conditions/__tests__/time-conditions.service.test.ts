@@ -138,6 +138,31 @@ describe('TimeConditionsService.createTimeCondition', () => {
         })).rejects.toMatchObject({ statusCode: 400 })
     })
 
+    it('creates with announcement falseRoute', async () => {
+        db.company.findUnique.mockResolvedValue(COMPANY)
+        db.timeCondition.findUnique.mockResolvedValue(null)
+        db.announcement.findUnique.mockResolvedValue({ companyId: 'c1', audioUploadedAt: new Date() })
+        db.timeCondition.create.mockResolvedValue({ ...TC, falseRoute: { type: 'announcement', id: 'ann1' } })
+        db.timeConditionTimeGroup.findMany.mockResolvedValue([])
+        const tc = await TimeConditionsService.createTimeCondition({
+            name: 'horario-comercial', companyId: 'c1',
+            falseRoute: { type: 'announcement', id: 'ann1' },
+            groupIds: [],
+        }) as any
+        expect(tc.id).toBe('tc1')
+    })
+
+    it('throws 400 when announcement has no audio uploaded yet', async () => {
+        db.company.findUnique.mockResolvedValue(COMPANY)
+        db.timeCondition.findUnique.mockResolvedValue(null)
+        db.announcement.findUnique.mockResolvedValue({ companyId: 'c1', audioUploadedAt: null })
+        await expect(TimeConditionsService.createTimeCondition({
+            name: 'x', companyId: 'c1',
+            falseRoute: { type: 'announcement', id: 'ann1' },
+            groupIds: [],
+        })).rejects.toMatchObject({ statusCode: 400 })
+    })
+
     it('throws 409 on duplicate name', async () => {
         db.company.findUnique.mockResolvedValue(COMPANY)
         db.timeCondition.findUnique.mockResolvedValue(TC)

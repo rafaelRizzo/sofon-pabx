@@ -1,12 +1,15 @@
+import { rm } from 'fs/promises'
 import { prisma } from '../../lib/prisma'
 import { CompaniesCache } from './cache/companies.cache'
 import { ExtensionsCache } from '../extensions/cache/extensions.cache'
 import { QueuesCache } from '../queues/cache/queues.cache'
+import { AnnouncementsCache } from '../announcements/cache/announcements.cache'
 import { PjsipRepository } from '../../asterisk/pjsip.repository'
 import { SipRepository } from '../../asterisk/sip.repository'
 import { AsteriskQueueRepository, queueAppExten } from '../../asterisk/queue.repository'
 import { InboundRouteRepository } from '../../asterisk/inboundroute.repository'
 import { TimeConditionRepository } from '../../asterisk/timecondition.repository'
+import { AnnouncementRepository, announcementSoundDir } from '../../asterisk/announcement.repository'
 import type { CreateCompanyInput, UpdateCompanyInput } from './schemas/company.schema'
 import { AppError } from '../../utils/errors/app.error'
 
@@ -112,7 +115,7 @@ export const deleteCompany = async (id: string) => {
         throw new AppError('Company not found', 404)
     }
 
-    const [extensions, queues, trunks, inboundRoutes, timeConditions, outboundPatterns] = await Promise.all([
+    const [extensions, queues, trunks, inboundRoutes, timeConditions, outboundPatterns, announcements] = await Promise.all([
         prisma.extension.findMany({
             where: { companyId: id },
             select: { number: true, type: true },
@@ -137,6 +140,10 @@ export const deleteCompany = async (id: string) => {
             where: { route: { companyId: id } },
             select: { pattern: true },
         }),
+        prisma.announcement.findMany({
+            where: { companyId: id },
+            select: { id: true },
+        }),
     ])
 
     const pjsipNumbers = extensions.filter((e) => e.type === 'pjsip').map((e) => e.number)
@@ -153,6 +160,7 @@ export const deleteCompany = async (id: string) => {
     const inboundRoutesForCleanup = inboundRoutes.map((r) => ({ trunkId: r.trunkId, didNumber: r.did.number }))
     const timeConditionIds = timeConditions.map((tc) => tc.id)
     const outboundPatternValues = outboundPatterns.map((p) => p.pattern)
+    const announcementIds = announcements.map((a) => a.id)
 
     await prisma.$transaction(async (tx) => {
         await AsteriskQueueRepository.removeMembersByInterfaces(tx, asteriskInterfaces)
@@ -160,6 +168,7 @@ export const deleteCompany = async (id: string) => {
         await AsteriskQueueRepository.removeManyQueueAppEntries(tx, queueAppExtens)
         await InboundRouteRepository.deleteMany(tx, inboundRoutesForCleanup)
         await TimeConditionRepository.deleteManyByIds(tx, timeConditionIds)
+        await AnnouncementRepository.removeManyByIds(tx, announcementIds)
         if (outboundPatternValues.length > 0)
             await tx.extensions.deleteMany({ where: { context: 'ramais', exten: { in: outboundPatternValues } } })
         await PjsipRepository.deleteManyByIds(tx, [...pjsipNumbers, ...trunkIds], trunkOutboundIds)
@@ -168,11 +177,15 @@ export const deleteCompany = async (id: string) => {
         await tx.company.delete({ where: { id } })
     })
 
+    // pasta de áudios da empresa — fora do banco, best-effort após o commit
+    await rm(announcementSoundDir(existing.asteriskId), { recursive: true, force: true })
+
     await Promise.all([
         CompaniesCache.invalidateCompany(id),
         CompaniesCache.invalidateAllCompanies(),
         ExtensionsCache.invalidateAllExtensions(),
         QueuesCache.invalidateNamespace(),
+        AnnouncementsCache.invalidateNamespace(),
         ...existing.users.map((u) => CompaniesCache.invalidateCompaniesByUser(u.userId)),
     ])
 }

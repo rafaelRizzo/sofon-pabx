@@ -216,6 +216,30 @@ describe('InboundRoutesService.createInboundRoute', () => {
             ...BASE_INPUT, destination: { type: 'queue', id: 'q1' },
         })).rejects.toMatchObject({ statusCode: 400 })
     })
+
+    it('creates route with announcement destination', async () => {
+        db.company.findUnique.mockResolvedValue(COMPANY)
+        db.did.findUnique.mockResolvedValue(DID)
+        db.trunk.findUnique.mockResolvedValue(TRUNK)
+        db.inboundRoute.findUnique.mockResolvedValue(null)
+        db.announcement.findUnique.mockResolvedValue({ companyId: 'c1', audioUploadedAt: new Date() })
+        db.inboundRoute.create.mockResolvedValue({ ...ROUTE, destination: { type: 'announcement', id: 'ann1' } })
+        const route = await InboundRoutesService.createInboundRoute({
+            ...BASE_INPUT, destination: { type: 'announcement', id: 'ann1' },
+        }) as any
+        expect(route.id).toBe('r1')
+    })
+
+    it('throws 400 when announcement has no audio uploaded yet', async () => {
+        db.company.findUnique.mockResolvedValue(COMPANY)
+        db.did.findUnique.mockResolvedValue(DID)
+        db.trunk.findUnique.mockResolvedValue(TRUNK)
+        db.inboundRoute.findUnique.mockResolvedValue(null)
+        db.announcement.findUnique.mockResolvedValue({ companyId: 'c1', audioUploadedAt: null })
+        await expect(InboundRoutesService.createInboundRoute({
+            ...BASE_INPUT, destination: { type: 'announcement', id: 'ann1' },
+        })).rejects.toMatchObject({ statusCode: 400 })
+    })
 })
 
 // ─── updateInboundRoute ───────────────────────────────────────────────────────
