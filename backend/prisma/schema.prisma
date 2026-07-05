@@ -29,6 +29,9 @@ model Company {
     timeConditions TimeCondition[]
     inboundRoutes  InboundRoute[]
     announcements  Announcement[]
+    ivrMenus       IvrMenu[]
+    requestTemplates RequestTemplate[]
+    audios         Audio[]
 
     @@map("companies")
 }
@@ -36,6 +39,10 @@ model Company {
 model Did {
     id            String         @id @default(cuid())
     number        String
+    // Override do dígito real que a trunk manda no ${EXTEN} da chamada, quando difere de `number`
+    // (ex: operadora manda 1832323232, mas `number` é o padrão de exibição 551832323232).
+    // Roteamento no dialplan usa exten ?? number — null cai no comportamento padrão.
+    exten         String?
     companyId     String
     company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
     inboundRoutes InboundRoute[]
@@ -119,6 +126,10 @@ model Queue {
     leaveWhenEmpty    Boolean       @default(false)
     weight            Int           @default(0)
     metadata          Json          @default("{}")
+    // Destino no dialplan quando a fila termina sem o cliente ter desligado (timeout, sem agente,
+    // ou agente desliga primeiro) — route destination compartilhado (ver route-destination.schema.ts).
+    // null/omitido = Hangup (comportamento atual)
+    postQueueDestination Json?
     createdAt         DateTime      @default(now()) @db.Timestamptz(3)
     updatedAt         DateTime      @updatedAt @db.Timestamptz(3)
     members           QueueMember[]
@@ -299,18 +310,104 @@ model InboundRoute {
 }
 
 model Announcement {
-    id              String    @id @default(cuid())
-    name            String    @db.VarChar(80)
-    companyId       String
-    company         Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-    // null até o upload de áudio ser feito — só então o Playback existe no dialplan (ver AnnouncementRepository)
-    audioUploadedAt DateTime? @db.Timestamptz(3)
-    createdAt       DateTime  @default(now()) @db.Timestamptz(3)
-    updatedAt       DateTime  @updatedAt @db.Timestamptz(3)
+    id        String   @id @default(cuid())
+    name      String   @db.VarChar(80)
+    companyId String
+    company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+    // null até vincular um Audio — só então o Playback existe no dialplan (ver AnnouncementRepository)
+    audioId   String?
+    audio     Audio?   @relation(fields: [audioId], references: [id], onDelete: SetNull)
+    createdAt DateTime @default(now()) @db.Timestamptz(3)
+    updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
     @@unique([name, companyId])
     @@index([companyId])
+    @@index([audioId])
     @@map("announcements")
+}
+
+model Audio {
+    id        String   @id @default(cuid())
+    name      String   @db.VarChar(80)
+    companyId String
+    company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+    createdAt DateTime @default(now()) @db.Timestamptz(3)
+    updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+    announcements Announcement[]
+    ivrMenus      IvrMenu[]
+
+    @@unique([name, companyId])
+    @@index([companyId])
+    @@map("audios")
+}
+
+model IvrMenu {
+    id                 String      @id @default(cuid())
+    name               String      @db.VarChar(80)
+    companyId          String
+    company            Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+    // null até vincular um Audio — mesmo padrão de Announcement.audioId (ver IvrRepository)
+    audioId            String?
+    audio              Audio?      @relation(fields: [audioId], references: [id], onDelete: SetNull)
+    // quantos dígitos o Read() aceita antes de parar de esperar — 1 = só opções de menu, >1 permite
+    // sequência longa (ex: CPF) tratada via longDestination quando não bate com nenhuma opção de 1 dígito
+    maxDigits          Int         @default(1)
+    // segundos que o Read() aguarda por dígito antes de contar como timeout (sem nenhum dígito digitado)
+    digitTimeout       Int         @default(5)
+    invalidRetries     Int         @default(3)
+    invalidDestination Json?
+    timeoutRetries     Int         @default(3)
+    timeoutDestination Json?
+    // destino quando o chamador digita mais de 1 dígito (até maxDigits) sem bater com opção de 1 dígito
+    longDestination    Json?
+    options            IvrOption[]
+    createdAt          DateTime    @default(now()) @db.Timestamptz(3)
+    updatedAt          DateTime    @updatedAt @db.Timestamptz(3)
+
+    @@unique([name, companyId])
+    @@index([companyId])
+    @@index([audioId])
+    @@map("ivr_menus")
+}
+
+model IvrOption {
+    id          String   @id @default(cuid())
+    ivrMenuId   String
+    ivrMenu     IvrMenu  @relation(fields: [ivrMenuId], references: [id], onDelete: Cascade)
+    digit       String   @db.VarChar(1)
+    destination Json?
+    createdAt   DateTime @default(now()) @db.Timestamptz(3)
+
+    @@unique([ivrMenuId, digit])
+    @@index([ivrMenuId])
+    @@map("ivr_options")
+}
+
+// Template de requisição HTTP síncrona executada em tempo de chamada via AGI (ver src/asterisk/agi-server.ts) —
+// usada como RouteDestination (type: "request") em Inbound Routes/Time Conditions/Queue postQueueDestination.
+// url/headers/body podem conter placeholders {{VAR}} resolvidos via AGI GET VARIABLE (ex: {{CALLERID(num)}}, {{EXTEN}}).
+model RequestTemplate {
+    id               String   @id @default(cuid())
+    name             String   @db.VarChar(80)
+    companyId        String
+    company          Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+    method           String   @default("GET") @db.VarChar(10)
+    url              String
+    headers          Json?
+    body             Json?
+    timeoutMs        Int      @default(5000)
+    // [{ path: "data.client[0].id", variable: "crm_client_id" }] — path avaliado sobre o JSON de resposta,
+    // resultado setado como variável de canal via AGI SET VARIABLE (disponível no dialplan após o request)
+    variableMappings Json     @default("[]")
+    onSuccess        Json?
+    onError          Json?
+    createdAt        DateTime @default(now()) @db.Timestamptz(3)
+    updatedAt        DateTime @updatedAt @db.Timestamptz(3)
+
+    @@unique([name, companyId])
+    @@index([companyId])
+    @@map("request_templates")
 }
 
 // ─── Asterisk Realtime Models ─────────────────────────────────────────────────

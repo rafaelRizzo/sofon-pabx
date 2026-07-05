@@ -501,6 +501,12 @@ switch => Realtime/timeconditions@extensions
 ; Contexto único compartilhado por todos os anúncios — exten gravado como ann-<id>
 ; por AnnouncementRepository (Playback + Hangup). Áudio em /var/lib/asterisk/sounds/<asteriskId>/<id>.wav
 switch => Realtime/announcements@extensions
+
+[ivrs]
+; Contexto único compartilhado por todos os menus de URA — exten gravado como ivr-<id>
+; por IvrRepository (Read + GotoIf, prioridades numéricas fazem o papel de labels).
+; Áudio em /var/lib/asterisk/sounds/<asteriskId>/ivr-<id>.wav
+switch => Realtime/ivrs@extensions
 EOF
 
 # modules.conf — garante chan_sip carregado se necessário

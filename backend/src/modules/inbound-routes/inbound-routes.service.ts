@@ -13,7 +13,7 @@ const inboundRouteSelect = {
     companyId: true,
     didId: true,
     trunkId: true,
-    did: { select: { id: true, number: true } },
+    did: { select: { id: true, number: true, exten: true } },
     trunk: { select: { id: true, name: true } },
     destination: true,
     createdAt: true,
@@ -51,7 +51,7 @@ export const getInboundRouteById = async (id: string): Promise<InboundRouteDto> 
 export const createInboundRoute = async (data: CreateInboundRouteInput) => {
     const [, did, trunk] = await Promise.all([
         getCompanyById(data.companyId),
-        prisma.did.findUnique({ where: { id: data.didId }, select: { id: true, number: true, companyId: true } }),
+        prisma.did.findUnique({ where: { id: data.didId }, select: { id: true, number: true, exten: true, companyId: true } }),
         prisma.trunk.findUnique({ where: { id: data.trunkId }, select: { id: true, companyId: true } }),
     ])
 
@@ -79,7 +79,7 @@ export const createInboundRoute = async (data: CreateInboundRouteInput) => {
             select: inboundRouteSelect,
         })
 
-        await InboundRouteRepository.create(tx, data.trunkId, did.number, data.destination ?? null)
+        await InboundRouteRepository.create(tx, data.trunkId, did.exten ?? did.number, data.destination ?? null)
         return created
     })
 
@@ -90,7 +90,7 @@ export const createInboundRoute = async (data: CreateInboundRouteInput) => {
 export const updateInboundRoute = async (id: string, data: UpdateInboundRouteInput) => {
     const existing = await prisma.inboundRoute.findUnique({
         where: { id },
-        include: { did: { select: { number: true } } },
+        include: { did: { select: { number: true, exten: true } } },
     })
     if (!existing) throw new AppError('Inbound route not found', 404)
 
@@ -110,7 +110,7 @@ export const updateInboundRoute = async (id: string, data: UpdateInboundRouteInp
             select: inboundRouteSelect,
         })
 
-        await InboundRouteRepository.update(tx, existing.trunkId, existing.did.number, newDest)
+        await InboundRouteRepository.update(tx, existing.trunkId, existing.did.exten ?? existing.did.number, newDest)
         return updated
     })
 
@@ -122,12 +122,12 @@ export const updateInboundRoute = async (id: string, data: UpdateInboundRouteInp
 export const deleteInboundRoute = async (id: string) => {
     const existing = await prisma.inboundRoute.findUnique({
         where: { id },
-        include: { did: { select: { number: true } } },
+        include: { did: { select: { number: true, exten: true } } },
     })
     if (!existing) throw new AppError('Inbound route not found', 404)
 
     await prisma.$transaction(async (tx) => {
-        await InboundRouteRepository.delete(tx, existing.trunkId, existing.did.number)
+        await InboundRouteRepository.delete(tx, existing.trunkId, existing.did.exten ?? existing.did.number)
         await tx.inboundRoute.delete({ where: { id } })
     })
 

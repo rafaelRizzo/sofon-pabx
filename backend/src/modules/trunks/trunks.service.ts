@@ -138,7 +138,7 @@ export const deleteTrunk = async (id: string) => {
 
     const inboundRoutes = await prisma.inboundRoute.findMany({
         where: { trunkId: id },
-        select: { did: { select: { number: true } } },
+        select: { did: { select: { number: true, exten: true } } },
     })
     const affectedOutboundRouteIds = (
         await prisma.outboundRouteTrunk.findMany({ where: { trunkId: id }, select: { routeId: true } })
@@ -146,7 +146,7 @@ export const deleteTrunk = async (id: string) => {
 
     await prisma.$transaction(async (tx) => {
         for (const ir of inboundRoutes) {
-            await InboundRouteRepository.delete(tx, id, ir.did.number)
+            await InboundRouteRepository.delete(tx, id, ir.did.exten ?? ir.did.number)
         }
         await PjsipRepository.deleteTrunk(tx, astId, existing.registrationMode)
         await tx.trunk.delete({ where: { id } })

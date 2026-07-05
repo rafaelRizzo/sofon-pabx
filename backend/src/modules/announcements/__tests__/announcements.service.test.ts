@@ -16,24 +16,21 @@ mock.module('../cache/announcements.cache', () => ({
 }))
 mock.module('../../../asterisk/announcement.repository', () => ({
     AnnouncementRepository: { syncEntry: mock(() => Promise.resolve()), removeEntry: mock(() => Promise.resolve()), removeManyByIds: mock(() => Promise.resolve()) },
-    announcementSoundDir: (asteriskId: string) => `/var/lib/asterisk/sounds/${asteriskId}`,
-    announcementSoundPath: (asteriskId: string, id: string) => `/var/lib/asterisk/sounds/${asteriskId}/${id}`,
 }))
-mock.module('../../../utils/audio-convert', () => ({
-    convertToAsteriskWav: mock(() => Promise.resolve()),
+mock.module('../../../asterisk/audio.repository', () => ({
+    audioSoundDir: (asteriskId: string) => `/var/lib/asterisk/sounds/${asteriskId}`,
+    audioSoundPath: (asteriskId: string, id: string) => `/var/lib/asterisk/sounds/${asteriskId}/${id}`,
 }))
-mock.module('fs/promises', () => ({
-    mkdir: mock(() => Promise.resolve()),
-    rm: mock(() => Promise.resolve()),
-    writeFile: mock(() => Promise.resolve()),
+mock.module('../../audios/audios.service', () => ({
+    assertAudioBelongsToCompany: mock(() => Promise.resolve()),
 }))
 
 import * as AnnouncementsService from '../announcements.service'
 import { AnnouncementRepository } from '../../../asterisk/announcement.repository'
-import { convertToAsteriskWav } from '../../../utils/audio-convert'
+import { assertAudioBelongsToCompany } from '../../audios/audios.service'
 
-const COMPANY = { id: 'c1', name: 'ACME' }
-const ANNOUNCEMENT = { id: 'a1', name: 'Fora do horário', companyId: 'c1', audioUploadedAt: null, createdAt: new Date(), updatedAt: new Date() }
+const COMPANY = { id: 'c1', name: 'ACME', asteriskId: 'ast1' }
+const ANNOUNCEMENT = { id: 'a1', name: 'Fora do horário', companyId: 'c1', audioId: null, createdAt: new Date(), updatedAt: new Date() }
 
 beforeEach(() => clearPrismaMock(db))
 
@@ -41,10 +38,33 @@ beforeEach(() => clearPrismaMock(db))
 describe('AnnouncementsService.createAnnouncement', () => {
     it('creates announcement without audio', async () => {
         db.company.findUnique.mockResolvedValue(COMPANY)
-        db.announcement.findUnique.mockResolvedValue(null)
+        db.announcement.findUnique
+            .mockResolvedValueOnce(null) // dup check
+            .mockResolvedValueOnce({ audioId: null, company: { asteriskId: 'ast1' } }) // resync
         db.announcement.create.mockResolvedValue(ANNOUNCEMENT)
         const announcement = await AnnouncementsService.createAnnouncement({ name: 'Fora do horário', companyId: 'c1' })
         expect(announcement.hasAudio).toBe(false)
+        expect(AnnouncementRepository.removeEntry).toHaveBeenCalledWith(expect.anything(), 'a1')
+    })
+
+    it('creates announcement with audioId and syncs dialplan', async () => {
+        db.company.findUnique.mockResolvedValue(COMPANY)
+        db.announcement.findUnique
+            .mockResolvedValueOnce(null) // dup check
+            .mockResolvedValueOnce({ audioId: 'audio1', company: { asteriskId: 'ast1' } }) // resync
+        db.announcement.create.mockResolvedValue({ ...ANNOUNCEMENT, audioId: 'audio1' })
+        const announcement = await AnnouncementsService.createAnnouncement({ name: 'Fora do horário', companyId: 'c1', audioId: 'audio1' })
+        expect(announcement.hasAudio).toBe(true)
+        expect(assertAudioBelongsToCompany).toHaveBeenCalledWith('audio1', 'c1')
+        expect(AnnouncementRepository.syncEntry).toHaveBeenCalledWith(expect.anything(), 'a1', '/var/lib/asterisk/sounds/ast1/audio1')
+    })
+
+    it('throws when audioId is invalid', async () => {
+        db.company.findUnique.mockResolvedValue(COMPANY)
+        db.announcement.findUnique.mockResolvedValueOnce(null)
+        ;(assertAudioBelongsToCompany as any).mockRejectedValueOnce(Object.assign(new Error('Audio not found'), { statusCode: 404 }))
+        await expect(AnnouncementsService.createAnnouncement({ name: 'Fora do horário', companyId: 'c1', audioId: 'bad' }))
+            .rejects.toMatchObject({ statusCode: 404 })
     })
 
     it('throws 409 with duplicate name in same company', async () => {
@@ -63,11 +83,11 @@ describe('AnnouncementsService.createAnnouncement', () => {
 
 // ─── getAnnouncementById ────────────────────────────────────────────────────────
 describe('AnnouncementsService.getAnnouncementById', () => {
-    it('returns hasAudio=true when audioUploadedAt is set', async () => {
-        db.announcement.findUnique.mockResolvedValue({ ...ANNOUNCEMENT, audioUploadedAt: new Date() })
+    it('returns hasAudio=true when audioId is set', async () => {
+        db.announcement.findUnique.mockResolvedValue({ ...ANNOUNCEMENT, audioId: 'audio1' })
         const announcement = await AnnouncementsService.getAnnouncementById('a1') as any
         expect(announcement.hasAudio).toBe(true)
-        expect(announcement.audioUploadedAt).toBeUndefined()
+        expect(announcement.audioId).toBe('audio1')
     })
 
     it('throws 404 with non-existent id', async () => {
@@ -77,39 +97,39 @@ describe('AnnouncementsService.getAnnouncementById', () => {
     })
 })
 
-// ─── uploadAnnouncementAudio ────────────────────────────────────────────────────
-describe('AnnouncementsService.uploadAnnouncementAudio', () => {
-    it('converts audio, syncs dialplan and marks audioUploadedAt', async () => {
-        db.announcement.findUnique.mockResolvedValue({ ...ANNOUNCEMENT, company: { asteriskId: 'ast1' } })
-        db.announcement.update.mockResolvedValue({ ...ANNOUNCEMENT, audioUploadedAt: new Date() })
-
-        const announcement = await AnnouncementsService.uploadAnnouncementAudio('a1', Buffer.from('fake-audio'), 'aviso.mp3')
-
-        expect(convertToAsteriskWav).toHaveBeenCalled()
-        expect(AnnouncementRepository.syncEntry).toHaveBeenCalledWith(expect.anything(), 'a1', '/var/lib/asterisk/sounds/ast1/a1')
+// ─── updateAnnouncement ─────────────────────────────────────────────────────────
+describe('AnnouncementsService.updateAnnouncement', () => {
+    it('links a new audioId and syncs dialplan', async () => {
+        db.announcement.findUnique
+            .mockResolvedValueOnce({ ...ANNOUNCEMENT }) // existing
+            .mockResolvedValueOnce({ audioId: 'audio1', company: { asteriskId: 'ast1' } }) // resync
+        db.announcement.update.mockResolvedValue({ ...ANNOUNCEMENT, audioId: 'audio1' })
+        const announcement = await AnnouncementsService.updateAnnouncement('a1', { audioId: 'audio1' })
         expect(announcement.hasAudio).toBe(true)
+        expect(AnnouncementRepository.syncEntry).toHaveBeenCalledWith(expect.anything(), 'a1', '/var/lib/asterisk/sounds/ast1/audio1')
+    })
+
+    it('unlinks audioId and removes dialplan', async () => {
+        db.announcement.findUnique
+            .mockResolvedValueOnce({ ...ANNOUNCEMENT, audioId: 'audio1' }) // existing
+            .mockResolvedValueOnce({ audioId: null, company: { asteriskId: 'ast1' } }) // resync
+        db.announcement.update.mockResolvedValue({ ...ANNOUNCEMENT, audioId: null })
+        const announcement = await AnnouncementsService.updateAnnouncement('a1', { audioId: null })
+        expect(announcement.hasAudio).toBe(false)
+        expect(AnnouncementRepository.removeEntry).toHaveBeenCalledWith(expect.anything(), 'a1')
     })
 
     it('throws 404 with non-existent id', async () => {
         db.announcement.findUnique.mockResolvedValue(null)
-        await expect(AnnouncementsService.uploadAnnouncementAudio('clxxxxxxxxxxxxxxxxxxxxxxxxx', Buffer.from('x'), 'a.wav'))
+        await expect(AnnouncementsService.updateAnnouncement('clxxxxxxxxxxxxxxxxxxxxxxxxx', { name: 'x' }))
             .rejects.toMatchObject({ statusCode: 404 })
-    })
-
-    it('propagates conversion failure without marking audioUploadedAt', async () => {
-        db.announcement.findUnique.mockResolvedValue({ ...ANNOUNCEMENT, company: { asteriskId: 'ast1' } })
-        ;(convertToAsteriskWav as any).mockRejectedValueOnce(Object.assign(new Error('bad format'), { statusCode: 422 }))
-
-        await expect(AnnouncementsService.uploadAnnouncementAudio('a1', Buffer.from('x'), 'a.xyz'))
-            .rejects.toMatchObject({ statusCode: 422 })
-        expect(db.announcement.update).not.toHaveBeenCalled()
     })
 })
 
 // ─── deleteAnnouncement ─────────────────────────────────────────────────────────
 describe('AnnouncementsService.deleteAnnouncement', () => {
-    it('deletes announcement, dialplan entry and audio file', async () => {
-        db.announcement.findUnique.mockResolvedValue({ ...ANNOUNCEMENT, company: { asteriskId: 'ast1' } })
+    it('deletes announcement and dialplan entry', async () => {
+        db.announcement.findUnique.mockResolvedValue({ id: 'a1', companyId: 'c1' })
         db.announcement.delete.mockResolvedValue(ANNOUNCEMENT)
         await AnnouncementsService.deleteAnnouncement('a1')
         expect(AnnouncementRepository.removeEntry).toHaveBeenCalledWith(expect.anything(), 'a1')

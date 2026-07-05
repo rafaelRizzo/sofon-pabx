@@ -141,7 +141,7 @@ describe('TimeConditionsService.createTimeCondition', () => {
     it('creates with announcement falseRoute', async () => {
         db.company.findUnique.mockResolvedValue(COMPANY)
         db.timeCondition.findUnique.mockResolvedValue(null)
-        db.announcement.findUnique.mockResolvedValue({ companyId: 'c1', audioUploadedAt: new Date() })
+        db.announcement.findUnique.mockResolvedValue({ companyId: 'c1', audioId: 'audio1' })
         db.timeCondition.create.mockResolvedValue({ ...TC, falseRoute: { type: 'announcement', id: 'ann1' } })
         db.timeConditionTimeGroup.findMany.mockResolvedValue([])
         const tc = await TimeConditionsService.createTimeCondition({
@@ -155,7 +155,7 @@ describe('TimeConditionsService.createTimeCondition', () => {
     it('throws 400 when announcement has no audio uploaded yet', async () => {
         db.company.findUnique.mockResolvedValue(COMPANY)
         db.timeCondition.findUnique.mockResolvedValue(null)
-        db.announcement.findUnique.mockResolvedValue({ companyId: 'c1', audioUploadedAt: null })
+        db.announcement.findUnique.mockResolvedValue({ companyId: 'c1', audioId: null })
         await expect(TimeConditionsService.createTimeCondition({
             name: 'x', companyId: 'c1',
             falseRoute: { type: 'announcement', id: 'ann1' },

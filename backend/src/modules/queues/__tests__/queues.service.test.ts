@@ -93,6 +93,19 @@ describe('QueuesService.createQueue', () => {
         await expect(QueuesService.createQueue({ name: 'suporte2', companyId: 'c1', number: '8001' } as any))
             .rejects.toMatchObject({ statusCode: 409 })
     })
+
+    it('syncs dialplan with postQueueDestination', async () => {
+        const { AsteriskQueueRepository } = await import('../../../asterisk/queue.repository')
+        db.company.findUnique.mockResolvedValue(COMPANY)
+        db.queue.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce(null)
+        db.queue.create.mockResolvedValue(QUEUE)
+        await QueuesService.createQueue({
+            name: 'suporte', companyId: 'c1', number: '8001', postQueueDestination: { type: 'hangup' },
+        } as any)
+        expect(AsteriskQueueRepository.syncQueueAppEntry).toHaveBeenCalledWith(
+            expect.anything(), 'ast1-8001', 'ast1-suporte', { type: 'hangup' },
+        )
+    })
 })
 
 // ─── getQueuesByCompany ───────────────────────────────────────────────────────
@@ -140,6 +153,18 @@ describe('QueuesService.updateQueue', () => {
         db.queue.update.mockResolvedValue({ ...QUEUE, timeout: 30 })
         const queue = await QueuesService.updateQueue('q1', { timeout: 30 }) as any
         expect(queue.timeout).toBe(30)
+    })
+
+    it('resyncs dialplan when only postQueueDestination changes', async () => {
+        const { AsteriskQueueRepository } = await import('../../../asterisk/queue.repository')
+        const existing = { ...QUEUE, number: '8000' }
+        db.queue.findUnique.mockResolvedValueOnce(existing)
+        db.queue.update.mockResolvedValue({ ...existing, postQueueDestination: { type: 'hangup' } })
+        await QueuesService.updateQueue('q1', { postQueueDestination: { type: 'hangup' } })
+        expect(AsteriskQueueRepository.removeQueueAppEntry).toHaveBeenCalledWith(expect.anything(), 'ast1-8000')
+        expect(AsteriskQueueRepository.syncQueueAppEntry).toHaveBeenCalledWith(
+            expect.anything(), 'ast1-8000', 'ast1-suporte', { type: 'hangup' },
+        )
     })
 })
 

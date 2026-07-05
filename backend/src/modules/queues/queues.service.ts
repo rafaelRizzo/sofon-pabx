@@ -4,6 +4,8 @@ import { QueuesCache } from './cache/queues.cache'
 import { QueueMembersCache } from '../queue-members/cache/queue-members.cache'
 import type { CreateQueueInput, UpdateQueueInput } from './schemas/queue.schema'
 import { AsteriskQueueRepository, queueAppExten, toAsteriskQueueName } from '../../asterisk/queue.repository'
+import { validateRouteDestination } from '../../schemas/route-destination.validate'
+import type { RouteDestination } from '../../schemas/route-destination.schema'
 import { AppError } from '../../utils/errors/app.error'
 
 const queueSelect = {
@@ -23,6 +25,7 @@ const queueSelect = {
     leaveWhenEmpty: true,
     weight: true,
     metadata: true,
+    postQueueDestination: true,
     createdAt: true,
     updatedAt: true,
     company: { select: { asteriskId: true } },
@@ -84,12 +87,19 @@ export const createQueue = async (data: CreateQueueInput) => {
     })
     if (duplicateNumber) throw new AppError('Queue number already in use for this company', 409)
 
+    await validateRouteDestination(data.postQueueDestination ?? null, data.companyId, 'postQueueDestination')
+
     const asteriskName = toAsteriskQueueName(company.asteriskId, data.name)
 
     const queue = await prisma.$transaction(async (tx) => {
-        const q = await tx.queue.create({ data, select: queueSelect })
+        const q = await tx.queue.create({
+            data: { ...data, postQueueDestination: data.postQueueDestination ?? undefined },
+            select: queueSelect,
+        })
         await AsteriskQueueRepository.createQueue(tx, asteriskName, data)
-        await AsteriskQueueRepository.syncQueueAppEntry(tx, queueAppExten(company.asteriskId, data.number), asteriskName)
+        await AsteriskQueueRepository.syncQueueAppEntry(
+            tx, queueAppExten(company.asteriskId, data.number), asteriskName, data.postQueueDestination ?? null,
+        )
         return q
     })
 
@@ -125,6 +135,9 @@ export const updateQueue = async (id: string, data: UpdateQueueInput) => {
         if (duplicate) throw new AppError('Queue number already in use for this company', 409)
     }
 
+    if (data.postQueueDestination !== undefined)
+        await validateRouteDestination(data.postQueueDestination, existing.companyId, 'postQueueDestination')
+
     const asteriskUpdate: Record<string, any> = {}
     if (data.strategy !== undefined) asteriskUpdate.strategy = data.strategy
     if (data.musicOnHold !== undefined) asteriskUpdate.musiconhold = data.musicOnHold
@@ -145,15 +158,18 @@ export const updateQueue = async (id: string, data: UpdateQueueInput) => {
 
     const newNumber = data.number === undefined ? existing.number : data.number
     const numberChanged = newNumber !== existing.number
+    const destChanged = data.postQueueDestination !== undefined
+    const newDest = destChanged ? data.postQueueDestination! : (existing.postQueueDestination as RouteDestination)
+    const needsResync = numberChanged || nameChanged || destChanged
 
     const queue = await prisma.$transaction(async (tx) => {
         if (nameChanged) await AsteriskQueueRepository.renameQueue(tx, oldAsteriskName, newAsteriskName)
         await AsteriskQueueRepository.updateQueue(tx, newAsteriskName, asteriskUpdate)
 
-        if (existing.number && (numberChanged || nameChanged))
+        if (existing.number && needsResync)
             await AsteriskQueueRepository.removeQueueAppEntry(tx, queueAppExten(existing.company.asteriskId, existing.number))
-        if (newNumber && (numberChanged || nameChanged))
-            await AsteriskQueueRepository.syncQueueAppEntry(tx, queueAppExten(existing.company.asteriskId, newNumber), newAsteriskName)
+        if (newNumber && needsResync)
+            await AsteriskQueueRepository.syncQueueAppEntry(tx, queueAppExten(existing.company.asteriskId, newNumber), newAsteriskName, newDest)
 
         return tx.queue.update({ where: { id }, data: appUpdate, select: queueSelect })
     })

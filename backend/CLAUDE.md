@@ -26,7 +26,7 @@ src/modules/<name>/
   schemas/<name>.schema.ts  # Zod schemas de input/output + response types
   cache/<name>.cache.ts     # wrapper de CacheManager para o módulo
 ```
-Módulos: auth, users, companies, dids, extensions, queues, queue-members, trunks, outbound-routes, inbound-routes, time-groups, time-conditions, cdr, announcements
+Módulos: auth, users, companies, dids, extensions, queues, queue-members, trunks, outbound-routes, inbound-routes, time-groups, time-conditions, cdr, announcements, ivr, request-templates, audios
 
 ## Repositórios Asterisk (`src/asterisk/`)
 Cada repositório escreve direto nas tabelas realtime do Asterisk via Prisma:
@@ -36,7 +36,9 @@ Cada repositório escreve direto nas tabelas realtime do Asterisk via Prisma:
 - `dialplan.repository.ts` → `extensions` (dialplan realtime)
 - `timecondition.repository.ts` → dialplan no contexto fixo `timeconditions` (exten `tc-<tcId>`/`tc-<tcId>-matched`)
 - `inboundroute.repository.ts` → dialplan para rotas de entrada
-- `announcement.repository.ts` → dialplan no contexto fixo `announcements` (exten `ann-<id>`, Playback+Hangup) + paths de áudio (`/var/lib/asterisk/sounds/<asteriskId>/<id>.wav`)
+- `announcement.repository.ts` → dialplan no contexto fixo `announcements` (exten `ann-<id>`, Playback+Hangup)
+- `ivr.repository.ts` → dialplan no contexto fixo `ivrs` (exten `ivr-<id>`), state machine de prioridades numéricas pra Read()+GotoIf
+- `audio.repository.ts` → só paths de áudio (`/var/lib/asterisk/sounds/<asteriskId>/<audioId>.wav`) — único lugar que grava arquivo físico; Announcement/IvrMenu só referenciam um `Audio.id`, sem dialplan próprio
 
 ---
 
@@ -157,8 +159,10 @@ Vars: `DATABASE_URL`, `JWT_SECRET`, `REFRESH_SECRET`, `JWT_EXPIRES_IN` (15m), `R
 - `PUT /outbound-routes/:id/trunks`: substitui lista completa (não aditivo)
 - `allowOutbound` em Extension: persiste `ALLOW_OUTBOUND=1/0` em `sip_peers.setvar` / `ps_endpoints.setvar`
 - Time Conditions: ao criar/atualizar/deletar, regenera dialplan no contexto fixo compartilhado `timeconditions` (exten `tc-<tcId>`/`tc-<tcId>-matched`) via `GotoIfTime` — OR lógico entre todos os ranges de todos os TGs vinculados. Contexto dinâmico por entidade (`tc-<id>`) não é usado — mesma limitação de `ramais-<asteriskId>` (ver seção acima): Asterisk só resolve realtime pra contextos declarados estaticamente em `extensions.conf`
-- **Route destination** (`src/schemas/route-destination.schema.ts`) — shape compartilhado por Inbound Routes (`destination`) e Time Conditions (`trueRoute`/`falseRoute`): `{ type: "extension"|"queue"|"voicemail"|"timecondition"|"announcement"|"hangup", id?: cuid2 } | null` (`id` obrigatório exceto hangup; `null`/omitido = hangup). Validação de existência/posse centralizada em `validateRouteDestination()` (`src/schemas/route-destination.validate.ts`), usada pelos dois services — não duplicar esse switch-case ao adicionar novo tipo
-- Announcements: cria só o registro; áudio é enviado depois via `POST /announcements/:id/audio` (multipart) e convertido automaticamente pra WAV PCM 16-bit mono 8kHz (slin) via `sox` — qualidade sem perdas, compatível com os codecs das trunks (ulaw/alaw) sem resample na chamada. Só grava o dialplan (`Playback`+`Hangup` no contexto `announcements`) e marca `audioUploadedAt` depois da conversão — usar como destino de rota exige áudio já enviado (senão 400)
+- **Route destination** (`src/schemas/route-destination.schema.ts`) — shape compartilhado por Inbound Routes (`destination`), Time Conditions (`trueRoute`/`falseRoute`), Queues (`postQueueDestination`), IVR Menus (`invalidDestination`/`timeoutDestination`/`longDestination`/opção de dígito) e Request Templates (`onSuccess`/`onError`): `{ type: "extension"|"queue"|"voicemail"|"timecondition"|"announcement"|"ivr"|"request"|"hangup", id?: cuid2 } | null` (`id` obrigatório exceto hangup; `null`/omitido = hangup). Validação de existência/posse centralizada em `validateRouteDestination()` (`src/schemas/route-destination.validate.ts`), usada por todos os services acima — não duplicar esse switch-case ao adicionar novo tipo
+- Áudio (`Audio` model, módulo `audios`) é desacoplado de quem o usa: upload é feito uma vez via `POST /audios` (multipart, por empresa) e o `audioId` retornado é referenciado por `Announcement.audioId`/`IvrMenu.audioId` — o mesmo Audio pode ser reaproveitado por mais de um registro. Áudio é convertido automaticamente pra WAV PCM 16-bit mono 8kHz (slin) via `sox` — qualidade sem perdas, compatível com os codecs das trunks (ulaw/alaw) sem resample na chamada. Único arquivo físico por Audio, em `/var/lib/asterisk/sounds/<asteriskId>/<audioId>.wav`
+  - `DELETE /audios/:id` desvincula automaticamente (`SetNull`) qualquer Announcement/IvrMenu que o referencie, removendo o dialplan deles na mesma operação (senão ficaria um Playback/Read apontando pro arquivo apagado) — não bloqueia com 409
+  - Announcement/IvrMenu usados como destino de rota (`type: "announcement"|"ivr"`) exigem `audioId` vinculado (`hasAudio: true`), senão 400 em `validateRouteDestination`
 - `context` de Extension: default `"ramais"`, compartilhado entre todas as empresas — isolamento entre empresas é feito via sufixo `asteriskId` no `number`/`exten` (ex: `2002_a9e2463c8f`), não por contexto Asterisk separado. Contextos dinâmicos por empresa (`ramais-<asteriskId>`) **não funcionam** nesse setup: o Asterisk só resolve realtime dialplan pra contextos declarados estaticamente em `extensions.conf` com `switch => Realtime/<contexto>@extensions` — tentativa de escopar por empresa quebra a resolução de chamadas. Isolamento de verdade entre empresas exigiria uma reformulação maior (contexto único + AGI/`func_odbc` decidindo rota em tempo de chamada, ao estilo MagnusBilling) — não implementado
 
 ## API — schemas de input/output por módulo
@@ -214,12 +218,25 @@ Vars: `DATABASE_URL`, `JWT_SECRET`, `REFRESH_SECRET`, `JWT_EXPIRES_IN` (15m), `R
 - Update: `{ name?, trueRoute?, falseRoute? }` (min 1)
 - Route format: route destination compartilhado (ver seção "Route destination" acima)
 
-**Announcements** — `{ id, name, companyId, hasAudio, createdAt, updatedAt }`
-- Create: `{ name, companyId }` → `{ announcementId }` (sem áudio ainda)
-- Update: `{ name }`
-- `POST /:id/audio` — multipart/form-data, 1 arquivo, até 15MB. Converte pra WAV slin 8kHz mono 16-bit via `sox`; sobrescreve áudio anterior; seta `audioUploadedAt`
-- Delete: remove registro, dialplan (`announcements`/`ann-<id>`) e o `.wav` em disco
-- Delete Company → cascade Announcements (dialplan + pasta `/var/lib/asterisk/sounds/<asteriskId>/` inteira)
+**Audios** — `{ id, name, companyId, createdAt, updatedAt }`
+- Create: `POST /audios` — multipart/form-data com campos de texto `name`+`companyId` **antes** do arquivo, até 15MB. Converte pra WAV slin 8kHz mono 16-bit via `sox` → `{ audioId }`
+- Update: `PATCH /:id` — `{ name }` (só rename)
+- Delete: `DELETE /:id` — remove registro e `.wav`; desvincula (não bloqueia) Announcement/IvrMenu que o referenciem, removendo o dialplan deles
+- `UNIQUE(name, companyId)`
+- Delete Company → cascade Audios (dialplan dos consumidores limpo antes; pasta `/var/lib/asterisk/sounds/<asteriskId>/` inteira removida)
+
+**Announcements** — `{ id, name, companyId, audioId, hasAudio, createdAt, updatedAt }`
+- Create: `{ name, companyId, audioId? }` → `{ announcementId }` (com `audioId` já sai com dialplan; sem ele fica pendente)
+- Update: `{ name?, audioId? }` (min 1; `audioId: null` desvincula e remove o dialplan)
+- Delete: remove registro e dialplan (`announcements`/`ann-<id>`) — não mexe no Audio vinculado
+- Delete Company → cascade Announcements (dialplan) + cascade Audios (ver seção Audios)
+
+**IVR Menus** (`/ivr-menus`) — `{ id, name, companyId, audioId, hasAudio, maxDigits, digitTimeout, invalidRetries, invalidDestination, timeoutRetries, timeoutDestination, longDestination, options[{id,digit,destination}], createdAt, updatedAt }`
+- Create: `{ name, companyId, audioId?, maxDigits?, digitTimeout?, invalidRetries?, invalidDestination?, timeoutRetries?, timeoutDestination?, longDestination?, options?[{digit, destination?}] }` → `{ ivrMenuId }`
+- Update: `{ name?, audioId?, ...resto opcional, options? }` (min 1; `options` substitui lista completa; `audioId: null` desvincula)
+- `maxDigits > 1` permite sequência longa (ex: CPF) tratada via `longDestination` quando não bate com nenhuma opção de 1 dígito
+- Delete: remove registro e dialplan (`ivrs`/`ivr-<id>`) — não mexe no Audio vinculado
+- Delete Company → cascade IVR Menus (dialplan) + cascade Audios (ver seção Audios)
 
 **CDR** — `GET /cdr` — `{ records[], total, limit }`
 - Query obrigatória: `companyId`; opcionais: `startDate`/`endDate` (`YYYY-MM-DD`, cobrem o dia inteiro 00:00:00–23:59:59.999, sem offset/hora), `src`, `dst`, `callStatus` (enum disposition), `limit`(max 200), `order`(asc|desc, default desc — aplica em startTime+id)

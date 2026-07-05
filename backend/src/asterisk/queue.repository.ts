@@ -1,11 +1,45 @@
 import { prisma } from '../lib/prisma'
+import type { RouteDestination } from '../schemas/route-destination.schema'
+import {
+    TC_CONTEXT, tcEntry, ANNOUNCEMENT_CONTEXT, announcementExten, IVR_CONTEXT, ivrExten,
+    REQUEST_TEMPLATE_CONTEXT, requestTemplateExten,
+} from './dialplan-names'
 
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 
-const QUEUE_APP_CONTEXT = 'queues-app'
+export const QUEUE_APP_CONTEXT = 'queues-app'
 
 export const toAsteriskQueueName = (asteriskId: string, queueName: string) => `${asteriskId}-${queueName}`
 export const queueAppExten = (asteriskId: string, number: string) => `${asteriskId}-${number}`
+
+// Pra onde o cliente vai quando a fila termina sem ele ter desligado (timeout, sem agente, ou
+// agente desliga primeiro) — mesmo RouteDestination usado por Inbound Routes/Time Conditions
+async function resolvePostQueueDestination(tx: Tx, dest: RouteDestination): Promise<{ app: string; appdata: string | null }> {
+    if (!dest || dest.type === 'hangup') return { app: 'Hangup', appdata: null }
+
+    switch (dest.type) {
+        case 'extension': {
+            const ext = await tx.extension.findUnique({ where: { id: dest.id }, select: { context: true, number: true } })
+            return ext ? { app: 'Goto', appdata: `${ext.context},${ext.number},1` } : { app: 'Hangup', appdata: null }
+        }
+        case 'queue': {
+            const q = await tx.queue.findUnique({ where: { id: dest.id }, select: { number: true, company: { select: { asteriskId: true } } } })
+            return q?.number
+                ? { app: 'Goto', appdata: `${QUEUE_APP_CONTEXT},${queueAppExten(q.company.asteriskId, q.number)},1` }
+                : { app: 'Hangup', appdata: null }
+        }
+        case 'voicemail':
+            return { app: 'Goto', appdata: `vm,${dest.id},1` }
+        case 'timecondition':
+            return { app: 'Goto', appdata: `${TC_CONTEXT},${tcEntry(dest.id)},1` }
+        case 'announcement':
+            return { app: 'Goto', appdata: `${ANNOUNCEMENT_CONTEXT},${announcementExten(dest.id)},1` }
+        case 'ivr':
+            return { app: 'Goto', appdata: `${IVR_CONTEXT},${ivrExten(dest.id)},1` }
+        case 'request':
+            return { app: 'Goto', appdata: `${REQUEST_TEMPLATE_CONTEXT},${requestTemplateExten(dest.id)},1` }
+    }
+}
 
 type AsteriskQueueData = {
     strategy?: string
@@ -111,12 +145,13 @@ export const AsteriskQueueRepository = {
         })
     },
 
-    async syncQueueAppEntry(tx: Tx, exten: string, asteriskName: string) {
+    async syncQueueAppEntry(tx: Tx, exten: string, asteriskName: string, postQueueDestination: RouteDestination = null) {
         await tx.extensions.deleteMany({ where: { context: QUEUE_APP_CONTEXT, exten } })
+        const { app, appdata } = await resolvePostQueueDestination(tx, postQueueDestination)
         await tx.extensions.createMany({
             data: [
                 { context: QUEUE_APP_CONTEXT, exten, priority: 1, app: 'Queue', appdata: asteriskName },
-                { context: QUEUE_APP_CONTEXT, exten, priority: 2, app: 'Hangup', appdata: null },
+                { context: QUEUE_APP_CONTEXT, exten, priority: 2, app, appdata },
             ],
         })
     },

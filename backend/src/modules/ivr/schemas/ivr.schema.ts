@@ -1,0 +1,78 @@
+import { z } from 'zod'
+import { timestamp, cuidParam, ok } from '../../../schemas/responses'
+import { routeDestinationSchema, routeDestinationResponseSchema } from '../../../schemas/route-destination.schema'
+
+export const idParamSchema = z.object({ id: cuidParam })
+export const companyQuerySchema = z.object({ companyId: z.cuid2() })
+
+export const destinationSchema = routeDestinationSchema
+export type IvrDest = z.infer<typeof destinationSchema>
+
+const digitSchema = z.string().regex(/^[0-9]$/, 'digit must be a single character 0-9')
+
+const ivrOptionsSchema = z.array(z.object({
+    digit:       digitSchema,
+    destination: destinationSchema.optional(),
+})).max(10).refine(
+    (opts) => new Set(opts.map((o) => o.digit)).size === opts.length,
+    { message: 'Duplicate digit in options' },
+)
+
+export const createIvrMenuSchema = z.object({
+    name:               z.string().min(1).max(80),
+    companyId:          z.cuid2(),
+    audioId:            z.cuid2().optional().describe('id de um Audio (POST /audios) já enviado — sem ele o menu fica sem dialplan até vincular um depois'),
+    maxDigits:          z.number().int().min(1).max(20).default(1),
+    digitTimeout:       z.number().int().min(1).max(60).default(5),
+    invalidRetries:     z.number().int().min(0).max(10).default(3),
+    invalidDestination: destinationSchema.optional(),
+    timeoutRetries:     z.number().int().min(0).max(10).default(3),
+    timeoutDestination: destinationSchema.optional(),
+    longDestination:    destinationSchema.optional(),
+    options:            ivrOptionsSchema.default([]),
+})
+
+export const updateIvrMenuSchema = z.object({
+    name:               z.string().min(1).max(80).optional(),
+    audioId:            z.cuid2().nullable().optional(),
+    maxDigits:          z.number().int().min(1).max(20).optional(),
+    digitTimeout:       z.number().int().min(1).max(60).optional(),
+    invalidRetries:     z.number().int().min(0).max(10).optional(),
+    invalidDestination: destinationSchema.optional(),
+    timeoutRetries:     z.number().int().min(0).max(10).optional(),
+    timeoutDestination: destinationSchema.optional(),
+    longDestination:    destinationSchema.optional(),
+    options:            ivrOptionsSchema.optional(),
+}).refine((d) => Object.keys(d).length > 0, { message: 'At least one field is required' })
+
+export type CreateIvrMenuInput = z.infer<typeof createIvrMenuSchema>
+export type UpdateIvrMenuInput = z.infer<typeof updateIvrMenuSchema>
+
+const IvrOptionSchema = z.object({
+    id:          z.string(),
+    digit:       z.string(),
+    destination: routeDestinationResponseSchema,
+})
+
+export const IvrMenuSchema = z.object({
+    id:                 z.string(),
+    name:               z.string(),
+    companyId:          z.string(),
+    audioId:            z.string().nullable(),
+    hasAudio:           z.boolean().describe('true quando há um Audio vinculado — usar como destino de rota exige áudio'),
+    maxDigits:          z.number().describe('máximo de dígitos aceitos pelo Read() — >1 permite sequência longa (ex: CPF) via longDestination'),
+    digitTimeout:       z.number().describe('segundos que o Asterisk aguarda por dígito antes de considerar timeout'),
+    invalidRetries:     z.number().describe('tentativas com dígito inválido antes de ir pro invalidDestination'),
+    invalidDestination: routeDestinationResponseSchema,
+    timeoutRetries:     z.number().describe('tentativas sem entrada antes de ir pro timeoutDestination'),
+    timeoutDestination: routeDestinationResponseSchema,
+    longDestination:    routeDestinationResponseSchema.describe('destino quando o chamador digita mais de 1 dígito (até maxDigits) sem bater com nenhuma opção — ex: CPF'),
+    options:            z.array(IvrOptionSchema),
+    createdAt:          timestamp,
+    updatedAt:          timestamp,
+})
+
+export const ListIvrMenusResponse = ok({ message: z.string(), ivrMenus: z.array(IvrMenuSchema) })
+export const GetIvrMenuResponse = ok({ message: z.string(), ivrMenu: IvrMenuSchema })
+export const CreateIvrMenuResponse = ok({ message: z.string(), ivrMenuId: z.string() })
+export const UpdateIvrMenuResponse = ok({ message: z.string() })

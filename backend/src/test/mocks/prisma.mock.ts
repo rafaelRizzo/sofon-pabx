@@ -3,6 +3,7 @@ import { mock } from 'bun:test'
 function model() {
     return {
         findUnique: mock(),
+        findUniqueOrThrow: mock(),
         findFirst: mock(),
         findMany: mock(() => Promise.resolve([])),
         create: mock(),
@@ -35,6 +36,10 @@ export function createPrismaMock() {
         timeConditionTimeGroup: model(),
         inboundRoute: model(),
         announcement: model(),
+        ivrMenu: model(),
+        ivrOption: model(),
+        requestTemplate: model(),
+        audio: model(),
         // Asterisk realtime
         ps_endpoints: model(),
         ps_auths: model(),

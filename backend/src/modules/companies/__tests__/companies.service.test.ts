@@ -35,10 +35,27 @@ mock.module('../../../asterisk/timecondition.repository', () => ({
 }))
 mock.module('../../../asterisk/announcement.repository', () => ({
     AnnouncementRepository: { removeManyByIds: mock(() => Promise.resolve()) },
-    announcementSoundDir: (asteriskId: string) => `/var/lib/asterisk/sounds/${asteriskId}`,
 }))
 mock.module('../../announcements/cache/announcements.cache', () => ({
     AnnouncementsCache: { invalidateNamespace: mock() },
+}))
+mock.module('../../../asterisk/ivr.repository', () => ({
+    IvrRepository: { removeManyByIds: mock(() => Promise.resolve()) },
+}))
+mock.module('../../ivr/cache/ivr.cache', () => ({
+    IvrCache: { invalidateNamespace: mock() },
+}))
+mock.module('../../../asterisk/audio.repository', () => ({
+    audioSoundDir: (asteriskId: string) => `/var/lib/asterisk/sounds/${asteriskId}`,
+}))
+mock.module('../../audios/cache/audios.cache', () => ({
+    AudiosCache: { invalidateNamespace: mock() },
+}))
+mock.module('../../../asterisk/request-template.repository', () => ({
+    RequestTemplateRepository: { removeManyByIds: mock(() => Promise.resolve()) },
+}))
+mock.module('../../request-templates/cache/request-templates.cache', () => ({
+    RequestTemplatesCache: { invalidateNamespace: mock() },
 }))
 mock.module('fs/promises', () => ({ rm: mock(() => Promise.resolve()) }))
 
@@ -47,6 +64,8 @@ import { AsteriskQueueRepository } from '../../../asterisk/queue.repository'
 import { InboundRouteRepository } from '../../../asterisk/inboundroute.repository'
 import { TimeConditionRepository } from '../../../asterisk/timecondition.repository'
 import { AnnouncementRepository } from '../../../asterisk/announcement.repository'
+import { IvrRepository } from '../../../asterisk/ivr.repository'
+import { RequestTemplateRepository } from '../../../asterisk/request-template.repository'
 
 const COMPANY = { id: 'c1', name: 'ACME', doc: null, asteriskId: 'ast1', timezone: 'America/Sao_Paulo', metadata: {}, createdAt: new Date(), updatedAt: new Date() }
 const USER = { id: 'u1', name: 'Admin', username: 'admin@test.com' }
@@ -146,6 +165,8 @@ describe('CompaniesService.deleteCompany', () => {
         db.timeCondition.findMany.mockResolvedValue([])
         db.outboundDialPattern.findMany.mockResolvedValue([])
         db.announcement.findMany.mockResolvedValue([])
+        db.ivrMenu.findMany.mockResolvedValue([])
+        db.requestTemplate.findMany.mockResolvedValue([])
         db.extension.deleteMany.mockResolvedValue({ count: 0 })
         db.company.delete.mockResolvedValue(COMPANY)
         await CompaniesService.deleteCompany('c1')
@@ -161,6 +182,8 @@ describe('CompaniesService.deleteCompany', () => {
         db.timeCondition.findMany.mockResolvedValue([{ id: 'tc1' }])
         db.outboundDialPattern.findMany.mockResolvedValue([{ pattern: '_0.' }])
         db.announcement.findMany.mockResolvedValue([{ id: 'ann1' }])
+        db.ivrMenu.findMany.mockResolvedValue([{ id: 'ivr1' }])
+        db.requestTemplate.findMany.mockResolvedValue([{ id: 'reqtpl1' }])
         db.extension.deleteMany.mockResolvedValue({ count: 0 })
         db.extensions.deleteMany.mockResolvedValue({ count: 0 })
         db.company.delete.mockResolvedValue(COMPANY)
@@ -171,6 +194,8 @@ describe('CompaniesService.deleteCompany', () => {
         expect(InboundRouteRepository.deleteMany).toHaveBeenCalledWith(expect.anything(), [{ trunkId: 't1', didNumber: '5511999998888' }])
         expect(TimeConditionRepository.deleteManyByIds).toHaveBeenCalledWith(expect.anything(), ['tc1'])
         expect(AnnouncementRepository.removeManyByIds).toHaveBeenCalledWith(expect.anything(), ['ann1'])
+        expect(IvrRepository.removeManyByIds).toHaveBeenCalledWith(expect.anything(), ['ivr1'])
+        expect(RequestTemplateRepository.removeManyByIds).toHaveBeenCalledWith(expect.anything(), ['reqtpl1'])
         expect(db.extensions.deleteMany).toHaveBeenCalledWith({ where: { context: 'ramais', exten: { in: ['_0.'] } } })
     })
 

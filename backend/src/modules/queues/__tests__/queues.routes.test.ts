@@ -17,7 +17,6 @@ let app: FastifyInstance
 let accessToken: string
 let userId: string
 let companyId: string
-let companyAsteriskId: string
 let extensionId: string
 let queueId: string
 let memberId: string
@@ -34,7 +33,6 @@ beforeAll(async () => {
         data: { name: `${PREFIX} Company`, metadata: {}, users: { create: { userId } } },
     })
     companyId = company.id
-    companyAsteriskId = company.asteriskId
 
     const ext = await prisma.extension.create({
         data: {
@@ -56,13 +54,9 @@ beforeAll(async () => {
 }, 30000)
 
 afterAll(async () => {
-    await prisma.queue_members.deleteMany({ where: { queue_name: { startsWith: companyAsteriskId } } }).catch(() => {})
-    await prisma.queues.deleteMany({ where: { name: { startsWith: companyAsteriskId } } }).catch(() => {})
-    await prisma.queueMember.deleteMany({ where: { queue: { companyId } } })
-    await prisma.queue.deleteMany({ where: { companyId } })
-    await prisma.extension.deleteMany({ where: { companyId } })
-    await prisma.userCompany.deleteMany({ where: { userId } })
-    await prisma.company.deleteMany({ where: { id: companyId } })
+    // DELETE /companies/:id já limpa cascata completa (queues-app, queue realtime, dialplan de
+    // extension, etc.) — evita deixar dialplan órfão em `extensions` como o cleanup manual fazia
+    await app.inject({ method: 'DELETE', url: `/companies/${companyId}`, headers: auth() })
     await prisma.user.deleteMany({ where: { username: { startsWith: PREFIX } } })
     await prisma.$disconnect()
     await app.close()
@@ -110,9 +104,7 @@ describe('POST /queues', () => {
         })
         expect(res.statusCode).toBe(201)
         const created = res.json().queueId
-        await prisma.queue_members.deleteMany({ where: { queue_name: { contains: 'vendas' } } }).catch(() => {})
-        await prisma.queues.deleteMany({ where: { name: { contains: 'vendas' } } }).catch(() => {})
-        await prisma.queue.delete({ where: { id: created } })
+        await app.inject({ method: 'DELETE', url: `/queues/${created}`, headers: auth() })
     })
 
     it('409 duplicate name in the same company', async () => {

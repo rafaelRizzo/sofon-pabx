@@ -3,12 +3,14 @@ import { getCompanyById } from '../companies/companies.service'
 import { DidsCache } from './cache/dids.cache'
 import type { CreateDidInput, UpdateDidInput } from './schemas/did.schema'
 import { InboundRouteRepository } from '../../asterisk/inboundroute.repository'
+import type { InboundDest } from '../inbound-routes/schemas/inbound-route.schema'
 import { InboundRoutesCache } from '../inbound-routes/cache/inbound-routes.cache'
 import { AppError } from '../../utils/errors/app.error'
 
 const select = {
     id: true,
     number: true,
+    exten: true,
     companyId: true,
     createdAt: true,
     updatedAt: true,
@@ -80,8 +82,30 @@ export const updateDid = async (id: string, data: UpdateDidInput) => {
         if (conflict && conflict.id !== id) throw new AppError('DID already exists for this company', 409)
     }
 
-    const did = await prisma.did.update({ where: { id }, data, select })
+    // exten é o override do dígito real que a trunk manda no EXTEN da chamada — quando ele ou o
+    // number mudam, a chave de roteamento (exten ?? number) muda e o dialplan precisa ser regravado
+    const oldRoutingKey = existing.exten ?? existing.number
+    const newNumber = data.number ?? existing.number
+    const newExten = data.exten === undefined ? existing.exten : data.exten
+    const newRoutingKey = newExten ?? newNumber
 
+    const inboundRoutes = newRoutingKey !== oldRoutingKey
+        ? await prisma.inboundRoute.findMany({ where: { didId: id }, select: { id: true, trunkId: true, destination: true } })
+        : []
+
+    const did = await prisma.$transaction(async (tx) => {
+        const updated = await tx.did.update({ where: { id }, data, select })
+        for (const ir of inboundRoutes) {
+            await InboundRouteRepository.delete(tx, ir.trunkId, oldRoutingKey)
+            await InboundRouteRepository.create(tx, ir.trunkId, newRoutingKey, ir.destination as InboundDest)
+        }
+        return updated
+    })
+
+    for (const ir of inboundRoutes) {
+        await InboundRoutesCache.invalidateRoute(ir.id)
+    }
+    if (inboundRoutes.length > 0) await InboundRoutesCache.invalidateByCompany(existing.companyId)
     await DidsCache.invalidateDid(id)
     await DidsCache.invalidateDidsByCompany(existing.companyId)
     await DidsCache.invalidateAll()
@@ -97,9 +121,11 @@ export const deleteDid = async (id: string) => {
         select: { id: true, trunkId: true },
     })
 
+    const routingKey = existing.exten ?? existing.number
+
     await prisma.$transaction(async (tx) => {
         for (const ir of inboundRoutes) {
-            await InboundRouteRepository.delete(tx, ir.trunkId, existing.number)
+            await InboundRouteRepository.delete(tx, ir.trunkId, routingKey)
         }
         await tx.did.delete({ where: { id } })
     })

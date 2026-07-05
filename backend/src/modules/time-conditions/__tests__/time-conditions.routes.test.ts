@@ -48,11 +48,9 @@ beforeAll(async () => {
 }, 30000)
 
 afterAll(async () => {
-    await prisma.timeConditionTimeGroup.deleteMany({ where: { timeCondition: { companyId } } })
-    await prisma.timeCondition.deleteMany({ where: { companyId } })
-    await prisma.timeGroup.deleteMany({ where: { companyId } })
-    await prisma.userCompany.deleteMany({ where: { userId } })
-    await prisma.company.deleteMany({ where: { id: companyId } })
+    // DELETE /companies/:id já limpa cascata completa (dialplan de timeconditions inclusive) —
+    // evita deixar dialplan órfão em `extensions` como o cleanup manual fazia
+    await app.inject({ method: 'DELETE', url: `/companies/${companyId}`, headers: auth() })
     await prisma.user.deleteMany({ where: { username: { startsWith: PREFIX } } })
     await prisma.$disconnect()
     await app.close()
@@ -88,8 +86,7 @@ describe('POST /time-conditions', () => {
         })
         expect(res.statusCode).toBe(201)
         const id = res.json().timeConditionId
-        await prisma.timeConditionTimeGroup.deleteMany({ where: { timeConditionId: id } })
-        await prisma.timeCondition.delete({ where: { id } })
+        await app.inject({ method: 'DELETE', url: `/time-conditions/${id}`, headers: auth() })
     })
 
     it('409 duplicate name in same company', async () => {

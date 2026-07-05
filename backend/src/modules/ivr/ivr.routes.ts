@@ -1,0 +1,99 @@
+import type { FastifyInstance } from 'fastify'
+import type { ZodTypeProvider } from 'fastify-type-provider-zod'
+import * as IvrController from './ivr.controller'
+import { protectedRoute } from '../../middleware/scope.middleware'
+import {
+    createIvrMenuSchema, updateIvrMenuSchema, idParamSchema, companyQuerySchema,
+    ListIvrMenusResponse, GetIvrMenuResponse, CreateIvrMenuResponse, UpdateIvrMenuResponse,
+} from './schemas/ivr.schema'
+import { errors, deleted } from '../../schemas/responses'
+
+export const ivrRoutes = async (app: FastifyInstance) => {
+    const router = app.withTypeProvider<ZodTypeProvider>()
+
+    router.get('/ivr-menus', {
+        onRequest: protectedRoute,
+        schema: {
+            tags: ['IVR'],
+            summary: 'Listar menus de URA por empresa',
+            security: [{ bearerAuth: [] }],
+            querystring: companyQuerySchema,
+            response: {
+                200: ListIvrMenusResponse,
+                401: errors[401],
+                403: errors[403],
+                404: errors[404],
+            },
+        },
+    }, IvrController.getIvrMenus as any)
+
+    router.get('/ivr-menus/:id', {
+        onRequest: protectedRoute,
+        schema: {
+            tags: ['IVR'],
+            summary: 'Buscar menu de URA',
+            security: [{ bearerAuth: [] }],
+            params: idParamSchema,
+            response: {
+                200: GetIvrMenuResponse,
+                401: errors[401],
+                403: errors[403],
+                404: errors[404],
+            },
+        },
+    }, IvrController.getIvrMenuById as any)
+
+    router.post('/ivr-menus', {
+        onRequest: protectedRoute,
+        schema: {
+            tags: ['IVR'],
+            summary: 'Criar menu de URA',
+            description: 'Cria o registro, a configuração e as opções de dígito (digit → destino) já em uma chamada. Envie audioId (criado via POST /audios) pra já sair com dialplan, ou omita e vincule depois via PUT.',
+            security: [{ bearerAuth: [] }],
+            body: createIvrMenuSchema,
+            response: {
+                201: CreateIvrMenuResponse,
+                401: errors[401],
+                403: errors[403],
+                404: errors[404],
+                409: errors[409],
+            },
+        },
+    }, IvrController.createIvrMenu as any)
+
+    router.put('/ivr-menus/:id', {
+        onRequest: protectedRoute,
+        schema: {
+            tags: ['IVR'],
+            summary: 'Atualizar menu de URA',
+            description: 'Atualiza nome, audioId (null desvincula), timeouts, retries, destinos especiais (invalid/timeout/long) e/ou as opções de dígito. Quando enviado, `options` substitui a lista completa.',
+            security: [{ bearerAuth: [] }],
+            params: idParamSchema,
+            body: updateIvrMenuSchema,
+            response: {
+                200: UpdateIvrMenuResponse,
+                401: errors[401],
+                403: errors[403],
+                404: errors[404],
+                409: errors[409],
+            },
+        },
+    }, IvrController.updateIvrMenu as any)
+
+    router.delete('/ivr-menus/:id', {
+        onRequest: protectedRoute,
+        schema: {
+            tags: ['IVR'],
+            summary: 'Remover menu de URA',
+            description: 'Remove o registro, as opções e o dialplan — o Audio vinculado não é apagado.',
+            security: [{ bearerAuth: [] }],
+            params: idParamSchema,
+            response: {
+                200: deleted,
+                401: errors[401],
+                403: errors[403],
+                404: errors[404],
+            },
+        },
+    }, IvrController.deleteIvrMenu as any)
+}

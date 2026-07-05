@@ -27,6 +27,9 @@ import { timeConditionsRoutes } from './modules/time-conditions/time-conditions.
 import { inboundRoutesRoutes } from './modules/inbound-routes/inbound-routes.routes'
 import { cdrRoutes } from './modules/cdr/cdr.routes'
 import { announcementsRoutes } from './modules/announcements/announcements.routes'
+import { ivrRoutes } from './modules/ivr/ivr.routes'
+import { requestTemplatesRoutes } from './modules/request-templates/request-templates.routes'
+import { audiosRoutes } from './modules/audios/audios.routes'
 
 const env = validateEnv()
 
@@ -171,6 +174,9 @@ app.register(timeConditionsRoutes)
 app.register(inboundRoutesRoutes)
 app.register(cdrRoutes)
 app.register(announcementsRoutes)
+app.register(ivrRoutes)
+app.register(requestTemplatesRoutes)
+app.register(audiosRoutes)
 
 // Health check
 app.get('/health', async (req, reply) => {

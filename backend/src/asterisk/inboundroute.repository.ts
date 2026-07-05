@@ -1,8 +1,10 @@
 import { prisma } from '../lib/prisma'
 import type { InboundDest } from '../modules/inbound-routes/schemas/inbound-route.schema'
 import { queueAppExten } from './queue.repository'
-import { TC_CONTEXT, tcEntry } from './timecondition.repository'
-import { ANNOUNCEMENT_CONTEXT, announcementExten } from './announcement.repository'
+import {
+    TC_CONTEXT, tcEntry, ANNOUNCEMENT_CONTEXT, announcementExten, IVR_CONTEXT, ivrExten,
+    REQUEST_TEMPLATE_CONTEXT, requestTemplateExten,
+} from './dialplan-names'
 
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 
@@ -26,6 +28,10 @@ async function resolveDestination(tx: Tx, dest: InboundDest): Promise<{ app: str
             return { app: 'Goto', appdata: `${TC_CONTEXT},${tcEntry(dest.id)},1` }
         case 'announcement':
             return { app: 'Goto', appdata: `${ANNOUNCEMENT_CONTEXT},${announcementExten(dest.id)},1` }
+        case 'ivr':
+            return { app: 'Goto', appdata: `${IVR_CONTEXT},${ivrExten(dest.id)},1` }
+        case 'request':
+            return { app: 'Goto', appdata: `${REQUEST_TEMPLATE_CONTEXT},${requestTemplateExten(dest.id)},1` }
     }
 }
 

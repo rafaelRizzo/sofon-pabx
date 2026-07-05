@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 // Destino de roteamento compartilhado por Inbound Routes e Time Conditions
 // (trueRoute/falseRoute). null = comportamento padrão do Asterisk (Hangup).
-export const ROUTE_DEST_TYPES = ['extension', 'queue', 'voicemail', 'timecondition', 'announcement', 'hangup'] as const
+export const ROUTE_DEST_TYPES = ['extension', 'queue', 'voicemail', 'timecondition', 'announcement', 'ivr', 'request', 'hangup'] as const
 
 const variants = <T extends z.ZodTypeAny>(idSchema: T) => [
     z.object({
@@ -23,6 +23,17 @@ const variants = <T extends z.ZodTypeAny>(idSchema: T) => [
     }),
     z.object({
         type: z.literal('announcement').describe('Toca um anúncio de áudio (Playback) e encerra a chamada — requer áudio já enviado'),
+        id: idSchema,
+    }),
+    z.object({
+        type: z.literal('ivr').describe('Direciona a chamada para um menu de URA (IVR) — requer áudio já enviado'),
+        id: idSchema,
+    }),
+    z.object({
+        type: z.literal('request').describe(
+            'Executa um Request Template via AGI (síncrono, trava a chamada até a resposta HTTP) — ' +
+            'variáveis extraídas do response ficam disponíveis no canal; roteamento continua por onSuccess/onError do template',
+        ),
         id: idSchema,
     }),
     z.object({

@@ -1,15 +1,15 @@
 import { prisma } from '../lib/prisma'
 import type { RouteDest } from '../modules/time-conditions/schemas/time-condition.schema'
 import { queueAppExten } from './queue.repository'
-import { ANNOUNCEMENT_CONTEXT, announcementExten } from './announcement.repository'
+import {
+    TC_CONTEXT, tcEntry, ANNOUNCEMENT_CONTEXT, announcementExten, IVR_CONTEXT, ivrExten,
+    REQUEST_TEMPLATE_CONTEXT, requestTemplateExten,
+} from './dialplan-names'
+
+export { TC_CONTEXT, tcEntry }
 
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 
-// contexto único compartilhado por todas as time conditions — contexto dinâmico por
-// entidade (tc-<id>) não funciona nesse setup: Asterisk só resolve realtime pra
-// contextos declarados estaticamente em extensions.conf (mesmo problema de ramais-<asteriskId>)
-export const TC_CONTEXT = 'timeconditions'
-export const tcEntry = (tcId: string) => `tc-${tcId}`
 const tcMatched = (tcId: string) => `tc-${tcId}-matched`
 
 type TimeRange = {
@@ -44,6 +44,10 @@ async function resolveRoute(tx: Tx, route: RouteDest): Promise<string | null> {
             return `${TC_CONTEXT},${tcEntry(route.id)},1`
         case 'announcement':
             return `${ANNOUNCEMENT_CONTEXT},${announcementExten(route.id)},1`
+        case 'ivr':
+            return `${IVR_CONTEXT},${ivrExten(route.id)},1`
+        case 'request':
+            return `${REQUEST_TEMPLATE_CONTEXT},${requestTemplateExten(route.id)},1`
         case 'hangup':
             return null
     }

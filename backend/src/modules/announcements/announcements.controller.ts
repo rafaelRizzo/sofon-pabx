@@ -5,8 +5,6 @@ import { handleError } from '../../utils/errors/handler.error'
 import { AppError } from '../../utils/errors/app.error'
 import { prisma } from '../../lib/prisma'
 
-const AUDIO_MIME_PREFIX = 'audio/'
-
 export const getAnnouncements = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
         const { companyId } = companyQuerySchema.parse(req.query)
@@ -64,27 +62,6 @@ export const deleteAnnouncement = async (req: FastifyRequest, reply: FastifyRepl
         req.scope.assertAccess(existing.companyId)
         await AnnouncementsService.deleteAnnouncement(id)
         return reply.send({ success: true, message: 'Announcement deleted successfully' })
-    } catch (error) {
-        return handleError(reply, error, req)
-    }
-}
-
-export const uploadAnnouncementAudio = async (req: FastifyRequest, reply: FastifyReply) => {
-    try {
-        const { id } = idParamSchema.parse(req.params)
-        const existing = await prisma.announcement.findUnique({ where: { id }, select: { companyId: true } })
-        if (!existing) throw new AppError('Announcement not found', 404)
-        req.scope.assertAccess(existing.companyId)
-
-        const file = await req.file()
-        if (!file) throw new AppError('No audio file sent', 400)
-        if (!file.mimetype.startsWith(AUDIO_MIME_PREFIX)) throw new AppError('File must be an audio file', 400)
-
-        const buffer = await file.toBuffer()
-        if (buffer.length === 0) throw new AppError('Empty audio file', 400)
-
-        const announcement = await AnnouncementsService.uploadAnnouncementAudio(id, buffer, file.filename)
-        return reply.send({ success: true, message: 'Audio uploaded and converted successfully', announcement })
     } catch (error) {
         return handleError(reply, error, req)
     }

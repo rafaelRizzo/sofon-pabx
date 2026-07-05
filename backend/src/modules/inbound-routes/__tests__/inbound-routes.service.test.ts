@@ -222,7 +222,7 @@ describe('InboundRoutesService.createInboundRoute', () => {
         db.did.findUnique.mockResolvedValue(DID)
         db.trunk.findUnique.mockResolvedValue(TRUNK)
         db.inboundRoute.findUnique.mockResolvedValue(null)
-        db.announcement.findUnique.mockResolvedValue({ companyId: 'c1', audioUploadedAt: new Date() })
+        db.announcement.findUnique.mockResolvedValue({ companyId: 'c1', audioId: 'audio1' })
         db.inboundRoute.create.mockResolvedValue({ ...ROUTE, destination: { type: 'announcement', id: 'ann1' } })
         const route = await InboundRoutesService.createInboundRoute({
             ...BASE_INPUT, destination: { type: 'announcement', id: 'ann1' },
@@ -235,7 +235,7 @@ describe('InboundRoutesService.createInboundRoute', () => {
         db.did.findUnique.mockResolvedValue(DID)
         db.trunk.findUnique.mockResolvedValue(TRUNK)
         db.inboundRoute.findUnique.mockResolvedValue(null)
-        db.announcement.findUnique.mockResolvedValue({ companyId: 'c1', audioUploadedAt: null })
+        db.announcement.findUnique.mockResolvedValue({ companyId: 'c1', audioId: null })
         await expect(InboundRoutesService.createInboundRoute({
             ...BASE_INPUT, destination: { type: 'announcement', id: 'ann1' },
         })).rejects.toMatchObject({ statusCode: 400 })

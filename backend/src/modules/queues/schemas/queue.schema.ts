@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { timestamp, ok } from '../../../schemas/responses'
+import { routeDestinationSchema, routeDestinationResponseSchema } from '../../../schemas/route-destination.schema'
 
 export const QUEUE_STRATEGIES = [
     'ringall',
@@ -42,6 +43,7 @@ export const createQueueSchema = z.object({
     joinEmpty: z.boolean().default(true),
     leaveWhenEmpty: z.boolean().default(false),
     weight: z.number().int().min(0).default(0),
+    postQueueDestination: routeDestinationSchema.optional(),
 })
 
 export const updateQueueSchema = z.object({
@@ -63,6 +65,7 @@ export const updateQueueSchema = z.object({
     joinEmpty: z.boolean().optional(),
     leaveWhenEmpty: z.boolean().optional(),
     weight: z.number().int().min(0).optional(),
+    postQueueDestination: routeDestinationSchema.optional(),
 })
 
 export type CreateQueueInput = z.infer<typeof createQueueSchema>
@@ -82,6 +85,7 @@ export const QueueSchema = z.object({
     weight: z.number(),
     joinEmpty: z.boolean(),
     leaveWhenEmpty: z.boolean(),
+    postQueueDestination: routeDestinationResponseSchema,
     createdAt: timestamp,
     updatedAt: timestamp,
 })
