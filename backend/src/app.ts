@@ -1,4 +1,4 @@
-import Fastify from 'fastify'
+import Fastify, { LogController } from 'fastify'
 import cookiePlugin from '@fastify/cookie'
 import helmet from '@fastify/helmet'
 import cors from '@fastify/cors'
@@ -35,7 +35,7 @@ const env = validateEnv()
 
 const app = Fastify({
     logger: false,
-    requestIdLogLabel: 'reqId',
+    logController: new LogController({ requestIdLogLabel: 'reqId' }),
     requestIdHeader: 'x-request-id',
     genReqId: () => randomUUID(),
 })
@@ -50,6 +50,8 @@ app.setSerializerCompiler(serializerCompiler)
 
 // Formata cada Date da resposta com o offset da empresa dona do registro (via companyId), caindo em env.TZ quando não há empresa no contexto
 app.addHook('preSerialization', async (request, reply, payload) => {
+    if (request.url.startsWith('/docs')) return payload
+
     const companyIds = collectCompanyIds(payload)
     const tzByCompanyId = new Map<string, string>()
 
