@@ -11,11 +11,13 @@ import { SipRepository } from '../../asterisk/sip.repository'
 import { AsteriskQueueRepository, queueAppExten } from '../../asterisk/queue.repository'
 import { InboundRouteRepository } from '../../asterisk/inboundroute.repository'
 import { TimeConditionRepository } from '../../asterisk/timecondition.repository'
+import { HolidayGroupRepository } from '../../asterisk/holidaygroup.repository'
 import { AnnouncementRepository } from '../../asterisk/announcement.repository'
 import { IvrRepository } from '../../asterisk/ivr.repository'
 import { audioSoundDir } from '../../asterisk/audio.repository'
 import { RequestTemplateRepository } from '../../asterisk/request-template.repository'
 import { RequestTemplatesCache } from '../request-templates/cache/request-templates.cache'
+import { HolidayGroupsCache } from '../holiday-groups/cache/holiday-groups.cache'
 import type { CreateCompanyInput, UpdateCompanyInput } from './schemas/company.schema'
 import { AppError } from '../../utils/errors/app.error'
 
@@ -121,7 +123,7 @@ export const deleteCompany = async (id: string) => {
         throw new AppError('Company not found', 404)
     }
 
-    const [extensions, queues, trunks, inboundRoutes, timeConditions, outboundPatterns, announcements, ivrMenus, requestTemplates] = await Promise.all([
+    const [extensions, queues, trunks, inboundRoutes, timeConditions, holidayGroups, outboundPatterns, announcements, ivrMenus, requestTemplates] = await Promise.all([
         prisma.extension.findMany({
             where: { companyId: id },
             select: { number: true, type: true },
@@ -139,6 +141,10 @@ export const deleteCompany = async (id: string) => {
             select: { trunkId: true, did: { select: { number: true } } },
         }),
         prisma.timeCondition.findMany({
+            where: { companyId: id },
+            select: { id: true },
+        }),
+        prisma.holidayGroup.findMany({
             where: { companyId: id },
             select: { id: true },
         }),
@@ -173,6 +179,7 @@ export const deleteCompany = async (id: string) => {
 
     const inboundRoutesForCleanup = inboundRoutes.map((r) => ({ trunkId: r.trunkId, didNumber: r.did.number }))
     const timeConditionIds = timeConditions.map((tc) => tc.id)
+    const holidayGroupIds = holidayGroups.map((hg) => hg.id)
     const outboundPatternValues = outboundPatterns.map((p) => p.pattern)
     const announcementIds = announcements.map((a) => a.id)
     const ivrMenuIds = ivrMenus.map((m) => m.id)
@@ -184,6 +191,7 @@ export const deleteCompany = async (id: string) => {
         await AsteriskQueueRepository.removeManyQueueAppEntries(tx, queueAppExtens)
         await InboundRouteRepository.deleteMany(tx, inboundRoutesForCleanup)
         await TimeConditionRepository.deleteManyByIds(tx, timeConditionIds)
+        await HolidayGroupRepository.deleteManyByIds(tx, holidayGroupIds)
         await AnnouncementRepository.removeManyByIds(tx, announcementIds)
         await IvrRepository.removeManyByIds(tx, ivrMenuIds)
         await RequestTemplateRepository.removeManyByIds(tx, requestTemplateIds)
@@ -207,6 +215,7 @@ export const deleteCompany = async (id: string) => {
         IvrCache.invalidateNamespace(),
         AudiosCache.invalidateNamespace(),
         RequestTemplatesCache.invalidateNamespace(),
+        HolidayGroupsCache.invalidateNamespace(),
         ...existing.users.map((u) => CompaniesCache.invalidateCompaniesByUser(u.userId)),
     ])
 }

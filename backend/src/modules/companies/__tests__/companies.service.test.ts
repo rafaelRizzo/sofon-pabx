@@ -33,6 +33,12 @@ mock.module('../../../asterisk/inboundroute.repository', () => ({
 mock.module('../../../asterisk/timecondition.repository', () => ({
     TimeConditionRepository: { deleteManyByIds: mock(() => Promise.resolve()) },
 }))
+mock.module('../../../asterisk/holidaygroup.repository', () => ({
+    HolidayGroupRepository: { deleteManyByIds: mock(() => Promise.resolve()) },
+}))
+mock.module('../../holiday-groups/cache/holiday-groups.cache', () => ({
+    HolidayGroupsCache: { invalidateNamespace: mock() },
+}))
 mock.module('../../../asterisk/announcement.repository', () => ({
     AnnouncementRepository: { removeManyByIds: mock(() => Promise.resolve()) },
 }))
@@ -63,6 +69,7 @@ import * as CompaniesService from '../companies.service'
 import { AsteriskQueueRepository } from '../../../asterisk/queue.repository'
 import { InboundRouteRepository } from '../../../asterisk/inboundroute.repository'
 import { TimeConditionRepository } from '../../../asterisk/timecondition.repository'
+import { HolidayGroupRepository } from '../../../asterisk/holidaygroup.repository'
 import { AnnouncementRepository } from '../../../asterisk/announcement.repository'
 import { IvrRepository } from '../../../asterisk/ivr.repository'
 import { RequestTemplateRepository } from '../../../asterisk/request-template.repository'
@@ -163,6 +170,7 @@ describe('CompaniesService.deleteCompany', () => {
         db.trunk.findMany.mockResolvedValue([])
         db.inboundRoute.findMany.mockResolvedValue([])
         db.timeCondition.findMany.mockResolvedValue([])
+        db.holidayGroup.findMany.mockResolvedValue([])
         db.outboundDialPattern.findMany.mockResolvedValue([])
         db.announcement.findMany.mockResolvedValue([])
         db.ivrMenu.findMany.mockResolvedValue([])
@@ -180,6 +188,7 @@ describe('CompaniesService.deleteCompany', () => {
         db.trunk.findMany.mockResolvedValue([])
         db.inboundRoute.findMany.mockResolvedValue([{ trunkId: 't1', did: { number: '5511999998888' } }])
         db.timeCondition.findMany.mockResolvedValue([{ id: 'tc1' }])
+        db.holidayGroup.findMany.mockResolvedValue([{ id: 'hol1' }])
         db.outboundDialPattern.findMany.mockResolvedValue([{ pattern: '_0.' }])
         db.announcement.findMany.mockResolvedValue([{ id: 'ann1' }])
         db.ivrMenu.findMany.mockResolvedValue([{ id: 'ivr1' }])
@@ -193,6 +202,7 @@ describe('CompaniesService.deleteCompany', () => {
         expect(AsteriskQueueRepository.removeManyQueueAppEntries).toHaveBeenCalledWith(expect.anything(), ['ast1-100'])
         expect(InboundRouteRepository.deleteMany).toHaveBeenCalledWith(expect.anything(), [{ trunkId: 't1', didNumber: '5511999998888' }])
         expect(TimeConditionRepository.deleteManyByIds).toHaveBeenCalledWith(expect.anything(), ['tc1'])
+        expect(HolidayGroupRepository.deleteManyByIds).toHaveBeenCalledWith(expect.anything(), ['hol1'])
         expect(AnnouncementRepository.removeManyByIds).toHaveBeenCalledWith(expect.anything(), ['ann1'])
         expect(IvrRepository.removeManyByIds).toHaveBeenCalledWith(expect.anything(), ['ivr1'])
         expect(RequestTemplateRepository.removeManyByIds).toHaveBeenCalledWith(expect.anything(), ['reqtpl1'])

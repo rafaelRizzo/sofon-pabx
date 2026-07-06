@@ -32,6 +32,7 @@ model Company {
     ivrMenus       IvrMenu[]
     requestTemplates RequestTemplate[]
     audios         Audio[]
+    holidayGroups  HolidayGroup[]
 
     @@map("companies")
 }
@@ -287,6 +288,41 @@ model TimeConditionTimeGroup {
     @@id([timeConditionId, timeGroupId])
     @@index([timeGroupId])
     @@map("time_condition_time_groups")
+}
+
+// Por empresa, igual ao par TimeGroup/TimeCondition só que num recurso só: lista de datas (HolidayDate,
+// igual TimeRange) + destino (trueRoute/falseRoute, igual TimeCondition). Se `url` estiver setada, um
+// job (src/jobs/holiday-resync.job.ts) substitui `dates` periodicamente a partir dessa URL e a API
+// bloqueia edição manual de `dates` enquanto ela existir — sem `url`, `dates` é editado à mão, igual
+// ranges de TimeGroup.
+model HolidayGroup {
+    id         String        @id @default(cuid())
+    name       String        @db.VarChar(80)
+    companyId  String
+    company    Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+    url        String?       @db.VarChar(500)
+    trueRoute  Json?
+    falseRoute Json?
+    dates      HolidayDate[]
+    createdAt  DateTime      @default(now()) @db.Timestamptz(3)
+    updatedAt  DateTime      @updatedAt @db.Timestamptz(3)
+
+    @@unique([name, companyId])
+    @@index([companyId])
+    @@map("holiday_groups")
+}
+
+model HolidayDate {
+    id             String       @id @default(cuid())
+    holidayGroupId String
+    holidayGroup   HolidayGroup @relation(fields: [holidayGroupId], references: [id], onDelete: Cascade)
+    name           String       @db.VarChar(80)
+    month          Int
+    day            Int
+    createdAt      DateTime     @default(now()) @db.Timestamptz(3)
+
+    @@index([holidayGroupId])
+    @@map("holiday_dates")
 }
 
 model InboundRoute {

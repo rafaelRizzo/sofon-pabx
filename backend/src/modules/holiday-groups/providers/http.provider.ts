@@ -1,0 +1,38 @@
+import { logger } from '../../../utils/logger'
+
+const TIMEOUT_MS = 3000
+
+// Shape esperado da URL configurada em HolidayGroup.url — mesmo contrato da BrasilAPI
+// (https://brasilapi.com.br/api/feriados/v1/{ano}): [{ date: "YYYY-MM-DD", name, type? }]
+type ApiHoliday = { date: string; name: string; type?: string }
+
+export type RemoteHoliday = { name: string; month: number; day: number }
+
+// Busca os feriados do ano numa URL externa (BrasilAPI, custom, o que o usuário configurar em
+// HolidayGroup.url) — usado só pelo job de resync (src/jobs/holiday-resync.job.ts). Retorna null em
+// qualquer falha (rede, timeout, resposta inválida); quem chama decide o que fazer no fallback.
+export async function fetchHolidaysFromUrl(baseUrl: string, year: number): Promise<RemoteHoliday[] | null> {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS)
+
+    try {
+        const res = await fetch(`${baseUrl.replace(/\/$/, '')}/${year}`, { signal: controller.signal })
+        if (!res.ok) {
+            logger.warn({ event: 'holidays.provider.error', url: baseUrl, status: res.status })
+            return null
+        }
+
+        const data = (await res.json()) as ApiHoliday[]
+        if (!Array.isArray(data) || data.length === 0) return null
+
+        return data.map((h) => {
+            const [, month, day] = h.date.split('-').map(Number)
+            return { name: h.name, month: month!, day: day! }
+        })
+    } catch (error) {
+        logger.warn({ event: 'holidays.provider.error', url: baseUrl, error: error instanceof Error ? error.message : String(error) })
+        return null
+    } finally {
+        clearTimeout(timeout)
+    }
+}

@@ -3,7 +3,7 @@ import type { RouteDestination } from '../schemas/route-destination.schema'
 import { QUEUE_APP_CONTEXT, queueAppExten } from './queue.repository'
 import {
     TC_CONTEXT, tcEntry, ANNOUNCEMENT_CONTEXT, announcementExten, IVR_CONTEXT, ivrExten,
-    REQUEST_TEMPLATE_CONTEXT, requestTemplateExten,
+    REQUEST_TEMPLATE_CONTEXT, requestTemplateExten, HOL_CONTEXT, holEntry,
 } from './dialplan-names'
 
 export type DialplanTarget = { context: string; exten: string; priority: number }
@@ -28,6 +28,8 @@ export async function resolveRouteDestinationToDialplan(dest: RouteDestination):
             return { context: 'vm', exten: dest.id, priority: 1 }
         case 'timecondition':
             return { context: TC_CONTEXT, exten: tcEntry(dest.id), priority: 1 }
+        case 'holiday':
+            return { context: HOL_CONTEXT, exten: holEntry(dest.id), priority: 1 }
         case 'announcement':
             return { context: ANNOUNCEMENT_CONTEXT, exten: announcementExten(dest.id), priority: 1 }
         case 'ivr':

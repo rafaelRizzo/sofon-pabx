@@ -3,7 +3,7 @@ import type { RouteDestination } from '../schemas/route-destination.schema'
 import { queueAppExten } from './queue.repository'
 import {
     TC_CONTEXT, tcEntry, ANNOUNCEMENT_CONTEXT, announcementExten, IVR_CONTEXT, ivrExten,
-    REQUEST_TEMPLATE_CONTEXT, requestTemplateExten,
+    REQUEST_TEMPLATE_CONTEXT, requestTemplateExten, HOL_CONTEXT, holEntry,
 } from './dialplan-names'
 
 export { IVR_CONTEXT, ivrExten }
@@ -31,6 +31,8 @@ async function resolveTarget(tx: Tx, dest: RouteDestination): Promise<string | n
             return `vm,${dest.id},1`
         case 'timecondition':
             return `${TC_CONTEXT},${tcEntry(dest.id)},1`
+        case 'holiday':
+            return `${HOL_CONTEXT},${holEntry(dest.id)},1`
         case 'announcement':
             return `${ANNOUNCEMENT_CONTEXT},${announcementExten(dest.id)},1`
         case 'ivr':

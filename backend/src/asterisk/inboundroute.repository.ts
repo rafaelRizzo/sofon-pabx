@@ -3,7 +3,7 @@ import type { InboundDest } from '../modules/inbound-routes/schemas/inbound-rout
 import { queueAppExten } from './queue.repository'
 import {
     TC_CONTEXT, tcEntry, ANNOUNCEMENT_CONTEXT, announcementExten, IVR_CONTEXT, ivrExten,
-    REQUEST_TEMPLATE_CONTEXT, requestTemplateExten,
+    REQUEST_TEMPLATE_CONTEXT, requestTemplateExten, HOL_CONTEXT, holEntry,
 } from './dialplan-names'
 
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
@@ -26,6 +26,8 @@ async function resolveDestination(tx: Tx, dest: InboundDest): Promise<{ app: str
             return { app: 'Goto', appdata: `vm,${dest.id},1` }
         case 'timecondition':
             return { app: 'Goto', appdata: `${TC_CONTEXT},${tcEntry(dest.id)},1` }
+        case 'holiday':
+            return { app: 'Goto', appdata: `${HOL_CONTEXT},${holEntry(dest.id)},1` }
         case 'announcement':
             return { app: 'Goto', appdata: `${ANNOUNCEMENT_CONTEXT},${announcementExten(dest.id)},1` }
         case 'ivr':

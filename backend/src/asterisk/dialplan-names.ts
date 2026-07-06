@@ -4,6 +4,9 @@
 export const TC_CONTEXT = 'timeconditions'
 export const tcEntry = (tcId: string) => `tc-${tcId}`
 
+export const HOL_CONTEXT = 'holidays'
+export const holEntry = (id: string) => `hol-${id}`
+
 export const ANNOUNCEMENT_CONTEXT = 'announcements'
 export const announcementExten = (id: string) => `ann-${id}`
 

@@ -1,24 +1,20 @@
 import { prisma } from '../lib/prisma'
-import type { RouteDest } from '../modules/time-conditions/schemas/time-condition.schema'
+import type { RouteDest } from '../modules/holiday-groups/schemas/holiday-group.schema'
 import { queueAppExten } from './queue.repository'
 import {
     TC_CONTEXT, tcEntry, ANNOUNCEMENT_CONTEXT, announcementExten, IVR_CONTEXT, ivrExten,
     REQUEST_TEMPLATE_CONTEXT, requestTemplateExten, HOL_CONTEXT, holEntry,
 } from './dialplan-names'
 
-export { TC_CONTEXT, tcEntry }
+export { HOL_CONTEXT, holEntry }
 
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 
-const tcMatched = (tcId: string) => `tc-${tcId}-matched`
+const holMatched = (id: string) => `hol-${id}-matched`
 
-type TimeRange = {
-    startTime: string
-    endTime:   string
-    weekdays:  string[]
-    monthdays: string
-    months:    string
-}
+const MONTH_CODES = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
+
+export type HolidayDate = { month: number; day: number }
 
 async function resolveRoute(tx: Tx, route: RouteDest): Promise<string | null> {
     if (!route) return null
@@ -56,26 +52,25 @@ async function resolveRoute(tx: Tx, route: RouteDest): Promise<string | null> {
 }
 
 function buildDialplan(
-    tcId: string,
+    id: string,
     name: string,
-    ranges: TimeRange[],
+    dates: HolidayDate[],
     trueAsterisk: string | null,
     falseAsterisk: string | null,
 ) {
-    const context = TC_CONTEXT
-    const entry = tcEntry(tcId)
-    const matched = tcMatched(tcId)
+    const context = HOL_CONTEXT
+    const entry = holEntry(id)
+    const matched = holMatched(id)
     const entries: { context: string; exten: string; priority: number; app: string; appdata: string | null }[] = []
 
-    entries.push({ context, exten: entry, priority: 1, app: 'NoOp', appdata: `TimeCondition: ${name}` })
+    entries.push({ context, exten: entry, priority: 1, app: 'NoOp', appdata: `HolidayGroup: ${name}` })
 
     let priority = 2
-    for (const range of ranges) {
-        const weekSpec = range.weekdays.length > 0 ? range.weekdays.join('&') : '*'
+    for (const date of dates) {
         entries.push({
             context, exten: entry, priority,
             app: 'GotoIfTime',
-            appdata: `${range.startTime}-${range.endTime},${weekSpec},${range.monthdays},${range.months}?${matched},1`,
+            appdata: `00:00-23:59,*,${date.day},${MONTH_CODES[date.month - 1]}?${matched},1`,
         })
         priority++
     }
@@ -95,33 +90,33 @@ function buildDialplan(
     return entries
 }
 
-export const TimeConditionRepository = {
-    async create(tx: Tx, tcId: string, name: string, ranges: TimeRange[], trueRoute: RouteDest, falseRoute: RouteDest) {
+export const HolidayGroupRepository = {
+    async create(tx: Tx, id: string, name: string, dates: HolidayDate[], trueRoute: RouteDest, falseRoute: RouteDest) {
         const [trueAsterisk, falseAsterisk] = await Promise.all([
             resolveRoute(tx, trueRoute),
             resolveRoute(tx, falseRoute),
         ])
-        const data = buildDialplan(tcId, name, ranges, trueAsterisk, falseAsterisk)
+        const data = buildDialplan(id, name, dates, trueAsterisk, falseAsterisk)
         if (data.length > 0) await tx.extensions.createMany({ data })
     },
 
-    async update(tx: Tx, tcId: string, name: string, ranges: TimeRange[], trueRoute: RouteDest, falseRoute: RouteDest) {
-        await tx.extensions.deleteMany({ where: { context: TC_CONTEXT, exten: { in: [tcEntry(tcId), tcMatched(tcId)] } } })
+    async update(tx: Tx, id: string, name: string, dates: HolidayDate[], trueRoute: RouteDest, falseRoute: RouteDest) {
+        await tx.extensions.deleteMany({ where: { context: HOL_CONTEXT, exten: { in: [holEntry(id), holMatched(id)] } } })
         const [trueAsterisk, falseAsterisk] = await Promise.all([
             resolveRoute(tx, trueRoute),
             resolveRoute(tx, falseRoute),
         ])
-        const data = buildDialplan(tcId, name, ranges, trueAsterisk, falseAsterisk)
+        const data = buildDialplan(id, name, dates, trueAsterisk, falseAsterisk)
         if (data.length > 0) await tx.extensions.createMany({ data })
     },
 
-    async delete(tx: Tx, tcId: string) {
-        await tx.extensions.deleteMany({ where: { context: TC_CONTEXT, exten: { in: [tcEntry(tcId), tcMatched(tcId)] } } })
+    async delete(tx: Tx, id: string) {
+        await tx.extensions.deleteMany({ where: { context: HOL_CONTEXT, exten: { in: [holEntry(id), holMatched(id)] } } })
     },
 
-    async deleteManyByIds(tx: Tx, tcIds: string[]) {
-        if (tcIds.length === 0) return
-        const extens = tcIds.flatMap((id) => [tcEntry(id), tcMatched(id)])
-        await tx.extensions.deleteMany({ where: { context: TC_CONTEXT, exten: { in: extens } } })
+    async deleteManyByIds(tx: Tx, ids: string[]) {
+        if (ids.length === 0) return
+        const extens = ids.flatMap((id) => [holEntry(id), holMatched(id)])
+        await tx.extensions.deleteMany({ where: { context: HOL_CONTEXT, exten: { in: extens } } })
     },
 }

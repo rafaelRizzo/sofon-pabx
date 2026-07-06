@@ -34,6 +34,8 @@ export function createPrismaMock() {
         timeRange: model(),
         timeCondition: model(),
         timeConditionTimeGroup: model(),
+        holidayGroup: model(),
+        holidayDate: model(),
         inboundRoute: model(),
         announcement: model(),
         ivrMenu: model(),

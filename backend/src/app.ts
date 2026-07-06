@@ -24,6 +24,7 @@ import { trunksRoutes } from './modules/trunks/trunks.routes'
 import { outboundRoutesRoutes } from './modules/outbound-routes/outbound-routes.routes'
 import { timeGroupsRoutes } from './modules/time-groups/time-groups.routes'
 import { timeConditionsRoutes } from './modules/time-conditions/time-conditions.routes'
+import { holidayGroupsRoutes } from './modules/holiday-groups/holiday-groups.routes'
 import { inboundRoutesRoutes } from './modules/inbound-routes/inbound-routes.routes'
 import { cdrRoutes } from './modules/cdr/cdr.routes'
 import { announcementsRoutes } from './modules/announcements/announcements.routes'
@@ -173,6 +174,7 @@ app.register(trunksRoutes)
 app.register(outboundRoutesRoutes)
 app.register(timeGroupsRoutes)
 app.register(timeConditionsRoutes)
+app.register(holidayGroupsRoutes)
 app.register(inboundRoutesRoutes)
 app.register(cdrRoutes)
 app.register(announcementsRoutes)

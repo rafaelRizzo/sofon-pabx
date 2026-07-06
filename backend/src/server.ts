@@ -2,6 +2,7 @@ import { app } from './app'
 import { validateEnv } from './config/env'
 import { connectRedis, disconnectRedis } from './config/redis'
 import { startAgiServer } from './asterisk/agi-server'
+import { startHolidayResyncJob } from './jobs/holiday-resync.job'
 import { logger } from './utils/logger'
 
 async function start() {
@@ -14,6 +15,7 @@ async function start() {
         await connectRedis()
 
         startAgiServer(env.AGI_HOST, env.AGI_PORT)
+        startHolidayResyncJob()
 
         await app.listen({ port: env.PORT, host: env.HOST })
         logger.info({

@@ -34,6 +34,12 @@ export async function validateRouteDestination(dest: RouteDestination, companyId
             if (tc.companyId !== companyId) throw new AppError(`${prefix}Time condition belongs to different company`, 403)
             break
         }
+        case 'holiday': {
+            const hg = await prisma.holidayGroup.findUnique({ where: { id: dest.id }, select: { companyId: true } })
+            if (!hg) throw new AppError(`${prefix}Holiday group not found`, 404)
+            if (hg.companyId !== companyId) throw new AppError(`${prefix}Holiday group belongs to different company`, 403)
+            break
+        }
         case 'announcement': {
             const ann = await prisma.announcement.findUnique({ where: { id: dest.id }, select: { companyId: true } })
             if (!ann) throw new AppError(`${prefix}Announcement not found`, 404)
