@@ -15,14 +15,12 @@ export const companyIdParamSchema = z.object({
 
 export const createDidSchema = z.object({
     number: z.string().regex(/^\d+$/, 'Only digits allowed'),
-    exten: z.string().regex(/^\d+$/, 'Only digits allowed').optional(),
     companyId: z.cuid2(),
 })
 
 export const updateDidSchema = z.object({
     number: z.string().regex(/^\d+$/, 'Only digits allowed').optional(),
-    exten: z.string().regex(/^\d+$/, 'Only digits allowed').nullable().optional(),
-}).refine((d) => Object.keys(d).length > 0, { message: 'At least one field is required: number, exten' })
+}).refine((d) => Object.keys(d).length > 0, { message: 'At least one field is required: number' })
 
 export type IdParam = z.infer<typeof idParamSchema>
 export type CompanyQuery = z.infer<typeof companyQuerySchema>
@@ -32,7 +30,6 @@ export type UpdateDidInput = z.infer<typeof updateDidSchema>
 export const DidSchema = z.object({
     id: z.string(),
     number: z.string(),
-    exten: z.string().nullable(),
     companyId: z.string(),
     createdAt: timestamp,
     updatedAt: timestamp,

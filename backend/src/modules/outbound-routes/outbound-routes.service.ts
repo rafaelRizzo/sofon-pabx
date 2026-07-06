@@ -17,17 +17,43 @@ function trunkAsteriskId(asteriskId: string, trunkName: string): string {
     return `${asteriskId}-trunk-${trunkName}`
 }
 
+type TrunkOpt = { astId: string; maxOut?: number | null }
+
+// Priority count per trunk block (used to pre-compute offsets for forward references):
+// with limit + not last = 5 (GotoIf count, Set GROUP, Dial, GotoIf DIALSTATUS, Set GROUP=)
+// with limit + last    = 3 (GotoIf count, Set GROUP, Dial)
+// no limit + not last  = 2 (Dial, GotoIf DIALSTATUS)
+// no limit + last      = 1 (Dial)
+function trunkBlockSize(hasLimit: boolean, isLast: boolean): number {
+    if (hasLimit && !isLast) return 5
+    if (hasLimit && isLast) return 3
+    if (!hasLimit && !isLast) return 2
+    return 1
+}
+
 function buildDialplanEntries(
     context: string,
     exten: string,
-    trunkAstIds: string[],
+    trunks: TrunkOpt[],
     prefix: string | null | undefined,
     prepend: string | null | undefined,
     asteriskId: string,
 ): Array<{ context: string; exten: string; priority: number; app: string; appdata: string | null }> {
     const hasTransform = !!(prefix || prepend)
     const destVar = hasTransform ? '${ODEST}' : '${EXTEN}'
-    const hangupPriority = (hasTransform ? 1 : 0) + 1 + 2 * trunkAstIds.length
+
+    // Pre-compute start priority of each trunk block
+    const transformOffset = hasTransform ? 1 : 0
+    const mixmonitorOffset = 1
+    const baseOffset = transformOffset + mixmonitorOffset + 1 // 1-indexed
+
+    const blockStarts: number[] = []
+    let cursor = baseOffset
+    for (let i = 0; i < trunks.length; i++) {
+        blockStarts.push(cursor)
+        cursor += trunkBlockSize(trunks[i].maxOut != null, i === trunks.length - 1)
+    }
+    const hangupPriority = cursor
 
     const entries: any[] = []
     let p = 1
@@ -45,13 +71,33 @@ function buildDialplanEntries(
         appdata: `/var/spool/asterisk/monitor/${asteriskId}/\${STRFTIME(,,%Y/%m/%d)}/\${UNIQUEID}_\${CUT(CALLERID(num),_,1)}_\${EXTEN}.wav,b`,
     })
 
-    for (let i = 0; i < trunkAstIds.length; i++) {
-        entries.push({ context, exten, priority: p++, app: 'Dial', appdata: `PJSIP/${destVar}@${trunkAstIds[i]},60` })
-        if (i < trunkAstIds.length - 1) {
+    for (let i = 0; i < trunks.length; i++) {
+        const { astId, maxOut } = trunks[i]
+        const isLast = i === trunks.length - 1
+        const nextTrunkStart = isLast ? hangupPriority : blockStarts[i + 1]
+
+        if (maxOut != null) {
             entries.push({
                 context, exten, priority: p++, app: 'GotoIf',
-                appdata: `$["\${DIALSTATUS}"="CHANUNAVAIL"]?${p}:${hangupPriority}`,
+                appdata: `$[\${GROUP_COUNT(out-${astId})} >= ${maxOut}]?${nextTrunkStart}`,
             })
+            entries.push({ context, exten, priority: p++, app: 'Set', appdata: `GROUP()=out-${astId}` })
+            entries.push({ context, exten, priority: p++, app: 'Dial', appdata: `PJSIP/${destVar}@${astId},60` })
+            if (!isLast) {
+                entries.push({
+                    context, exten, priority: p++, app: 'GotoIf',
+                    appdata: `$["\${DIALSTATUS}"="CHANUNAVAIL"]?${p}:${hangupPriority}`,
+                })
+                entries.push({ context, exten, priority: p++, app: 'Set', appdata: 'GROUP()=' })
+            }
+        } else {
+            entries.push({ context, exten, priority: p++, app: 'Dial', appdata: `PJSIP/${destVar}@${astId},60` })
+            if (!isLast) {
+                entries.push({
+                    context, exten, priority: p++, app: 'GotoIf',
+                    appdata: `$["\${DIALSTATUS}"="CHANUNAVAIL"]?${p}:${hangupPriority}`,
+                })
+            }
         }
     }
 
@@ -63,13 +109,13 @@ async function syncPatternDialplan(
     tx: Tx,
     context: string,
     exten: string,
-    trunkAstIds: string[],
+    trunks: TrunkOpt[],
     prefix: string | null | undefined,
     prepend: string | null | undefined,
     asteriskId: string,
 ) {
     await tx.extensions.deleteMany({ where: { context, exten } })
-    const entries = buildDialplanEntries(context, exten, trunkAstIds, prefix, prepend, asteriskId)
+    const entries = buildDialplanEntries(context, exten, trunks, prefix, prepend, asteriskId)
     await tx.extensions.createMany({ data: entries })
 }
 
@@ -89,7 +135,7 @@ async function getRouteContext(tx: Tx, routeId: string) {
     // trunk is many-to-one → JOIN within findMany — single query
     const trunks = await tx.outboundRouteTrunk.findMany({
         where: { routeId },
-        select: { position: true, trunk: { select: { name: true } } },
+        select: { position: true, trunk: { select: { name: true, maxOutChannels: true } } },
         orderBy: { position: 'asc' },
     })
 
@@ -100,9 +146,12 @@ export async function resyncAllPatterns(tx: Tx, routeId: string) {
     const ctx = await getRouteContext(tx, routeId)
     if (!ctx) return
 
-    const trunkAstIds = ctx.trunks.map((rt) => trunkAsteriskId(ctx.company.asteriskId, rt.trunk.name))
+    const trunkOpts: TrunkOpt[] = ctx.trunks.map((rt) => ({
+        astId: trunkAsteriskId(ctx.company.asteriskId, rt.trunk.name),
+        maxOut: rt.trunk.maxOutChannels,
+    }))
     for (const p of ctx.patterns) {
-        await syncPatternDialplan(tx, 'ramais', p.pattern, trunkAstIds, p.prefix, p.prepend, ctx.company.asteriskId)
+        await syncPatternDialplan(tx, 'ramais', p.pattern, trunkOpts, p.prefix, p.prepend, ctx.company.asteriskId)
     }
 }
 
@@ -195,15 +244,18 @@ export const createOutboundRoute = async (data: CreateOutboundRouteInput) => {
 
     const trunks = await prisma.trunk.findMany({
         where: { id: { in: data.trunkIds }, companyId: data.companyId },
-        select: { id: true, name: true },
+        select: { id: true, name: true, maxOutChannels: true },
     })
     if (trunks.length !== data.trunkIds.length) throw new AppError('One or more trunks not found', 404)
 
     const orderedTrunks = data.trunkIds.map((tid, i) => {
         const t = trunks.find((t) => t.id === tid)!
-        return { id: t.id, name: t.name, position: i }
+        return { id: t.id, name: t.name, maxOutChannels: t.maxOutChannels, position: i }
     })
-    const trunkAstIds = orderedTrunks.map((t) => trunkAsteriskId(company.asteriskId, t.name))
+    const trunkOpts: TrunkOpt[] = orderedTrunks.map((t) => ({
+        astId: trunkAsteriskId(company.asteriskId, t.name),
+        maxOut: t.maxOutChannels,
+    }))
 
     if (data.extensionIds?.length) {
         const extensions = await prisma.extension.findMany({
@@ -242,7 +294,7 @@ export const createOutboundRoute = async (data: CreateOutboundRouteInput) => {
         }
 
         for (const p of data.patterns) {
-            await syncPatternDialplan(tx, 'ramais', p.pattern, trunkAstIds, p.prefix, p.prepend, company.asteriskId)
+            await syncPatternDialplan(tx, 'ramais', p.pattern, trunkOpts, p.prefix, p.prepend, company.asteriskId)
         }
     })
 

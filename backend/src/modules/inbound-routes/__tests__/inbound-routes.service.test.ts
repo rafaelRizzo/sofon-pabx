@@ -229,17 +229,6 @@ describe('InboundRoutesService.createInboundRoute', () => {
         }) as any
         expect(route.id).toBe('r1')
     })
-
-    it('throws 400 when announcement has no audio uploaded yet', async () => {
-        db.company.findUnique.mockResolvedValue(COMPANY)
-        db.did.findUnique.mockResolvedValue(DID)
-        db.trunk.findUnique.mockResolvedValue(TRUNK)
-        db.inboundRoute.findUnique.mockResolvedValue(null)
-        db.announcement.findUnique.mockResolvedValue({ companyId: 'c1', audioId: null })
-        await expect(InboundRoutesService.createInboundRoute({
-            ...BASE_INPUT, destination: { type: 'announcement', id: 'ann1' },
-        })).rejects.toMatchObject({ statusCode: 400 })
-    })
 })
 
 // ─── updateInboundRoute ───────────────────────────────────────────────────────

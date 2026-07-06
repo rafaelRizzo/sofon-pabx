@@ -1,10 +1,13 @@
+import { Prisma } from '../../../generated/prisma/client'
 import { prisma } from '../../lib/prisma'
 import { getCompanyById } from '../companies/companies.service'
 import { AnnouncementsCache } from './cache/announcements.cache'
 import { AnnouncementRepository } from '../../asterisk/announcement.repository'
 import { audioSoundPath } from '../../asterisk/audio.repository'
 import { assertAudioBelongsToCompany } from '../audios/audios.service'
+import { validateRouteDestination } from '../../schemas/route-destination.validate'
 import type { CreateAnnouncementInput, UpdateAnnouncementInput } from './schemas/announcement.schema'
+import type { RouteDestination } from '../../schemas/route-destination.schema'
 import { AppError } from '../../utils/errors/app.error'
 
 const select = {
@@ -12,6 +15,7 @@ const select = {
     name: true,
     companyId: true,
     audioId: true,
+    destination: true,
     createdAt: true,
     updatedAt: true,
 } as const
@@ -20,21 +24,16 @@ const toDto = <T extends { audioId: string | null }>(a: T) => ({ ...a, hasAudio:
 
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 
-// Reconstrói (ou remove) o dialplan da empresa a partir do audioId atual — chamado dentro da mesma
-// transação sempre que create/update mexe em audioId. Sem áudio vinculado, não há dialplan (mesmo
-// padrão de IvrMenu — ver IvrService.resyncDialplan).
 async function resyncDialplan(tx: Tx, id: string) {
     const announcement = await tx.announcement.findUnique({
         where: { id },
-        select: { audioId: true, company: { select: { asteriskId: true } } },
+        select: { audioId: true, destination: true, company: { select: { asteriskId: true } } },
     })
     if (!announcement) return
-    if (!announcement.audioId) {
-        await AnnouncementRepository.removeEntry(tx, id)
-        return
-    }
-    const soundPath = audioSoundPath(announcement.company.asteriskId, announcement.audioId)
-    await AnnouncementRepository.syncEntry(tx, id, soundPath)
+    const soundPath = announcement.audioId
+        ? audioSoundPath(announcement.company.asteriskId, announcement.audioId)
+        : null
+    await AnnouncementRepository.syncEntry(tx, id, soundPath, announcement.destination as RouteDestination)
 }
 
 export const getAnnouncementsByCompany = async (companyId: string) => {
@@ -70,9 +69,18 @@ export const createAnnouncement = async (data: CreateAnnouncementInput) => {
     if (existing) throw new AppError('Announcement already exists for this company', 409)
 
     await assertAudioBelongsToCompany(data.audioId, data.companyId)
+    await validateRouteDestination(data.destination ?? null, data.companyId)
 
     const announcement = await prisma.$transaction(async (tx) => {
-        const created = await tx.announcement.create({ data, select })
+        const created = await tx.announcement.create({
+            data: {
+                name: data.name,
+                companyId: data.companyId,
+                audioId: data.audioId,
+                destination: data.destination ?? undefined,
+            },
+            select,
+        })
         await resyncDialplan(tx, created.id)
         return created
     })
@@ -93,9 +101,18 @@ export const updateAnnouncement = async (id: string, data: UpdateAnnouncementInp
     }
 
     if (data.audioId !== undefined) await assertAudioBelongsToCompany(data.audioId, existing.companyId)
+    if (data.destination !== undefined) await validateRouteDestination(data.destination, existing.companyId)
 
     const announcement = await prisma.$transaction(async (tx) => {
-        const updated = await tx.announcement.update({ where: { id }, data, select })
+        const updated = await tx.announcement.update({
+            where: { id },
+            data: {
+                name: data.name,
+                audioId: data.audioId,
+                destination: data.destination === undefined ? undefined : (data.destination ?? Prisma.JsonNull),
+            },
+            select,
+        })
         await resyncDialplan(tx, id)
         return updated
     })

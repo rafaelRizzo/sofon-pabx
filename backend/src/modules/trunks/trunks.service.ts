@@ -27,6 +27,8 @@ const trunkSelect = {
     password: true,
     context: true,
     codecs: true,
+    maxInChannels: true,
+    maxOutChannels: true,
     metadata: true,
     createdAt: true,
     updatedAt: true,
@@ -76,6 +78,8 @@ export const createTrunk = async (data: CreateTrunkInput) => {
                 username,
                 password,
                 codecs: data.codecs,
+                maxInChannels: data.maxInChannels ?? null,
+                maxOutChannels: data.maxOutChannels ?? null,
             },
         })
 
@@ -112,6 +116,9 @@ export const updateTrunk = async (id: string, data: UpdateTrunkInput) => {
 
     const astId = toAsteriskId(existing.company.asteriskId, existing.name)
 
+    const maxInChanged = 'maxInChannels' in data && data.maxInChannels !== existing.maxInChannels
+    const maxOutChanged = 'maxOutChannels' in data && data.maxOutChannels !== existing.maxOutChannels
+
     await prisma.$transaction(async (tx) => {
         await PjsipRepository.updateTrunk(tx, astId, {
             ...data,
@@ -120,6 +127,26 @@ export const updateTrunk = async (id: string, data: UpdateTrunkInput) => {
             existingUsername: existing.username,
         })
         await tx.trunk.update({ where: { id }, data })
+
+        if (maxInChanged) {
+            const newMax = data.maxInChannels ?? null
+            const inboundRoutes = await tx.inboundRoute.findMany({
+                where: { trunkId: id },
+                select: { destination: true, did: { select: { number: true } } },
+            })
+            for (const ir of inboundRoutes) {
+                await InboundRouteRepository.update(tx, id, ir.did.number, ir.destination as any, newMax)
+            }
+        }
+
+        if (maxOutChanged) {
+            const affectedRouteIds = (
+                await tx.outboundRouteTrunk.findMany({ where: { trunkId: id }, select: { routeId: true } })
+            ).map((rt) => rt.routeId)
+            for (const routeId of affectedRouteIds) {
+                await resyncAllPatterns(tx, routeId)
+            }
+        }
     })
 
     await TrunksCache.invalidateTrunk(id)
@@ -138,7 +165,7 @@ export const deleteTrunk = async (id: string) => {
 
     const inboundRoutes = await prisma.inboundRoute.findMany({
         where: { trunkId: id },
-        select: { did: { select: { number: true, exten: true } } },
+        select: { did: { select: { number: true } } },
     })
     const affectedOutboundRouteIds = (
         await prisma.outboundRouteTrunk.findMany({ where: { trunkId: id }, select: { routeId: true } })
@@ -146,7 +173,7 @@ export const deleteTrunk = async (id: string) => {
 
     await prisma.$transaction(async (tx) => {
         for (const ir of inboundRoutes) {
-            await InboundRouteRepository.delete(tx, id, ir.did.exten ?? ir.did.number)
+            await InboundRouteRepository.delete(tx, id, ir.did.number)
         }
         await PjsipRepository.deleteTrunk(tx, astId, existing.registrationMode)
         await tx.trunk.delete({ where: { id } })

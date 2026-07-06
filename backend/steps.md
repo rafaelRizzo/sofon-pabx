@@ -1,5 +1,13 @@
 # Sofon PABX — Spec-Driven Tracker
 
+## Escopo (não-negociável)
+
+**Não é micro-SaaS multi-tenant.** É centralização de provisionamento e roteamento de chamadas pra **instâncias de Asterisk isoladas, uma por VPS** (modelo MagnusBilling) — o Sofon orquestra várias instâncias via API, nunca concentra o tráfego/troncos de várias empresas numa única VPS/IP.
+
+**Motivo:** operadoras monitoram volume/padrão de chamadas por IP pra detecção de fraude (CLI spoofing, robocall, SIMbox). Um único IP com troncos de N empresas: amplia o raio de bloqueio (uma empresa com tráfego anômalo derruba o IP de todas), viola limite contratual de canais simultâneos por IP, e acopla risco de compliance entre clientes sem relação entre si. Ver seção "Escopo" do [README.md](../README.md) raiz.
+
+Qualquer feature/spec daqui pra frente deve assumir esse modelo — isolamento lógico (`asteriskId`) dentro da mesma VPS é válido, isolamento de tenants desconhecidos numa VPS compartilhada não é.
+
 ## Status legend
 - `[x]` implementado e testado
 - `[~]` implementado, sem testes

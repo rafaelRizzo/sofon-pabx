@@ -31,7 +31,7 @@ export const InboundRouteSchema = z.object({
     companyId: z.string(),
     didId: z.string(),
     trunkId: z.string(),
-    did: z.object({ id: z.string(), number: z.string(), exten: z.string().nullable() }),
+    did: z.object({ id: z.string(), number: z.string() }),
     trunk: z.object({ id: z.string(), name: z.string() }),
     destination: routeDestinationResponseSchema,
     createdAt: timestamp,

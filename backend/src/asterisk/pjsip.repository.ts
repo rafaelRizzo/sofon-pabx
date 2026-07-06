@@ -60,7 +60,7 @@ export const PjsipRepository = {
 
         if (opts.registrationMode === 'outbound') {
             await tx.ps_aors.create({
-                data: { id, contact: `sip:${opts.host}`, qualify_frequency: 0 },
+                data: { id, contact: `sip:${opts.host}`, qualify_frequency: 60 },
             })
             await tx.ps_endpoints.create({
                 data: {
@@ -74,6 +74,10 @@ export const PjsipRepository = {
                     allow: opts.codecs,
                     setvar: opts.setvar,
                     accountcode: opts.accountcode,
+                    direct_media: false,
+                    force_rport: true,
+                    rtp_symmetric: true,
+                    rewrite_contact: true,
                 } as any,
             })
             await tx.ps_registrations.create({
@@ -98,6 +102,10 @@ export const PjsipRepository = {
                     id, aors: id, auth: id, context: opts.context,
                     disallow: 'all', allow: opts.codecs, setvar: opts.setvar,
                     accountcode: opts.accountcode,
+                    direct_media: false,
+                    force_rport: true,
+                    rtp_symmetric: true,
+                    rewrite_contact: true,
                 } as any,
             })
             if (opts.host) {

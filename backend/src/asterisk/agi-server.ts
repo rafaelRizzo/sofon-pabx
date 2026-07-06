@@ -12,9 +12,13 @@ import type { VariableMapping } from '../modules/request-templates/schemas/reque
 type AgiConn = {
     socket: Bun.Socket<AgiConn>
     buffer: string
+    lineQueue: string[]
     lineResolvers: Array<(line: string) => void>
 }
 
+// Quando o Asterisk envia o ambiente AGI inteiro em um único pacote TCP, todas as linhas chegam
+// de uma vez antes dos awaits seguintes registrarem resolvers — lineQueue armazena as linhas
+// chegadas sem resolver pendente para entrega síncrona no próximo readLine.
 function feedData(conn: AgiConn, chunk: string) {
     conn.buffer += chunk
     let idx: number
@@ -23,10 +27,12 @@ function feedData(conn: AgiConn, chunk: string) {
         conn.buffer = conn.buffer.slice(idx + 1)
         const resolve = conn.lineResolvers.shift()
         if (resolve) resolve(line)
+        else conn.lineQueue.push(line)
     }
 }
 
 function readLine(conn: AgiConn): Promise<string> {
+    if (conn.lineQueue.length > 0) return Promise.resolve(conn.lineQueue.shift()!)
     return new Promise((resolve) => conn.lineResolvers.push(resolve))
 }
 
@@ -160,6 +166,7 @@ async function handleRequestTemplate(conn: AgiConn, templateId: string) {
         }
     }
 
+    logger.info({ event: 'agi.request_template.done', templateId, success, mappings: mappings.length })
     const dest = (success ? template.onSuccess : template.onError) as RouteDestination
     const target = await resolveRouteDestinationToDialplan(dest)
     if (target) await agiExecGoto(conn, target)
@@ -171,7 +178,7 @@ export function startAgiServer(host: string, port: number) {
         port,
         socket: {
             open(socket) {
-                socket.data = { socket, buffer: '', lineResolvers: [] }
+                socket.data = { socket, buffer: '', lineQueue: [], lineResolvers: [] }
                 handleConnection(socket.data).catch((error) => {
                     logger.error({ event: 'agi.session.error', message: error instanceof Error ? error.message : String(error) })
                 }).finally(() => socket.end())
@@ -182,7 +189,10 @@ export function startAgiServer(host: string, port: number) {
             error(socket, error) {
                 logger.error({ event: 'agi.socket.error', message: error.message })
             },
-            close() { },
+            close(socket) {
+                for (const resolve of socket.data.lineResolvers) resolve('')
+                socket.data.lineResolvers = []
+            },
             drain() { },
         },
     })

@@ -22,6 +22,7 @@ mock.module('../../extensions/cache/extensions.cache', () => ({
 mock.module('../../../asterisk/ivr.repository', () => ({
     IvrRepository: {
         syncEntry: mock(() => Promise.resolve()),
+        syncNoAudioEntry: mock(() => Promise.resolve()),
         removeEntry: mock(() => Promise.resolve()),
         removeManyByIds: mock(() => Promise.resolve()),
     },
@@ -193,15 +194,6 @@ describe('IvrService.createIvrMenu', () => {
         })).rejects.toMatchObject({ statusCode: 403 })
     })
 
-    it('throws 400 when longDestination ivr has no audio uploaded yet', async () => {
-        db.company.findUnique.mockResolvedValue(COMPANY)
-        db.ivrMenu.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce({ companyId: 'c1', audioId: null })
-        await expect(IvrService.createIvrMenu({
-            name: 'x', companyId: 'c1', maxDigits: 11, digitTimeout: 5, invalidRetries: 3, timeoutRetries: 3, options: [],
-            longDestination: { type: 'ivr', id: 'ivr2' },
-        })).rejects.toMatchObject({ statusCode: 400 })
-    })
-
     it('throws 409 on duplicate name', async () => {
         db.company.findUnique.mockResolvedValue(COMPANY)
         db.ivrMenu.findUnique.mockResolvedValue(MENU)
@@ -247,7 +239,7 @@ describe('IvrService.updateIvrMenu', () => {
         expect(IvrRepository.syncEntry).toHaveBeenCalled()
     })
 
-    it('unlinks audioId and removes dialplan', async () => {
+    it('unlinks audioId and writes hangup dialplan', async () => {
         const withAudio = { ...MENU, audioId: 'audio1' }
         db.ivrMenu.findUnique
             .mockResolvedValueOnce(withAudio) // existing
@@ -255,7 +247,7 @@ describe('IvrService.updateIvrMenu', () => {
         db.ivrMenu.update.mockResolvedValue({ ...MENU, audioId: null })
         const menu = await IvrService.updateIvrMenu('ivr1', { audioId: null }) as any
         expect(menu.hasAudio).toBe(false)
-        expect(IvrRepository.removeEntry).toHaveBeenCalledWith(expect.anything(), 'ivr1')
+        expect(IvrRepository.syncNoAudioEntry).toHaveBeenCalledWith(expect.anything(), 'ivr1')
     })
 
     it('throws 404 with non-existent id', async () => {

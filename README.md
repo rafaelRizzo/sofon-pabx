@@ -9,7 +9,18 @@
 ![Asterisk](https://img.shields.io/badge/Asterisk-Realtime%2FODBC-F68422?style=flat&logo=asterisk&logoColor=white)
 [![License](https://img.shields.io/badge/license-proprietary-lightgrey?style=flat)](LICENSE)
 
-Backend de gerenciamento de PABX (Asterisk) multi-empresa: provisionamento de ramais, troncos, filas, rotas de entrada/saída, condições de horário e DIDs, escrevendo diretamente nas tabelas realtime do Asterisk via banco compartilhado.
+Backend de gerenciamento de PABX (Asterisk): provisionamento de ramais, troncos, filas, rotas de entrada/saída, condições de horário e DIDs, escrevendo diretamente nas tabelas realtime do Asterisk via banco compartilhado **por instância**.
+
+## Escopo
+
+**Este projeto não é um micro-SaaS multi-tenant.** É uma ferramenta de centralização de provisionamento e roteamento de chamadas para **instâncias de Asterisk isoladas, uma por VPS**, no modelo MagnusBilling: o Sofon orquestra várias instâncias via API, cada instância roda isolada com IP público e troncos próprios.
+
+**Motivo técnico:** troncos SIP (operadoras) monitoram volume e padrão de chamadas por IP de origem para detecção de fraude/spam (CLI spoofing, robocall, SIMbox). Concentrar troncos de várias empresas distintas numa única VPS/IP:
+- amplia o raio de bloqueio — tráfego anômalo de um cliente pode derrubar/blacklistar o IP pra todos os outros;
+- viola limites contratuais de canais simultâneos por IP que a maioria das operadoras impõe;
+- acopla o risco de fraude/compliance de clientes sem nenhuma relação entre si.
+
+O isolamento entre empresas por sufixo `asteriskId` (ver [backend/CLAUDE.md](backend/CLAUDE.md), seção "context de Extension") só é seguro **dentro de uma única instância controlada pelo mesmo operador** — não usar como base pra hospedar clientes finais desconhecidos entre si compartilhando a mesma VPS/IP de troncos.
 
 ## Stack
 
@@ -48,7 +59,7 @@ Cada módulo do backend segue o padrão `routes → controller → service`, com
 
 O backend não fala AMI/ARI diretamente — ele escreve nas tabelas realtime (`sip_peers`, `ps_endpoints`, `ps_auths`, `ps_aors`, `queues`, `queue_members`, `extensions`/dialplan) que o Asterisk lê via ODBC. Suporta `chan_sip` (legado) e `chan_pjsip` em paralelo por compatibilidade com o mercado BR.
 
-Isolamento entre empresas é feito por sufixo (`asteriskId`) nos identificadores (ramal, número), não por contexto Asterisk separado — todas as empresas compartilham o mesmo `extensions.conf` estático com `switch => Realtime`.
+Isolamento entre empresas é feito por sufixo (`asteriskId`) nos identificadores (ramal, número), não por contexto Asterisk separado — todas as empresas compartilham o mesmo `extensions.conf` estático com `switch => Realtime`. Esse isolamento é lógico (dialplan/banco), não de rede/tronco — por isso vale só dentro da mesma VPS/operador (ver seção "Escopo").
 
 ## Desenvolvimento
 

@@ -120,6 +120,14 @@ function buildDialplan(
 }
 
 export const IvrRepository = {
+    // IVR sem áudio vinculado — grava Hangup para evitar "invalid extension" quando a URA for
+    // usada como destino de rota antes de ter áudio configurado
+    async syncNoAudioEntry(tx: Tx, id: string) {
+        const exten = ivrExten(id)
+        await tx.extensions.deleteMany({ where: { context: IVR_CONTEXT, exten } })
+        await tx.extensions.create({ data: { context: IVR_CONTEXT, exten, priority: 1, app: 'Hangup', appdata: null } })
+    },
+
     // soundPath: caminho absoluto SEM extensão (Read resolve o formato sozinho, igual Playback)
     async syncEntry(
         tx: Tx,

@@ -39,10 +39,6 @@ model Company {
 model Did {
     id            String         @id @default(cuid())
     number        String
-    // Override do dígito real que a trunk manda no ${EXTEN} da chamada, quando difere de `number`
-    // (ex: operadora manda 1832323232, mas `number` é o padrão de exibição 551832323232).
-    // Roteamento no dialplan usa exten ?? number — null cai no comportamento padrão.
-    exten         String?
     companyId     String
     company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
     inboundRoutes InboundRoute[]
@@ -168,6 +164,8 @@ model Trunk {
     password         String?              @db.VarChar(80)
     context          String               @default("from-trunk") @db.VarChar(40)
     codecs           String               @default("ulaw,alaw") @db.VarChar(200)
+    maxInChannels    Int?
+    maxOutChannels   Int?
     metadata         Json                 @default("{}")
     createdAt        DateTime             @default(now()) @db.Timestamptz(3)
     updatedAt        DateTime             @updatedAt @db.Timestamptz(3)
@@ -310,15 +308,16 @@ model InboundRoute {
 }
 
 model Announcement {
-    id        String   @id @default(cuid())
-    name      String   @db.VarChar(80)
-    companyId String
-    company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+    id          String   @id @default(cuid())
+    name        String   @db.VarChar(80)
+    companyId   String
+    company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
     // null até vincular um Audio — só então o Playback existe no dialplan (ver AnnouncementRepository)
-    audioId   String?
-    audio     Audio?   @relation(fields: [audioId], references: [id], onDelete: SetNull)
-    createdAt DateTime @default(now()) @db.Timestamptz(3)
-    updatedAt DateTime @updatedAt @db.Timestamptz(3)
+    audioId     String?
+    audio       Audio?   @relation(fields: [audioId], references: [id], onDelete: SetNull)
+    destination Json?
+    createdAt   DateTime @default(now()) @db.Timestamptz(3)
+    updatedAt   DateTime @updatedAt @db.Timestamptz(3)
 
     @@unique([name, companyId])
     @@index([companyId])

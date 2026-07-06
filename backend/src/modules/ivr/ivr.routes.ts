@@ -50,7 +50,47 @@ export const ivrRoutes = async (app: FastifyInstance) => {
             summary: 'Criar menu de URA',
             description: 'Cria o registro, a configuração e as opções de dígito (digit → destino) já em uma chamada. Envie audioId (criado via POST /audios) pra já sair com dialplan, ou omita e vincule depois via PUT.',
             security: [{ bearerAuth: [] }],
-            body: createIvrMenuSchema,
+            body: createIvrMenuSchema.meta({
+                examples: [
+                    {
+                        name: 'Menu simples (1 dígito)',
+                        value: {
+                            name: 'Menu Principal',
+                            companyId: '<companyId>',
+                            audioId: '<audioId>',
+                            maxDigits: 1,
+                            digitTimeout: 5,
+                            invalidRetries: 3,
+                            timeoutRetries: 3,
+                            options: [
+                                { digit: '1', destination: { type: 'extension', id: '<extensionId>' } },
+                                { digit: '2', destination: { type: 'queue', id: '<queueId>' } },
+                                { digit: '0', destination: { type: 'hangup' } },
+                            ],
+                            invalidDestination: { type: 'announcement', id: '<announcementId>' },
+                            timeoutDestination: { type: 'announcement', id: '<announcementId>' },
+                        },
+                    },
+                    {
+                        name: 'Menu com longDestination (CPF)',
+                        value: {
+                            name: 'Consulta CPF',
+                            companyId: '<companyId>',
+                            audioId: '<audioId>',
+                            maxDigits: 11,
+                            digitTimeout: 10,
+                            invalidRetries: 2,
+                            timeoutRetries: 2,
+                            options: [
+                                { digit: '1', destination: { type: 'queue', id: '<queueId>' } },
+                            ],
+                            longDestination: { type: 'request', id: '<requestTemplateId>' },
+                            invalidDestination: { type: 'announcement', id: '<announcementId>' },
+                            timeoutDestination: { type: 'hangup' },
+                        },
+                    },
+                ],
+            }),
             response: {
                 201: CreateIvrMenuResponse,
                 401: errors[401],

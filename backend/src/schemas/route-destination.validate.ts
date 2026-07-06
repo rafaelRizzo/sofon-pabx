@@ -35,17 +35,15 @@ export async function validateRouteDestination(dest: RouteDestination, companyId
             break
         }
         case 'announcement': {
-            const ann = await prisma.announcement.findUnique({ where: { id: dest.id }, select: { companyId: true, audioId: true } })
+            const ann = await prisma.announcement.findUnique({ where: { id: dest.id }, select: { companyId: true } })
             if (!ann) throw new AppError(`${prefix}Announcement not found`, 404)
             if (ann.companyId !== companyId) throw new AppError(`${prefix}Announcement belongs to different company`, 403)
-            if (!ann.audioId) throw new AppError(`${prefix}Announcement has no audio uploaded yet`, 400)
             break
         }
         case 'ivr': {
-            const ivr = await prisma.ivrMenu.findUnique({ where: { id: dest.id }, select: { companyId: true, audioId: true } })
+            const ivr = await prisma.ivrMenu.findUnique({ where: { id: dest.id }, select: { companyId: true } })
             if (!ivr) throw new AppError(`${prefix}IVR menu not found`, 404)
             if (ivr.companyId !== companyId) throw new AppError(`${prefix}IVR menu belongs to different company`, 403)
-            if (!ivr.audioId) throw new AppError(`${prefix}IVR menu has no audio uploaded yet`, 400)
             break
         }
         case 'request': {

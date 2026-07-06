@@ -136,7 +136,7 @@ export const deleteCompany = async (id: string) => {
         }),
         prisma.inboundRoute.findMany({
             where: { companyId: id },
-            select: { trunkId: true, did: { select: { number: true, exten: true } } },
+            select: { trunkId: true, did: { select: { number: true } } },
         }),
         prisma.timeCondition.findMany({
             where: { companyId: id },
@@ -171,7 +171,7 @@ export const deleteCompany = async (id: string) => {
         .filter((t) => t.registrationMode === 'outbound')
         .map((t) => `${existing.asteriskId}-trunk-${t.name}`)
 
-    const inboundRoutesForCleanup = inboundRoutes.map((r) => ({ trunkId: r.trunkId, didNumber: r.did.exten ?? r.did.number }))
+    const inboundRoutesForCleanup = inboundRoutes.map((r) => ({ trunkId: r.trunkId, didNumber: r.did.number }))
     const timeConditionIds = timeConditions.map((tc) => tc.id)
     const outboundPatternValues = outboundPatterns.map((p) => p.pattern)
     const announcementIds = announcements.map((a) => a.id)

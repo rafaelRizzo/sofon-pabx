@@ -78,10 +78,9 @@ describe('POST /inbound-routes', () => {
         routeId = body.inboundRouteId
 
         const dialplan = await prisma.extensions.findFirst({
-            where: { context: TRUNK_ROUTED_CONTEXT, exten: `${didNumber}_${trunkId}` },
+            where: { context: TRUNK_ROUTED_CONTEXT, exten: `${didNumber}_${trunkId}`, app: 'Hangup' },
         })
         expect(dialplan).not.toBeNull()
-        expect(dialplan?.app).toBe('Hangup')
     })
 
     it('409 duplicate trunk+DID combination', async () => {
@@ -211,9 +210,9 @@ describe('PUT /inbound-routes/:id', () => {
         expect(res.statusCode).toBe(200)
 
         const dialplan = await prisma.extensions.findFirst({
-            where: { context: TRUNK_ROUTED_CONTEXT, exten: `${didNumber}_${trunkId}` },
+            where: { context: TRUNK_ROUTED_CONTEXT, exten: `${didNumber}_${trunkId}`, app: 'Hangup' },
         })
-        expect(dialplan?.app).toBe('Hangup')
+        expect(dialplan).not.toBeNull()
     })
 
     it('400 empty body', async () => {

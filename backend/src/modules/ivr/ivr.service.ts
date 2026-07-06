@@ -48,7 +48,7 @@ async function resyncDialplan(tx: Tx, id: string) {
     })
     if (!menu) return
     if (!menu.audioId) {
-        await IvrRepository.removeEntry(tx, id)
+        await IvrRepository.syncNoAudioEntry(tx, id)
         return
     }
 

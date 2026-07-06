@@ -10,7 +10,6 @@ import { AppError } from '../../utils/errors/app.error'
 const select = {
     id: true,
     number: true,
-    exten: true,
     companyId: true,
     createdAt: true,
     updatedAt: true,
@@ -82,12 +81,9 @@ export const updateDid = async (id: string, data: UpdateDidInput) => {
         if (conflict && conflict.id !== id) throw new AppError('DID already exists for this company', 409)
     }
 
-    // exten é o override do dígito real que a trunk manda no EXTEN da chamada — quando ele ou o
-    // number mudam, a chave de roteamento (exten ?? number) muda e o dialplan precisa ser regravado
-    const oldRoutingKey = existing.exten ?? existing.number
+    const oldRoutingKey = existing.number
     const newNumber = data.number ?? existing.number
-    const newExten = data.exten === undefined ? existing.exten : data.exten
-    const newRoutingKey = newExten ?? newNumber
+    const newRoutingKey = newNumber
 
     const inboundRoutes = newRoutingKey !== oldRoutingKey
         ? await prisma.inboundRoute.findMany({ where: { didId: id }, select: { id: true, trunkId: true, destination: true } })
@@ -121,7 +117,7 @@ export const deleteDid = async (id: string) => {
         select: { id: true, trunkId: true },
     })
 
-    const routingKey = existing.exten ?? existing.number
+    const routingKey = existing.number
 
     await prisma.$transaction(async (tx) => {
         for (const ir of inboundRoutes) {

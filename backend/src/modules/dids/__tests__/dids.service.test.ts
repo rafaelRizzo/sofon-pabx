@@ -89,14 +89,14 @@ describe('DidsService.updateDid', () => {
         expect(did.number).toBe('551100009999')
     })
 
-    it('regenerates dialplan of existing inbound routes when routing key changes', async () => {
+    it('regenerates dialplan of existing inbound routes when number changes', async () => {
         const { InboundRouteRepository } = await import('../../../asterisk/inboundroute.repository')
         db.did.findUnique.mockResolvedValueOnce(DID).mockResolvedValueOnce(null)
-        db.did.update.mockResolvedValue({ ...DID, exten: '1832323232' })
+        db.did.update.mockResolvedValue({ ...DID, number: '551100009998' })
         db.inboundRoute.findMany.mockResolvedValue([{ id: 'ir1', trunkId: 't1', destination: { type: 'hangup' } }])
-        await DidsService.updateDid('d1', { exten: '1832323232' })
+        await DidsService.updateDid('d1', { number: '551100009998' })
         expect(InboundRouteRepository.delete).toHaveBeenCalledWith(expect.anything(), 't1', DID.number)
-        expect(InboundRouteRepository.create).toHaveBeenCalledWith(expect.anything(), 't1', '1832323232', { type: 'hangup' })
+        expect(InboundRouteRepository.create).toHaveBeenCalledWith(expect.anything(), 't1', '551100009998', { type: 'hangup' })
     })
 
     it('does not touch dialplan when routing key is unchanged', async () => {
