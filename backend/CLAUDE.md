@@ -26,19 +26,21 @@ src/modules/<name>/
   schemas/<name>.schema.ts  # Zod schemas de input/output + response types
   cache/<name>.cache.ts     # wrapper de CacheManager para o módulo
 ```
-Módulos: auth, users, companies, dids, extensions, queues, queue-members, trunks, outbound-routes, inbound-routes, time-groups, time-conditions, cdr, announcements, ivr, request-templates, audios
+Módulos: auth, users, companies, dids, extensions, queues, queue-members, trunks, outbound-routes, inbound-routes, time-groups, time-conditions, holiday-groups, cdr, announcements, ivr, request-templates, audios
 
 ## Repositórios Asterisk (`src/asterisk/`)
 Cada repositório escreve direto nas tabelas realtime do Asterisk via Prisma:
 - `sip.repository.ts` → `sip_peers`
 - `pjsip.repository.ts` → `ps_endpoints`, `ps_auths`, `ps_aors`, `ps_identifies`, `ps_registrations`
 - `queue.repository.ts` → `queues`, `queue_members`
-- `dialplan.repository.ts` → `extensions` (dialplan realtime)
-- `timecondition.repository.ts` → dialplan no contexto fixo `timeconditions` (exten `tc-<tcId>`/`tc-<tcId>-matched`)
-- `inboundroute.repository.ts` → dialplan para rotas de entrada
-- `announcement.repository.ts` → dialplan no contexto fixo `announcements` (exten `ann-<id>`, Playback+Hangup)
-- `ivr.repository.ts` → dialplan no contexto fixo `ivrs` (exten `ivr-<id>`), state machine de prioridades numéricas pra Read()+GotoIf
+- `dialplan.repository.ts` → tabela `extensions` via Realtime — contextos `ramais` e `from-trunk-routed` (alta escrita; permanecem no banco)
+- `inboundroute.repository.ts` → tabela `extensions` via Realtime — contexto `from-trunk-routed`, exten `<did>_<trunkId>`
+- `timecondition.repository.ts` → arquivo estático via `dialplan-file.repository.ts` — contexto `timeconditions`, exten `tc-<tcId>`/`tc-<tcId>-matched`, `GotoIfTime` em OR lógico sobre todos os ranges dos TGs vinculados
+- `announcement.repository.ts` → arquivo estático via `dialplan-file.repository.ts` — contexto `announcements`, exten `ann-<id>`, `Playback` + destino final
+- `ivr.repository.ts` → arquivo estático via `dialplan-file.repository.ts` — contexto `ivrs`, exten `ivr-<id>`, state machine `Read()+GotoIf` com prioridades numéricas
+- `holidaygroup.repository.ts` → arquivo estático via `dialplan-file.repository.ts` — contexto `holidays`, exten `hol-<id>`, `GotoIfTime` por datas (month/day)
 - `audio.repository.ts` → só paths de áudio (`/var/lib/asterisk/sounds/<asteriskId>/<audioId>.wav`) — único lugar que grava arquivo físico; Announcement/IvrMenu só referenciam um `Audio.id`, sem dialplan próprio
+- `dialplan-file.repository.ts` → infraestrutura de materialização: gera `/etc/asterisk/dialplan-extra/<context>/<asteriskId>.conf` a partir de linhas `DialplanRow[]`. Escrita atômica via `rename()` no mesmo filesystem. Lock por chave `<context>/<asteriskId>` serializa CRUDs simultâneos. Após cada escrita chama `asterisk -rx 'dialplan reload'`. Contextos gerenciados: `timeconditions`, `announcements`, `ivrs`, `queues-app`, `request-templates`, `holidays` — zero query ao banco em tempo de chamada para esses contextos.
 
 ---
 
@@ -158,12 +160,12 @@ Vars: `DATABASE_URL`, `JWT_SECRET`, `REFRESH_SECRET`, `JWT_EXPIRES_IN` (15m), `R
 - `position` em OutboundRoute: menor = maior prioridade
 - `PUT /outbound-routes/:id/trunks`: substitui lista completa (não aditivo)
 - `allowOutbound` em Extension: persiste `ALLOW_OUTBOUND=1/0` em `sip_peers.setvar` / `ps_endpoints.setvar`
-- Time Conditions: ao criar/atualizar/deletar, regenera dialplan no contexto fixo compartilhado `timeconditions` (exten `tc-<tcId>`/`tc-<tcId>-matched`) via `GotoIfTime` — OR lógico entre todos os ranges de todos os TGs vinculados. Contexto dinâmico por entidade (`tc-<id>`) não é usado — mesma limitação de `ramais-<asteriskId>` (ver seção acima): Asterisk só resolve realtime pra contextos declarados estaticamente em `extensions.conf`
-- **Route destination** (`src/schemas/route-destination.schema.ts`) — shape compartilhado por Inbound Routes (`destination`), Time Conditions (`trueRoute`/`falseRoute`), Queues (`postQueueDestination`), IVR Menus (`invalidDestination`/`timeoutDestination`/`longDestination`/opção de dígito) e Request Templates (`onSuccess`/`onError`): `{ type: "extension"|"queue"|"voicemail"|"timecondition"|"announcement"|"ivr"|"request"|"hangup", id?: cuid2 } | null` (`id` obrigatório exceto hangup; `null`/omitido = hangup). Validação de existência/posse centralizada em `validateRouteDestination()` (`src/schemas/route-destination.validate.ts`), usada por todos os services acima — não duplicar esse switch-case ao adicionar novo tipo
+- Time Conditions: ao criar/atualizar/deletar, regenera o arquivo estático do contexto `timeconditions` para a empresa via `dialplan-file.repository.ts` — exten `tc-<tcId>`/`tc-<tcId>-matched`, `GotoIfTime` em OR lógico sobre todos os ranges de todos os TGs vinculados. Arquivo em `/etc/asterisk/dialplan-extra/timeconditions/<asteriskId>.conf`, incluído pelo `extensions.conf` estático — sem queries ao banco em tempo de chamada.
+- **Route destination** (`src/schemas/route-destination.schema.ts`) — shape compartilhado por Inbound Routes (`destination`), Time Conditions (`trueRoute`/`falseRoute`), Holiday Groups (`trueRoute`/`falseRoute`), Queues (`postQueueDestination`), IVR Menus (`invalidDestination`/`timeoutDestination`/`longDestination`/opção de dígito), Announcements (`destination`) e Request Templates (`onSuccess`/`onError`): `{ type: "extension"|"queue"|"voicemail"|"timecondition"|"holiday"|"announcement"|"ivr"|"request"|"hangup", id?: cuid2 } | null` (`id` obrigatório exceto hangup; `null`/omitido = hangup). Validação de existência/posse centralizada em `validateRouteDestination()` (`src/schemas/route-destination.validate.ts`), usada por todos os services acima — não duplicar esse switch-case ao adicionar novo tipo
 - Áudio (`Audio` model, módulo `audios`) é desacoplado de quem o usa: upload é feito uma vez via `POST /audios` (multipart, por empresa) e o `audioId` retornado é referenciado por `Announcement.audioId`/`IvrMenu.audioId` — o mesmo Audio pode ser reaproveitado por mais de um registro. Áudio é convertido automaticamente pra WAV PCM 16-bit mono 8kHz (slin) via `sox` — qualidade sem perdas, compatível com os codecs das trunks (ulaw/alaw) sem resample na chamada. Único arquivo físico por Audio, em `/var/lib/asterisk/sounds/<asteriskId>/<audioId>.wav`
   - `DELETE /audios/:id` desvincula automaticamente (`SetNull`) qualquer Announcement/IvrMenu que o referencie, removendo o dialplan deles na mesma operação (senão ficaria um Playback/Read apontando pro arquivo apagado) — não bloqueia com 409
   - Announcement/IvrMenu usados como destino de rota (`type: "announcement"|"ivr"`) exigem `audioId` vinculado (`hasAudio: true`), senão 400 em `validateRouteDestination`
-- `context` de Extension: default `"ramais"`, compartilhado entre todas as empresas — isolamento entre empresas é feito via sufixo `asteriskId` no `number`/`exten` (ex: `2002_a9e2463c8f`), não por contexto Asterisk separado. Contextos dinâmicos por empresa (`ramais-<asteriskId>`) **não funcionam** nesse setup: o Asterisk só resolve realtime dialplan pra contextos declarados estaticamente em `extensions.conf` com `switch => Realtime/<contexto>@extensions` — tentativa de escopar por empresa quebra a resolução de chamadas. Isolamento de verdade entre empresas exigiria uma reformulação maior (contexto único + AGI/`func_odbc` decidindo rota em tempo de chamada, ao estilo MagnusBilling) — não implementado
+- `context` de Extension: default `"ramais"`, compartilhado entre todas as empresas — isolamento é feito via sufixo `asteriskId` no `number`/`exten` (ex: `2002_a9e2463c8f`), não por contexto separado. Contextos dinâmicos por empresa (`ramais-<asteriskId>`) **não funcionam** via Realtime: o Asterisk só resolve realtime dialplan pra contextos declarados estaticamente em `extensions.conf` com `switch => Realtime/<contexto>@extensions`. Os demais contextos (`timeconditions`, `announcements`, `ivrs`, `queues-app`, `request-templates`, `holidays`) **contornam essa limitação via arquivos estáticos** por empresa (ver `dialplan-file.repository.ts`) — sem Realtime, sem o problema. `ramais` e `from-trunk-routed` permanecem no banco (Realtime) porque têm escrita frequente (provisionamento de ramais/rotas) e o contexto único já isola por `exten` sufixado.
 
 ## API — schemas de input/output por módulo
 
@@ -218,6 +220,14 @@ Vars: `DATABASE_URL`, `JWT_SECRET`, `REFRESH_SECRET`, `JWT_EXPIRES_IN` (15m), `R
 - Update: `{ name?, trueRoute?, falseRoute? }` (min 1)
 - Route format: route destination compartilhado (ver seção "Route destination" acima)
 
+**Holiday Groups** — `{ id, name, companyId, url?, trueRoute, falseRoute, dates[{id,name,month,day}], createdAt, updatedAt }`
+- Create: `{ name, companyId, url?, trueRoute?, falseRoute?, dates?[{name, month(1-12), day(1-31)}] }` → `{ holidayGroupId }` — `url` e `dates` são mutuamente exclusivos
+- Update: `{ name?, url?, trueRoute?, falseRoute?, dates? }` (min 1; mesma restrição url×dates)
+- `url`: endpoint externo que retorna lista de feriados — quando configurada, `dates` é read-only via API (gerenciado pelo job `holiday-resync.job.ts` que substitui as datas periodicamente); `url: null` converte pro modo manual
+- `dates` max 50 por grupo; `trueRoute`/`falseRoute`: route destination compartilhado
+- Dialplan: contexto fixo `holidays`, exten `hol-<id>`, `GotoIfTime` por datas (month/day, sem hora/weekday)
+- `UNIQUE(name, companyId)`
+
 **Audios** — `{ id, name, companyId, createdAt, updatedAt }`
 - Create: `POST /audios` — multipart/form-data com campos de texto `name`+`companyId` **antes** do arquivo, até 15MB. Converte pra WAV slin 8kHz mono 16-bit via `sox` → `{ audioId }`
 - Update: `PATCH /:id` — `{ name }` (só rename)
@@ -225,9 +235,10 @@ Vars: `DATABASE_URL`, `JWT_SECRET`, `REFRESH_SECRET`, `JWT_EXPIRES_IN` (15m), `R
 - `UNIQUE(name, companyId)`
 - Delete Company → cascade Audios (dialplan dos consumidores limpo antes; pasta `/var/lib/asterisk/sounds/<asteriskId>/` inteira removida)
 
-**Announcements** — `{ id, name, companyId, audioId, hasAudio, createdAt, updatedAt }`
-- Create: `{ name, companyId, audioId? }` → `{ announcementId }` (com `audioId` já sai com dialplan; sem ele fica pendente)
-- Update: `{ name?, audioId? }` (min 1; `audioId: null` desvincula e remove o dialplan)
+**Announcements** — `{ id, name, companyId, audioId, hasAudio, destination, createdAt, updatedAt }`
+- Create: `{ name, companyId, audioId?, destination? }` → `{ announcementId }` (com `audioId` já sai com dialplan; sem ele fica pendente)
+- Update: `{ name?, audioId?, destination? }` (min 1; `audioId: null` desvincula e remove o dialplan)
+- `destination`: route destination compartilhado — para onde vai após o áudio tocar (null/omitido = Hangup)
 - Delete: remove registro e dialplan (`announcements`/`ann-<id>`) — não mexe no Audio vinculado
 - Delete Company → cascade Announcements (dialplan) + cascade Audios (ver seção Audios)
 
@@ -238,9 +249,48 @@ Vars: `DATABASE_URL`, `JWT_SECRET`, `REFRESH_SECRET`, `JWT_EXPIRES_IN` (15m), `R
 - Delete: remove registro e dialplan (`ivrs`/`ivr-<id>`) — não mexe no Audio vinculado
 - Delete Company → cascade IVR Menus (dialplan) + cascade Audios (ver seção Audios)
 
+**Request Templates** — `{ id, name, companyId, method, url, headers?, body?, timeoutMs, variableMappings[], onSuccess, onError, createdAt, updatedAt }`
+- Create: `{ name, companyId, method?("GET"), url, headers?(json), body?(json), timeoutMs?(5000), variableMappings?[{path, variable}], onSuccess?, onError? }`
+- Update: `{ method?, url?, headers?, body?, timeoutMs?, variableMappings?, onSuccess?, onError? }` (min 1)
+- `variableMappings`: max 20; `path` = JSON path sobre a resposta HTTP (ex: `data.client[0].id`), `variable` = nome da variável de canal setada via AGI (`SET VARIABLE`) — disponível no dialplan após o request
+- `onSuccess`/`onError`: route destination compartilhado — destino após execução AGI
+- Executado em tempo de chamada via AGI server (`src/asterisk/agi-server.ts`); placeholders `{{VAR}}` em `url`/`headers`/`body` resolvidos via `AGI GET VARIABLE`
+- `timeoutMs` default 5000; `UNIQUE(name, companyId)`
+
 **CDR** — `GET /cdr` — `{ records[], total, limit }`
 - Query obrigatória: `companyId`; opcionais: `startDate`/`endDate` (`YYYY-MM-DD`, cobrem o dia inteiro 00:00:00–23:59:59.999, sem offset/hora), `src`, `dst`, `callStatus` (enum disposition), `limit`(max 200), `order`(asc|desc, default desc — aplica em startTime+id)
 - Sem paginação por cursor — só `limit`/`order`, sem navegação por página
 - Isolamento por empresa via `accountcode = Company.asteriskId` (não por FK)
 - `callStatus` na query mapeia pra coluna `disposition` no banco; na resposta o campo também sai como `callStatus` (não `disposition`) — nome escolhido por ser mais intuitivo pro consumidor da API
 - `startTime`/`answerTime`/`endTime`: ver seção Timezone — são hora local naive do CDR nativo do Asterisk, formatados na saída via `formatNaiveLocalISOString`, nunca como UTC direto. Filtro por data não precisa de conversão de tz: os dígitos de `startDate`/`endDate` já batem 1:1 com o storage naive local
+
+---
+
+## Status de implementação
+
+Legend: `[x]` implementado + testado (unit + integration) | `[~]` implementado, só testes unit | `[ ]` pendente
+
+| Módulo | Rotas | Unit | Integration |
+|--------|-------|------|-------------|
+| Health | `GET /health` | — | — |
+| Auth | POST register/login/refresh/logout | `[x]` | `[x]` |
+| Users | GET list/:id/:id/companies · POST · PUT · DELETE | `[x]` | `[x]` |
+| Companies | GET list/:id · POST · PUT · DELETE | `[x]` | `[x]` |
+| DIDs | GET list/:id/company/:id · POST · PUT · DELETE | `[x]` | `[x]` |
+| Extensions | GET list/:id · POST · POST /batch · PUT · PATCH /password · DELETE | `[x]` | `[x]` |
+| Queues | GET list/company/:id/:id · POST · PUT · DELETE | `[x]` | `[x]` |
+| Queue Members | GET/POST/PUT/DELETE `/queues/:id/members` | `[x]` | `[ ]` |
+| Trunks | GET list/:id · POST · PUT · DELETE | `[~]` | `[ ]` |
+| Outbound Routes | GET list/:id · POST · PUT · DELETE · patterns CRUD · PUT /trunks · POST/DELETE /extensions | `[x]` | `[x]` |
+| Inbound Routes | GET list/:id · POST · PUT · DELETE | `[x]` | `[x]` |
+| Time Groups | GET list/:id · POST · PUT · DELETE | `[x]` | `[x]` |
+| Time Conditions | GET list/:id · POST · PUT · DELETE | `[x]` | `[x]` |
+| Holiday Groups | GET list/:id · POST · PUT · DELETE | `[~]` | `[ ]` |
+| CDR | GET /cdr | `[~]` | `[ ]` |
+| Announcements | GET list/:id · POST · PATCH · DELETE | `[~]` | `[ ]` |
+| IVR Menus | GET list/:id · POST · PUT · DELETE | `[~]` | `[ ]` |
+| Request Templates | GET list/:id · POST · PUT · DELETE | `[~]` | `[ ]` |
+| Audios | GET list/:id · POST · PATCH · DELETE | `[~]` | `[ ]` |
+
+**Pendências de teste:**
+- `[ ]` Integration tests: Queue Members, Trunks, Holiday Groups, CDR, Announcements, IVR Menus, Request Templates, Audios

@@ -167,7 +167,7 @@ export const AsteriskQueueRepository = {
                 )
             }
             await writeContextFile(QUEUE_APP_CONTEXT, asteriskId, entries)
-            await reloadDialplan()
+            reloadDialplan()
         })
     },
 }

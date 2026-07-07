@@ -23,7 +23,7 @@ export const RequestTemplateRepository = {
                 ]
             })
             await writeContextFile(REQUEST_TEMPLATE_CONTEXT, asteriskId, entries)
-            await reloadDialplan()
+            reloadDialplan()
         })
     },
 }

@@ -68,7 +68,7 @@ export const AnnouncementRepository = {
                 entries.push(...buildDialplan(a.id, soundPath, target))
             }
             await writeContextFile(ANNOUNCEMENT_CONTEXT, asteriskId, entries)
-            await reloadDialplan()
+            reloadDialplan()
         })
     },
 }

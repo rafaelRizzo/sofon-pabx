@@ -115,7 +115,7 @@ export const TimeConditionRepository = {
                 entries.push(...buildDialplan(tc.id, tc.name, ranges, trueAsterisk, falseAsterisk))
             }
             await writeContextFile(TC_CONTEXT, asteriskId, entries)
-            await reloadDialplan()
+            reloadDialplan()
         })
     },
 }

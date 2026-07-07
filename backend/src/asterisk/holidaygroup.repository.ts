@@ -107,7 +107,7 @@ export const HolidayGroupRepository = {
                 entries.push(...buildDialplan(g.id, g.name, g.dates, trueAsterisk, falseAsterisk))
             }
             await writeContextFile(HOL_CONTEXT, asteriskId, entries)
-            await reloadDialplan()
+            reloadDialplan()
         })
     },
 }

@@ -156,7 +156,7 @@ export const IvrRepository = {
                 ))
             }
             await writeContextFile(IVR_CONTEXT, asteriskId, entries)
-            await reloadDialplan()
+            reloadDialplan()
         })
     },
 }

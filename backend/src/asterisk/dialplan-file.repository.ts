@@ -65,17 +65,34 @@ export async function writeContextFile(context: string, asteriskId: string, entr
 // Backend e Asterisk rodam no mesmo host (mesmo padrão de AGI_HOST=127.0.0.1) — sem AMI configurado
 // nesse projeto, só spawn direto (mesma abordagem já usada pra `sox` em audio-convert.ts). Falha aqui
 // não derruba a request: o arquivo já está correto, o próximo reload (manual ou próximo CRUD) resolve.
-export async function reloadDialplan() {
-    const proc = Bun.spawn(['asterisk', '-rx', 'dialplan reload'], { stdout: 'pipe', stderr: 'pipe' })
-    const [exitCode, stderr] = await Promise.all([proc.exited, new Response(proc.stderr).text()])
-    if (exitCode !== 0) logger.warn({ event: 'dialplan.reload.failed', exitCode, stderr: stderr.trim() })
+//
+// Chamadores NÃO devem dar await nisso — o arquivo já está correto no disco quando a request
+// responde; o reload só precisa acontecer em algum momento depois, sem segurar a request pra isso.
+const RELOAD_DEBOUNCE_MS = 500
+let pendingReload: Promise<void> | null = null
+
+// Debounce: CRUDs concorrentes de empresas/contextos diferentes (cada um já escreveu seu próprio
+// arquivo antes de chamar isso) caem no mesmo reload em vez de um `dialplan reload` global por write —
+// sem isso, 20 empresas editando quase junto disparam 20 reloads globais quase simultâneos.
+export function reloadDialplan(): Promise<void> {
+    if (pendingReload) return pendingReload
+    pendingReload = new Promise((resolve) => {
+        setTimeout(async () => {
+            const proc = Bun.spawn(['asterisk', '-rx', 'dialplan reload'], { stdout: 'pipe', stderr: 'pipe' })
+            const [exitCode, stderr] = await Promise.all([proc.exited, new Response(proc.stderr).text()])
+            if (exitCode !== 0) logger.warn({ event: 'dialplan.reload.failed', exitCode, stderr: stderr.trim() })
+            pendingReload = null
+            resolve()
+        }, RELOAD_DEBOUNCE_MS)
+    })
+    return pendingReload
 }
 
 // Best-effort: remove os arquivos das empresa em todos os contextos migrados — usado no delete de
 // Company, quando não há mais nada pra "regenerar" (a empresa já não existe).
 export async function removeCompanyDialplanFiles(asteriskId: string, contexts: string[]) {
     await Promise.all(contexts.map((context) => rm(dialplanFilePath(context, asteriskId), { force: true })))
-    await reloadDialplan()
+    reloadDialplan()
 }
 
 // Serializa regenerações concorrentes da mesma empresa+contexto (ex: dois CRUDs quase simultâneos)
