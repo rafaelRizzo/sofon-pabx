@@ -6,7 +6,7 @@ import { protectedRoute } from '../../middleware/scope.middleware'
 import {
     createExtensionSchema, createExtensionBatchSchema, updateExtensionSchema, extensionIdParamSchema,
     BatchResultSchema, ListExtensionsResponse, GetExtensionResponse,
-    CreateExtensionResponse, UpdateExtensionResponse, ResetPasswordResponse,
+    CreateExtensionResponse, UpdateExtensionResponse, ResetPasswordResponse, ExportExtensionsResponse,
 } from './schemas/extension.schema'
 import { errors, deleted } from '../../schemas/responses'
 
@@ -29,6 +29,21 @@ export const extensionsRoutes = async (app: FastifyInstance) => {
             },
         },
     }, ExtensionsController.getAllExtensions as any)
+
+    router.get('/extensions/export', {
+        onRequest: protectedRoute,
+        schema: {
+            tags: ['Extensions'],
+            summary: 'Exportar ramais com usuário e senha',
+            description: 'Filtra por empresa via ?companyId. Expõe a senha em texto puro — uso restrito.',
+            security: [{ bearerAuth: [] }],
+            querystring: optionalCompanyQuery,
+            response: {
+                200: ExportExtensionsResponse,
+                401: errors[401],
+            },
+        },
+    }, ExtensionsController.exportExtensions as any)
 
     router.get('/extensions/:id', {
         onRequest: protectedRoute,

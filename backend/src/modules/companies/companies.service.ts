@@ -24,6 +24,7 @@ const companySelect = {
     id: true,
     name: true,
     doc: true,
+    status: true,
     asteriskId: true,
     timezone: true,
     metadata: true,
@@ -92,7 +93,7 @@ export const createCompany = async ({ userId, ...data }: Omit<CreateCompanyInput
     return company
 }
 
-export const updateCompany = async (id: string, data: UpdateCompanyInput) => {
+export const updateCompany = async (id: string, { userId, ...data }: UpdateCompanyInput) => {
     const existing = await prisma.company.findUnique({
         where: { id },
         include: { users: { select: { userId: true } } },
@@ -101,15 +102,37 @@ export const updateCompany = async (id: string, data: UpdateCompanyInput) => {
         throw new AppError('Company not found', 404)
     }
 
-    const company = await prisma.company.update({
-        where: { id },
-        data,
-        select: companySelect,
+    if (userId) {
+        const user = await prisma.user.findUnique({ where: { id: userId } })
+        if (!user) {
+            throw new AppError('User not found', 404)
+        }
+    }
+
+    const company = await prisma.$transaction(async (tx) => {
+        const updated = await tx.company.update({
+            where: { id },
+            data,
+            select: companySelect,
+        })
+
+        // vínculo N:N aditivo — não desvincula os usuários existentes
+        if (userId) {
+            await tx.userCompany.upsert({
+                where: { userId_companyId: { userId, companyId: id } },
+                create: { userId, companyId: id },
+                update: {},
+            })
+        }
+
+        return updated
     })
 
     await CompaniesCache.invalidateCompany(id)
     await CompaniesCache.invalidateAllCompanies()
-    await Promise.all(existing.users.map((u) => CompaniesCache.invalidateCompaniesByUser(u.userId)))
+    const affectedUsers = new Set(existing.users.map((u) => u.userId))
+    if (userId) affectedUsers.add(userId)
+    await Promise.all([...affectedUsers].map((uid) => CompaniesCache.invalidateCompaniesByUser(uid)))
     return company
 }
 

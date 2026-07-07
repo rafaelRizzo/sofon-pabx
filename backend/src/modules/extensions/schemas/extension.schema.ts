@@ -33,7 +33,6 @@ const sipFields = {
     remoteSecret: z.string().max(40).optional(),
     callGroup: z.string().max(40).optional(),
     pickupGroup: z.string().max(40).optional(),
-    mailbox: z.string().max(40).optional(),
     accountCode: z.string().max(40).optional(),
     fromUser: z.string().max(40).optional(),
     fromDomain: z.string().max(40).optional(),
@@ -44,34 +43,31 @@ const sipFields = {
     setVar: z.string().max(200).optional(),
     amaFlags: z.string().max(40).optional(),
     callCounter: z.string().max(10).optional(),
-    busyLevel: z.number().int().optional(),
+    busyLevel: z.number().int().min(0).max(100).optional(),
     allowOverlap: z.string().max(10).optional(),
     allowSubscribe: z.string().max(10).optional(),
     videoSupport: z.string().max(10).optional(),
-    maxCallBitrate: z.number().int().optional(),
+    maxCallBitrate: z.number().int().min(0).max(10000).optional(),
     rfc2833Compensate: z.string().max(10).optional(),
     sessionTimers: z.string().max(10).optional(),
-    sessionExpires: z.number().int().optional(),
-    sessionMinse: z.number().int().optional(),
+    sessionExpires: z.number().int().min(90).max(86400).optional(),
+    sessionMinse: z.number().int().min(90).max(86400).optional(),
     sessionRefresher: z.string().max(10).optional(),
-    t38ptUsertpsource: z.string().max(10).optional(),
     regExten: z.string().max(40).optional(),
     defaultIp: z.string().max(45).optional(),
-    rtpTimeout: z.number().int().optional(),
-    rtpHoldTimeout: z.number().int().optional(),
+    rtpTimeout: z.number().int().min(0).max(3600).optional(),
+    rtpHoldTimeout: z.number().int().min(0).max(3600).optional(),
     sendRpid: z.string().max(10).optional(),
     outboundProxy: z.string().max(40).optional(),
     callbackExtension: z.string().max(40).optional(),
-    timerT1: z.number().int().optional(),
-    timerB: z.number().int().optional(),
-    qualifyFreq: z.number().int().optional(),
+    timerT1: z.number().int().min(1).max(5000).optional(),
+    timerB: z.number().int().min(1).max(64000).optional(),
+    qualifyFreq: z.number().int().min(1).max(3600).optional(),
     constantsSrc: z.string().max(10).optional(),
     contactPermit: z.string().max(95).optional(),
     contactDeny: z.string().max(95).optional(),
     useReqPhone: z.string().max(10).optional(),
     textSupport: z.string().max(10).optional(),
-    faxDetect: z.string().max(10).optional(),
-    buggyMwi: z.string().max(10).optional(),
     auth: z.string().max(40).optional(),
     fullName: z.string().max(40).optional(),
     trunkName: z.string().max(40).optional(),
@@ -80,13 +76,14 @@ const sipFields = {
     mohInterpret: z.string().max(40).optional(),
     mohSuggest: z.string().max(40).optional(),
     parkingLot: z.string().max(40).optional(),
-    hasVoicemail: z.string().max(10).optional(),
     subscribeContext: z.string().max(80).optional(),
-    subscribeMwi: z.string().max(10).optional(),
-    vmExten: z.string().max(40).optional(),
     autoFraming: z.string().max(10).optional(),
-    rtpKeepalive: z.number().int().optional(),
+    rtpKeepalive: z.number().int().min(0).max(3600).optional(),
 }
+
+// md5Secret/remoteSecret são credenciais alternativas do chan_sip — graváveis só no create,
+// nunca devem voltar num GET (response) nem entrar no merge de detalhes lido do sip_peers
+const { md5Secret: _md5Secret, remoteSecret: _remoteSecret, ...sipFieldsPublic } = sipFields
 
 // ─── PJSIP-only fields (ps_endpoints + ps_aors via aor_ prefix) ──────────────
 const pjsipFields = {
@@ -101,8 +98,8 @@ const pjsipFields = {
     rtpSymmetric: z.boolean().optional(),
     sendDiversion: z.boolean().optional(),
     timers: z.string().max(40).optional(),
-    timersMinSe: z.number().int().optional(),
-    timersSessExpires: z.number().int().optional(),
+    timersMinSe: z.number().int().min(90).max(86400).optional(),
+    timersSessExpires: z.number().int().min(90).max(86400).optional(),
     language: z.string().max(10).optional(),
     oneTouchRecording: z.boolean().optional(),
     allowTransfer: z.boolean().optional(),
@@ -110,21 +107,19 @@ const pjsipFields = {
     fromUser: z.string().max(40).nullish(),
     fromDomain: z.string().max(40).nullish(),
     outboundProxy: z.string().max(40).nullish(),
-    mailboxes: z.string().max(40).nullish(),
     mohSuggest: z.string().max(40).optional(),
     rel: z.string().max(40).optional(),
     // ps_aors (aor prefix)
-    aorMaxContacts: z.number().int().optional(),
-    aorQualifyFrequency: z.number().int().optional(),
-    aorQualifyTimeout: z.number().optional(),
-    aorMinimumExpiration: z.number().int().optional(),
-    aorMaximumExpiration: z.number().int().optional(),
-    aorDefaultExpiration: z.number().int().optional(),
+    aorMaxContacts: z.number().int().min(1).max(20).optional(),
+    aorQualifyFrequency: z.number().int().min(0).max(3600).optional(),
+    aorQualifyTimeout: z.number().min(0).max(60).optional(),
+    aorMinimumExpiration: z.number().int().min(1).max(604800).optional(),
+    aorMaximumExpiration: z.number().int().min(1).max(604800).optional(),
+    aorDefaultExpiration: z.number().int().min(1).max(604800).optional(),
     aorRemoveExisting: z.boolean().optional(),
     aorAuthenticateQualify: z.boolean().optional(),
     aorSupportPath: z.boolean().optional(),
     aorOutboundProxy: z.string().max(40).nullish(),
-    aorMailboxes: z.string().max(80).nullish(),
     // user informs logical name(s), e.g. "suporte" or "suporte,financeiro"
     // service prefixes with asteriskId before writing to ps_endpoints
     namedCallGroup: z.string().max(80).optional(),
@@ -139,10 +134,78 @@ const baseShape = {
     allowOutbound: z.boolean().default(true),
 }
 
+// Defaults sensatos de chan_sip pra um ramal comum — só no create; update usa sipFields sem default
+// pra não sobrescrever quando o campo é omitido (ver sipFieldsForUpdate abaixo)
+const sipCreateDefaults = {
+    host: sipFields.host.default('dynamic'),
+    peerType: sipFields.peerType.default('friend'),
+    nat: sipFields.nat.default('force_rport,comedia'),
+    dtmfMode: sipFields.dtmfMode.default('rfc2833'),
+    directMedia: sipFields.directMedia.default('no'),
+    qualify: sipFields.qualify.default('yes'),
+    disallow: sipFields.disallow.default('all'),
+    allow: sipFields.allow.default('ulaw,alaw'),
+    insecure: sipFields.insecure.default('port,invite'),
+    transport: sipFields.transport.default('udp'),
+    callCounter: sipFields.callCounter.default('yes'),
+    allowOverlap: sipFields.allowOverlap.default('no'),
+    allowSubscribe: sipFields.allowSubscribe.default('yes'),
+    videoSupport: sipFields.videoSupport.default('no'),
+    sessionTimers: sipFields.sessionTimers.default('accept'),
+    sessionExpires: sipFields.sessionExpires.default(1800),
+    sessionMinse: sipFields.sessionMinse.default(90),
+    sessionRefresher: sipFields.sessionRefresher.default('uas'),
+    qualifyFreq: sipFields.qualifyFreq.default(60),
+    rtpKeepalive: sipFields.rtpKeepalive.default(0),
+}
+
+// Defaults espelham os @default de ps_endpoints/ps_aors no schema.prisma — só no create; update usa
+// pjsipFields sem default pra não sobrescrever quando o campo é omitido
+const pjsipCreateDefaults = {
+    transport: pjsipFields.transport.default('transport-udp'),
+    disallow: pjsipFields.disallow.default('all'),
+    allow: pjsipFields.allow.default('ulaw,alaw'),
+    directMedia: pjsipFields.directMedia.default(false),
+    dtmfMode: pjsipFields.dtmfMode.default('rfc4733'),
+    forceRport: pjsipFields.forceRport.default(true),
+    iceSupport: pjsipFields.iceSupport.default(false),
+    rewriteContact: pjsipFields.rewriteContact.default(true),
+    rtpSymmetric: pjsipFields.rtpSymmetric.default(true),
+    sendDiversion: pjsipFields.sendDiversion.default(true),
+    timers: pjsipFields.timers.default('yes'),
+    timersMinSe: pjsipFields.timersMinSe.default(90),
+    timersSessExpires: pjsipFields.timersSessExpires.default(1800),
+    language: pjsipFields.language.default('pt_BR'),
+    oneTouchRecording: pjsipFields.oneTouchRecording.default(false),
+    allowTransfer: pjsipFields.allowTransfer.default(true),
+    allowSubscribe: pjsipFields.allowSubscribe.default(true),
+    mohSuggest: pjsipFields.mohSuggest.default('default'),
+    rel: pjsipFields.rel.default('yes'),
+    aorMaxContacts: pjsipFields.aorMaxContacts.default(1),
+    aorQualifyFrequency: pjsipFields.aorQualifyFrequency.default(60),
+    aorQualifyTimeout: pjsipFields.aorQualifyTimeout.default(3),
+    aorMinimumExpiration: pjsipFields.aorMinimumExpiration.default(60),
+    aorMaximumExpiration: pjsipFields.aorMaximumExpiration.default(7200),
+    aorDefaultExpiration: pjsipFields.aorDefaultExpiration.default(3600),
+    aorRemoveExisting: pjsipFields.aorRemoveExisting.default(true),
+    aorAuthenticateQualify: pjsipFields.aorAuthenticateQualify.default(false),
+    aorSupportPath: pjsipFields.aorSupportPath.default(false),
+}
+
 export const createExtensionSchema = z.discriminatedUnion('type', [
-    z.object({ ...baseShape, type: z.literal('sip'), ...sipFields }).strict(),
-    z.object({ ...baseShape, type: z.literal('pjsip'), ...pjsipFields }).strict(),
+    z.object({ ...baseShape, type: z.literal('sip'), ...sipFields, ...sipCreateDefaults }).strict(),
+    z.object({ ...baseShape, type: z.literal('pjsip'), ...pjsipFields, ...pjsipCreateDefaults }).strict(),
 ])
+
+// accountCode é sempre = company.asteriskId, controlado 100% pelo server (ver extensions.service.ts) —
+// aceito no create (sobrescrito, então enviar é inofensivo) mas nunca editável via update.
+// md5Secret/remoteSecret: credenciais alternativas do chan_sip — editáveis só no create, nunca no update
+const {
+    accountCode: _accountCodeNotEditable,
+    md5Secret: _md5SecretNotEditable,
+    remoteSecret: _remoteSecretNotEditable,
+    ...sipFieldsForUpdate
+} = sipFields
 
 export const updateExtensionSchema = z
     .object({
@@ -150,7 +213,7 @@ export const updateExtensionSchema = z
         alias: aliasSchema.optional(),
         context: z.string().max(40).optional(),
         allowOutbound: z.boolean().optional(),
-        ...sipFields,
+        ...sipFieldsForUpdate,
         ...pjsipFields,
         // shared fields — use most permissive constraint
         language: z.string().max(40).optional(),
@@ -170,6 +233,7 @@ export const updateExtensionSchema = z
 // ─── Mapping: camelCase API → Asterisk DB column names ───────────────────────
 
 export const sipFieldMap: Record<string, string> = {
+    peerType: 'type',
     dtmfMode: 'dtmfmode',
     directMedia: 'directmedia',
     callerId: 'callerid',
@@ -198,7 +262,6 @@ export const sipFieldMap: Record<string, string> = {
     sessionExpires: 'sessionexpires',
     sessionMinse: 'sessionminse',
     sessionRefresher: 'sessionrefresher',
-    t38ptUsertpsource: 't38pt_usertpsource',
     regExten: 'regexten',
     defaultIp: 'defaultip',
     rtpTimeout: 'rtptimeout',
@@ -214,8 +277,6 @@ export const sipFieldMap: Record<string, string> = {
     contactDeny: 'contactdeny',
     useReqPhone: 'usereqphone',
     textSupport: 'textsupport',
-    faxDetect: 'faxdetect',
-    buggyMwi: 'buggymwi',
     fullName: 'fullname',
     trunkName: 'trunkname',
     cidNumber: 'cid_number',
@@ -223,10 +284,7 @@ export const sipFieldMap: Record<string, string> = {
     mohInterpret: 'mohinterpret',
     mohSuggest: 'mohsuggest',
     parkingLot: 'parkinglot',
-    hasVoicemail: 'hasvoicemail',
     subscribeContext: 'subscribecontext',
-    subscribeMwi: 'subscribemwi',
-    vmExten: 'vmexten',
     autoFraming: 'autoframing',
     rtpKeepalive: 'rtpkeepalive',
 }
@@ -258,14 +316,14 @@ export const pjsipFieldMap: Record<string, string> = {
     aorAuthenticateQualify: 'aor_authenticate_qualify',
     aorSupportPath: 'aor_support_path',
     aorOutboundProxy: 'aor_outbound_proxy',
-    aorMailboxes: 'aor_mailboxes',
     namedCallGroup: 'namedcallgroup',
     namedPickupGroup: 'namedpickupgroup',
-    accountCode: 'accountcode',
 }
 
 export const sipFieldKeys = Object.keys(sipFields)
 export const pjsipFieldKeys = Object.keys(pjsipFields)
+// Usado só na direção de leitura (GET) — exclui md5Secret/remoteSecret, ver sipFieldsPublic acima
+export const sipReadableFieldKeys = Object.keys(sipFieldsPublic)
 
 export const BATCH_LIMIT = 50
 
@@ -294,8 +352,9 @@ export type CreateExtensionInput = z.infer<typeof createExtensionSchema>
 export type CreateExtensionBatchInput = z.infer<typeof createExtensionBatchSchema>
 export type UpdateExtensionInput = z.infer<typeof updateExtensionSchema>
 
-// GET expõe todos os campos crus do sip_peers/ps_endpoints+ps_aors (menos senha — secret/md5secret/remotesecret
-// não entram em sipFields, e o password do pjsip vive só em ps_auths, nunca consultado pra esse merge)
+// GET expõe todos os campos crus do sip_peers/ps_endpoints+ps_aors (menos senha — secret nunca entra em
+// sipFields, md5Secret/remoteSecret são excluídos via sipFieldsPublic, e o password do pjsip vive só em
+// ps_auths, nunca consultado pra esse merge)
 export const ExtensionSchema = z.object({
     id: z.string(),
     alias: z.string(),
@@ -307,7 +366,7 @@ export const ExtensionSchema = z.object({
     allowOutbound: z.boolean(),
     createdAt: timestamp,
     updatedAt: timestamp,
-    ...sipFields,
+    ...sipFieldsPublic,
     ...pjsipFields,
     // sipFields/pjsipFields divergem de tipo nessas duas chaves — mesmo tratamento do updateExtensionSchema
     directMedia: z.union([z.string().max(10), z.boolean()]).optional(),
@@ -330,3 +389,17 @@ export const GetExtensionResponse = ok({ message: z.string(), extension: Extensi
 export const CreateExtensionResponse = ok({ message: z.string(), extension: ExtensionWithPasswordSchema })
 export const UpdateExtensionResponse = ok({ message: z.string(), extension: ExtensionSchema })
 export const ResetPasswordResponse = ok({ message: z.string(), password: z.string() })
+
+export const ExportExtensionSchema = z.object({
+    id: z.string(),
+    alias: z.string(),
+    username: z.string(),
+    name: z.string(),
+    type: z.enum(['sip', 'pjsip']),
+    companyId: z.string(),
+    password: z.string(),
+})
+export const ExportExtensionsResponse = ok({
+    message: z.string(),
+    extensions: z.array(ExportExtensionSchema),
+})

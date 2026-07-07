@@ -54,7 +54,11 @@ export const updateCompany = async (req: FastifyRequest, reply: FastifyReply) =>
         const { id } = idParamSchema.parse(req.params)
         const data = updateCompanySchema.parse(req.body)
         req.scope.assertAccess(id)
-        await CompaniesService.updateCompany(id, data)
+
+        // como no create: só admin pode vincular outro usuário
+        const userId = req.scope.isAdmin && data.userId ? data.userId : undefined
+
+        await CompaniesService.updateCompany(id, { ...data, userId })
         return reply.send({
             success: true,
             message: 'Company updated successfully',

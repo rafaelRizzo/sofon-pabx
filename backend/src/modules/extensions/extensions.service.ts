@@ -3,7 +3,7 @@ import { prisma } from '../../lib/prisma'
 import { getCompanyById } from '../companies/companies.service'
 import { ExtensionsCache } from './cache/extensions.cache'
 import type { CreateExtensionInput, UpdateExtensionInput } from './schemas/extension.schema'
-import { sipFieldKeys, pjsipFieldKeys, sipFieldMap, pjsipFieldMap } from './schemas/extension.schema'
+import { sipFieldKeys, sipReadableFieldKeys, pjsipFieldKeys, sipFieldMap, pjsipFieldMap } from './schemas/extension.schema'
 import { PjsipRepository } from '../../asterisk/pjsip.repository'
 import { SipRepository } from '../../asterisk/sip.repository'
 import { DialplanRepository } from '../../asterisk/dialplan.repository'
@@ -49,9 +49,9 @@ function toPjsipDbFields(data: Record<string, any>): Record<string, any> {
 }
 
 // Reverso de toSipDbFields/toPjsipDbFields — usado no GET pra devolver os campos crus do sip_peers/ps_endpoints
-// já traduzidos de volta pro nome camelCase da API. Só cobre chaves declaradas em sipFields/pjsipFields, então
-// colunas internas (secret, md5secret, id, aors, auth, accountcode...) nunca aparecem — não precisa filtrar à mão.
-const sipDbToApi: Record<string, string> = Object.fromEntries(sipFieldKeys.map((k) => [sipFieldMap[k] ?? k, k]))
+// já traduzidos de volta pro nome camelCase da API. Usa sipReadableFieldKeys (não sipFieldKeys) pra excluir
+// md5Secret/remoteSecret — colunas internas (secret, id, aors, auth, accountcode...) nunca entram em sipFields.
+const sipDbToApi: Record<string, string> = Object.fromEntries(sipReadableFieldKeys.map((k) => [sipFieldMap[k] ?? k, k]))
 const pjsipDbToApi: Record<string, string> = Object.fromEntries(pjsipFieldKeys.map((k) => [pjsipFieldMap[k] ?? k, k]))
 
 function fromDbFields(row: Record<string, any>, dbToApi: Record<string, string>): Record<string, any> {
@@ -148,35 +148,30 @@ export const getAllExtensions = async (companyIds?: string[]) => {
     if (singleCompanyId) grouped = (await ExtensionsCache.getByCompany(singleCompanyId)) as GroupedExtensions | null
     else if (isAll) grouped = (await ExtensionsCache.getAllExtensions()) as GroupedExtensions | null
 
-    if (!grouped) {
-        const extensions = await prisma.extension.findMany({
-            where: companyIds ? { companyId: { in: companyIds } } : undefined,
-            select: {
-                id: true,
-                alias: true,
-                number: true,
-                type: true,
-                name: true,
-                context: true,
-                allowOutbound: true,
-                companyId: true,
-                createdAt: true,
-                updatedAt: true,
-            },
-        })
+    if (grouped) return grouped
 
-        const mapped = extensions.map(({ number, allowOutbound, ...rest }) => ({ ...rest, allowOutbound, username: number }))
-        grouped = {
-            sip: mapped.filter((e) => e.type === 'sip'),
-            pjsip: mapped.filter((e) => e.type === 'pjsip'),
-        }
+    const extensions = await prisma.extension.findMany({
+        where: companyIds ? { companyId: { in: companyIds } } : undefined,
+        select: {
+            id: true,
+            alias: true,
+            number: true,
+            type: true,
+            name: true,
+            context: true,
+            allowOutbound: true,
+            companyId: true,
+            createdAt: true,
+            updatedAt: true,
+        },
+    })
 
-        if (singleCompanyId) await ExtensionsCache.setByCompany(singleCompanyId, grouped)
-        else if (isAll) await ExtensionsCache.setAllExtensions(grouped)
-    }
+    const mapped = extensions.map(({ number, allowOutbound, ...rest }) => ({ ...rest, allowOutbound, username: number }))
+    const sip = mapped.filter((e) => e.type === 'sip')
+    const pjsip = mapped.filter((e) => e.type === 'pjsip')
 
-    const pjsipNumbers = grouped.pjsip.map((e: any) => e.username)
-    const sipNumbers = grouped.sip.map((e: any) => e.username)
+    const pjsipNumbers = pjsip.map((e) => e.username)
+    const sipNumbers = sip.map((e) => e.username)
 
     const [pjsipSync, sipSync] = await Promise.all([
         pjsipNumbers.length > 0
@@ -190,10 +185,54 @@ export const getAllExtensions = async (companyIds?: string[]) => {
     const pjsipSynced = new Set(pjsipSync.map((e: any) => e.id))
     const sipSynced = new Set(sipSync.map((e: any) => e.name))
 
-    return {
-        sip: grouped.sip.map((e: any) => ({ ...e, synced: sipSynced.has(e.username) })),
-        pjsip: grouped.pjsip.map((e: any) => ({ ...e, synced: pjsipSynced.has(e.username) })),
+    grouped = {
+        sip: sip.map((e) => ({ ...e, synced: sipSynced.has(e.username) })),
+        pjsip: pjsip.map((e) => ({ ...e, synced: pjsipSynced.has(e.username) })),
     }
+
+    if (singleCompanyId) await ExtensionsCache.setByCompany(singleCompanyId, grouped)
+    else if (isAll) await ExtensionsCache.setAllExtensions(grouped)
+
+    return grouped
+}
+
+// Export em massa — única leitura que expõe secret/password de propósito, então nunca passa
+// pelo ExtensionsCache (que guarda o DTO público) e consulta sip_peers/ps_auths direto
+export const getExtensionsForExport = async (companyIds?: string[]) => {
+    const grouped = await getAllExtensions(companyIds)
+    const all = [...grouped.sip, ...grouped.pjsip] as Array<{
+        id: string
+        alias: string
+        username: string
+        name: string
+        type: 'sip' | 'pjsip'
+        companyId: string
+    }>
+
+    const sipUsernames = all.filter((e) => e.type === 'sip').map((e) => e.username)
+    const pjsipUsernames = all.filter((e) => e.type === 'pjsip').map((e) => e.username)
+
+    const [sipSecrets, pjsipSecrets] = await Promise.all([
+        sipUsernames.length > 0
+            ? prisma.sip_peers.findMany({ where: { name: { in: sipUsernames } }, select: { name: true, secret: true } })
+            : [],
+        pjsipUsernames.length > 0
+            ? prisma.ps_auths.findMany({ where: { id: { in: pjsipUsernames } }, select: { id: true, password: true } })
+            : [],
+    ])
+
+    const sipSecretByUsername = new Map(sipSecrets.map((s: any) => [s.name, s.secret]))
+    const pjsipSecretByUsername = new Map(pjsipSecrets.map((s: any) => [s.id, s.password]))
+
+    return all.map((e) => ({
+        id: e.id,
+        alias: e.alias,
+        username: e.username,
+        name: e.name,
+        type: e.type,
+        companyId: e.companyId,
+        password: (e.type === 'sip' ? sipSecretByUsername.get(e.username) : pjsipSecretByUsername.get(e.username)) ?? '',
+    }))
 }
 
 const extensionSelect = {
@@ -243,11 +282,17 @@ export const getExtensionDto = async (id: string): Promise<ExtensionDto> => {
 export const getExtensionById = async (id: string): Promise<ExtensionDto & { synced: boolean }> => {
     const dto = await getExtensionDto(id)
 
+    type LiveDetails = { synced: boolean } & Record<string, any>
+    const cachedLive = await ExtensionsCache.getLiveDetails<LiveDetails>(id)
+    if (cachedLive) return { ...dto, ...cachedLive }
+
     const [synced, details] = await Promise.all([
         checkAsteriskSync(dto.username, dto.type),
         getAsteriskDetails(dto.username, dto.type),
     ])
-    return { ...dto, ...details, synced }
+    const live: LiveDetails = { ...details, synced }
+    await ExtensionsCache.setLiveDetails(id, live)
+    return { ...dto, ...live }
 }
 
 export const createExtension = async (data: CreateExtensionInput) => {
@@ -396,6 +441,7 @@ export const updateExtension = async (id: string, data: UpdateExtensionInput) =>
     })
 
     await ExtensionsCache.invalidateExtension(id)
+    await ExtensionsCache.invalidateLiveDetails(id)
     await ExtensionsCache.invalidateAllExtensions()
     const updated = await getExtensionById(id)
     return provisionedPassword ? { ...updated, provisioned: true, password: provisionedPassword } : updated
@@ -429,6 +475,8 @@ export const resetExtensionPassword = async (id: string) => {
     })
 
     await ExtensionsCache.invalidateExtension(id)
+    await ExtensionsCache.invalidateLiveDetails(id)
+    await ExtensionsCache.invalidateAllExtensions()
     return { password }
 }
 
@@ -475,6 +523,7 @@ export const deleteExtension = async (id: string) => {
     })
 
     await ExtensionsCache.invalidateExtension(id)
+    await ExtensionsCache.invalidateLiveDetails(id)
     await ExtensionsCache.invalidateAllExtensions()
     return { id, alias, companyId }
 }

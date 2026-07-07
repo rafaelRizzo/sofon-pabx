@@ -51,4 +51,20 @@ export class ExtensionsCache {
         await cacheManager.invalidate(NAMESPACE)
         logger.info({ event: 'cache.invalidate', namespace: NAMESPACE, key: 'all' })
     }
+
+    static async getLiveDetails<T = unknown>(id: string) {
+        const cached = await cacheManager.get<T>(`${NAMESPACE}:live`, id)
+        logger.info({ event: cached ? 'cache.hit' : 'cache.miss', namespace: NAMESPACE, key: `live:${id}` })
+        return cached
+    }
+
+    static async setLiveDetails(id: string, data: any, config?: CacheConfig) {
+        await cacheManager.set(`${NAMESPACE}:live`, id, data, config)
+        logger.info({ event: 'cache.set', namespace: NAMESPACE, key: `live:${id}` })
+    }
+
+    static async invalidateLiveDetails(id: string) {
+        await cacheManager.invalidateByKey(`${NAMESPACE}:live:${id}`)
+        logger.info({ event: 'cache.invalidate', namespace: NAMESPACE, key: `live:${id}` })
+    }
 }

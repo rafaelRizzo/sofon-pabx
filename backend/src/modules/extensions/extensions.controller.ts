@@ -20,6 +20,23 @@ export const getAllExtensions = async (req: FastifyRequest, reply: FastifyReply)
     }
 }
 
+export const exportExtensions = async (req: FastifyRequest, reply: FastifyReply) => {
+    try {
+        const filter = extensionQuerySchema.safeParse(req.query)
+
+        if (filter.success) {
+            req.scope.assertAccess(filter.data.companyId)
+            const extensions = await ExtensionsService.getExtensionsForExport([filter.data.companyId])
+            return reply.send({ success: true, message: 'Extensions exported successfully', extensions })
+        }
+
+        const extensions = await ExtensionsService.getExtensionsForExport(req.scope.companyIds ?? undefined)
+        return reply.send({ success: true, message: 'Extensions exported successfully', extensions })
+    } catch (error) {
+        return handleError(reply, error, req)
+    }
+}
+
 export const getExtensionById = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
         const { id } = extensionIdParamSchema.parse(req.params)

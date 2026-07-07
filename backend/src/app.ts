@@ -129,8 +129,9 @@ app.register(helmet, {
     contentSecurityPolicy: false,
 })
 app.register(cors, {
-    origin: env.CORS_ORIGIN,
+    origin: env.CORS_ORIGIN.split(',').map((o) => o.trim()),
     credentials: true,
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 })
 app.register(rateLimit, {
     max: env.RATE_LIMIT_MAX,

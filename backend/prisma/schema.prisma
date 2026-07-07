@@ -10,29 +10,30 @@ datasource db {
 // ─── Application Models ───────────────────────────────────────────────────────
 
 model Company {
-    id             String          @id @default(cuid())
-    asteriskId     String          @unique @default(dbgenerated("substring(replace(gen_random_uuid()::text, '-', ''), 1, 10)")) @db.VarChar(10)
-    name           String
-    doc            String?
+    id               String            @id @default(cuid())
+    asteriskId       String            @unique @default(dbgenerated("substring(replace(gen_random_uuid()::text, '-', ''), 1, 10)")) @db.VarChar(10)
+    name             String
+    doc              String?
+    status           String            @default("active") // active | inactive | blocked
     // padrão de storage é sempre UTC (Timestamptz) — este campo só define o fuso de exibição na API
-    timezone       String          @default("America/Sao_Paulo") @db.VarChar(64)
-    metadata       Json            @default("{}")
-    createdAt      DateTime        @default(now()) @db.Timestamptz(3)
-    updatedAt      DateTime        @updatedAt @db.Timestamptz(3)
-    users          UserCompany[]
-    dids           Did[]
-    extensions     Extension[]
-    queues         Queue[]
-    trunks         Trunk[]
-    outboundRoutes OutboundRoute[]
-    timeGroups     TimeGroup[]
-    timeConditions TimeCondition[]
-    inboundRoutes  InboundRoute[]
-    announcements  Announcement[]
-    ivrMenus       IvrMenu[]
+    timezone         String            @default("America/Sao_Paulo") @db.VarChar(64)
+    metadata         Json              @default("{}")
+    createdAt        DateTime          @default(now()) @db.Timestamptz(3)
+    updatedAt        DateTime          @updatedAt @db.Timestamptz(3)
+    users            UserCompany[]
+    dids             Did[]
+    extensions       Extension[]
+    queues           Queue[]
+    trunks           Trunk[]
+    outboundRoutes   OutboundRoute[]
+    timeGroups       TimeGroup[]
+    timeConditions   TimeCondition[]
+    inboundRoutes    InboundRoute[]
+    announcements    Announcement[]
+    ivrMenus         IvrMenu[]
     requestTemplates RequestTemplate[]
-    audios         Audio[]
-    holidayGroups  HolidayGroup[]
+    audios           Audio[]
+    holidayGroups    HolidayGroup[]
 
     @@map("companies")
 }
@@ -106,30 +107,30 @@ model Extension {
 }
 
 model Queue {
-    id                String        @id @default(cuid())
-    name              String        @db.VarChar(80)
-    number            String        @db.VarChar(20)
-    companyId         String
-    company           Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
-    strategy          String        @default("ringall")
-    musicOnHold       String        @default("default")
-    timeout           Int           @default(15)
-    retry             Int           @default(5)
-    maxLen            Int           @default(0)
-    wrapupTime        Int           @default(0)
-    announce          String?
-    announceFrequency Int           @default(0)
-    joinEmpty         Boolean       @default(true)
-    leaveWhenEmpty    Boolean       @default(false)
-    weight            Int           @default(0)
-    metadata          Json          @default("{}")
+    id                   String        @id @default(cuid())
+    name                 String        @db.VarChar(80)
+    number               String        @db.VarChar(20)
+    companyId            String
+    company              Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+    strategy             String        @default("ringall")
+    musicOnHold          String        @default("default")
+    timeout              Int           @default(15)
+    retry                Int           @default(5)
+    maxLen               Int           @default(0)
+    wrapupTime           Int           @default(0)
+    announce             String?
+    announceFrequency    Int           @default(0)
+    joinEmpty            Boolean       @default(true)
+    leaveWhenEmpty       Boolean       @default(false)
+    weight               Int           @default(0)
+    metadata             Json          @default("{}")
     // Destino no dialplan quando a fila termina sem o cliente ter desligado (timeout, sem agente,
     // ou agente desliga primeiro) — route destination compartilhado (ver route-destination.schema.ts).
     // null/omitido = Hangup (comportamento atual)
     postQueueDestination Json?
-    createdAt         DateTime      @default(now()) @db.Timestamptz(3)
-    updatedAt         DateTime      @updatedAt @db.Timestamptz(3)
-    members           QueueMember[]
+    createdAt            DateTime      @default(now()) @db.Timestamptz(3)
+    updatedAt            DateTime      @updatedAt @db.Timestamptz(3)
+    members              QueueMember[]
 
     @@unique([name, companyId])
     @@unique([number, companyId])
@@ -550,29 +551,29 @@ model ps_endpoints {
 
 // CDR nativo do Asterisk (cdr_adaptive_odbc) — account_code = Company.asteriskId, setado em todo ps_endpoints/sip_peers
 model cdr {
-    id           BigInt    @id @default(autoincrement())
-    src          String?   @db.VarChar(80)
-    dst          String?   @db.VarChar(80)
-    context      String?   @db.VarChar(80) @map("dcontext")
-    callerid     String?   @db.VarChar(80) @map("clid")
-    srcChannel   String?   @db.VarChar(80) @map("channel")
-    dstChannel   String?   @db.VarChar(80) @map("dstchannel")
-    lastApp      String?   @db.VarChar(80) @map("lastapp")
-    lastData     String?   @db.VarChar(200) @map("lastdata")
+    id          BigInt    @id @default(autoincrement())
+    src         String?   @db.VarChar(80)
+    dst         String?   @db.VarChar(80)
+    context     String?   @map("dcontext") @db.VarChar(80)
+    callerid    String?   @map("clid") @db.VarChar(80)
+    srcChannel  String?   @map("channel") @db.VarChar(80)
+    dstChannel  String?   @map("dstchannel") @db.VarChar(80)
+    lastApp     String?   @map("lastapp") @db.VarChar(80)
+    lastData    String?   @map("lastdata") @db.VarChar(200)
     // sem @db.Timestamptz de propósito: o Asterisk grava esses campos com a hora LOCAL do SO (America/Sao_Paulo,
     // ver setups/install-asterisk.sh), não UTC. O driver pg lê os dígitos como se fossem UTC — qualquer código que
     // ler/filtrar por esses campos precisa compensar isso via parseNaiveLocalDate/formatNaiveLocalISOString
     // (src/utils/timezone.ts), nunca tratar como instante UTC real como os outros DateTime deste schema.
-    startTime    DateTime? @map("start")
-    answerTime   DateTime? @map("answer")
+    startTime   DateTime? @map("start")
+    answerTime  DateTime? @map("answer")
     // "end" é palavra reservada no Postgres (CASE...END) — INSERT sem aspas quebra a sintaxe, por isso o @map difere do nome real do CDR
-    endTime      DateTime? @map("endtime")
-    duration     Int?
-    billsec      Int?
-    disposition  String?   @db.VarChar(45)
-    amaflags     Int?
-    accountcode  String?   @db.VarChar(80)
-    uniqueid     String?   @db.VarChar(150)
+    endTime     DateTime? @map("endtime")
+    duration    Int?
+    billsec     Int?
+    disposition String?   @db.VarChar(45)
+    amaflags    Int?
+    accountcode String?   @db.VarChar(80)
+    uniqueid    String?   @db.VarChar(150)
 
     // composto: toda query filtra por accountcode e ordena por startTime desc — cobre WHERE+ORDER BY num único index scan
     @@index([accountcode, startTime(sort: Desc)])
@@ -608,7 +609,7 @@ model sip_peers {
     language          String? @default("pt_BR") @db.VarChar(40)
     disallow          String? @default("all") @db.VarChar(200)
     allow             String? @default("ulaw,alaw,g729") @db.VarChar(200)
-    insecure          String? @db.VarChar(40)
+    insecure          String? @default("port,invite") @db.VarChar(40)
     trustrpid         String? @db.VarChar(10)
     progressinband    String? @db.VarChar(10)
     promiscredir      String? @db.VarChar(10)

@@ -12,7 +12,8 @@ mock.module('../cache/extensions.cache', () => ({
         getAllExtensions: mock(() => null), setAllExtensions: mock(),
         getByCompany: mock(() => null), setByCompany: mock(),
         getExtension: mock(() => null), setExtension: mock(),
-        invalidateExtension: mock(), invalidateAllExtensions: mock(),
+        getLiveDetails: mock(() => null), setLiveDetails: mock(),
+        invalidateExtension: mock(), invalidateAllExtensions: mock(), invalidateLiveDetails: mock(),
     },
 }))
 mock.module('../../../asterisk/pjsip.repository', () => ({
@@ -95,6 +96,17 @@ describe('ExtensionsService.getExtensionById', () => {
         const ext = await ExtensionsService.getExtensionById('e1') as any
         expect(ext.id).toBe('e1')
         expect(typeof ext.synced).toBe('boolean')
+    })
+
+    it('serves live sip/pjsip details from cache on a hit, skipping asterisk tables', async () => {
+        db.extension.findUnique.mockResolvedValue(EXT_DB)
+        const { ExtensionsCache } = await import('../cache/extensions.cache')
+        ;(ExtensionsCache.getLiveDetails as any).mockResolvedValueOnce({ synced: true, callerid: 'cached' })
+
+        const ext = await ExtensionsService.getExtensionById('e1') as any
+
+        expect(ext).toMatchObject({ id: 'e1', synced: true, callerid: 'cached' })
+        expect(db.ps_endpoints.findUnique).not.toHaveBeenCalled()
     })
 })
 

@@ -4,6 +4,8 @@ import { timestamp, ok } from '../../../schemas/responses'
 const IANA_TIMEZONES = new Set(Intl.supportedValuesOf('timeZone'))
 const timezoneSchema = z.string().refine((tz) => IANA_TIMEZONES.has(tz), { message: 'Invalid IANA timezone' })
 
+export const companyStatusSchema = z.enum(['active', 'inactive', 'blocked'])
+
 export const idParamSchema = z.object({
     id: z.cuid2(),
 })
@@ -15,6 +17,7 @@ export const userIdParamSchema = z.object({
 export const createCompanySchema = z.object({
     name: z.string().min(1),
     doc: z.string().optional(),
+    status: companyStatusSchema.optional(),
     timezone: timezoneSchema.optional(),
     metadata: z.record(z.string(), z.string()).optional().default({}),
     userId: z.cuid2().optional(),
@@ -23,8 +26,10 @@ export const createCompanySchema = z.object({
 export const updateCompanySchema = z.object({
     name: z.string().min(1).optional(),
     doc: z.string().optional(),
+    status: companyStatusSchema.optional(),
     timezone: timezoneSchema.optional(),
     metadata: z.record(z.string(), z.string()).optional(),
+    userId: z.cuid2().optional(),
 })
 
 export type IdParam = z.infer<typeof idParamSchema>
@@ -35,6 +40,7 @@ export const CompanySchema = z.object({
     id: z.string(),
     name: z.string(),
     doc: z.string().nullable(),
+    status: companyStatusSchema,
     timezone: z.string(),
     metadata: z.record(z.string(), z.unknown()),
     createdAt: timestamp,
