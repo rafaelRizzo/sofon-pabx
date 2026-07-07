@@ -19,10 +19,10 @@ mock.module('../../../asterisk/audio.repository', () => ({
     audioSoundPath: (asteriskId: string, id: string) => `/var/lib/asterisk/sounds/${asteriskId}/${id}`,
 }))
 mock.module('../../../asterisk/announcement.repository', () => ({
-    AnnouncementRepository: { syncEntry: mock(() => Promise.resolve()), removeEntry: mock(() => Promise.resolve()), removeManyByIds: mock(() => Promise.resolve()) },
+    AnnouncementRepository: { regenerate: mock(() => Promise.resolve()) },
 }))
 mock.module('../../../asterisk/ivr.repository', () => ({
-    IvrRepository: { syncEntry: mock(() => Promise.resolve()), removeEntry: mock(() => Promise.resolve()), removeManyByIds: mock(() => Promise.resolve()) },
+    IvrRepository: { regenerate: mock(() => Promise.resolve()) },
 }))
 mock.module('../../announcements/cache/announcements.cache', () => ({
     AnnouncementsCache: {
@@ -147,8 +147,8 @@ describe('AudiosService.deleteAudio', () => {
         db.ivrMenu.findMany.mockResolvedValue([])
         await AudiosService.deleteAudio('audio1')
         expect(db.audio.delete).toHaveBeenCalledWith({ where: { id: 'audio1' } })
-        expect(AnnouncementRepository.removeEntry).not.toHaveBeenCalled()
-        expect(IvrRepository.removeEntry).not.toHaveBeenCalled()
+        expect(AnnouncementRepository.regenerate).not.toHaveBeenCalled()
+        expect(IvrRepository.regenerate).not.toHaveBeenCalled()
     })
 
     it('unlinks referencing announcements and ivr menus, removing their dialplan', async () => {
@@ -156,8 +156,8 @@ describe('AudiosService.deleteAudio', () => {
         db.announcement.findMany.mockResolvedValue([{ id: 'a1', companyId: 'c1' }])
         db.ivrMenu.findMany.mockResolvedValue([{ id: 'ivr1', companyId: 'c1' }])
         await AudiosService.deleteAudio('audio1')
-        expect(AnnouncementRepository.removeEntry).toHaveBeenCalledWith(expect.anything(), 'a1')
-        expect(IvrRepository.removeEntry).toHaveBeenCalledWith(expect.anything(), 'ivr1')
+        expect(AnnouncementRepository.regenerate).toHaveBeenCalledWith('c1')
+        expect(IvrRepository.regenerate).toHaveBeenCalledWith('c1')
         expect(db.audio.delete).toHaveBeenCalledWith({ where: { id: 'audio1' } })
     })
 

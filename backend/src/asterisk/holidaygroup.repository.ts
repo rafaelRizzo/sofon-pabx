@@ -5,10 +5,9 @@ import {
     TC_CONTEXT, tcEntry, ANNOUNCEMENT_CONTEXT, announcementExten, IVR_CONTEXT, ivrExten,
     REQUEST_TEMPLATE_CONTEXT, requestTemplateExten, HOL_CONTEXT, holEntry,
 } from './dialplan-names'
+import { resolveAsteriskId, withDialplanLock, writeContextFile, reloadDialplan, type DialplanRow } from './dialplan-file.repository'
 
 export { HOL_CONTEXT, holEntry }
-
-type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 
 const holMatched = (id: string) => `hol-${id}-matched`
 
@@ -16,19 +15,19 @@ const MONTH_CODES = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'se
 
 export type HolidayDate = { month: number; day: number }
 
-async function resolveRoute(tx: Tx, route: RouteDest): Promise<string | null> {
+async function resolveRoute(route: RouteDest): Promise<string | null> {
     if (!route) return null
 
     switch (route.type) {
         case 'extension': {
-            const ext = await tx.extension.findUnique({
+            const ext = await prisma.extension.findUnique({
                 where: { id: route.id },
                 select: { context: true, number: true },
             })
             return ext ? `${ext.context},${ext.number},1` : null
         }
         case 'queue': {
-            const q = await tx.queue.findUnique({
+            const q = await prisma.queue.findUnique({
                 where: { id: route.id },
                 select: { number: true, company: { select: { asteriskId: true } } },
             })
@@ -57,11 +56,11 @@ function buildDialplan(
     dates: HolidayDate[],
     trueAsterisk: string | null,
     falseAsterisk: string | null,
-) {
+): DialplanRow[] {
     const context = HOL_CONTEXT
     const entry = holEntry(id)
     const matched = holMatched(id)
-    const entries: { context: string; exten: string; priority: number; app: string; appdata: string | null }[] = []
+    const entries: DialplanRow[] = []
 
     entries.push({ context, exten: entry, priority: 1, app: 'NoOp', appdata: `HolidayGroup: ${name}` })
 
@@ -91,32 +90,24 @@ function buildDialplan(
 }
 
 export const HolidayGroupRepository = {
-    async create(tx: Tx, id: string, name: string, dates: HolidayDate[], trueRoute: RouteDest, falseRoute: RouteDest) {
-        const [trueAsterisk, falseAsterisk] = await Promise.all([
-            resolveRoute(tx, trueRoute),
-            resolveRoute(tx, falseRoute),
-        ])
-        const data = buildDialplan(id, name, dates, trueAsterisk, falseAsterisk)
-        if (data.length > 0) await tx.extensions.createMany({ data })
-    },
-
-    async update(tx: Tx, id: string, name: string, dates: HolidayDate[], trueRoute: RouteDest, falseRoute: RouteDest) {
-        await tx.extensions.deleteMany({ where: { context: HOL_CONTEXT, exten: { in: [holEntry(id), holMatched(id)] } } })
-        const [trueAsterisk, falseAsterisk] = await Promise.all([
-            resolveRoute(tx, trueRoute),
-            resolveRoute(tx, falseRoute),
-        ])
-        const data = buildDialplan(id, name, dates, trueAsterisk, falseAsterisk)
-        if (data.length > 0) await tx.extensions.createMany({ data })
-    },
-
-    async delete(tx: Tx, id: string) {
-        await tx.extensions.deleteMany({ where: { context: HOL_CONTEXT, exten: { in: [holEntry(id), holMatched(id)] } } })
-    },
-
-    async deleteManyByIds(tx: Tx, ids: string[]) {
-        if (ids.length === 0) return
-        const extens = ids.flatMap((id) => [holEntry(id), holMatched(id)])
-        await tx.extensions.deleteMany({ where: { context: HOL_CONTEXT, exten: { in: extens } } })
+    // Reconstrói o arquivo de dialplan da empresa inteira pra esse contexto, a partir do estado
+    // atual em banco — chamado depois de qualquer create/update/delete de HolidayGroup (fora da tx,
+    // já que é I/O de arquivo + spawn de subprocesso). Sempre consistente com o banco, mesmo se uma
+    // regeneração concorrente for perdida (a próxima chamada corrige).
+    async regenerate(companyId: string) {
+        const asteriskId = await resolveAsteriskId(companyId)
+        return withDialplanLock(`${HOL_CONTEXT}:${asteriskId}`, async () => {
+            const groups = await prisma.holidayGroup.findMany({ where: { companyId }, include: { dates: true } })
+            const entries: DialplanRow[] = []
+            for (const g of groups) {
+                const [trueAsterisk, falseAsterisk] = await Promise.all([
+                    resolveRoute(g.trueRoute as RouteDest),
+                    resolveRoute(g.falseRoute as RouteDest),
+                ])
+                entries.push(...buildDialplan(g.id, g.name, g.dates, trueAsterisk, falseAsterisk))
+            }
+            await writeContextFile(HOL_CONTEXT, asteriskId, entries)
+            await reloadDialplan()
+        })
     },
 }

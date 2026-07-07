@@ -484,39 +484,31 @@ switch => Realtime/from-trunk-routed@extensions
 exten => i,1,Noop(DID sem rota: ${EXTEN})
  same => n,Hangup(1)
 
+; queues-app, timeconditions, announcements, ivrs, holidays e request-templates são contextos
+; compartilhados de BAIXA escrita (só mudam por CRUD via API, nunca por ligação) — em vez de
+; Realtime (query no Postgres a cada Goto, pbx_realtime não tem cache), o dialplan é materializado
+; em arquivo estático por empresa em /etc/asterisk/dialplan-extra/<contexto>/<asteriskId>.conf,
+; regenerado + reload (`dialplan reload`) a cada CRUD (ver src/asterisk/dialplan-file.repository.ts).
+; `ramais`/`from-trunk-routed` continuam via Realtime (alta escrita, fora desse escopo).
+; #tryinclude (não #include) — não erra quando a empresa ainda não gerou nenhum .conf pra esse
+; contexto (glob sem match); #include exige que exista pelo menos 1 arquivo.
 [queues-app]
-; Contexto único compartilhado por todas as filas — exten gravado como <asteriskId>-<number>
-; por AsteriskQueueRepository.syncQueueAppEntry
-switch => Realtime/queues-app@extensions
+#tryinclude "dialplan-extra/queues-app/*.conf"
 
 [timeconditions]
-; Contexto único compartilhado por todas as time conditions — exten gravado como
-; tc-<tcId> (entrada) / tc-<tcId>-matched (branch true) por TimeConditionRepository.
-; Contexto dinâmico por entidade NÃO funciona nesse setup pelo mesmo motivo de
-; ramais-<asteriskId>: Asterisk só resolve realtime pra contextos declarados
-; estaticamente aqui com switch => Realtime/<contexto>@extensions.
-switch => Realtime/timeconditions@extensions
+#tryinclude "dialplan-extra/timeconditions/*.conf"
 
 [announcements]
-; Contexto único compartilhado por todos os anúncios — exten gravado como ann-<id>
-; por AnnouncementRepository (Playback + Hangup). Áudio em /var/lib/asterisk/sounds/<asteriskId>/<id>.wav
-switch => Realtime/announcements@extensions
+#tryinclude "dialplan-extra/announcements/*.conf"
 
 [ivrs]
-; Contexto único compartilhado por todos os menus de URA — exten gravado como ivr-<id>
-; por IvrRepository (Read + GotoIf, prioridades numéricas fazem o papel de labels).
-; Áudio em /var/lib/asterisk/sounds/<asteriskId>/ivr-<id>.wav
-switch => Realtime/ivrs@extensions
+#tryinclude "dialplan-extra/ivrs/*.conf"
 
 [holidays]
-; Contexto único compartilhado por todos os holiday groups — exten gravado como
-; hol-<id> (entrada) / hol-<id>-matched (branch true) por HolidayGroupRepository.
-switch => Realtime/holidays@extensions
+#tryinclude "dialplan-extra/holidays/*.conf"
 
 [request-templates]
-; Contexto único compartilhado por todos os request templates — exten gravado como
-; req-<id> (AGI + Hangup) por RequestTemplateRepository. AGI aponta pro agiUrl do template.
-switch => Realtime/request-templates@extensions
+#tryinclude "dialplan-extra/request-templates/*.conf"
 EOF
 
 # modules.conf — garante chan_sip carregado se necessário
@@ -655,6 +647,14 @@ mkdir -p /var/lib/asterisk/sounds
 chown -R asterisk:asterisk /var/lib/asterisk/sounds
 chmod 755 /var/lib/asterisk/sounds
 log "Diretório de anúncios criado → /var/lib/asterisk/sounds"
+
+# --- Dialplan estático por empresa (queues-app/timeconditions/announcements/ivrs/holidays/
+# request-templates) — arquivos gerados pela API, incluídos via #include em extensions.conf
+# (ver src/asterisk/dialplan-file.repository.ts) ---
+mkdir -p /etc/asterisk/dialplan-extra/{queues-app,timeconditions,announcements,ivrs,holidays,request-templates}
+chown -R asterisk:asterisk /etc/asterisk/dialplan-extra
+chmod 755 /etc/asterisk/dialplan-extra
+log "Diretório de dialplan estático criado → /etc/asterisk/dialplan-extra"
 
 # --- Logger: garante gravação em disco ---
 mkdir -p /var/log/asterisk

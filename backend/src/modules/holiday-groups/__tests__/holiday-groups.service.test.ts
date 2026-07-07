@@ -17,12 +17,7 @@ mock.module('../cache/holiday-groups.cache', () => ({
     },
 }))
 mock.module('../../../asterisk/holidaygroup.repository', () => ({
-    HolidayGroupRepository: {
-        create: mock(() => Promise.resolve()),
-        update: mock(() => Promise.resolve()),
-        delete: mock(() => Promise.resolve()),
-        deleteManyByIds: mock(() => Promise.resolve()),
-    },
+    HolidayGroupRepository: { regenerate: mock(() => Promise.resolve()) },
 }))
 mock.module('../providers/http.provider', () => ({
     fetchHolidaysFromUrl: mock(() => Promise.resolve(null)),

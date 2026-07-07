@@ -53,15 +53,17 @@ export async function resyncHolidayGroupFromUrl(tx: Tx, id: string, year: number
 
     await tx.holidayDate.deleteMany({ where: { holidayGroupId: id } })
     if (dates.length > 0) await tx.holidayDate.createMany({ data: dates.map((d) => ({ ...d, holidayGroupId: id })) })
-
-    await HolidayGroupRepository.update(tx, id, hg.name, dates, hg.trueRoute as RouteDest, hg.falseRoute as RouteDest)
 }
 
 export async function resyncAllHolidayGroupsFromUrl(year: number) {
-    const groups = await prisma.holidayGroup.findMany({ where: { url: { not: null } }, select: { id: true } })
+    const groups = await prisma.holidayGroup.findMany({ where: { url: { not: null } }, select: { id: true, companyId: true } })
     for (const { id } of groups) {
         await prisma.$transaction((tx) => resyncHolidayGroupFromUrl(tx, id, year))
     }
+
+    const companyIds = [...new Set(groups.map((g) => g.companyId))]
+    for (const companyId of companyIds) await HolidayGroupRepository.regenerate(companyId)
+
     if (groups.length > 0) await HolidayGroupsCache.invalidateNamespace()
     return groups.length
 }
@@ -114,11 +116,10 @@ export const createHolidayGroup = async (data: CreateHolidayGroupInput) => {
             select: holidayGroupSelect,
         })
 
-        await HolidayGroupRepository.create(tx, created.id, created.name, initialDates, data.trueRoute ?? null, data.falseRoute ?? null)
-
         return created
     })
 
+    await HolidayGroupRepository.regenerate(data.companyId)
     await HolidayGroupsCache.invalidateByCompany(data.companyId)
     return hg
 }
@@ -169,11 +170,10 @@ export const updateHolidayGroup = async (id: string, data: UpdateHolidayGroupInp
             select: holidayGroupSelect,
         })
 
-        await HolidayGroupRepository.update(tx, id, updated.name, effectiveDates, newTrue, newFalse)
-
         return updated
     })
 
+    await HolidayGroupRepository.regenerate(existing.companyId)
     await HolidayGroupsCache.invalidateHolidayGroup(id)
     await HolidayGroupsCache.invalidateByCompany(existing.companyId)
     return hg
@@ -184,10 +184,10 @@ export const deleteHolidayGroup = async (id: string) => {
     if (!existing) throw new AppError('Holiday group not found', 404)
 
     await prisma.$transaction(async (tx) => {
-        await HolidayGroupRepository.delete(tx, id)
         await tx.holidayGroup.delete({ where: { id } })
     })
 
+    await HolidayGroupRepository.regenerate(existing.companyId)
     await HolidayGroupsCache.invalidateHolidayGroup(id)
     await HolidayGroupsCache.invalidateByCompany(existing.companyId)
 }

@@ -23,30 +23,19 @@ mock.module('../../../asterisk/queue.repository', () => ({
     AsteriskQueueRepository: {
         removeMembersByInterfaces: mock(() => Promise.resolve()),
         deleteManyQueues: mock(() => Promise.resolve()),
-        removeManyQueueAppEntries: mock(() => Promise.resolve()),
     },
-    queueAppExten: (asteriskId: string, number: string) => `${asteriskId}-${number}`,
 }))
 mock.module('../../../asterisk/inboundroute.repository', () => ({
     InboundRouteRepository: { deleteMany: mock(() => Promise.resolve()) },
 }))
-mock.module('../../../asterisk/timecondition.repository', () => ({
-    TimeConditionRepository: { deleteManyByIds: mock(() => Promise.resolve()) },
-}))
-mock.module('../../../asterisk/holidaygroup.repository', () => ({
-    HolidayGroupRepository: { deleteManyByIds: mock(() => Promise.resolve()) },
+mock.module('../../../asterisk/dialplan-file.repository', () => ({
+    removeCompanyDialplanFiles: mock(() => Promise.resolve()),
 }))
 mock.module('../../holiday-groups/cache/holiday-groups.cache', () => ({
     HolidayGroupsCache: { invalidateNamespace: mock() },
 }))
-mock.module('../../../asterisk/announcement.repository', () => ({
-    AnnouncementRepository: { removeManyByIds: mock(() => Promise.resolve()) },
-}))
 mock.module('../../announcements/cache/announcements.cache', () => ({
     AnnouncementsCache: { invalidateNamespace: mock() },
-}))
-mock.module('../../../asterisk/ivr.repository', () => ({
-    IvrRepository: { removeManyByIds: mock(() => Promise.resolve()) },
 }))
 mock.module('../../ivr/cache/ivr.cache', () => ({
     IvrCache: { invalidateNamespace: mock() },
@@ -57,9 +46,6 @@ mock.module('../../../asterisk/audio.repository', () => ({
 mock.module('../../audios/cache/audios.cache', () => ({
     AudiosCache: { invalidateNamespace: mock() },
 }))
-mock.module('../../../asterisk/request-template.repository', () => ({
-    RequestTemplateRepository: { removeManyByIds: mock(() => Promise.resolve()) },
-}))
 mock.module('../../request-templates/cache/request-templates.cache', () => ({
     RequestTemplatesCache: { invalidateNamespace: mock() },
 }))
@@ -68,11 +54,7 @@ mock.module('fs/promises', () => ({ rm: mock(() => Promise.resolve()) }))
 import * as CompaniesService from '../companies.service'
 import { AsteriskQueueRepository } from '../../../asterisk/queue.repository'
 import { InboundRouteRepository } from '../../../asterisk/inboundroute.repository'
-import { TimeConditionRepository } from '../../../asterisk/timecondition.repository'
-import { HolidayGroupRepository } from '../../../asterisk/holidaygroup.repository'
-import { AnnouncementRepository } from '../../../asterisk/announcement.repository'
-import { IvrRepository } from '../../../asterisk/ivr.repository'
-import { RequestTemplateRepository } from '../../../asterisk/request-template.repository'
+import { removeCompanyDialplanFiles } from '../../../asterisk/dialplan-file.repository'
 
 const COMPANY = { id: 'c1', name: 'ACME', doc: null, asteriskId: 'ast1', timezone: 'America/Sao_Paulo', metadata: {}, createdAt: new Date(), updatedAt: new Date() }
 const USER = { id: 'u1', name: 'Admin', username: 'admin@test.com' }
@@ -169,44 +151,31 @@ describe('CompaniesService.deleteCompany', () => {
         db.queue.findMany.mockResolvedValue([])
         db.trunk.findMany.mockResolvedValue([])
         db.inboundRoute.findMany.mockResolvedValue([])
-        db.timeCondition.findMany.mockResolvedValue([])
-        db.holidayGroup.findMany.mockResolvedValue([])
         db.outboundDialPattern.findMany.mockResolvedValue([])
-        db.announcement.findMany.mockResolvedValue([])
-        db.ivrMenu.findMany.mockResolvedValue([])
-        db.requestTemplate.findMany.mockResolvedValue([])
         db.extension.deleteMany.mockResolvedValue({ count: 0 })
         db.company.delete.mockResolvedValue(COMPANY)
         await CompaniesService.deleteCompany('c1')
         expect(db.company.delete).toHaveBeenCalled()
+        expect(removeCompanyDialplanFiles).toHaveBeenCalledWith('ast1', expect.any(Array))
     })
 
-    it('cleans up orphaned Asterisk dialplan for queues-app, inbound routes, time conditions and outbound patterns', async () => {
+    it('cleans up orphaned Asterisk dialplan for queues, inbound routes and outbound patterns', async () => {
         db.company.findUnique.mockResolvedValue({ ...COMPANY, users: [] })
         db.extension.findMany.mockResolvedValue([])
         db.queue.findMany.mockResolvedValue([{ name: 'suporte', number: '100' }])
         db.trunk.findMany.mockResolvedValue([])
         db.inboundRoute.findMany.mockResolvedValue([{ trunkId: 't1', did: { number: '5511999998888' } }])
-        db.timeCondition.findMany.mockResolvedValue([{ id: 'tc1' }])
-        db.holidayGroup.findMany.mockResolvedValue([{ id: 'hol1' }])
         db.outboundDialPattern.findMany.mockResolvedValue([{ pattern: '_0.' }])
-        db.announcement.findMany.mockResolvedValue([{ id: 'ann1' }])
-        db.ivrMenu.findMany.mockResolvedValue([{ id: 'ivr1' }])
-        db.requestTemplate.findMany.mockResolvedValue([{ id: 'reqtpl1' }])
         db.extension.deleteMany.mockResolvedValue({ count: 0 })
         db.extensions.deleteMany.mockResolvedValue({ count: 0 })
         db.company.delete.mockResolvedValue(COMPANY)
 
         await CompaniesService.deleteCompany('c1')
 
-        expect(AsteriskQueueRepository.removeManyQueueAppEntries).toHaveBeenCalledWith(expect.anything(), ['ast1-100'])
+        expect(AsteriskQueueRepository.deleteManyQueues).toHaveBeenCalledWith(expect.anything(), ['ast1-suporte'])
         expect(InboundRouteRepository.deleteMany).toHaveBeenCalledWith(expect.anything(), [{ trunkId: 't1', didNumber: '5511999998888' }])
-        expect(TimeConditionRepository.deleteManyByIds).toHaveBeenCalledWith(expect.anything(), ['tc1'])
-        expect(HolidayGroupRepository.deleteManyByIds).toHaveBeenCalledWith(expect.anything(), ['hol1'])
-        expect(AnnouncementRepository.removeManyByIds).toHaveBeenCalledWith(expect.anything(), ['ann1'])
-        expect(IvrRepository.removeManyByIds).toHaveBeenCalledWith(expect.anything(), ['ivr1'])
-        expect(RequestTemplateRepository.removeManyByIds).toHaveBeenCalledWith(expect.anything(), ['reqtpl1'])
         expect(db.extensions.deleteMany).toHaveBeenCalledWith({ where: { context: 'ramais', exten: { in: ['_0.'] } } })
+        expect(removeCompanyDialplanFiles).toHaveBeenCalledWith('ast1', expect.any(Array))
     })
 
     it('throws 404 with non-existent id', async () => {

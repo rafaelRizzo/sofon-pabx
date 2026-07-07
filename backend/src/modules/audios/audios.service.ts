@@ -112,11 +112,11 @@ export const deleteAudio = async (id: string) => {
     ])
 
     await prisma.$transaction(async (tx) => {
-        for (const a of announcements) await AnnouncementRepository.removeEntry(tx, a.id)
-        for (const m of ivrMenus) await IvrRepository.removeEntry(tx, m.id)
         await tx.audio.delete({ where: { id } })
     })
 
+    if (announcements.length > 0) await AnnouncementRepository.regenerate(existing.companyId)
+    if (ivrMenus.length > 0) await IvrRepository.regenerate(existing.companyId)
     await rm(`${audioSoundPath(existing.company.asteriskId, id)}.wav`, { force: true })
 
     await Promise.all([

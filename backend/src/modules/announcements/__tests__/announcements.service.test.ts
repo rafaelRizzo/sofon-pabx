@@ -15,19 +15,16 @@ mock.module('../cache/announcements.cache', () => ({
     },
 }))
 mock.module('../../../asterisk/announcement.repository', () => ({
-    AnnouncementRepository: { syncEntry: mock(() => Promise.resolve()), removeEntry: mock(() => Promise.resolve()), removeManyByIds: mock(() => Promise.resolve()) },
-}))
-mock.module('../../../asterisk/audio.repository', () => ({
-    audioSoundDir: (asteriskId: string) => `/var/lib/asterisk/sounds/${asteriskId}`,
-    audioSoundPath: (asteriskId: string, id: string) => `/var/lib/asterisk/sounds/${asteriskId}/${id}`,
-}))
-mock.module('../../audios/audios.service', () => ({
-    assertAudioBelongsToCompany: mock(() => Promise.resolve()),
+    AnnouncementRepository: { regenerate: mock(() => Promise.resolve()) },
 }))
 
+// NÃO mockar '../../audios/audios.service' aqui: esse módulo é compartilhado (mesmo caminho
+// resolvido) com audios.service.test.ts, que precisa da implementação REAL de
+// assertAudioBelongsToCompany — um mock.module parcial nesse specifier vaza pro outro arquivo
+// quando o bun roda a suíte inteira no mesmo processo. Em vez disso, deixamos a função real rodar
+// contra o `db.audio.findUnique` já mockado abaixo.
 import * as AnnouncementsService from '../announcements.service'
 import { AnnouncementRepository } from '../../../asterisk/announcement.repository'
-import { assertAudioBelongsToCompany } from '../../audios/audios.service'
 
 const COMPANY = { id: 'c1', name: 'ACME', asteriskId: 'ast1' }
 const ANNOUNCEMENT = { id: 'a1', name: 'Fora do horário', companyId: 'c1', audioId: null, createdAt: new Date(), updatedAt: new Date() }
@@ -38,31 +35,27 @@ beforeEach(() => clearPrismaMock(db))
 describe('AnnouncementsService.createAnnouncement', () => {
     it('creates announcement without audio', async () => {
         db.company.findUnique.mockResolvedValue(COMPANY)
-        db.announcement.findUnique
-            .mockResolvedValueOnce(null) // dup check
-            .mockResolvedValueOnce({ audioId: null, company: { asteriskId: 'ast1' } }) // resync
+        db.announcement.findUnique.mockResolvedValueOnce(null) // dup check
         db.announcement.create.mockResolvedValue(ANNOUNCEMENT)
         const announcement = await AnnouncementsService.createAnnouncement({ name: 'Fora do horário', companyId: 'c1' })
         expect(announcement.hasAudio).toBe(false)
-        expect(AnnouncementRepository.syncEntry).toHaveBeenCalledWith(expect.anything(), 'a1', null, undefined)
+        expect(AnnouncementRepository.regenerate).toHaveBeenCalledWith('c1')
     })
 
     it('creates announcement with audioId and syncs dialplan', async () => {
         db.company.findUnique.mockResolvedValue(COMPANY)
-        db.announcement.findUnique
-            .mockResolvedValueOnce(null) // dup check
-            .mockResolvedValueOnce({ audioId: 'audio1', company: { asteriskId: 'ast1' } }) // resync
+        db.announcement.findUnique.mockResolvedValueOnce(null) // dup check
+        db.audio.findUnique.mockResolvedValue({ companyId: 'c1' })
         db.announcement.create.mockResolvedValue({ ...ANNOUNCEMENT, audioId: 'audio1' })
         const announcement = await AnnouncementsService.createAnnouncement({ name: 'Fora do horário', companyId: 'c1', audioId: 'audio1' })
         expect(announcement.hasAudio).toBe(true)
-        expect(assertAudioBelongsToCompany).toHaveBeenCalledWith('audio1', 'c1')
-        expect(AnnouncementRepository.syncEntry).toHaveBeenCalledWith(expect.anything(), 'a1', '/var/lib/asterisk/sounds/ast1/audio1', undefined)
+        expect(AnnouncementRepository.regenerate).toHaveBeenCalledWith('c1')
     })
 
     it('throws when audioId is invalid', async () => {
         db.company.findUnique.mockResolvedValue(COMPANY)
         db.announcement.findUnique.mockResolvedValueOnce(null)
-        ;(assertAudioBelongsToCompany as any).mockRejectedValueOnce(Object.assign(new Error('Audio not found'), { statusCode: 404 }))
+        db.audio.findUnique.mockResolvedValue(null)
         await expect(AnnouncementsService.createAnnouncement({ name: 'Fora do horário', companyId: 'c1', audioId: 'bad' }))
             .rejects.toMatchObject({ statusCode: 404 })
     })
@@ -100,23 +93,20 @@ describe('AnnouncementsService.getAnnouncementById', () => {
 // ─── updateAnnouncement ─────────────────────────────────────────────────────────
 describe('AnnouncementsService.updateAnnouncement', () => {
     it('links a new audioId and syncs dialplan', async () => {
-        db.announcement.findUnique
-            .mockResolvedValueOnce({ ...ANNOUNCEMENT }) // existing
-            .mockResolvedValueOnce({ audioId: 'audio1', company: { asteriskId: 'ast1' } }) // resync
+        db.announcement.findUnique.mockResolvedValueOnce({ ...ANNOUNCEMENT }) // existing
+        db.audio.findUnique.mockResolvedValue({ companyId: 'c1' })
         db.announcement.update.mockResolvedValue({ ...ANNOUNCEMENT, audioId: 'audio1' })
         const announcement = await AnnouncementsService.updateAnnouncement('a1', { audioId: 'audio1' })
         expect(announcement.hasAudio).toBe(true)
-        expect(AnnouncementRepository.syncEntry).toHaveBeenCalledWith(expect.anything(), 'a1', '/var/lib/asterisk/sounds/ast1/audio1', undefined)
+        expect(AnnouncementRepository.regenerate).toHaveBeenCalledWith('c1')
     })
 
     it('unlinks audioId and keeps dialplan with hangup', async () => {
-        db.announcement.findUnique
-            .mockResolvedValueOnce({ ...ANNOUNCEMENT, audioId: 'audio1' }) // existing
-            .mockResolvedValueOnce({ audioId: null, company: { asteriskId: 'ast1' } }) // resync
+        db.announcement.findUnique.mockResolvedValueOnce({ ...ANNOUNCEMENT, audioId: 'audio1' }) // existing
         db.announcement.update.mockResolvedValue({ ...ANNOUNCEMENT, audioId: null })
         const announcement = await AnnouncementsService.updateAnnouncement('a1', { audioId: null })
         expect(announcement.hasAudio).toBe(false)
-        expect(AnnouncementRepository.syncEntry).toHaveBeenCalledWith(expect.anything(), 'a1', null, undefined)
+        expect(AnnouncementRepository.regenerate).toHaveBeenCalledWith('c1')
     })
 
     it('throws 404 with non-existent id', async () => {
@@ -132,7 +122,7 @@ describe('AnnouncementsService.deleteAnnouncement', () => {
         db.announcement.findUnique.mockResolvedValue({ id: 'a1', companyId: 'c1' })
         db.announcement.delete.mockResolvedValue(ANNOUNCEMENT)
         await AnnouncementsService.deleteAnnouncement('a1')
-        expect(AnnouncementRepository.removeEntry).toHaveBeenCalledWith(expect.anything(), 'a1')
+        expect(AnnouncementRepository.regenerate).toHaveBeenCalledWith('c1')
         expect(db.announcement.delete).toHaveBeenCalledWith({ where: { id: 'a1' } })
     })
 

@@ -32,11 +32,9 @@ mock.module('../../../asterisk/queue.repository', () => ({
         removeMember: mock(() => Promise.resolve()),
         removeMembersByInterfaces: mock(() => Promise.resolve()),
         deleteManyQueues: mock(() => Promise.resolve()),
-        syncQueueAppEntry: mock(() => Promise.resolve()),
-        removeQueueAppEntry: mock(() => Promise.resolve()),
+        regenerate: mock(() => Promise.resolve()),
     },
     toAsteriskQueueName: (asteriskId: string, queueName: string) => `${asteriskId}-${queueName}`,
-    queueAppExten: (asteriskId: string, number: string) => `${asteriskId}-${number}`,
 }))
 
 import * as QueuesService from '../queues.service'
@@ -102,9 +100,7 @@ describe('QueuesService.createQueue', () => {
         await QueuesService.createQueue({
             name: 'suporte', companyId: 'c1', number: '8001', postQueueDestination: { type: 'hangup' },
         } as any)
-        expect(AsteriskQueueRepository.syncQueueAppEntry).toHaveBeenCalledWith(
-            expect.anything(), 'ast1-8001', 'ast1-suporte', { type: 'hangup' },
-        )
+        expect(AsteriskQueueRepository.regenerate).toHaveBeenCalledWith('c1')
     })
 })
 
@@ -161,10 +157,7 @@ describe('QueuesService.updateQueue', () => {
         db.queue.findUnique.mockResolvedValueOnce(existing)
         db.queue.update.mockResolvedValue({ ...existing, postQueueDestination: { type: 'hangup' } })
         await QueuesService.updateQueue('q1', { postQueueDestination: { type: 'hangup' } })
-        expect(AsteriskQueueRepository.removeQueueAppEntry).toHaveBeenCalledWith(expect.anything(), 'ast1-8000')
-        expect(AsteriskQueueRepository.syncQueueAppEntry).toHaveBeenCalledWith(
-            expect.anything(), 'ast1-8000', 'ast1-suporte', { type: 'hangup' },
-        )
+        expect(AsteriskQueueRepository.regenerate).toHaveBeenCalledWith('c1')
     })
 })
 

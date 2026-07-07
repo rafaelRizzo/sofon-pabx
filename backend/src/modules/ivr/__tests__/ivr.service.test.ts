@@ -20,24 +20,16 @@ mock.module('../../extensions/cache/extensions.cache', () => ({
     ExtensionsCache: { getExtension: mock(() => null), setExtension: mock() },
 }))
 mock.module('../../../asterisk/ivr.repository', () => ({
-    IvrRepository: {
-        syncEntry: mock(() => Promise.resolve()),
-        syncNoAudioEntry: mock(() => Promise.resolve()),
-        removeEntry: mock(() => Promise.resolve()),
-        removeManyByIds: mock(() => Promise.resolve()),
-    },
-}))
-mock.module('../../../asterisk/audio.repository', () => ({
-    audioSoundDir: (asteriskId: string) => `/var/lib/asterisk/sounds/${asteriskId}`,
-    audioSoundPath: (asteriskId: string, id: string) => `/var/lib/asterisk/sounds/${asteriskId}/${id}`,
-}))
-mock.module('../../audios/audios.service', () => ({
-    assertAudioBelongsToCompany: mock(() => Promise.resolve()),
+    IvrRepository: { regenerate: mock(() => Promise.resolve()) },
 }))
 
+// NÃO mockar '../../audios/audios.service' aqui: esse módulo é compartilhado (mesmo caminho
+// resolvido) com audios.service.test.ts, que precisa da implementação REAL de
+// assertAudioBelongsToCompany — um mock.module parcial nesse specifier vaza pro outro arquivo
+// quando o bun roda a suíte inteira no mesmo processo. Em vez disso, deixamos a função real rodar
+// contra o `db.audio.findUnique` já mockado abaixo.
 import * as IvrService from '../ivr.service'
 import { IvrRepository } from '../../../asterisk/ivr.repository'
-import { assertAudioBelongsToCompany } from '../../audios/audios.service'
 
 const COMPANY = { id: 'c1', name: 'ACME' }
 const EXT = { id: 'e1', companyId: 'c1', context: 'ramais', number: '1001' }
@@ -55,8 +47,7 @@ const MENU = {
 
 beforeEach(() => {
     clearPrismaMock(db)
-    ;(IvrRepository.syncEntry as any).mockClear()
-    ;(IvrRepository.removeEntry as any).mockClear()
+    ;(IvrRepository.regenerate as any).mockClear()
 })
 
 // ─── getIvrMenusByCompany ───────────────────────────────────────────────────────
@@ -109,9 +100,8 @@ describe('IvrService.createIvrMenu', () => {
 
     it('creates menu with audioId and syncs dialplan', async () => {
         db.company.findUnique.mockResolvedValue(COMPANY)
-        db.ivrMenu.findUnique
-            .mockResolvedValueOnce(null) // dup check
-            .mockResolvedValueOnce({ ...MENU, audioId: 'audio1' }) // resync
+        db.ivrMenu.findUnique.mockResolvedValueOnce(null) // dup check
+        db.audio.findUnique.mockResolvedValue({ companyId: 'c1' })
         db.ivrMenu.create.mockResolvedValue({ id: 'ivr1' })
         db.ivrMenu.findUniqueOrThrow.mockResolvedValue({ ...MENU, audioId: 'audio1' })
         const menu = await IvrService.createIvrMenu({
@@ -119,14 +109,13 @@ describe('IvrService.createIvrMenu', () => {
             maxDigits: 1, digitTimeout: 5, invalidRetries: 3, timeoutRetries: 3, options: [],
         }) as any
         expect(menu.hasAudio).toBe(true)
-        expect(assertAudioBelongsToCompany).toHaveBeenCalledWith('audio1', 'c1')
-        expect(IvrRepository.syncEntry).toHaveBeenCalled()
+        expect(IvrRepository.regenerate).toHaveBeenCalledWith('c1')
     })
 
     it('throws when audioId is invalid', async () => {
         db.company.findUnique.mockResolvedValue(COMPANY)
         db.ivrMenu.findUnique.mockResolvedValueOnce(null)
-        ;(assertAudioBelongsToCompany as any).mockRejectedValueOnce(Object.assign(new Error('Audio not found'), { statusCode: 404 }))
+        db.audio.findUnique.mockResolvedValue(null)
         await expect(IvrService.createIvrMenu({
             name: 'menu-principal', companyId: 'c1', audioId: 'bad',
             maxDigits: 1, digitTimeout: 5, invalidRetries: 3, timeoutRetries: 3, options: [],
@@ -212,42 +201,38 @@ describe('IvrService.createIvrMenu', () => {
 
 // ─── updateIvrMenu ──────────────────────────────────────────────────────────────
 describe('IvrService.updateIvrMenu', () => {
-    it('updates name without resyncing dialplan when audio not linked', async () => {
-        db.ivrMenu.findUnique.mockResolvedValueOnce(MENU).mockResolvedValueOnce(null).mockResolvedValueOnce(MENU)
+    it('updates name and regenerates dialplan', async () => {
+        db.ivrMenu.findUnique.mockResolvedValueOnce(MENU).mockResolvedValueOnce(null)
         db.ivrMenu.update.mockResolvedValue({ ...MENU, name: 'novo-menu' })
         const menu = await IvrService.updateIvrMenu('ivr1', { name: 'novo-menu' }) as any
         expect(menu.name).toBe('novo-menu')
-        expect(IvrRepository.syncEntry).not.toHaveBeenCalled()
+        expect(IvrRepository.regenerate).toHaveBeenCalledWith('c1')
     })
 
     it('resyncs dialplan when audio already linked', async () => {
         const withAudio = { ...MENU, audioId: 'audio1' }
-        db.ivrMenu.findUnique.mockResolvedValueOnce(withAudio).mockResolvedValueOnce(withAudio)
+        db.ivrMenu.findUnique.mockResolvedValueOnce(withAudio)
         db.ivrMenu.update.mockResolvedValue({ ...withAudio, digitTimeout: 8 })
         await IvrService.updateIvrMenu('ivr1', { digitTimeout: 8 })
-        expect(IvrRepository.syncEntry).toHaveBeenCalled()
+        expect(IvrRepository.regenerate).toHaveBeenCalledWith('c1')
     })
 
     it('links a new audioId and resyncs dialplan', async () => {
-        db.ivrMenu.findUnique
-            .mockResolvedValueOnce(MENU) // existing
-            .mockResolvedValueOnce({ ...MENU, audioId: 'audio1' }) // resync
+        db.ivrMenu.findUnique.mockResolvedValueOnce(MENU) // existing
+        db.audio.findUnique.mockResolvedValue({ companyId: 'c1' })
         db.ivrMenu.update.mockResolvedValue({ ...MENU, audioId: 'audio1' })
         const menu = await IvrService.updateIvrMenu('ivr1', { audioId: 'audio1' }) as any
         expect(menu.hasAudio).toBe(true)
-        expect(assertAudioBelongsToCompany).toHaveBeenCalledWith('audio1', 'c1')
-        expect(IvrRepository.syncEntry).toHaveBeenCalled()
+        expect(IvrRepository.regenerate).toHaveBeenCalledWith('c1')
     })
 
     it('unlinks audioId and writes hangup dialplan', async () => {
         const withAudio = { ...MENU, audioId: 'audio1' }
-        db.ivrMenu.findUnique
-            .mockResolvedValueOnce(withAudio) // existing
-            .mockResolvedValueOnce({ ...MENU, audioId: null }) // resync
+        db.ivrMenu.findUnique.mockResolvedValueOnce(withAudio) // existing
         db.ivrMenu.update.mockResolvedValue({ ...MENU, audioId: null })
         const menu = await IvrService.updateIvrMenu('ivr1', { audioId: null }) as any
         expect(menu.hasAudio).toBe(false)
-        expect(IvrRepository.syncNoAudioEntry).toHaveBeenCalledWith(expect.anything(), 'ivr1')
+        expect(IvrRepository.regenerate).toHaveBeenCalledWith('c1')
     })
 
     it('throws 404 with non-existent id', async () => {
@@ -264,7 +249,7 @@ describe('IvrService.updateIvrMenu', () => {
 
     it('replaces options and resyncs when audio already linked', async () => {
         const withAudio = { ...MENU, audioId: 'audio1' }
-        db.ivrMenu.findUnique.mockResolvedValueOnce(withAudio).mockResolvedValueOnce(withAudio)
+        db.ivrMenu.findUnique.mockResolvedValueOnce(withAudio)
         db.ivrMenu.update.mockResolvedValue(withAudio)
         db.ivrMenu.findUniqueOrThrow.mockResolvedValue({
             ...withAudio, options: [{ id: 'o1', digit: '1', destination: { type: 'extension', id: 'e1' } }],
@@ -275,16 +260,16 @@ describe('IvrService.updateIvrMenu', () => {
 
         expect(db.ivrOption.deleteMany).toHaveBeenCalledWith({ where: { ivrMenuId: 'ivr1' } })
         expect(db.ivrOption.createMany).toHaveBeenCalled()
-        expect(IvrRepository.syncEntry).toHaveBeenCalled()
+        expect(IvrRepository.regenerate).toHaveBeenCalledWith('c1')
         expect(menu.options).toHaveLength(1)
     })
 
-    it('does not resync dialplan when replacing options and audio not linked yet', async () => {
-        db.ivrMenu.findUnique.mockResolvedValueOnce(MENU).mockResolvedValueOnce(MENU)
+    it('regenerates dialplan when replacing options', async () => {
+        db.ivrMenu.findUnique.mockResolvedValueOnce(MENU)
         db.ivrMenu.update.mockResolvedValue(MENU)
         db.ivrMenu.findUniqueOrThrow.mockResolvedValue(MENU)
         await IvrService.updateIvrMenu('ivr1', { options: [] })
-        expect(IvrRepository.syncEntry).not.toHaveBeenCalled()
+        expect(IvrRepository.regenerate).toHaveBeenCalledWith('c1')
     })
 
     it('throws 404 when option destination extension not found', async () => {
@@ -302,7 +287,7 @@ describe('IvrService.deleteIvrMenu', () => {
         db.ivrMenu.findUnique.mockResolvedValue({ id: 'ivr1', companyId: 'c1' })
         db.ivrMenu.delete.mockResolvedValue(MENU)
         await IvrService.deleteIvrMenu('ivr1')
-        expect(IvrRepository.removeEntry).toHaveBeenCalledWith(expect.anything(), 'ivr1')
+        expect(IvrRepository.regenerate).toHaveBeenCalledWith('c1')
         expect(db.ivrMenu.delete).toHaveBeenCalledWith({ where: { id: 'ivr1' } })
     })
 

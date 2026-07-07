@@ -3,7 +3,6 @@ import { prisma } from '../../lib/prisma'
 import { getCompanyById } from '../companies/companies.service'
 import { IvrCache } from './cache/ivr.cache'
 import { IvrRepository } from '../../asterisk/ivr.repository'
-import { audioSoundPath } from '../../asterisk/audio.repository'
 import { assertAudioBelongsToCompany } from '../audios/audios.service'
 import { validateRouteDestination } from '../../schemas/route-destination.validate'
 import type { CreateIvrMenuInput, UpdateIvrMenuInput, IvrDest } from './schemas/ivr.schema'
@@ -30,44 +29,6 @@ const ivrMenuSelect = {
 } as const
 
 const toDto = <T extends { audioId: string | null }>(m: T) => ({ ...m, hasAudio: m.audioId !== null })
-
-type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
-
-// Reconstrói o dialplan da URA a partir do estado atual em banco — chamado dentro da mesma
-// transação sempre que name/timeouts/retries/destinos/opções/audioId mudam. Sem áudio vinculado,
-// não há o que sincronizar (mesmo comportamento de Announcement — dialplan só existe com audioId).
-async function resyncDialplan(tx: Tx, id: string) {
-    const menu = await tx.ivrMenu.findUnique({
-        where: { id },
-        select: {
-            name: true, audioId: true, maxDigits: true, digitTimeout: true,
-            invalidRetries: true, invalidDestination: true, timeoutRetries: true, timeoutDestination: true,
-            longDestination: true, company: { select: { asteriskId: true } },
-            options: { select: { digit: true, destination: true } },
-        },
-    })
-    if (!menu) return
-    if (!menu.audioId) {
-        await IvrRepository.syncNoAudioEntry(tx, id)
-        return
-    }
-
-    await IvrRepository.syncEntry(
-        tx, id,
-        {
-            name: menu.name,
-            soundPath: audioSoundPath(menu.company.asteriskId, menu.audioId),
-            maxDigits: menu.maxDigits,
-            digitTimeout: menu.digitTimeout,
-            invalidRetries: menu.invalidRetries,
-            timeoutRetries: menu.timeoutRetries,
-        },
-        menu.options as { digit: string; destination: IvrDest }[],
-        menu.invalidDestination as IvrDest,
-        menu.timeoutDestination as IvrDest,
-        menu.longDestination as IvrDest,
-    )
-}
 
 const validateDest = (dest: IvrDest | undefined | null, companyId: string, label: string) =>
     validateRouteDestination(dest ?? null, companyId, label)
@@ -134,10 +95,10 @@ export const createIvrMenu = async (data: CreateIvrMenuInput) => {
                 data: options.map((o) => ({ ivrMenuId: created.id, digit: o.digit, destination: o.destination ?? undefined })),
             })
         }
-        await resyncDialplan(tx, created.id)
         return tx.ivrMenu.findUniqueOrThrow({ where: { id: created.id }, select: ivrMenuSelect })
     })
 
+    await IvrRepository.regenerate(data.companyId)
     await IvrCache.invalidateByCompany(data.companyId)
     return toDto(menu)
 }
@@ -187,11 +148,11 @@ export const updateIvrMenu = async (id: string, data: UpdateIvrMenuInput) => {
                 })
             }
         }
-        await resyncDialplan(tx, id)
         if (data.options === undefined) return updated
         return await tx.ivrMenu.findUniqueOrThrow({ where: { id }, select: ivrMenuSelect })
     })
 
+    await IvrRepository.regenerate(existing.companyId)
     await IvrCache.invalidateMenu(id)
     await IvrCache.invalidateByCompany(existing.companyId)
     return toDto(menu)
@@ -202,10 +163,10 @@ export const deleteIvrMenu = async (id: string) => {
     if (!existing) throw new AppError('IVR menu not found', 404)
 
     await prisma.$transaction(async (tx) => {
-        await IvrRepository.removeEntry(tx, id)
         await tx.ivrMenu.delete({ where: { id } })
     })
 
+    await IvrRepository.regenerate(existing.companyId)
     await IvrCache.invalidateMenu(id)
     await IvrCache.invalidateByCompany(existing.companyId)
 }

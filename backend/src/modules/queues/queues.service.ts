@@ -3,9 +3,8 @@ import { getCompanyById } from '../companies/companies.service'
 import { QueuesCache } from './cache/queues.cache'
 import { QueueMembersCache } from '../queue-members/cache/queue-members.cache'
 import type { CreateQueueInput, UpdateQueueInput } from './schemas/queue.schema'
-import { AsteriskQueueRepository, queueAppExten, toAsteriskQueueName } from '../../asterisk/queue.repository'
+import { AsteriskQueueRepository, toAsteriskQueueName } from '../../asterisk/queue.repository'
 import { validateRouteDestination } from '../../schemas/route-destination.validate'
-import type { RouteDestination } from '../../schemas/route-destination.schema'
 import { AppError } from '../../utils/errors/app.error'
 
 const queueSelect = {
@@ -97,12 +96,10 @@ export const createQueue = async (data: CreateQueueInput) => {
             select: queueSelect,
         })
         await AsteriskQueueRepository.createQueue(tx, asteriskName, data)
-        await AsteriskQueueRepository.syncQueueAppEntry(
-            tx, queueAppExten(company.asteriskId, data.number), asteriskName, data.postQueueDestination ?? null,
-        )
         return q
     })
 
+    await AsteriskQueueRepository.regenerate(data.companyId)
     await QueuesCache.invalidateByCompany(data.companyId)
     await QueuesCache.invalidateAll()
     return queue
@@ -159,21 +156,16 @@ export const updateQueue = async (id: string, data: UpdateQueueInput) => {
     const newNumber = data.number === undefined ? existing.number : data.number
     const numberChanged = newNumber !== existing.number
     const destChanged = data.postQueueDestination !== undefined
-    const newDest = destChanged ? data.postQueueDestination! : (existing.postQueueDestination as RouteDestination)
     const needsResync = numberChanged || nameChanged || destChanged
 
     const queue = await prisma.$transaction(async (tx) => {
         if (nameChanged) await AsteriskQueueRepository.renameQueue(tx, oldAsteriskName, newAsteriskName)
         await AsteriskQueueRepository.updateQueue(tx, newAsteriskName, asteriskUpdate)
 
-        if (existing.number && needsResync)
-            await AsteriskQueueRepository.removeQueueAppEntry(tx, queueAppExten(existing.company.asteriskId, existing.number))
-        if (newNumber && needsResync)
-            await AsteriskQueueRepository.syncQueueAppEntry(tx, queueAppExten(existing.company.asteriskId, newNumber), newAsteriskName, newDest)
-
         return tx.queue.update({ where: { id }, data: appUpdate, select: queueSelect })
     })
 
+    if (needsResync) await AsteriskQueueRepository.regenerate(existing.companyId)
     await QueuesCache.invalidateQueue(id)
     await QueuesCache.invalidateByCompany(existing.companyId)
     await QueuesCache.invalidateAll()
@@ -191,10 +183,10 @@ export const deleteQueue = async (id: string) => {
 
     await prisma.$transaction(async (tx) => {
         await AsteriskQueueRepository.deleteQueue(tx, asteriskName)
-        if (existing.number) await AsteriskQueueRepository.removeQueueAppEntry(tx, queueAppExten(existing.company.asteriskId, existing.number))
         await tx.queue.delete({ where: { id } })
     })
 
+    await AsteriskQueueRepository.regenerate(existing.companyId)
     await QueuesCache.invalidateQueue(id)
     await QueueMembersCache.invalidateMembers(id)
     await QueuesCache.invalidateByCompany(existing.companyId)

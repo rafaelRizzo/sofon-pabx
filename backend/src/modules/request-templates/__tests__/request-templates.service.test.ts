@@ -17,10 +17,7 @@ mock.module('../cache/request-templates.cache', () => ({
     },
 }))
 mock.module('../../../asterisk/request-template.repository', () => ({
-    RequestTemplateRepository: {
-        syncEntry: mock(() => Promise.resolve()),
-        removeEntry: mock(() => Promise.resolve()),
-    },
+    RequestTemplateRepository: { regenerate: mock(() => Promise.resolve()) },
 }))
 
 import * as RequestTemplatesService from '../request-templates.service'
@@ -47,7 +44,7 @@ describe('RequestTemplatesService.createRequestTemplate', () => {
         } as any)
 
         expect(template.id).toBe('t1')
-        expect(RequestTemplateRepository.syncEntry).toHaveBeenCalledWith(expect.anything(), 't1', expect.stringContaining('t1'))
+        expect(RequestTemplateRepository.regenerate).toHaveBeenCalledWith('c1')
     })
 
     it('throws 404 with non-existent companyId', async () => {
@@ -113,7 +110,7 @@ describe('RequestTemplatesService.deleteRequestTemplate', () => {
         db.requestTemplate.findUnique.mockResolvedValue(TEMPLATE)
         db.requestTemplate.delete.mockResolvedValue(TEMPLATE)
         await RequestTemplatesService.deleteRequestTemplate('t1')
-        expect(RequestTemplateRepository.removeEntry).toHaveBeenCalledWith(expect.anything(), 't1')
+        expect(RequestTemplateRepository.regenerate).toHaveBeenCalledWith('c1')
         expect(db.requestTemplate.delete).toHaveBeenCalledWith({ where: { id: 't1' } })
     })
 

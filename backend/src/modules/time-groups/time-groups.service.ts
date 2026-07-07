@@ -2,7 +2,7 @@ import { prisma } from '../../lib/prisma'
 import { getCompanyById } from '../companies/companies.service'
 import { TimeGroupsCache } from './cache/time-groups.cache'
 import type { CreateTimeGroupInput, UpdateTimeGroupInput } from './schemas/time-group.schema'
-import { resyncTimeConditionDialplan } from '../time-conditions/time-conditions.service'
+import { TimeConditionRepository } from '../../asterisk/timecondition.repository'
 import { TimeConditionsCache } from '../time-conditions/cache/time-conditions.cache'
 import { AppError } from '../../utils/errors/app.error'
 
@@ -89,9 +89,6 @@ export const updateTimeGroup = async (id: string, data: UpdateTimeGroupInput) =>
         if (data.ranges) {
             await tx.timeRange.deleteMany({ where: { timeGroupId: id } })
             await tx.timeRange.createMany({ data: data.ranges.map((r) => ({ ...r, timeGroupId: id })) })
-            for (const tcId of affectedIds) {
-                await resyncTimeConditionDialplan(tx, tcId)
-            }
         }
         return tx.timeGroup.update({
             where: { id },
@@ -100,6 +97,7 @@ export const updateTimeGroup = async (id: string, data: UpdateTimeGroupInput) =>
         })
     })
 
+    if (data.ranges && affectedIds.length > 0) await TimeConditionRepository.regenerate(existing.companyId)
     for (const tcId of affectedIds) await TimeConditionsCache.invalidateTimeCondition(tcId)
     await TimeGroupsCache.invalidateTimeGroup(id)
     await TimeGroupsCache.invalidateByCompany(existing.companyId)
@@ -115,11 +113,9 @@ export const deleteTimeGroup = async (id: string) => {
 
     await prisma.$transaction(async (tx) => {
         await tx.timeGroup.delete({ where: { id } })
-        for (const tcId of affectedIds) {
-            await resyncTimeConditionDialplan(tx, tcId)
-        }
     })
 
+    if (affectedIds.length > 0) await TimeConditionRepository.regenerate(existing.companyId)
     for (const tcId of affectedIds) await TimeConditionsCache.invalidateTimeCondition(tcId)
     await TimeConditionsCache.invalidateByCompany(existing.companyId)
     await TimeGroupsCache.invalidateTimeGroup(id)

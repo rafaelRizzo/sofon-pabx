@@ -1,27 +1,27 @@
 import { prisma } from '../lib/prisma'
 import type { RouteDestination } from '../schemas/route-destination.schema'
 import { queueAppExten } from './queue.repository'
+import { audioSoundPath } from './audio.repository'
 import {
     TC_CONTEXT, tcEntry, ANNOUNCEMENT_CONTEXT, announcementExten, IVR_CONTEXT, ivrExten,
     REQUEST_TEMPLATE_CONTEXT, requestTemplateExten, HOL_CONTEXT, holEntry,
 } from './dialplan-names'
+import { resolveAsteriskId, withDialplanLock, writeContextFile, reloadDialplan, type DialplanRow } from './dialplan-file.repository'
 
 export { IVR_CONTEXT, ivrExten }
 
-type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
-
 // "context,exten,priority" para destinos fora do exten atual, ou null para hangup —
 // mesmo contrato de resolveRoute() em timecondition.repository.ts
-async function resolveTarget(tx: Tx, dest: RouteDestination): Promise<string | null> {
+async function resolveTarget(dest: RouteDestination): Promise<string | null> {
     if (!dest || dest.type === 'hangup') return null
 
     switch (dest.type) {
         case 'extension': {
-            const ext = await tx.extension.findUnique({ where: { id: dest.id }, select: { context: true, number: true } })
+            const ext = await prisma.extension.findUnique({ where: { id: dest.id }, select: { context: true, number: true } })
             return ext ? `${ext.context},${ext.number},1` : null
         }
         case 'queue': {
-            const q = await tx.queue.findUnique({
+            const q = await prisma.queue.findUnique({
                 where: { id: dest.id },
                 select: { number: true, company: { select: { asteriskId: true } } },
             })
@@ -51,13 +51,10 @@ type MenuConfig = {
     timeoutRetries: number
 }
 
-type DigitOption = { digit: string; destination: RouteDestination }
-
-type Row = { context: string; exten: string; priority: number; app: string; appdata: string | null }
-
 // Máquina de estados construída só com prioridades numéricas dentro do MESMO exten (Goto/GotoIf
 // aceitam um número puro como alvo = "essa prioridade, mesmo contexto/exten") — sem depender de
-// labels do extensions.conf, que não existem no dialplan realtime (mesma limitação de tc-<id>).
+// labels do extensions.conf, que não existem no dialplan estático gerado por entidade (mesma
+// limitação de tc-<id>).
 //
 // Read() lê até maxDigits, parando antes se o chamador pausar entre dígitos: 0 dígitos == timeout
 // (READSTATUS=TIMEOUT), 1+ dígitos == segue pro match (LEN==1 checa as opções; LEN>1 vai pro
@@ -70,7 +67,7 @@ function buildDialplan(
     invalidTarget: string | null,
     timeoutTarget: string | null,
     longTarget: string | null,
-) {
+): DialplanRow[] {
     const context = IVR_CONTEXT
     const exten = ivrExten(id)
     const K = options.length
@@ -90,7 +87,7 @@ function buildDialplan(
     const TIMEOUT_DEST = INVALID_INCR + 8
     const HANGUP = INVALID_INCR + 9
 
-    const rows: Row[] = []
+    const rows: DialplanRow[] = []
     const push = (priority: number, app: string, appdata: string | null) => rows.push({ context, exten, priority, app, appdata })
 
     push(1, 'NoOp', `IVR: ${cfg.name}`)
@@ -122,44 +119,44 @@ function buildDialplan(
 }
 
 export const IvrRepository = {
-    // IVR sem áudio vinculado — grava Hangup para evitar "invalid extension" quando a URA for
-    // usada como destino de rota antes de ter áudio configurado
-    async syncNoAudioEntry(tx: Tx, id: string) {
-        const exten = ivrExten(id)
-        await tx.extensions.deleteMany({ where: { context: IVR_CONTEXT, exten } })
-        await tx.extensions.create({ data: { context: IVR_CONTEXT, exten, priority: 1, app: 'Hangup', appdata: null } })
-    },
-
-    // soundPath: caminho absoluto SEM extensão (Read resolve o formato sozinho, igual Playback)
-    async syncEntry(
-        tx: Tx,
-        id: string,
-        cfg: MenuConfig,
-        options: DigitOption[],
-        invalidDestination: RouteDestination,
-        timeoutDestination: RouteDestination,
-        longDestination: RouteDestination,
-    ) {
-        const exten = ivrExten(id)
-        await tx.extensions.deleteMany({ where: { context: IVR_CONTEXT, exten } })
-
-        const [resolvedOptions, invalidTarget, timeoutTarget, longTarget] = await Promise.all([
-            Promise.all(options.map(async (o) => ({ digit: o.digit, target: await resolveTarget(tx, o.destination) }))),
-            resolveTarget(tx, invalidDestination),
-            resolveTarget(tx, timeoutDestination),
-            resolveTarget(tx, longDestination),
-        ])
-
-        const rows = buildDialplan(id, cfg, resolvedOptions, invalidTarget, timeoutTarget, longTarget)
-        await tx.extensions.createMany({ data: rows })
-    },
-
-    async removeEntry(tx: Tx, id: string) {
-        await tx.extensions.deleteMany({ where: { context: IVR_CONTEXT, exten: ivrExten(id) } })
-    },
-
-    async removeManyByIds(tx: Tx, ids: string[]) {
-        if (ids.length === 0) return
-        await tx.extensions.deleteMany({ where: { context: IVR_CONTEXT, exten: { in: ids.map(ivrExten) } } })
+    // Reconstrói o arquivo de dialplan da empresa inteira pra esse contexto, a partir do estado
+    // atual em banco — chamado depois de qualquer create/update/delete de IvrMenu. Menu sem áudio
+    // vinculado ainda entra no arquivo como Hangup (evita "invalid extension" se usado como destino
+    // de rota antes de ter áudio configurado).
+    async regenerate(companyId: string) {
+        const asteriskId = await resolveAsteriskId(companyId)
+        return withDialplanLock(`${IVR_CONTEXT}:${asteriskId}`, async () => {
+            const menus = await prisma.ivrMenu.findMany({
+                where: { companyId },
+                include: { options: { orderBy: { digit: 'asc' } } },
+            })
+            const entries: DialplanRow[] = []
+            for (const m of menus) {
+                if (!m.audioId) {
+                    entries.push({ context: IVR_CONTEXT, exten: ivrExten(m.id), priority: 1, app: 'Hangup', appdata: null })
+                    continue
+                }
+                const [resolvedOptions, invalidTarget, timeoutTarget, longTarget] = await Promise.all([
+                    Promise.all(m.options.map(async (o) => ({ digit: o.digit, target: await resolveTarget(o.destination as RouteDestination) }))),
+                    resolveTarget(m.invalidDestination as RouteDestination),
+                    resolveTarget(m.timeoutDestination as RouteDestination),
+                    resolveTarget(m.longDestination as RouteDestination),
+                ])
+                entries.push(...buildDialplan(
+                    m.id,
+                    {
+                        name: m.name,
+                        soundPath: audioSoundPath(asteriskId, m.audioId),
+                        maxDigits: m.maxDigits,
+                        digitTimeout: m.digitTimeout,
+                        invalidRetries: m.invalidRetries,
+                        timeoutRetries: m.timeoutRetries,
+                    },
+                    resolvedOptions, invalidTarget, timeoutTarget, longTarget,
+                ))
+            }
+            await writeContextFile(IVR_CONTEXT, asteriskId, entries)
+            await reloadDialplan()
+        })
     },
 }

@@ -16,8 +16,8 @@ mock.module('../cache/time-groups.cache', () => ({
         invalidateAll: mock(), invalidateNamespace: mock(),
     },
 }))
-mock.module('../../time-conditions/time-conditions.service', () => ({
-    resyncTimeConditionDialplan: mock(() => Promise.resolve()),
+mock.module('../../../asterisk/timecondition.repository', () => ({
+    TimeConditionRepository: { regenerate: mock(() => Promise.resolve()) },
 }))
 mock.module('../../time-conditions/cache/time-conditions.cache', () => ({
     TimeConditionsCache: { invalidateTimeCondition: mock(() => Promise.resolve()), invalidateByCompany: mock(() => Promise.resolve()) },

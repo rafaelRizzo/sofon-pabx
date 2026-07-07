@@ -5,10 +5,9 @@ import {
     TC_CONTEXT, tcEntry, ANNOUNCEMENT_CONTEXT, announcementExten, IVR_CONTEXT, ivrExten,
     REQUEST_TEMPLATE_CONTEXT, requestTemplateExten, HOL_CONTEXT, holEntry,
 } from './dialplan-names'
+import { resolveAsteriskId, withDialplanLock, writeContextFile, reloadDialplan, type DialplanRow } from './dialplan-file.repository'
 
 export { TC_CONTEXT, tcEntry }
-
-type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 
 const tcMatched = (tcId: string) => `tc-${tcId}-matched`
 
@@ -20,19 +19,19 @@ type TimeRange = {
     months:    string
 }
 
-async function resolveRoute(tx: Tx, route: RouteDest): Promise<string | null> {
+async function resolveRoute(route: RouteDest): Promise<string | null> {
     if (!route) return null
 
     switch (route.type) {
         case 'extension': {
-            const ext = await tx.extension.findUnique({
+            const ext = await prisma.extension.findUnique({
                 where: { id: route.id },
                 select: { context: true, number: true },
             })
             return ext ? `${ext.context},${ext.number},1` : null
         }
         case 'queue': {
-            const q = await tx.queue.findUnique({
+            const q = await prisma.queue.findUnique({
                 where: { id: route.id },
                 select: { number: true, company: { select: { asteriskId: true } } },
             })
@@ -61,11 +60,11 @@ function buildDialplan(
     ranges: TimeRange[],
     trueAsterisk: string | null,
     falseAsterisk: string | null,
-) {
+): DialplanRow[] {
     const context = TC_CONTEXT
     const entry = tcEntry(tcId)
     const matched = tcMatched(tcId)
-    const entries: { context: string; exten: string; priority: number; app: string; appdata: string | null }[] = []
+    const entries: DialplanRow[] = []
 
     entries.push({ context, exten: entry, priority: 1, app: 'NoOp', appdata: `TimeCondition: ${name}` })
 
@@ -96,32 +95,27 @@ function buildDialplan(
 }
 
 export const TimeConditionRepository = {
-    async create(tx: Tx, tcId: string, name: string, ranges: TimeRange[], trueRoute: RouteDest, falseRoute: RouteDest) {
-        const [trueAsterisk, falseAsterisk] = await Promise.all([
-            resolveRoute(tx, trueRoute),
-            resolveRoute(tx, falseRoute),
-        ])
-        const data = buildDialplan(tcId, name, ranges, trueAsterisk, falseAsterisk)
-        if (data.length > 0) await tx.extensions.createMany({ data })
-    },
-
-    async update(tx: Tx, tcId: string, name: string, ranges: TimeRange[], trueRoute: RouteDest, falseRoute: RouteDest) {
-        await tx.extensions.deleteMany({ where: { context: TC_CONTEXT, exten: { in: [tcEntry(tcId), tcMatched(tcId)] } } })
-        const [trueAsterisk, falseAsterisk] = await Promise.all([
-            resolveRoute(tx, trueRoute),
-            resolveRoute(tx, falseRoute),
-        ])
-        const data = buildDialplan(tcId, name, ranges, trueAsterisk, falseAsterisk)
-        if (data.length > 0) await tx.extensions.createMany({ data })
-    },
-
-    async delete(tx: Tx, tcId: string) {
-        await tx.extensions.deleteMany({ where: { context: TC_CONTEXT, exten: { in: [tcEntry(tcId), tcMatched(tcId)] } } })
-    },
-
-    async deleteManyByIds(tx: Tx, tcIds: string[]) {
-        if (tcIds.length === 0) return
-        const extens = tcIds.flatMap((id) => [tcEntry(id), tcMatched(id)])
-        await tx.extensions.deleteMany({ where: { context: TC_CONTEXT, exten: { in: extens } } })
+    // Reconstrói o arquivo de dialplan da empresa inteira pra esse contexto, a partir do estado
+    // atual em banco (TimeCondition + ranges agregados via TimeGroups vinculados) — chamado depois
+    // de qualquer create/update/delete de TimeCondition, ou de mudança num TimeGroup vinculado.
+    async regenerate(companyId: string) {
+        const asteriskId = await resolveAsteriskId(companyId)
+        return withDialplanLock(`${TC_CONTEXT}:${asteriskId}`, async () => {
+            const conditions = await prisma.timeCondition.findMany({
+                where: { companyId },
+                include: { timeGroups: { include: { timeGroup: { include: { ranges: true } } } } },
+            })
+            const entries: DialplanRow[] = []
+            for (const tc of conditions) {
+                const ranges = tc.timeGroups.flatMap((g) => g.timeGroup.ranges)
+                const [trueAsterisk, falseAsterisk] = await Promise.all([
+                    resolveRoute(tc.trueRoute as RouteDest),
+                    resolveRoute(tc.falseRoute as RouteDest),
+                ])
+                entries.push(...buildDialplan(tc.id, tc.name, ranges, trueAsterisk, falseAsterisk))
+            }
+            await writeContextFile(TC_CONTEXT, asteriskId, entries)
+            await reloadDialplan()
+        })
     },
 }

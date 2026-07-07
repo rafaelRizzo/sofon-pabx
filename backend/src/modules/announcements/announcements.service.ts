@@ -3,11 +3,9 @@ import { prisma } from '../../lib/prisma'
 import { getCompanyById } from '../companies/companies.service'
 import { AnnouncementsCache } from './cache/announcements.cache'
 import { AnnouncementRepository } from '../../asterisk/announcement.repository'
-import { audioSoundPath } from '../../asterisk/audio.repository'
 import { assertAudioBelongsToCompany } from '../audios/audios.service'
 import { validateRouteDestination } from '../../schemas/route-destination.validate'
 import type { CreateAnnouncementInput, UpdateAnnouncementInput } from './schemas/announcement.schema'
-import type { RouteDestination } from '../../schemas/route-destination.schema'
 import { AppError } from '../../utils/errors/app.error'
 
 const select = {
@@ -21,20 +19,6 @@ const select = {
 } as const
 
 const toDto = <T extends { audioId: string | null }>(a: T) => ({ ...a, hasAudio: a.audioId !== null })
-
-type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
-
-async function resyncDialplan(tx: Tx, id: string) {
-    const announcement = await tx.announcement.findUnique({
-        where: { id },
-        select: { audioId: true, destination: true, company: { select: { asteriskId: true } } },
-    })
-    if (!announcement) return
-    const soundPath = announcement.audioId
-        ? audioSoundPath(announcement.company.asteriskId, announcement.audioId)
-        : null
-    await AnnouncementRepository.syncEntry(tx, id, soundPath, announcement.destination as RouteDestination)
-}
 
 export const getAnnouncementsByCompany = async (companyId: string) => {
     const cached = await AnnouncementsCache.getByCompany(companyId)
@@ -81,10 +65,10 @@ export const createAnnouncement = async (data: CreateAnnouncementInput) => {
             },
             select,
         })
-        await resyncDialplan(tx, created.id)
         return created
     })
 
+    await AnnouncementRepository.regenerate(data.companyId)
     await AnnouncementsCache.invalidateByCompany(data.companyId)
     return toDto(announcement)
 }
@@ -113,10 +97,10 @@ export const updateAnnouncement = async (id: string, data: UpdateAnnouncementInp
             },
             select,
         })
-        await resyncDialplan(tx, id)
         return updated
     })
 
+    await AnnouncementRepository.regenerate(existing.companyId)
     await AnnouncementsCache.invalidateAnnouncement(id)
     await AnnouncementsCache.invalidateByCompany(existing.companyId)
     return toDto(announcement)
@@ -127,10 +111,10 @@ export const deleteAnnouncement = async (id: string) => {
     if (!existing) throw new AppError('Announcement not found', 404)
 
     await prisma.$transaction(async (tx) => {
-        await AnnouncementRepository.removeEntry(tx, id)
         await tx.announcement.delete({ where: { id } })
     })
 
+    await AnnouncementRepository.regenerate(existing.companyId)
     await AnnouncementsCache.invalidateAnnouncement(id)
     await AnnouncementsCache.invalidateByCompany(existing.companyId)
 }

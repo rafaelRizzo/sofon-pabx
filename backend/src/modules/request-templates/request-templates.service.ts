@@ -1,16 +1,11 @@
 import { Prisma } from '../../../generated/prisma/client'
 import { prisma } from '../../lib/prisma'
-import { validateEnv } from '../../config/env'
 import { getCompanyById } from '../companies/companies.service'
 import { RequestTemplatesCache } from './cache/request-templates.cache'
 import { RequestTemplateRepository } from '../../asterisk/request-template.repository'
 import { validateRouteDestination } from '../../schemas/route-destination.validate'
 import type { CreateRequestTemplateInput, UpdateRequestTemplateInput } from './schemas/request-template.schema'
 import { AppError } from '../../utils/errors/app.error'
-
-const env = validateEnv()
-
-const buildAgiUrl = (id: string) => `agi://${env.AGI_HOST}:${env.AGI_PORT}/run,${id}`
 
 const select = {
     id: true,
@@ -97,10 +92,10 @@ export const createRequestTemplate = async (data: CreateRequestTemplateInput) =>
             },
             select,
         })
-        await RequestTemplateRepository.syncEntry(tx, created.id, buildAgiUrl(created.id))
         return created
     })
 
+    await RequestTemplateRepository.regenerate(data.companyId)
     await RequestTemplatesCache.invalidateByCompany(data.companyId)
     await RequestTemplatesCache.invalidateAll()
     return template
@@ -147,10 +142,10 @@ export const deleteRequestTemplate = async (id: string) => {
     if (!existing) throw new AppError('Request template not found', 404)
 
     await prisma.$transaction(async (tx) => {
-        await RequestTemplateRepository.removeEntry(tx, id)
         await tx.requestTemplate.delete({ where: { id } })
     })
 
+    await RequestTemplateRepository.regenerate(existing.companyId)
     await RequestTemplatesCache.invalidateTemplate(id)
     await RequestTemplatesCache.invalidateByCompany(existing.companyId)
     await RequestTemplatesCache.invalidateAll()

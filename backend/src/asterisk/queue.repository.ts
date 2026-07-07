@@ -4,6 +4,7 @@ import {
     TC_CONTEXT, tcEntry, ANNOUNCEMENT_CONTEXT, announcementExten, IVR_CONTEXT, ivrExten,
     REQUEST_TEMPLATE_CONTEXT, requestTemplateExten, HOL_CONTEXT, holEntry,
 } from './dialplan-names'
+import { resolveAsteriskId, withDialplanLock, writeContextFile, reloadDialplan, type DialplanRow } from './dialplan-file.repository'
 
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 
@@ -14,16 +15,16 @@ export const queueAppExten = (asteriskId: string, number: string) => `${asterisk
 
 // Pra onde o cliente vai quando a fila termina sem ele ter desligado (timeout, sem agente, ou
 // agente desliga primeiro) — mesmo RouteDestination usado por Inbound Routes/Time Conditions
-async function resolvePostQueueDestination(tx: Tx, dest: RouteDestination): Promise<{ app: string; appdata: string | null }> {
+async function resolvePostQueueDestination(dest: RouteDestination): Promise<{ app: string; appdata: string | null }> {
     if (!dest || dest.type === 'hangup') return { app: 'Hangup', appdata: null }
 
     switch (dest.type) {
         case 'extension': {
-            const ext = await tx.extension.findUnique({ where: { id: dest.id }, select: { context: true, number: true } })
+            const ext = await prisma.extension.findUnique({ where: { id: dest.id }, select: { context: true, number: true } })
             return ext ? { app: 'Goto', appdata: `${ext.context},${ext.number},1` } : { app: 'Hangup', appdata: null }
         }
         case 'queue': {
-            const q = await tx.queue.findUnique({ where: { id: dest.id }, select: { number: true, company: { select: { asteriskId: true } } } })
+            const q = await prisma.queue.findUnique({ where: { id: dest.id }, select: { number: true, company: { select: { asteriskId: true } } } })
             return q?.number
                 ? { app: 'Goto', appdata: `${QUEUE_APP_CONTEXT},${queueAppExten(q.company.asteriskId, q.number)},1` }
                 : { app: 'Hangup', appdata: null }
@@ -147,23 +148,26 @@ export const AsteriskQueueRepository = {
         })
     },
 
-    async syncQueueAppEntry(tx: Tx, exten: string, asteriskName: string, postQueueDestination: RouteDestination = null) {
-        await tx.extensions.deleteMany({ where: { context: QUEUE_APP_CONTEXT, exten } })
-        const { app, appdata } = await resolvePostQueueDestination(tx, postQueueDestination)
-        await tx.extensions.createMany({
-            data: [
-                { context: QUEUE_APP_CONTEXT, exten, priority: 1, app: 'Queue', appdata: asteriskName },
-                { context: QUEUE_APP_CONTEXT, exten, priority: 2, app, appdata },
-            ],
+    // Reconstrói o arquivo de dialplan da empresa inteira pra esse contexto, a partir do estado
+    // atual em banco — chamado depois de qualquer create/update/delete de Queue (nome, número ou
+    // postQueueDestination). exten de cada fila é `<asteriskId>-<number>` (queueAppExten).
+    async regenerate(companyId: string) {
+        const asteriskId = await resolveAsteriskId(companyId)
+        return withDialplanLock(`${QUEUE_APP_CONTEXT}:${asteriskId}`, async () => {
+            const queues = await prisma.queue.findMany({ where: { companyId } })
+            const entries: DialplanRow[] = []
+            for (const q of queues) {
+                if (!q.number) continue
+                const exten = queueAppExten(asteriskId, q.number)
+                const asteriskName = toAsteriskQueueName(asteriskId, q.name)
+                const { app, appdata } = await resolvePostQueueDestination(q.postQueueDestination as RouteDestination)
+                entries.push(
+                    { context: QUEUE_APP_CONTEXT, exten, priority: 1, app: 'Queue', appdata: asteriskName },
+                    { context: QUEUE_APP_CONTEXT, exten, priority: 2, app, appdata },
+                )
+            }
+            await writeContextFile(QUEUE_APP_CONTEXT, asteriskId, entries)
+            await reloadDialplan()
         })
-    },
-
-    async removeQueueAppEntry(tx: Tx, exten: string) {
-        await tx.extensions.deleteMany({ where: { context: QUEUE_APP_CONTEXT, exten } })
-    },
-
-    async removeManyQueueAppEntries(tx: Tx, extens: string[]) {
-        if (extens.length > 0)
-            await tx.extensions.deleteMany({ where: { context: QUEUE_APP_CONTEXT, exten: { in: extens } } })
     },
 }

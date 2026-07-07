@@ -20,12 +20,7 @@ mock.module('../../extensions/cache/extensions.cache', () => ({
     ExtensionsCache: { getExtension: mock(() => null), setExtension: mock() },
 }))
 mock.module('../../../asterisk/timecondition.repository', () => ({
-    TimeConditionRepository: {
-        create: mock(() => Promise.resolve()),
-        update: mock(() => Promise.resolve()),
-        delete: mock(() => Promise.resolve()),
-        deleteManyByIds: mock(() => Promise.resolve()),
-    },
+    TimeConditionRepository: { regenerate: mock(() => Promise.resolve()) },
 }))
 
 import * as TimeConditionsService from '../time-conditions.service'

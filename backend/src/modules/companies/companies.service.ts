@@ -8,16 +8,15 @@ import { IvrCache } from '../ivr/cache/ivr.cache'
 import { AudiosCache } from '../audios/cache/audios.cache'
 import { PjsipRepository } from '../../asterisk/pjsip.repository'
 import { SipRepository } from '../../asterisk/sip.repository'
-import { AsteriskQueueRepository, queueAppExten } from '../../asterisk/queue.repository'
+import { AsteriskQueueRepository, QUEUE_APP_CONTEXT } from '../../asterisk/queue.repository'
 import { InboundRouteRepository } from '../../asterisk/inboundroute.repository'
-import { TimeConditionRepository } from '../../asterisk/timecondition.repository'
-import { HolidayGroupRepository } from '../../asterisk/holidaygroup.repository'
-import { AnnouncementRepository } from '../../asterisk/announcement.repository'
-import { IvrRepository } from '../../asterisk/ivr.repository'
 import { audioSoundDir } from '../../asterisk/audio.repository'
-import { RequestTemplateRepository } from '../../asterisk/request-template.repository'
+import { removeCompanyDialplanFiles } from '../../asterisk/dialplan-file.repository'
+import { TC_CONTEXT, HOL_CONTEXT, ANNOUNCEMENT_CONTEXT, IVR_CONTEXT, REQUEST_TEMPLATE_CONTEXT } from '../../asterisk/dialplan-names'
 import { RequestTemplatesCache } from '../request-templates/cache/request-templates.cache'
 import { HolidayGroupsCache } from '../holiday-groups/cache/holiday-groups.cache'
+
+const DIALPLAN_FILE_CONTEXTS = [TC_CONTEXT, HOL_CONTEXT, ANNOUNCEMENT_CONTEXT, IVR_CONTEXT, REQUEST_TEMPLATE_CONTEXT, QUEUE_APP_CONTEXT]
 import type { CreateCompanyInput, UpdateCompanyInput } from './schemas/company.schema'
 import { AppError } from '../../utils/errors/app.error'
 
@@ -123,7 +122,7 @@ export const deleteCompany = async (id: string) => {
         throw new AppError('Company not found', 404)
     }
 
-    const [extensions, queues, trunks, inboundRoutes, timeConditions, holidayGroups, outboundPatterns, announcements, ivrMenus, requestTemplates] = await Promise.all([
+    const [extensions, queues, trunks, inboundRoutes, outboundPatterns] = await Promise.all([
         prisma.extension.findMany({
             where: { companyId: id },
             select: { number: true, type: true },
@@ -140,29 +139,9 @@ export const deleteCompany = async (id: string) => {
             where: { companyId: id },
             select: { trunkId: true, did: { select: { number: true } } },
         }),
-        prisma.timeCondition.findMany({
-            where: { companyId: id },
-            select: { id: true },
-        }),
-        prisma.holidayGroup.findMany({
-            where: { companyId: id },
-            select: { id: true },
-        }),
         prisma.outboundDialPattern.findMany({
             where: { route: { companyId: id } },
             select: { pattern: true },
-        }),
-        prisma.announcement.findMany({
-            where: { companyId: id },
-            select: { id: true },
-        }),
-        prisma.ivrMenu.findMany({
-            where: { companyId: id },
-            select: { id: true },
-        }),
-        prisma.requestTemplate.findMany({
-            where: { companyId: id },
-            select: { id: true },
         }),
     ])
 
@@ -170,7 +149,6 @@ export const deleteCompany = async (id: string) => {
     const sipNumbers = extensions.filter((e) => e.type === 'sip').map((e) => e.number)
     const asteriskInterfaces = extensions.map((e) => `${e.type.toUpperCase()}/${e.number}`)
     const asteriskQueueNames = queues.map((q) => `${existing.asteriskId}-${q.name}`)
-    const queueAppExtens = queues.map((q) => queueAppExten(existing.asteriskId, q.number))
 
     const trunkIds = trunks.map((t) => `${existing.asteriskId}-trunk-${t.name}`)
     const trunkOutboundIds = trunks
@@ -178,23 +156,12 @@ export const deleteCompany = async (id: string) => {
         .map((t) => `${existing.asteriskId}-trunk-${t.name}`)
 
     const inboundRoutesForCleanup = inboundRoutes.map((r) => ({ trunkId: r.trunkId, didNumber: r.did.number }))
-    const timeConditionIds = timeConditions.map((tc) => tc.id)
-    const holidayGroupIds = holidayGroups.map((hg) => hg.id)
     const outboundPatternValues = outboundPatterns.map((p) => p.pattern)
-    const announcementIds = announcements.map((a) => a.id)
-    const ivrMenuIds = ivrMenus.map((m) => m.id)
-    const requestTemplateIds = requestTemplates.map((r) => r.id)
 
     await prisma.$transaction(async (tx) => {
         await AsteriskQueueRepository.removeMembersByInterfaces(tx, asteriskInterfaces)
         await AsteriskQueueRepository.deleteManyQueues(tx, asteriskQueueNames)
-        await AsteriskQueueRepository.removeManyQueueAppEntries(tx, queueAppExtens)
         await InboundRouteRepository.deleteMany(tx, inboundRoutesForCleanup)
-        await TimeConditionRepository.deleteManyByIds(tx, timeConditionIds)
-        await HolidayGroupRepository.deleteManyByIds(tx, holidayGroupIds)
-        await AnnouncementRepository.removeManyByIds(tx, announcementIds)
-        await IvrRepository.removeManyByIds(tx, ivrMenuIds)
-        await RequestTemplateRepository.removeManyByIds(tx, requestTemplateIds)
         if (outboundPatternValues.length > 0)
             await tx.extensions.deleteMany({ where: { context: 'ramais', exten: { in: outboundPatternValues } } })
         await PjsipRepository.deleteManyByIds(tx, [...pjsipNumbers, ...trunkIds], trunkOutboundIds)
@@ -203,8 +170,9 @@ export const deleteCompany = async (id: string) => {
         await tx.company.delete({ where: { id } })
     })
 
-    // pasta de áudios da empresa — fora do banco, best-effort após o commit
+    // pasta de áudios + arquivos de dialplan da empresa — fora do banco, best-effort após o commit
     await rm(audioSoundDir(existing.asteriskId), { recursive: true, force: true })
+    await removeCompanyDialplanFiles(existing.asteriskId, DIALPLAN_FILE_CONTEXTS)
 
     await Promise.all([
         CompaniesCache.invalidateCompany(id),
