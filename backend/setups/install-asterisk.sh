@@ -507,6 +507,16 @@ switch => Realtime/announcements@extensions
 ; por IvrRepository (Read + GotoIf, prioridades numéricas fazem o papel de labels).
 ; Áudio em /var/lib/asterisk/sounds/<asteriskId>/ivr-<id>.wav
 switch => Realtime/ivrs@extensions
+
+[holidays]
+; Contexto único compartilhado por todos os holiday groups — exten gravado como
+; hol-<id> (entrada) / hol-<id>-matched (branch true) por HolidayGroupRepository.
+switch => Realtime/holidays@extensions
+
+[request-templates]
+; Contexto único compartilhado por todos os request templates — exten gravado como
+; req-<id> (AGI + Hangup) por RequestTemplateRepository. AGI aponta pro agiUrl do template.
+switch => Realtime/request-templates@extensions
 EOF
 
 # modules.conf — garante chan_sip carregado se necessário
