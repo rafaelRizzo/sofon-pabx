@@ -27,6 +27,22 @@ const envSchema = z.object({
     // announcements, ivrs, holidays, queues-app, request-templates). Default é o caminho real do
     // Asterisk — testes de integração sobrescrevem via .env.test pra um dir gravável sem Asterisk instalado.
     DIALPLAN_EXTRA_DIR: z.string().default('/etc/asterisk/dialplan-extra'),
+}).superRefine((cfg, ctx) => {
+    // Em produção os defaults públicos de JWT_SECRET/REFRESH_SECRET são inaceitáveis (tokens forjáveis
+    // por quem lê o repo). Exige segredos próprios, fortes e distintos — só falha em produção pra não
+    // atrapalhar dev/test.
+    if (cfg.NODE_ENV !== 'production') return
+    const check = (key: 'JWT_SECRET' | 'REFRESH_SECRET') => {
+        const v = cfg[key]
+        if (!v || v.length < 32 || v.startsWith('your-')) {
+            ctx.addIssue({ code: z.ZodIssueCode.custom, path: [key], message: `${key} must be a strong custom secret (>= 32 chars) in production` })
+        }
+    }
+    check('JWT_SECRET')
+    check('REFRESH_SECRET')
+    if (cfg.JWT_SECRET === cfg.REFRESH_SECRET) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['REFRESH_SECRET'], message: 'REFRESH_SECRET must differ from JWT_SECRET' })
+    }
 })
 
 export type Env = z.infer<typeof envSchema>

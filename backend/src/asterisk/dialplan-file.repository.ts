@@ -26,16 +26,23 @@ export async function resolveAsteriskId(companyId: string): Promise<string> {
 // autoincrementa a prioridade) — equivalente ao par (app,appdata) que ia pra cada coluna da tabela
 // `extensions`. appdata já vem pronto como argumento único da app (pode conter vírgulas — a app é
 // quem parseia o próprio appdata, igual acontecia lendo a coluna via Realtime).
+// Asterisk lê o .conf linha a linha — um \r ou \n dentro de exten/app/appdata quebraria pra uma nova
+// diretiva de dialplan (ex: nome de IVR/TimeCondition/Holiday com newline injetaria System()/AGI =
+// RCE no host). Remove caracteres de controle aqui como defesa central, independente da origem do valor.
+const stripControl = (s: string) => s.replace(/[\x00-\x1f\x7f]/g, '')
+
 function renderEntries(entries: DialplanRow[]): string {
     const lines: string[] = []
     let currentExten: string | null = null
     for (const e of entries) {
-        const appdata = e.appdata ?? ''
-        if (e.exten !== currentExten) {
-            lines.push(`exten => ${e.exten},1,${e.app}(${appdata})`)
-            currentExten = e.exten
+        const exten = stripControl(e.exten)
+        const app = stripControl(e.app)
+        const appdata = stripControl(e.appdata ?? '')
+        if (exten !== currentExten) {
+            lines.push(`exten => ${exten},1,${app}(${appdata})`)
+            currentExten = exten
         } else {
-            lines.push(` same => n,${e.app}(${appdata})`)
+            lines.push(` same => n,${app}(${appdata})`)
         }
     }
     return lines.length > 0 ? lines.join('\n') + '\n' : ''

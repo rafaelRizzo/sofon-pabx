@@ -12,7 +12,7 @@ export const idParamSchema = z.object({ id: cuidParam })
 export const companyQuerySchema = z.object({ companyId: z.cuid2() })
 
 export const createTimeConditionSchema = z.object({
-    name:       z.string().min(1).max(80),
+    name:       z.string().min(1).max(80).regex(/^[^\x00-\x1f\x7f]*$/, 'Nome não pode conter caracteres de controle'),
     companyId:  z.cuid2(),
     trueRoute:  routeDestSchema.optional(),
     falseRoute: routeDestSchema.optional(),
@@ -20,7 +20,7 @@ export const createTimeConditionSchema = z.object({
 })
 
 export const updateTimeConditionSchema = z.object({
-    name:       z.string().min(1).max(80).optional(),
+    name:       z.string().min(1).max(80).regex(/^[^\x00-\x1f\x7f]*$/, 'Nome não pode conter caracteres de controle').optional(),
     trueRoute:  routeDestSchema.optional(),
     falseRoute: routeDestSchema.optional(),
 }).refine((d) => Object.keys(d).length > 0, { message: 'At least one field is required: name, trueRoute, falseRoute' })

@@ -3,6 +3,7 @@ import * as UsersService from './users.service'
 import { createUserSchema, updateUserSchema, idParamSchema } from './schemas/user.schema'
 import { handleError } from '../../utils/errors/handler.error'
 import { AppError } from '../../utils/errors/app.error'
+import { prisma } from '../../lib/prisma'
 
 const assertSelfOrAdmin = (req: FastifyRequest, id: string) => {
     if (!req.scope.isAdmin && req.user!.id !== id) {
@@ -43,8 +44,13 @@ export const createUser = async (req: FastifyRequest, reply: FastifyReply) => {
         const { role: requesterRole, id: requesterId } = req.user!
         const data = createUserSchema.parse(req.body)
 
-        if (requesterRole === 'reseller') {
-            if (data.role !== 'user') throw new AppError('Resellers can only create users with role "user"', 403)
+        // só admin/reseller criam usuários; não-admin só cria role "user" —
+        // sem isso, um "user" comum criava admin via POST /users (escalação de privilégio)
+        if (requesterRole !== 'admin' && requesterRole !== 'reseller') {
+            throw new AppError('Forbidden', 403)
+        }
+        if (requesterRole !== 'admin' && data.role !== 'user') {
+            throw new AppError('Resellers can only create users with role "user"', 403)
         }
 
         const createdBy = requesterRole !== 'admin' ? requesterId : undefined
@@ -62,6 +68,15 @@ export const updateUser = async (req: FastifyRequest, reply: FastifyReply) => {
         assertSelfOrAdmin(req, id)
 
         const data = updateUserSchema.parse(req.body)
+
+        // extensionId governa pause/unpause em filas — não-admin não pode vincular ramal fora do seu
+        // escopo de empresa (IDOR). Admin (companyIds null) pode qualquer um.
+        if (data.extensionId && !req.scope.isAdmin) {
+            const ext = await prisma.extension.findUnique({ where: { id: data.extensionId }, select: { companyId: true } })
+            if (!ext) throw new AppError('Extension not found', 404)
+            req.scope.assertAccess(ext.companyId)
+        }
+
         await UsersService.updateUser(id, data)
 
         return reply.send({

@@ -1,6 +1,7 @@
 import { prisma } from '../lib/prisma'
 import { logger } from '../utils/logger'
 import { resolveRouteDestinationToDialplan } from './route-destination-resolver'
+import { assertSafeUrl } from '../utils/net/safe-url'
 import type { RouteDestination } from '../schemas/route-destination.schema'
 import type { VariableMapping } from '../modules/request-templates/schemas/request-template.schema'
 
@@ -135,6 +136,8 @@ async function handleRequestTemplate(conn: AgiConn, templateId: string) {
     let parsed: unknown = null
 
     try {
+        // SSRF: só libera http/https pra host externo (bloqueia loopback/privado/link-local/metadata)
+        await assertSafeUrl(url)
         const controller = new AbortController()
         const timeout = setTimeout(() => controller.abort(), template.timeoutMs)
         try {

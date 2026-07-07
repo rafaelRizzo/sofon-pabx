@@ -19,7 +19,7 @@ const ivrOptionsSchema = z.array(z.object({
 )
 
 export const createIvrMenuSchema = z.object({
-    name:               z.string().min(1).max(80),
+    name:               z.string().min(1).max(80).regex(/^[^\x00-\x1f\x7f]*$/, 'Nome não pode conter caracteres de controle'),
     companyId:          z.cuid2(),
     audioId:            z.cuid2().optional().describe('id de um Audio (POST /audios) já enviado — sem ele o menu fica sem dialplan até vincular um depois'),
     maxDigits:          z.number().int().min(1).max(20).default(1),
@@ -33,7 +33,7 @@ export const createIvrMenuSchema = z.object({
 })
 
 export const updateIvrMenuSchema = z.object({
-    name:               z.string().min(1).max(80).optional(),
+    name:               z.string().min(1).max(80).regex(/^[^\x00-\x1f\x7f]*$/, 'Nome não pode conter caracteres de controle').optional(),
     audioId:            z.cuid2().nullable().optional(),
     maxDigits:          z.number().int().min(1).max(20).optional(),
     digitTimeout:       z.number().int().min(1).max(60).optional(),

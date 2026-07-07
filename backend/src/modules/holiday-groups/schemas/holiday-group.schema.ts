@@ -16,7 +16,7 @@ const holidayDateSchema = z.object({
 })
 
 export const createHolidayGroupSchema = z.object({
-    name:       z.string().min(1).max(80),
+    name:       z.string().min(1).max(80).regex(/^[^\x00-\x1f\x7f]*$/, 'Nome não pode conter caracteres de controle'),
     companyId:  z.cuid2(),
     url:        z.string().min(1).max(500).optional(),
     trueRoute:  routeDestSchema.optional(),
@@ -28,7 +28,7 @@ export const createHolidayGroupSchema = z.object({
 })
 
 export const updateHolidayGroupSchema = z.object({
-    name:       z.string().min(1).max(80).optional(),
+    name:       z.string().min(1).max(80).regex(/^[^\x00-\x1f\x7f]*$/, 'Nome não pode conter caracteres de controle').optional(),
     url:        z.union([z.string().min(1).max(500), z.null()]).optional(),
     trueRoute:  routeDestSchema.optional(),
     falseRoute: routeDestSchema.optional(),

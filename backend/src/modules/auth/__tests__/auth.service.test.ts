@@ -5,8 +5,15 @@ const db = createPrismaMock()
 
 mock.module('../../../lib/prisma', () => ({ prisma: db }))
 mock.module('../../../lib/jwt', () => ({
-    generateTokens: mock(() => Promise.resolve({ token: 'access-token', refreshToken: 'refresh-token' })),
-    verifyRefreshToken: mock(() => ({ id: 'user-id', role: 'admin', jti: 'jti-1' })),
+    generateTokens: mock(() => Promise.resolve({ token: 'access-token', refreshToken: 'refresh-token', refreshJti: 'jti-2' })),
+    verifyRefreshToken: mock(() => ({ id: 'user-id', role: 'admin', jti: 'jti-1', type: 'refresh' })),
+}))
+mock.module('../../../lib/jti', () => ({
+    jtiManager: {
+        exists: mock(() => Promise.resolve(true)),
+        revoke: mock(() => Promise.resolve()),
+        add: mock(() => Promise.resolve()),
+    },
 }))
 
 import * as AuthService from '../auth.service'

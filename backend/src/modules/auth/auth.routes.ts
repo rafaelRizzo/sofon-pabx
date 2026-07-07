@@ -6,10 +6,15 @@ import { loginSchema, TokenResponse, LogoutResponse } from './schemas/auth.schem
 import { createUserSchema } from '../users/schemas/user.schema'
 import { errors } from '../../schemas/responses'
 
+// Throttle agressivo em auth: barra brute-force/credential-stuffing (o rate limit global de 1000/s
+// é frouxo demais pra endpoints de credencial).
+const authRateLimit = { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }
+
 export const authRoutes = async (app: FastifyInstance) => {
     const router = app.withTypeProvider<ZodTypeProvider>()
 
     router.post('/auth/register', {
+        ...authRateLimit,
         schema: {
             tags: ['Auth'],
             summary: 'Registrar primeiro usuário',
@@ -23,6 +28,7 @@ export const authRoutes = async (app: FastifyInstance) => {
     }, AuthController.register as any)
 
     router.post('/auth/login', {
+        ...authRateLimit,
         schema: {
             tags: ['Auth'],
             summary: 'Login',
@@ -36,6 +42,7 @@ export const authRoutes = async (app: FastifyInstance) => {
     }, AuthController.login as any)
 
     router.post('/auth/refresh', {
+        ...authRateLimit,
         schema: {
             tags: ['Auth'],
             summary: 'Renovar access token',

@@ -72,6 +72,15 @@ export const logout = async (req: FastifyRequest, reply: FastifyReply) => {
             }
         }
 
+        // revoga também o JTI do refresh (cookie) — senão o refresh sobreviveria ao logout por 7 dias
+        const refreshToken = req.cookies.refreshToken
+        if (refreshToken) {
+            const decodedRefresh = jwt.decode(refreshToken) as { jti?: string }
+            if (decodedRefresh?.jti) {
+                await jtiManager.revoke(decodedRefresh.jti)
+            }
+        }
+
         reply.clearCookie('refreshToken', { path: '/' })
 
         return reply.status(200).send({

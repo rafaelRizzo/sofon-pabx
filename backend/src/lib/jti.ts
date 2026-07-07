@@ -54,8 +54,8 @@ export const jtiManager = {
 
     revokeByUserId: async (userId: string) => {
         try {
-            const keys = await redisClient.keys(`${JTI_PREFIX}*`)
-            for (const key of keys) {
+            // SCAN (não-bloqueante) em vez de KEYS — KEYS trava o Redis em O(N) sob escala
+            for await (const key of redisClient.scanIterator({ MATCH: `${JTI_PREFIX}*`, COUNT: 100 })) {
                 const val = await redisClient.get(key)
                 if (val === userId) {
                     await redisClient.del(key)
