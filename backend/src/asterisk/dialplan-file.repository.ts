@@ -2,6 +2,7 @@ import { mkdir, rename, rm, writeFile } from 'fs/promises'
 import { dirname } from 'path'
 import { prisma } from '../lib/prisma'
 import { logger } from '../utils/logger'
+import { validateEnv } from '../config/env'
 
 // Materializa o dialplan de contextos compartilhados de baixa escrita (holidays, timeconditions,
 // announcements, ivrs, queues-app, request-templates) em arquivo estático por empresa, em vez de
@@ -9,7 +10,8 @@ import { logger } from '../utils/logger'
 // direto no Postgres a cada ligação. Como essas entidades só mudam via CRUD (nunca por chamada),
 // materializar em arquivo elimina a query em tempo de chamada. `ramais`/`from-trunk-routed` continuam
 // via Realtime (alta escrita, fora do escopo).
-export const DIALPLAN_EXTRA_DIR = '/etc/asterisk/dialplan-extra'
+const env = validateEnv()
+export const DIALPLAN_EXTRA_DIR = env.DIALPLAN_EXTRA_DIR
 
 export type DialplanRow = { context: string; exten: string; priority: number; app: string; appdata: string | null }
 
@@ -78,11 +80,16 @@ export function reloadDialplan(): Promise<void> {
     if (pendingReload) return pendingReload
     pendingReload = new Promise((resolve) => {
         setTimeout(async () => {
-            const proc = Bun.spawn(['asterisk', '-rx', 'dialplan reload'], { stdout: 'pipe', stderr: 'pipe' })
-            const [exitCode, stderr] = await Promise.all([proc.exited, new Response(proc.stderr).text()])
-            if (exitCode !== 0) logger.warn({ event: 'dialplan.reload.failed', exitCode, stderr: stderr.trim() })
-            pendingReload = null
-            resolve()
+            try {
+                const proc = Bun.spawn(['asterisk', '-rx', 'dialplan reload'], { stdout: 'pipe', stderr: 'pipe' })
+                const [exitCode, stderr] = await Promise.all([proc.exited, new Response(proc.stderr).text()])
+                if (exitCode !== 0) logger.warn({ event: 'dialplan.reload.failed', exitCode, stderr: stderr.trim() })
+            } catch (error) {
+                logger.warn({ event: 'dialplan.reload.failed', error: error instanceof Error ? error.message : String(error) })
+            } finally {
+                pendingReload = null
+                resolve()
+            }
         }, RELOAD_DEBOUNCE_MS)
     })
     return pendingReload

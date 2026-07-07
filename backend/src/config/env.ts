@@ -23,6 +23,10 @@ const envSchema = z.object({
     // AGI(agi://AGI_HOST:AGI_PORT/run,<requestTemplateId>) ao executar um RouteDestination type: "request"
     AGI_HOST: z.string().default('127.0.0.1'),
     AGI_PORT: z.coerce.number().default(4573),
+    // Diretório onde dialplan-file.repository.ts materializa os contextos estáticos (timeconditions,
+    // announcements, ivrs, holidays, queues-app, request-templates). Default é o caminho real do
+    // Asterisk — testes de integração sobrescrevem via .env.test pra um dir gravável sem Asterisk instalado.
+    DIALPLAN_EXTRA_DIR: z.string().default('/etc/asterisk/dialplan-extra'),
 })
 
 export type Env = z.infer<typeof envSchema>
