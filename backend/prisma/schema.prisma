@@ -162,7 +162,9 @@ model Trunk {
     companyId        String
     company          Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
     registrationMode String               @db.VarChar(10)
+    identifyBy       String?              @db.VarChar(10) // "ip" | "username" — só p/ registrationMode inbound
     host             String?              @db.VarChar(255)
+    port             Int?
     username         String?              @db.VarChar(80)
     password         String?              @db.VarChar(80)
     context          String               @default("from-trunk") @db.VarChar(40)

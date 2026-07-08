@@ -22,7 +22,9 @@ const trunkSelect = {
     name: true,
     companyId: true,
     registrationMode: true,
+    identifyBy: true,
     host: true,
+    port: true,
     username: true,
     password: true,
     context: true,
@@ -65,8 +67,10 @@ export const createTrunk = async (data: CreateTrunkInput) => {
     if (existing) throw new AppError('Trunk already exists for this company', 409)
 
     const astId = toAsteriskId(company.asteriskId, data.name)
-    const password = data.password ?? generatePassword()
-    const username = data.username ?? astId
+    const identifyBy = data.registrationMode === 'inbound' ? (data.username ? 'username' : 'ip') : null
+    const hasAuth = data.registrationMode === 'outbound' || identifyBy === 'username'
+    const username = hasAuth ? (data.username ?? astId) : null
+    const password = hasAuth ? (data.password ?? generatePassword()) : null
 
     await prisma.$transaction(async (tx) => {
         const created = await tx.trunk.create({
@@ -74,7 +78,9 @@ export const createTrunk = async (data: CreateTrunkInput) => {
                 name: data.name,
                 companyId: data.companyId,
                 registrationMode: data.registrationMode,
+                identifyBy,
                 host: data.registrationMode === 'outbound' ? data.host : (data.host ?? null),
+                port: data.port ?? null,
                 username,
                 password,
                 codecs: data.codecs,
@@ -87,12 +93,14 @@ export const createTrunk = async (data: CreateTrunkInput) => {
         await tx.trunk.update({ where: { id: created.id }, data: { context: TRUNK_ENTRY_CONTEXT } })
 
         await PjsipRepository.createTrunk(tx, astId, {
-            username,
-            password,
+            username: username ?? undefined,
+            password: password ?? undefined,
             context: TRUNK_ENTRY_CONTEXT,
             codecs: data.codecs,
             registrationMode: data.registrationMode,
+            identifyBy,
             host: data.host,
+            port: data.port,
             setvar: `TRUNKID=${created.id}`,
             accountcode: company.asteriskId,
         })
@@ -114,6 +122,25 @@ export const updateTrunk = async (id: string, data: UpdateTrunkInput) => {
     })
     if (!existing) throw new AppError('Trunk not found', 404)
 
+    if (existing.registrationMode === 'outbound' && data.username === null)
+        throw new AppError('Tronco outbound exige username', 400)
+
+    const existingIdentifyBy = existing.identifyBy as 'ip' | 'username' | null
+    let identifyBy = existingIdentifyBy
+    const trunkUpdate: Record<string, any> = { ...data }
+
+    if (existing.registrationMode === 'inbound') {
+        if (data.username === null) {
+            identifyBy = 'ip'
+            trunkUpdate.username = null
+            trunkUpdate.password = null
+        } else if (data.username) {
+            identifyBy = 'username'
+            trunkUpdate.password = data.password ?? existing.password ?? generatePassword()
+        }
+        if (identifyBy !== existingIdentifyBy) trunkUpdate.identifyBy = identifyBy
+    }
+
     const astId = toAsteriskId(existing.company.asteriskId, existing.name)
 
     const maxInChanged = 'maxInChannels' in data && data.maxInChannels !== existing.maxInChannels
@@ -122,11 +149,16 @@ export const updateTrunk = async (id: string, data: UpdateTrunkInput) => {
     await prisma.$transaction(async (tx) => {
         await PjsipRepository.updateTrunk(tx, astId, {
             ...data,
+            username: trunkUpdate.username,
+            password: trunkUpdate.password,
             registrationMode: existing.registrationMode,
+            identifyBy,
+            existingIdentifyBy,
             existingHost: existing.host,
+            existingPort: existing.port,
             existingUsername: existing.username,
         })
-        await tx.trunk.update({ where: { id }, data })
+        await tx.trunk.update({ where: { id }, data: trunkUpdate })
 
         if (maxInChanged) {
             const newMax = data.maxInChannels ?? null
@@ -162,6 +194,7 @@ export const deleteTrunk = async (id: string) => {
     if (!existing) throw new AppError('Trunk not found', 404)
 
     const astId = toAsteriskId(existing.company.asteriskId, existing.name)
+    const endpointId = existing.identifyBy === 'username' && existing.username ? existing.username : astId
 
     const inboundRoutes = await prisma.inboundRoute.findMany({
         where: { trunkId: id },
@@ -175,7 +208,7 @@ export const deleteTrunk = async (id: string) => {
         for (const ir of inboundRoutes) {
             await InboundRouteRepository.delete(tx, id, ir.did.number)
         }
-        await PjsipRepository.deleteTrunk(tx, astId, existing.registrationMode)
+        await PjsipRepository.deleteTrunk(tx, astId, existing.registrationMode, endpointId)
         await tx.trunk.delete({ where: { id } })
         for (const routeId of affectedOutboundRouteIds) {
             await resyncAllPatterns(tx, routeId)

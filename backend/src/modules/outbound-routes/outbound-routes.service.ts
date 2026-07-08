@@ -243,7 +243,7 @@ export const createOutboundRoute = async (data: CreateOutboundRouteInput) => {
     const company = await getCompanyById(data.companyId)
 
     const trunks = await prisma.trunk.findMany({
-        where: { id: { in: data.trunkIds }, companyId: data.companyId },
+        where: { id: { in: data.trunkIds }, companyId: data.companyId, registrationMode: 'outbound' },
         select: { id: true, name: true, maxOutChannels: true },
     })
     if (trunks.length !== data.trunkIds.length) throw new AppError('One or more trunks not found', 404)
@@ -318,7 +318,7 @@ export const updateOutboundRoute = async (id: string, data: UpdateOutboundRouteI
 
     if (trunkIds) {
         const trunks = await prisma.trunk.findMany({
-            where: { id: { in: trunkIds }, companyId: existing.companyId },
+            where: { id: { in: trunkIds }, companyId: existing.companyId, registrationMode: 'outbound' },
             select: { id: true },
         })
         if (trunks.length !== trunkIds.length) throw new AppError('One or more trunks not found', 404)
@@ -459,7 +459,7 @@ export const setTrunks = async (routeId: string, data: SetTrunksInput) => {
     if (!route) throw new AppError('Outbound route not found', 404)
 
     const trunks = await prisma.trunk.findMany({
-        where: { id: { in: data.trunkIds }, companyId: route.companyId },
+        where: { id: { in: data.trunkIds }, companyId: route.companyId, registrationMode: 'outbound' },
         select: { id: true, name: true },
     })
     if (trunks.length !== data.trunkIds.length) throw new AppError('One or more trunks not found', 404)

@@ -37,7 +37,10 @@ beforeAll(async () => {
     companyId = company.id
 
     const trunk = await prisma.trunk.create({
-        data: { name: `tk${TS.slice(-8)}`, companyId, registrationMode: 'inbound' },
+        data: {
+            name: `tk${TS.slice(-8)}`, companyId, registrationMode: 'outbound',
+            host: '127.0.0.1', username: `tk${TS.slice(-8)}`, password: 'test-password-123',
+        },
     })
     trunkId = trunk.id
 

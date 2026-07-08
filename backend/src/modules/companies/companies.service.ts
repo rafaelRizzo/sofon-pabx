@@ -168,7 +168,7 @@ export const deleteCompany = async (id: string) => {
         }),
         prisma.trunk.findMany({
             where: { companyId: id },
-            select: { name: true, registrationMode: true },
+            select: { name: true, registrationMode: true, identifyBy: true, username: true },
         }),
         prisma.inboundRoute.findMany({
             where: { companyId: id },
@@ -189,6 +189,9 @@ export const deleteCompany = async (id: string) => {
     const trunkOutboundIds = trunks
         .filter((t) => t.registrationMode === 'outbound')
         .map((t) => `${existing.asteriskId}-trunk-${t.name}`)
+    const trunkUsernameEndpointIds = trunks
+        .filter((t) => t.identifyBy === 'username' && t.username)
+        .map((t) => t.username as string)
 
     const inboundRoutesForCleanup = inboundRoutes.map((r) => ({ trunkId: r.trunkId, didNumber: r.did.number }))
     const outboundPatternValues = outboundPatterns.map((p) => p.pattern)
@@ -199,7 +202,7 @@ export const deleteCompany = async (id: string) => {
         await InboundRouteRepository.deleteMany(tx, inboundRoutesForCleanup)
         if (outboundPatternValues.length > 0)
             await tx.extensions.deleteMany({ where: { context: 'ramais', exten: { in: outboundPatternValues } } })
-        await PjsipRepository.deleteManyByIds(tx, [...pjsipNumbers, ...trunkIds], trunkOutboundIds)
+        await PjsipRepository.deleteManyByIds(tx, [...pjsipNumbers, ...trunkIds], trunkOutboundIds, trunkUsernameEndpointIds)
         await SipRepository.deleteManyByNames(tx, sipNumbers)
         await tx.extension.deleteMany({ where: { companyId: id } })
         await tx.company.delete({ where: { id } })

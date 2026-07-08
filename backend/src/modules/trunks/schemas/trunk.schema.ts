@@ -13,9 +13,12 @@ const baseTrunkShape = {
     maxOutChannels: z.number().int().min(1).optional(),
 }
 
+const portShape = { port: z.number().int().min(1).max(65535).optional() }
+
 export const createTrunkSchema = z.discriminatedUnion('registrationMode', [
     z.object({
         ...baseTrunkShape,
+        ...portShape,
         registrationMode: z.literal('outbound'),
         host: z.string().min(1).max(255),
         username: z.string().min(1).max(80),
@@ -23,6 +26,7 @@ export const createTrunkSchema = z.discriminatedUnion('registrationMode', [
     }),
     z.object({
         ...baseTrunkShape,
+        ...portShape,
         registrationMode: z.literal('inbound'),
         host: z.string().min(1).max(255).optional(),
         username: z.string().min(1).max(80).optional(),
@@ -32,7 +36,8 @@ export const createTrunkSchema = z.discriminatedUnion('registrationMode', [
 
 export const updateTrunkSchema = z.object({
     host: z.string().min(1).max(255).optional(),
-    username: z.string().min(1).max(80).optional(),
+    port: z.number().int().min(1).max(65535).nullable().optional(),
+    username: z.string().min(1).max(80).nullable().optional(),
     password: z.string().min(1).max(80).optional(),
     codecs: z.string().max(200).optional(),
     maxInChannels: z.number().int().min(1).nullable().optional(),
@@ -50,7 +55,9 @@ export const TrunkSchema = z.object({
     name: z.string(),
     companyId: z.string(),
     registrationMode: z.enum(['outbound', 'inbound']),
+    identifyBy: z.enum(['ip', 'username']).nullable(),
     host: z.string().nullable(),
+    port: z.number().nullable(),
     username: z.string().nullable(),
     password: z.string().nullable(),
     context: z.string(),
