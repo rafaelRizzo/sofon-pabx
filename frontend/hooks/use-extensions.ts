@@ -31,7 +31,6 @@ export type Extension = {
     updatedAt: string
     // SIP optional
     host?: string
-    port?: string
     peerType?: string
     nat?: string
     qualify?: string
@@ -70,7 +69,6 @@ const optFloat = z.preprocess(
 // Campos SIP opcionais (espelha o backend)
 const sipOptional = {
     host: z.string().max(40).optional(),
-    port: z.string().max(6).optional(),
     peerType: z.enum(["friend", "peer", "user"]).optional(),
     nat: z.string().max(40).optional(),
     qualify: z.string().max(10).optional(),

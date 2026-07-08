@@ -11,6 +11,8 @@ import { ExtensionsTable } from "@/components/Extensions/extensions-table"
 import { PageHeader } from "@/components/page-header"
 import {
     AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
     AlertDialogContent,
     AlertDialogDescription,
     AlertDialogFooter,
@@ -61,6 +63,8 @@ export default function ExtensionsPage() {
     const [createOpen, setCreateOpen] = useState(false)
     const [editExtension, setEditExtension] = useState<Extension | null>(null)
     const [deleteTarget, setDeleteTarget] = useState<Extension | null>(null)
+    const [resetTarget, setResetTarget] = useState<Extension | null>(null)
+    const [resetting, setResetting] = useState(false)
     const [passwordReveal, setPasswordReveal] =
         useState<PasswordReveal | null>(null)
     const [typeFilter, setTypeFilter] = useState<ExtensionType | "all">("all")
@@ -92,14 +96,18 @@ export default function ExtensionsPage() {
         return updateExtension(editExtension.id, form)
     }
 
-    const handleResetPassword = async (ext: Extension) => {
-        const password = await resetPassword(ext.id)
+    const handleConfirmResetPassword = async () => {
+        if (!resetTarget) return
+        setResetting(true)
+        const password = await resetPassword(resetTarget.id)
+        setResetting(false)
         if (password) {
             setPasswordReveal({
-                alias: ext.alias,
-                username: ext.username,
+                alias: resetTarget.alias,
+                username: resetTarget.username,
                 password,
             })
+            setResetTarget(null)
         }
     }
 
@@ -197,7 +205,7 @@ export default function ExtensionsPage() {
                 companies={companies}
                 loading={loading}
                 onEdit={setEditExtension}
-                onResetPassword={handleResetPassword}
+                onResetPassword={setResetTarget}
                 onDelete={setDeleteTarget}
             />
 
@@ -237,6 +245,37 @@ export default function ExtensionsPage() {
                 }
                 onConfirm={handleDelete}
             />
+
+            <AlertDialog
+                open={!!resetTarget}
+                onOpenChange={(open) => {
+                    if (!open && !resetting) setResetTarget(null)
+                }}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Resetar senha</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Tem certeza que deseja resetar a senha do ramal{" "}
+                            <strong>
+                                {resetTarget?.alias} — {resetTarget?.name}
+                            </strong>
+                            ? A senha atual deixará de funcionar.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={resetting}>
+                            Cancelar
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            disabled={resetting}
+                            onClick={handleConfirmResetPassword}
+                        >
+                            {resetting ? "Resetando..." : "Resetar"}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
 
             <AlertDialog
                 open={!!passwordReveal}

@@ -136,7 +136,6 @@ function SipSections({ r, c }: { r: any; c: any }) {
                 <AccordionContent>
                     <G2>
                         <StrInput label="Host" name="host" register={r} />
-                        <StrInput label="Porta" name="port" register={r} />
                         <Field>
                             <FieldLabel>Tipo de peer</FieldLabel>
                             <Controller
@@ -740,21 +739,21 @@ const TYPES = [
 
 type Props =
     | {
-          open: boolean
-          onOpenChange: (open: boolean) => void
-          extension: null
-          companies: Company[]
-          onCreate: (form: ExtensionCreateForm) => Promise<any>
-          onUpdate?: never
-      }
+        open: boolean
+        onOpenChange: (open: boolean) => void
+        extension: null
+        companies: Company[]
+        onCreate: (form: ExtensionCreateForm) => Promise<any>
+        onUpdate?: never
+    }
     | {
-          open: boolean
-          onOpenChange: (open: boolean) => void
-          extension: Extension | string
-          companies: Company[]
-          onCreate?: never
-          onUpdate: (form: ExtensionUpdateForm) => Promise<boolean>
-      }
+        open: boolean
+        onOpenChange: (open: boolean) => void
+        extension: Extension | string
+        companies: Company[]
+        onCreate?: never
+        onUpdate: (form: ExtensionUpdateForm) => Promise<boolean>
+    }
 
 export function ExtensionFormDialog({
     open,
@@ -1067,7 +1066,7 @@ export function ExtensionFormDialog({
                             {isEdit && extensionData && (
                                 <Field>
                                     <FieldLabel>Usuário SIP</FieldLabel>
-                                    <div className="rounded-md border bg-muted px-3 py-2 font-mono text-sm select-all">
+                                    <div className="flex h-7 items-center rounded-md border border-input bg-input/20 px-2 font-mono text-sm select-all dark:bg-input/30">
                                         {extensionData.username}
                                     </div>
                                 </Field>
@@ -1127,12 +1126,10 @@ export function ExtensionFormDialog({
                                 </Field>
                             )}
 
-                            <G2>
-                                <Field>
-                                    <FieldLabel>Contexto</FieldLabel>
-                                    <Input {...r("context")} />
-                                </Field>
-                            </G2>
+                            <Field>
+                                <FieldLabel>Contexto</FieldLabel>
+                                <Input {...r("context")} />
+                            </Field>
 
                             <Controller
                                 control={control}
@@ -1181,8 +1178,8 @@ export function ExtensionFormDialog({
                                 ? "Salvando..."
                                 : "Criando..."
                             : isEdit
-                              ? "Salvar"
-                              : "Criar"}
+                                ? "Salvar"
+                                : "Criar"}
                     </Button>
                 </DialogFooter>
             </DialogContent>

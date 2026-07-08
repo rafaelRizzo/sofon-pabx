@@ -75,6 +75,11 @@ export const createCompany = async ({ userId, ...data }: Omit<CreateCompanyInput
         throw new AppError('User not found', 404)
     }
 
+    if (data.doc) {
+        const existing = await prisma.company.findUnique({ where: { name_doc: { name: data.name, doc: data.doc } } })
+        if (existing) throw new AppError('Company with this name and document already exists', 409)
+    }
+
     const company = await prisma.$transaction(async (tx) => {
         const created = await tx.company.create({
             data,
@@ -107,6 +112,13 @@ export const updateCompany = async (id: string, { userId, ...data }: UpdateCompa
         if (!user) {
             throw new AppError('User not found', 404)
         }
+    }
+
+    const name = data.name ?? existing.name
+    const doc = data.doc !== undefined ? data.doc : existing.doc
+    if (doc && (name !== existing.name || doc !== existing.doc)) {
+        const conflict = await prisma.company.findUnique({ where: { name_doc: { name, doc } } })
+        if (conflict && conflict.id !== id) throw new AppError('Company with this name and document already exists', 409)
     }
 
     const company = await prisma.$transaction(async (tx) => {

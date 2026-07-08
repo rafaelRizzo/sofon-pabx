@@ -19,6 +19,12 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table"
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { type Company } from "@/hooks/use-companies"
 import { type Extension } from "@/hooks/use-extensions"
 
@@ -52,7 +58,9 @@ export function ExtensionsTable({
                         <TableHead>Tipo</TableHead>
                         <TableHead>Empresa</TableHead>
                         <TableHead className="text-center">Saída</TableHead>
-                        <TableHead className="w-30" />
+                        <TableHead className="w-30 text-right">
+                            Ações
+                        </TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -106,38 +114,75 @@ export function ExtensionsTable({
                                     )}
                                 </TableCell>
                                 <TableCell>
-                                    <div className="flex justify-end gap-1">
-                                        <Button
-                                            variant="outline"
-                                            size="icon"
-                                            onClick={() => onEdit(ext)}
-                                        >
-                                            <PencilIcon />
-                                            <span className="sr-only">
-                                                Editar
-                                            </span>
-                                        </Button>
-                                        <Button
-                                            variant="outline"
-                                            size="icon"
-                                            onClick={() => onResetPassword(ext)}
-                                        >
-                                            <RotateCcwIcon />
-                                            <span className="sr-only">
-                                                Resetar senha
-                                            </span>
-                                        </Button>
-                                        <Button
-                                            variant="destructive"
-                                            size="icon"
-                                            onClick={() => onDelete(ext)}
-                                        >
-                                            <Trash2Icon />
-                                            <span className="sr-only">
-                                                Deletar
-                                            </span>
-                                        </Button>
-                                    </div>
+                                    <TooltipProvider delay={100}>
+                                        <div className="flex justify-end gap-1">
+                                            <Tooltip>
+                                                <TooltipTrigger
+                                                    render={
+                                                        <Button
+                                                            variant="outline"
+                                                            size="icon"
+                                                            onClick={() =>
+                                                                onEdit(ext)
+                                                            }
+                                                        >
+                                                            <PencilIcon />
+                                                            <span className="sr-only">
+                                                                Editar
+                                                            </span>
+                                                        </Button>
+                                                    }
+                                                />
+                                                <TooltipContent>
+                                                    Editar ramal
+                                                </TooltipContent>
+                                            </Tooltip>
+                                            <Tooltip>
+                                                <TooltipTrigger
+                                                    render={
+                                                        <Button
+                                                            variant="outline"
+                                                            size="icon"
+                                                            onClick={() =>
+                                                                onResetPassword(
+                                                                    ext
+                                                                )
+                                                            }
+                                                        >
+                                                            <RotateCcwIcon />
+                                                            <span className="sr-only">
+                                                                Resetar senha
+                                                            </span>
+                                                        </Button>
+                                                    }
+                                                />
+                                                <TooltipContent>
+                                                    Resetar senha
+                                                </TooltipContent>
+                                            </Tooltip>
+                                            <Tooltip>
+                                                <TooltipTrigger
+                                                    render={
+                                                        <Button
+                                                            variant="destructive"
+                                                            size="icon"
+                                                            onClick={() =>
+                                                                onDelete(ext)
+                                                            }
+                                                        >
+                                                            <Trash2Icon />
+                                                            <span className="sr-only">
+                                                                Deletar
+                                                            </span>
+                                                        </Button>
+                                                    }
+                                                />
+                                                <TooltipContent>
+                                                    Deletar ramal
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        </div>
+                                    </TooltipProvider>
                                 </TableCell>
                             </TableRow>
                         ))

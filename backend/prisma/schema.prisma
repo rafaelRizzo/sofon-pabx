@@ -35,6 +35,7 @@ model Company {
     audios           Audio[]
     holidayGroups    HolidayGroup[]
 
+    @@unique([name, doc])
     @@map("companies")
 }
 

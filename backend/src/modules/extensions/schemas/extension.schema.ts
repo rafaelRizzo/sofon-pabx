@@ -14,7 +14,6 @@ export const extensionQuerySchema = z.object({
 // ─── SIP-only fields (sip_peers) ─────────────────────────────────────────────
 const sipFields = {
     host: z.string().max(40).optional(),
-    port: z.string().max(6).optional(),
     peerType: z.enum(['friend', 'peer', 'user']).optional(),
     nat: z.string().max(40).optional(),
     dtmfMode: z.string().max(10).optional(),

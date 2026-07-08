@@ -115,6 +115,23 @@ describe('CompaniesService.createCompany', () => {
             data: expect.objectContaining({ timezone: 'Europe/Lisbon' }),
         }))
     })
+
+    it('throws 409 when name+doc already exists', async () => {
+        db.user.findUnique.mockResolvedValue(USER)
+        db.company.findUnique.mockResolvedValue({ ...COMPANY, doc: '12345678900' })
+        await expect(CompaniesService.createCompany({ name: 'ACME', doc: '12345678900', userId: 'u1', metadata: {} }))
+            .rejects.toMatchObject({ statusCode: 409 })
+        expect(db.company.create).not.toHaveBeenCalled()
+    })
+
+    it('allows create without doc even if name is duplicated', async () => {
+        db.user.findUnique.mockResolvedValue(USER)
+        db.company.create.mockResolvedValue(COMPANY)
+        db.userCompany.create.mockResolvedValue({})
+        await CompaniesService.createCompany({ name: 'ACME', userId: 'u1', metadata: {} })
+        expect(db.company.findUnique).not.toHaveBeenCalledWith(expect.objectContaining({ where: { name_doc: expect.anything() } }))
+        expect(db.company.create).toHaveBeenCalled()
+    })
 })
 
 // ─── updateCompany ────────────────────────────────────────────────────────────
@@ -140,6 +157,24 @@ describe('CompaniesService.updateCompany', () => {
         expect(db.company.update).toHaveBeenCalledWith(expect.objectContaining({
             data: { timezone: 'Europe/Lisbon' },
         }))
+    })
+
+    it('throws 409 when updated name+doc collides with another company', async () => {
+        db.company.findUnique
+            .mockResolvedValueOnce({ ...COMPANY, doc: '12345678900', users: [] })
+            .mockResolvedValueOnce({ ...COMPANY, id: 'c2', doc: '12345678900' })
+        await expect(CompaniesService.updateCompany('c1', { name: 'Renamed' }))
+            .rejects.toMatchObject({ statusCode: 409 })
+        expect(db.company.update).not.toHaveBeenCalled()
+    })
+
+    it('allows update when name+doc collides only with itself', async () => {
+        db.company.findUnique
+            .mockResolvedValueOnce({ ...COMPANY, doc: '12345678900', users: [] })
+            .mockResolvedValueOnce({ ...COMPANY, doc: '12345678900' })
+        db.company.update.mockResolvedValue({ ...COMPANY, name: 'Renamed', doc: '12345678900' })
+        const company = await CompaniesService.updateCompany('c1', { name: 'Renamed' }) as any
+        expect(company.name).toBe('Renamed')
     })
 })
 
