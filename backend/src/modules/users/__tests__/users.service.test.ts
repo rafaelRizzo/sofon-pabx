@@ -13,7 +13,7 @@ mock.module('../../companies/cache/companies.cache', () => ({
 
 import * as UsersService from '../users.service'
 
-const USER = { id: 'u1', name: 'Test', username: 'test@test.com', role: 'user', status: 'active', extensionId: null, createdBy: null, webhookSlug: 'slug', createdAt: new Date(), updatedAt: new Date() }
+const USER = { id: 'u1', name: 'Test', username: 'test@test.com', role: 'user', status: 'active', extensionId: null, createdBy: null, webhookSlug: 'slug', companies: [], createdAt: new Date(), updatedAt: new Date() }
 
 beforeEach(() => clearPrismaMock(db))
 

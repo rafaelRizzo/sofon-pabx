@@ -15,6 +15,7 @@ import { removeCompanyDialplanFiles } from '../../asterisk/dialplan-file.reposit
 import { TC_CONTEXT, HOL_CONTEXT, ANNOUNCEMENT_CONTEXT, IVR_CONTEXT, REQUEST_TEMPLATE_CONTEXT } from '../../asterisk/dialplan-names'
 import { RequestTemplatesCache } from '../request-templates/cache/request-templates.cache'
 import { HolidayGroupsCache } from '../holiday-groups/cache/holiday-groups.cache'
+import { UsersCache } from '../users/cache/users.cache'
 
 const DIALPLAN_FILE_CONTEXTS = [TC_CONTEXT, HOL_CONTEXT, ANNOUNCEMENT_CONTEXT, IVR_CONTEXT, REQUEST_TEMPLATE_CONTEXT, QUEUE_APP_CONTEXT]
 import type { CreateCompanyInput, UpdateCompanyInput } from './schemas/company.schema'
@@ -95,6 +96,8 @@ export const createCompany = async ({ userId, ...data }: Omit<CreateCompanyInput
 
     await CompaniesCache.invalidateAllCompanies()
     await CompaniesCache.invalidateCompaniesByUser(userId)
+    await UsersCache.invalidateUser(userId)
+    await UsersCache.invalidateAllUsers()
     return company
 }
 
@@ -145,6 +148,10 @@ export const updateCompany = async (id: string, { userId, ...data }: UpdateCompa
     const affectedUsers = new Set(existing.users.map((u) => u.userId))
     if (userId) affectedUsers.add(userId)
     await Promise.all([...affectedUsers].map((uid) => CompaniesCache.invalidateCompaniesByUser(uid)))
+    if (userId) {
+        await Promise.all([...affectedUsers].map((uid) => UsersCache.invalidateUser(uid)))
+        await UsersCache.invalidateAllUsers()
+    }
     return company
 }
 
@@ -223,5 +230,7 @@ export const deleteCompany = async (id: string) => {
         RequestTemplatesCache.invalidateNamespace(),
         HolidayGroupsCache.invalidateNamespace(),
         ...existing.users.map((u) => CompaniesCache.invalidateCompaniesByUser(u.userId)),
+        ...existing.users.map((u) => UsersCache.invalidateUser(u.userId)),
+        UsersCache.invalidateAllUsers(),
     ])
 }

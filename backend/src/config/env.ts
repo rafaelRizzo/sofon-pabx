@@ -27,6 +27,13 @@ const envSchema = z.object({
     // announcements, ivrs, holidays, queues-app, request-templates). Default é o caminho real do
     // Asterisk — testes de integração sobrescrevem via .env.test pra um dir gravável sem Asterisk instalado.
     DIALPLAN_EXTRA_DIR: z.string().default('/etc/asterisk/dialplan-extra'),
+    // Espelham a escolha feita em setups/install-asterisk.sh (versão do Asterisk define as portas
+    // SIP/PJSIP) — o instalador grava esses valores no .env do backend. Expostos via GET /system/sip-config
+    // pro frontend exibir a configuração correta (ex: instruções de provisionamento de ramal).
+    ASTERISK_VERSION: z.string().optional(),
+    SIP_LEGACY_ENABLED: z.coerce.boolean().default(false),
+    SIP_PORT: z.coerce.number().optional(),
+    PJSIP_PORT: z.coerce.number().default(5060),
 }).superRefine((cfg, ctx) => {
     // Em produção os defaults públicos de JWT_SECRET/REFRESH_SECRET são inaceitáveis (tokens forjáveis
     // por quem lê o repo). Exige segredos próprios, fortes e distintos — só falha em produção pra não

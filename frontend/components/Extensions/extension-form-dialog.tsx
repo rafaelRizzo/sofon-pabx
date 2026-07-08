@@ -10,6 +10,7 @@ import {
     AccordionItem,
     AccordionTrigger,
 } from "@/components/ui/accordion"
+import { CodecCheckboxes } from "@/components/codec-checkboxes"
 import { Button } from "@/components/ui/button"
 import {
     Combobox,
@@ -92,6 +93,33 @@ function NumInput({
             <FieldLabel>{label}</FieldLabel>
             <Input type="number" {...register(name)} />
         </Field>
+    )
+}
+
+function CodecField({
+    label,
+    name,
+    control,
+}: {
+    label: string
+    name: string
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    control: any
+}) {
+    return (
+        <Controller
+            control={control}
+            name={name}
+            render={({ field }) => (
+                <Field>
+                    <FieldLabel>{label}</FieldLabel>
+                    <CodecCheckboxes
+                        value={field.value ?? ""}
+                        onChange={field.onChange}
+                    />
+                </Field>
+            )}
+        />
     )
 }
 
@@ -192,29 +220,31 @@ function SipSections({ r, c }: { r: any; c: any }) {
             <AccordionItem value="codecs">
                 <AccordionTrigger>Codecs</AccordionTrigger>
                 <AccordionContent>
-                    <G2>
-                        <StrInput
-                            label="Disallow"
-                            name="disallow"
-                            register={r}
-                        />
-                        <StrInput label="Allow" name="allow" register={r} />
-                        <StrInput
-                            label="DTMF Mode"
-                            name="dtmfMode"
-                            register={r}
-                        />
-                        <StrInput
-                            label="Direct Media"
-                            name="directMedia"
-                            register={r}
-                        />
-                        <StrInput
-                            label="Language"
-                            name="language"
-                            register={r}
-                        />
-                    </G2>
+                    <div className="space-y-3">
+                        <CodecField label="Allow" name="allow" control={c} />
+                        <G2>
+                            <StrInput
+                                label="Disallow"
+                                name="disallow"
+                                register={r}
+                            />
+                            <StrInput
+                                label="DTMF Mode"
+                                name="dtmfMode"
+                                register={r}
+                            />
+                            <StrInput
+                                label="Direct Media"
+                                name="directMedia"
+                                register={r}
+                            />
+                            <StrInput
+                                label="Language"
+                                name="language"
+                                register={r}
+                            />
+                        </G2>
+                    </div>
                 </AccordionContent>
             </AccordionItem>
 
@@ -517,24 +547,26 @@ function PjsipSections({ r, c }: { r: any; c: any }) {
             <AccordionItem value="codecs">
                 <AccordionTrigger>Codecs</AccordionTrigger>
                 <AccordionContent>
-                    <G2>
-                        <StrInput
-                            label="Disallow"
-                            name="disallow"
-                            register={r}
-                        />
-                        <StrInput label="Allow" name="allow" register={r} />
-                        <StrInput
-                            label="DTMF Mode"
-                            name="dtmfMode"
-                            register={r}
-                        />
-                        <StrInput
-                            label="Language"
-                            name="language"
-                            register={r}
-                        />
-                    </G2>
+                    <div className="space-y-3">
+                        <CodecField label="Allow" name="allow" control={c} />
+                        <G2>
+                            <StrInput
+                                label="Disallow"
+                                name="disallow"
+                                register={r}
+                            />
+                            <StrInput
+                                label="DTMF Mode"
+                                name="dtmfMode"
+                                register={r}
+                            />
+                            <StrInput
+                                label="Language"
+                                name="language"
+                                register={r}
+                            />
+                        </G2>
+                    </div>
                 </AccordionContent>
             </AccordionItem>
 
@@ -764,7 +796,6 @@ export function ExtensionFormDialog({
     onUpdate,
 }: Props) {
     const isEdit = !!extension
-    const companyLabels = companies.map((c) => c.name)
 
     const [loadingExtension, setLoadingExtension] = useState(false)
     const [currentExtension, setCurrentExtension] = useState<Extension | null>(
@@ -1082,22 +1113,23 @@ export function ExtensionFormDialog({
                                             const sel =
                                                 companies.find(
                                                     (c) => c.id === field.value
-                                                )?.name ?? ""
+                                                ) ?? null
                                             return (
-                                                <Combobox
-                                                    items={companyLabels}
-                                                    value={sel || null}
-                                                    onValueChange={(label) => {
-                                                        const found =
-                                                            companies.find(
-                                                                (c) =>
-                                                                    c.name ===
-                                                                    label
-                                                            )
+                                                <Combobox<Company>
+                                                    items={companies}
+                                                    value={sel}
+                                                    itemToStringLabel={(c) =>
+                                                        c.name
+                                                    }
+                                                    isItemEqualToValue={(
+                                                        a,
+                                                        b
+                                                    ) => a.id === b.id}
+                                                    onValueChange={(company) =>
                                                         field.onChange(
-                                                            found?.id ?? ""
+                                                            company?.id ?? ""
                                                         )
-                                                    }}
+                                                    }
                                                 >
                                                     <ComboboxInput placeholder="Buscar empresa..." />
                                                     <ComboboxContent>
@@ -1106,15 +1138,19 @@ export function ExtensionFormDialog({
                                                         </ComboboxEmpty>
                                                         <ComboboxList>
                                                             {(
-                                                                label: string
+                                                                company: Company
                                                             ) => (
                                                                 <ComboboxItem
-                                                                    key={label}
+                                                                    key={
+                                                                        company.id
+                                                                    }
                                                                     value={
-                                                                        label
+                                                                        company
                                                                     }
                                                                 >
-                                                                    {label}
+                                                                    {
+                                                                        company.name
+                                                                    }
                                                                 </ComboboxItem>
                                                             )}
                                                         </ComboboxList>

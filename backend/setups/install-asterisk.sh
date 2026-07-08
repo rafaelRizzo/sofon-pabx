@@ -187,7 +187,7 @@ read -r REPLY
 # STEP 1 - ATUALIZAR SISTEMA
 # ============================================================
 show_header
-show_progress 1 12 "Atualizando sistema"
+show_progress 1 13 "Atualizando sistema"
 run apt-get update
 DEBIAN_FRONTEND=noninteractive run apt-get upgrade -y
 log "Sistema atualizado"
@@ -197,7 +197,7 @@ sleep 1
 # STEP 2 - DEPENDÊNCIAS
 # ============================================================
 show_header
-show_progress 2 12 "Instalando dependências"
+show_progress 2 13 "Instalando dependências"
 DEPS=(
     build-essential git wget curl autoconf automake libtool
     libxml2-dev libncurses5-dev uuid-dev libjansson-dev
@@ -217,7 +217,7 @@ sleep 1
 # STEP 3 - DOWNLOAD
 # ============================================================
 show_header
-show_progress 3 12 "Baixando Asterisk ${ASTERISK_VERSION}"
+show_progress 3 13 "Baixando Asterisk ${ASTERISK_VERSION}"
 cd /usr/src
 [[ -d "asterisk-${ASTERISK_VERSION}" ]] && rm -rf "asterisk-${ASTERISK_VERSION}"
 [[ -f "asterisk-${ASTERISK_VERSION}.tar.gz" ]] && rm -f "asterisk-${ASTERISK_VERSION}.tar.gz"
@@ -235,7 +235,7 @@ sleep 1
 # STEP 4 - PRÉ-REQUISITOS
 # ============================================================
 show_header
-show_progress 4 12 "Instalando pré-requisitos do Asterisk"
+show_progress 4 13 "Instalando pré-requisitos do Asterisk"
 contrib/scripts/install_prereq install >> "$LOG_FILE" 2>&1 || warn "Alguns pré-requisitos falharam (pode ser normal)"
 [[ "$USE_LEGACY_SIP" == true ]] && contrib/scripts/get_mp3_source.sh >> "$LOG_FILE" 2>&1 || true
 log "Pré-requisitos concluídos"
@@ -245,7 +245,7 @@ sleep 1
 # STEP 5 - CONFIGURE
 # ============================================================
 show_header
-show_progress 5 12 "Configurando compilação"
+show_progress 5 13 "Configurando compilação"
 
 CONF_OPTS="--with-jansson-bundled"
 [[ "$USE_LEGACY_SIP" == true ]] && CONF_OPTS="$CONF_OPTS --with-pjproject-bundled"
@@ -277,7 +277,7 @@ sleep 1
 # STEP 6 - COMPILAR
 # ============================================================
 show_header
-show_progress 6 12 "Compilando Asterisk (5-15 min)..."
+show_progress 6 13 "Compilando Asterisk (5-15 min)..."
 make -j"$(nproc)" >> "$LOG_FILE" 2>&1 || err "Falha na compilação — verifique $LOG_FILE"
 log "Compilação concluída"
 sleep 1
@@ -287,7 +287,7 @@ sleep 1
 # FIX: backup ANTES do make install; samples apenas em fresh install
 # ============================================================
 show_header
-show_progress 7 12 "Instalando binários"
+show_progress 7 13 "Instalando binários"
 
 # Backup com timestamp completo para proteger re-execuções
 for f in sip.conf pjsip.conf extensions.conf rtp.conf modules.conf manager.conf; do
@@ -321,7 +321,7 @@ sleep 1
 # STEP 8 - USUÁRIO E PERMISSÕES
 # ============================================================
 show_header
-show_progress 8 12 "Configurando usuário asterisk"
+show_progress 8 13 "Configurando usuário asterisk"
 
 # Timezone do sistema — sem isso o CDR e os logs gravam em UTC, difícil de ler no dia a dia
 timedatectl set-timezone America/Sao_Paulo >> "$LOG_FILE" 2>&1 || warn "Falha ao ajustar timezone"
@@ -357,7 +357,7 @@ sleep 1
 # FIX: dialplan usa switch => Realtime/ para ramais com nomes arbitrários
 # ============================================================
 show_header
-show_progress 9 12 "Criando configurações"
+show_progress 9 13 "Criando configurações"
 
 # rtp.conf
 cat > /etc/asterisk/rtp.conf << 'EOF'
@@ -527,7 +527,7 @@ sleep 1
 # STEP 10 - INICIAR SERVIÇO
 # ============================================================
 show_header
-show_progress 10 12 "Iniciando Asterisk"
+show_progress 10 13 "Iniciando Asterisk"
 systemctl daemon-reload
 systemctl enable asterisk >> "$LOG_FILE" 2>&1 || true
 systemctl restart asterisk >> "$LOG_FILE" 2>&1 || err "Falha ao iniciar Asterisk"
@@ -545,7 +545,7 @@ sleep 1
 # STEP 11 - FIREWALL (nftables)
 # ============================================================
 show_header
-show_progress 11 12 "Configurando firewall"
+show_progress 11 13 "Configurando firewall"
 
 # Desativa UFW — conflita com nftables
 if command -v ufw &>/dev/null; then
@@ -634,7 +634,7 @@ fi
 # STEP 12 - SEGURANÇA
 # ============================================================
 show_header
-show_progress 12 12 "Aplicando hardening de segurança"
+show_progress 12 13 "Aplicando hardening de segurança"
 
 # --- Monitor: diretório de gravações de chamadas ---
 mkdir -p /var/spool/asterisk/monitor
@@ -933,6 +933,41 @@ MANAGE_FW_EOF
 
 chmod +x /usr/local/sbin/manage-fw
 log "manage-fw instalado em /usr/local/sbin/manage-fw"
+
+# ============================================================
+# STEP 13 - SINCRONIZAR .ENV DO BACKEND
+# Versão do Asterisk define as portas SIP/PJSIP (ver ASTERISK_VERSION/PJSIP_PORT/SIP_PORT
+# em src/config/env.ts) — o backend expõe isso pro frontend via GET /system/sip-config.
+# ============================================================
+show_header
+show_progress 13 13 "Sincronizando configuração com o backend"
+
+set_env_var() {
+    local file=$1 key=$2 value=$3
+    if grep -q "^${key}=" "$file" 2>/dev/null; then
+        sed -i "s|^${key}=.*|${key}=${value}|" "$file"
+    else
+        echo "${key}=${value}" >> "$file"
+    fi
+}
+
+echo -ne "${CYAN}→${NC} Caminho do .env do backend [/opt/sofon-pabx/backend/.env] (Enter p/ pular): "
+read -r BACKEND_ENV_FILE
+
+if [[ -n "$BACKEND_ENV_FILE" && -f "$BACKEND_ENV_FILE" ]]; then
+    set_env_var "$BACKEND_ENV_FILE" "ASTERISK_VERSION" "$ASTERISK_VERSION"
+    set_env_var "$BACKEND_ENV_FILE" "SIP_LEGACY_ENABLED" "$USE_LEGACY_SIP"
+    set_env_var "$BACKEND_ENV_FILE" "PJSIP_PORT" "$PJSIP_PORT"
+    [[ "$USE_LEGACY_SIP" == true ]] && set_env_var "$BACKEND_ENV_FILE" "SIP_PORT" "$SIP_PORT"
+    log "Backend .env atualizado (${BACKEND_ENV_FILE}) — reinicie o serviço do backend para aplicar"
+else
+    warn "Backend .env não localizado — adicione manualmente:"
+    echo "    ASTERISK_VERSION=${ASTERISK_VERSION}"
+    echo "    SIP_LEGACY_ENABLED=${USE_LEGACY_SIP}"
+    echo "    PJSIP_PORT=${PJSIP_PORT}"
+    [[ "$USE_LEGACY_SIP" == true ]] && echo "    SIP_PORT=${SIP_PORT}"
+fi
+sleep 1
 
 # ============================================================
 # SUMÁRIO FINAL

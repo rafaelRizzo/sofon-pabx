@@ -11,6 +11,7 @@ const select = {
     id: true,
     number: true,
     companyId: true,
+    status: true,
     createdAt: true,
     updatedAt: true,
 }

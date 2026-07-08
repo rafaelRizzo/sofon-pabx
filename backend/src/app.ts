@@ -13,6 +13,7 @@ import { logger } from './utils/logger'
 import { formatDatesDeep, collectCompanyIds } from './utils/timezone'
 import { getCompanyById } from './modules/companies/companies.service'
 import { validateEnv } from './config/env'
+import { protectedRoute } from './middleware/scope.middleware'
 import { usersRoutes } from './modules/users/users.routes'
 import { authRoutes } from './modules/auth/auth.routes'
 import { companiesRoutes } from './modules/companies/companies.routes'
@@ -186,6 +187,19 @@ app.register(audiosRoutes)
 // Health check
 app.get('/health', async (req, reply) => {
     return reply.send({ status: 'ok' })
+})
+
+// Config SIP/PJSIP da instância (versão do Asterisk define as portas — ver setups/install-asterisk.sh)
+app.register(async (router) => {
+    router.get('/system/sip-config', { onRequest: protectedRoute }, async (req, reply) => {
+        return reply.send({
+            success: true,
+            asteriskVersion: env.ASTERISK_VERSION ?? null,
+            legacySipEnabled: env.SIP_LEGACY_ENABLED,
+            sipPort: env.SIP_LEGACY_ENABLED ? env.SIP_PORT ?? null : null,
+            pjsipPort: env.PJSIP_PORT,
+        })
+    })
 })
 
 export { app }

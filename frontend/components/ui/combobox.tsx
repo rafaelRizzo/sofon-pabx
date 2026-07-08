@@ -55,6 +55,7 @@ function ComboboxInput({
     disabled = false,
     showTrigger = true,
     showClear = false,
+    autoComplete = "off",
     ...props
 }: ComboboxPrimitive.Input.Props & {
     showTrigger?: boolean
@@ -64,6 +65,7 @@ function ComboboxInput({
         <InputGroup className={cn("w-auto", className)}>
             <ComboboxPrimitive.Input
                 render={<InputGroupInput disabled={disabled} />}
+                autoComplete={autoComplete}
                 {...props}
             />
             <InputGroupAddon align="inline-end">
@@ -143,7 +145,7 @@ function ComboboxItem({
         <ComboboxPrimitive.Item
             data-slot="combobox-item"
             className={cn(
-                "relative flex min-h-7 w-full cursor-default items-center gap-2 rounded-md px-2 py-1 text-xs/relaxed outline-hidden select-none data-highlighted:bg-accent data-highlighted:text-accent-foreground not-data-[variant=destructive]:data-highlighted:**:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5",
+                "relative flex min-h-7 w-full cursor-default items-center gap-2 rounded-md py-1 pr-6 pl-2 text-xs/relaxed outline-hidden select-none data-highlighted:bg-accent data-highlighted:text-accent-foreground not-data-[variant=destructive]:data-highlighted:**:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5",
                 className
             )}
             {...props}
@@ -271,12 +273,14 @@ function ComboboxChip({
 
 function ComboboxChipsInput({
     className,
+    autoComplete = "off",
     ...props
 }: ComboboxPrimitive.Input.Props) {
     return (
         <ComboboxPrimitive.Input
             data-slot="combobox-chip-input"
             className={cn("min-w-16 flex-1 outline-none", className)}
+            autoComplete={autoComplete}
             {...props}
         />
     )

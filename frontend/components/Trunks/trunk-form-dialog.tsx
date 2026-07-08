@@ -4,6 +4,7 @@ import { useEffect } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm, useWatch } from "react-hook-form"
 
+import { CodecCheckboxes } from "@/components/codec-checkboxes"
 import { Button } from "@/components/ui/button"
 import {
     Combobox,
@@ -78,7 +79,6 @@ export function TrunkFormDialog({
     onUpdate,
 }: Props) {
     const isEdit = !!trunk
-    const companyLabels = companies.map((c) => c.name)
 
     const createForm = useForm<TrunkCreateForm>({
         resolver: zodResolver(createTrunkSchema) as any,
@@ -145,6 +145,7 @@ export function TrunkFormDialog({
     })
 
     const r = isEdit ? updateForm.register : createForm.register
+    const control = isEdit ? updateForm.control : createForm.control
     const errors = isEdit
         ? updateForm.formState.errors
         : createForm.formState.errors
@@ -234,17 +235,20 @@ export function TrunkFormDialog({
                                         const sel =
                                             companies.find(
                                                 (c) => c.id === field.value
-                                            )?.name ?? ""
+                                            ) ?? null
                                         return (
-                                            <Combobox
-                                                items={companyLabels}
-                                                value={sel || null}
-                                                onValueChange={(label) => {
-                                                    const found = companies.find(
-                                                        (c) => c.name === label
+                                            <Combobox<Company>
+                                                items={companies}
+                                                value={sel}
+                                                itemToStringLabel={(c) => c.name}
+                                                isItemEqualToValue={(a, b) =>
+                                                    a.id === b.id
+                                                }
+                                                onValueChange={(company) =>
+                                                    field.onChange(
+                                                        company?.id ?? ""
                                                     )
-                                                    field.onChange(found?.id ?? "")
-                                                }}
+                                                }
                                             >
                                                 <ComboboxInput placeholder="Buscar empresa..." />
                                                 <ComboboxContent>
@@ -252,12 +256,12 @@ export function TrunkFormDialog({
                                                         Nenhuma empresa
                                                     </ComboboxEmpty>
                                                     <ComboboxList>
-                                                        {(label: string) => (
+                                                        {(company: Company) => (
                                                             <ComboboxItem
-                                                                key={label}
-                                                                value={label}
+                                                                key={company.id}
+                                                                value={company}
                                                             >
-                                                                {label}
+                                                                {company.name}
                                                             </ComboboxItem>
                                                         )}
                                                     </ComboboxList>
@@ -354,7 +358,16 @@ export function TrunkFormDialog({
 
                         <Field>
                             <FieldLabel>Codecs</FieldLabel>
-                            <Input placeholder="ulaw,alaw" {...r("codecs")} />
+                            <Controller
+                                control={control as any}
+                                name="codecs"
+                                render={({ field }) => (
+                                    <CodecCheckboxes
+                                        value={field.value ?? ""}
+                                        onChange={field.onChange}
+                                    />
+                                )}
+                            />
                             {errors.codecs && (
                                 <FieldError>
                                     {errors.codecs.message as string}

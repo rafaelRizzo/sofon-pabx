@@ -45,6 +45,7 @@ model Did {
     companyId     String
     company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
     inboundRoutes InboundRoute[]
+    status        String         @default("active") // active | inactive | blocked
     createdAt     DateTime       @default(now()) @db.Timestamptz(3)
     updatedAt     DateTime       @updatedAt @db.Timestamptz(3)
 
@@ -169,6 +170,7 @@ model Trunk {
     password         String?              @db.VarChar(80)
     context          String               @default("from-trunk") @db.VarChar(40)
     codecs           String               @default("ulaw,alaw") @db.VarChar(200)
+    techPrefix       String?              @db.VarChar(20)
     maxInChannels    Int?
     maxOutChannels   Int?
     metadata         Json                 @default("{}")

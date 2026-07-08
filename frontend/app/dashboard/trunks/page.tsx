@@ -9,15 +9,16 @@ import { PageHeader } from "@/components/page-header"
 import { TrunkFormDialog } from "@/components/Trunks/trunk-form-dialog"
 import { TrunksTable } from "@/components/Trunks/trunks-table"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select"
-import { useCompanies } from "@/hooks/use-companies"
+    Combobox,
+    ComboboxContent,
+    ComboboxEmpty,
+    ComboboxInput,
+    ComboboxItem,
+    ComboboxList,
+} from "@/components/ui/combobox"
+import { Input } from "@/components/ui/input"
+import { useCompanies, type Company } from "@/hooks/use-companies"
 import { usePagination } from "@/hooks/use-pagination"
 import { useTrunks, type Trunk } from "@/hooks/use-trunks"
 
@@ -71,28 +72,34 @@ export default function TrunksPage() {
             </PageHeader>
 
             <div className="flex gap-2">
-                <Select
-                    items={companies.map((c) => ({ value: c.id, label: c.name }))}
-                    value={companyId}
-                    onValueChange={(v) => setCompanyId(v as string)}
-                >
-                    <SelectTrigger className="w-56">
-                        <SelectValue placeholder="Selecione a empresa" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {companies.map((c) => (
-                            <SelectItem key={c.id} value={c.id}>
-                                {c.name}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
                 <Input
                     placeholder="Buscar por nome, host..."
                     value={filter}
                     onChange={(e) => setFilter(e.target.value)}
                     className="max-w-sm"
                 />
+                <Combobox<Company>
+                    items={companies}
+                    value={companies.find((c) => c.id === companyId) ?? null}
+                    itemToStringLabel={(c) => c.name}
+                    isItemEqualToValue={(a, b) => a.id === b.id}
+                    onValueChange={(company) => setCompanyId(company?.id ?? "")}
+                >
+                    <ComboboxInput
+                        placeholder="Buscar empresa..."
+                        className="w-56"
+                    />
+                    <ComboboxContent>
+                        <ComboboxEmpty>Nenhuma empresa</ComboboxEmpty>
+                        <ComboboxList>
+                            {(company: Company) => (
+                                <ComboboxItem key={company.id} value={company}>
+                                    {company.name}
+                                </ComboboxItem>
+                            )}
+                        </ComboboxList>
+                    </ComboboxContent>
+                </Combobox>
             </div>
 
             <TrunksTable

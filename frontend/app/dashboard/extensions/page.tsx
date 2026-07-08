@@ -20,6 +20,14 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
+import {
+    Combobox,
+    ComboboxContent,
+    ComboboxEmpty,
+    ComboboxInput,
+    ComboboxItem,
+    ComboboxList,
+} from "@/components/ui/combobox"
 import { Input } from "@/components/ui/input"
 import {
     Select,
@@ -28,7 +36,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
-import { useCompanies } from "@/hooks/use-companies"
+import { useCompanies, type Company } from "@/hooks/use-companies"
 import {
     useExtensions,
     type Extension,
@@ -39,6 +47,10 @@ import {
 import { usePagination } from "@/hooks/use-pagination"
 
 type PasswordReveal = { alias: string; username: string; password: string }
+
+type CompanyFilterOption = { id: string; name: string }
+
+const ALL_COMPANIES: CompanyFilterOption = { id: "all", name: "Todas as empresas" }
 
 const TYPE_FILTERS = [
     { value: "all", label: "Todos os tipos" },
@@ -68,11 +80,11 @@ export default function ExtensionsPage() {
     const [passwordReveal, setPasswordReveal] =
         useState<PasswordReveal | null>(null)
     const [typeFilter, setTypeFilter] = useState<ExtensionType | "all">("all")
+    const [companyFilter, setCompanyFilter] = useState<string>("all")
 
-    const filteredExtensions =
-        typeFilter === "all"
-            ? extensions
-            : extensions.filter((e) => e.type === typeFilter)
+    const filteredExtensions = extensions
+        .filter((e) => typeFilter === "all" || e.type === typeFilter)
+        .filter((e) => companyFilter === "all" || e.companyId === companyFilter)
 
     const { paginated, page, setPage, totalPages, total } = usePagination(
         filteredExtensions,
@@ -180,6 +192,34 @@ export default function ExtensionsPage() {
                     onChange={(e) => setFilter(e.target.value)}
                     className="max-w-sm"
                 />
+                <Combobox<CompanyFilterOption>
+                    items={[ALL_COMPANIES, ...companies]}
+                    value={
+                        [ALL_COMPANIES, ...companies].find(
+                            (c) => c.id === companyFilter
+                        ) ?? ALL_COMPANIES
+                    }
+                    itemToStringLabel={(c) => c.name}
+                    isItemEqualToValue={(a, b) => a.id === b.id}
+                    onValueChange={(company) =>
+                        setCompanyFilter(company?.id ?? "all")
+                    }
+                >
+                    <ComboboxInput
+                        placeholder="Buscar empresa..."
+                        className="w-56"
+                    />
+                    <ComboboxContent>
+                        <ComboboxEmpty>Nenhuma empresa</ComboboxEmpty>
+                        <ComboboxList>
+                            {(company: CompanyFilterOption) => (
+                                <ComboboxItem key={company.id} value={company}>
+                                    {company.name}
+                                </ComboboxItem>
+                            )}
+                        </ComboboxList>
+                    </ComboboxContent>
+                </Combobox>
                 <Select
                     items={TYPE_FILTERS}
                     value={typeFilter}

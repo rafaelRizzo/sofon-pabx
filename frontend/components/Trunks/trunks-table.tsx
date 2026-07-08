@@ -1,6 +1,6 @@
 "use client"
 
-import { PencilIcon, Trash2Icon } from "lucide-react"
+import { InfinityIcon, PencilIcon, Trash2Icon } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -92,8 +92,15 @@ export function TrunksTable({ trunks, loading, onEdit, onDelete }: Props) {
                                     {trunk.codecs}
                                 </TableCell>
                                 <TableCell className="text-center text-sm">
-                                    {trunk.maxInChannels ?? "∞"} /{" "}
-                                    {trunk.maxOutChannels ?? "∞"}
+                                    <div className="flex items-center justify-center gap-1">
+                                        {trunk.maxInChannels ?? (
+                                            <InfinityIcon className="size-3.5" />
+                                        )}
+                                        <span>/</span>
+                                        {trunk.maxOutChannels ?? (
+                                            <InfinityIcon className="size-3.5" />
+                                        )}
+                                    </div>
                                 </TableCell>
                                 <TableCell>
                                     <TooltipProvider delay={100}>

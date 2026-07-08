@@ -17,7 +17,7 @@ function trunkAsteriskId(asteriskId: string, trunkName: string): string {
     return `${asteriskId}-trunk-${trunkName}`
 }
 
-type TrunkOpt = { astId: string; maxOut?: number | null }
+type TrunkOpt = { astId: string; maxOut?: number | null; techPrefix?: string | null }
 
 // Priority count per trunk block (used to pre-compute offsets for forward references):
 // with limit + not last = 5 (GotoIf count, Set GROUP, Dial, GotoIf DIALSTATUS, Set GROUP=)
@@ -72,9 +72,10 @@ function buildDialplanEntries(
     })
 
     for (let i = 0; i < trunks.length; i++) {
-        const { astId, maxOut } = trunks[i]
+        const { astId, maxOut, techPrefix } = trunks[i]
         const isLast = i === trunks.length - 1
         const nextTrunkStart = isLast ? hangupPriority : blockStarts[i + 1]
+        const dialTarget = `PJSIP/${techPrefix ?? ''}${destVar}@${astId},60`
 
         if (maxOut != null) {
             entries.push({
@@ -82,7 +83,7 @@ function buildDialplanEntries(
                 appdata: `$[\${GROUP_COUNT(out-${astId})} >= ${maxOut}]?${nextTrunkStart}`,
             })
             entries.push({ context, exten, priority: p++, app: 'Set', appdata: `GROUP()=out-${astId}` })
-            entries.push({ context, exten, priority: p++, app: 'Dial', appdata: `PJSIP/${destVar}@${astId},60` })
+            entries.push({ context, exten, priority: p++, app: 'Dial', appdata: dialTarget })
             if (!isLast) {
                 entries.push({
                     context, exten, priority: p++, app: 'GotoIf',
@@ -91,7 +92,7 @@ function buildDialplanEntries(
                 entries.push({ context, exten, priority: p++, app: 'Set', appdata: 'GROUP()=' })
             }
         } else {
-            entries.push({ context, exten, priority: p++, app: 'Dial', appdata: `PJSIP/${destVar}@${astId},60` })
+            entries.push({ context, exten, priority: p++, app: 'Dial', appdata: dialTarget })
             if (!isLast) {
                 entries.push({
                     context, exten, priority: p++, app: 'GotoIf',
@@ -119,6 +120,42 @@ async function syncPatternDialplan(
     await tx.extensions.createMany({ data: entries })
 }
 
+// O dialplan é escrito em context='ramais' + exten=pattern (ver syncPatternDialplan) — duas rotas da
+// mesma empresa com o mesmo padrão se sobrescrevem silenciosamente no Asterisk, então o padrão precisa
+// ser único por empresa. exclude.routeId ignora TODOS os padrões de uma rota (replace completo, ex:
+// updateOutboundRoute); exclude.patternId ignora só um registro específico (edição pontual, updatePattern).
+async function assertPatternsAvailable(
+    companyId: string,
+    patterns: string[],
+    exclude?: { routeId?: string; patternId?: string },
+) {
+    const seen = new Set<string>()
+    for (const pattern of patterns) {
+        if (seen.has(pattern)) {
+            throw new AppError(`Padrão de discagem duplicado no formulário: "${pattern}"`, 409)
+        }
+        seen.add(pattern)
+    }
+
+    const conflict = await prisma.outboundDialPattern.findFirst({
+        where: {
+            pattern: { in: patterns },
+            ...(exclude?.patternId && { id: { not: exclude.patternId } }),
+            route: {
+                companyId,
+                ...(exclude?.routeId && { id: { not: exclude.routeId } }),
+            },
+        },
+        select: { pattern: true, route: { select: { name: true } } },
+    })
+    if (conflict) {
+        throw new AppError(
+            `Padrão "${conflict.pattern}" já está em uso na rota "${conflict.route.name}"`,
+            409
+        )
+    }
+}
+
 // Sequential queries inside transaction — avoids concurrent client.query() from multi-relation include
 async function getRouteContext(tx: Tx, routeId: string) {
     const route = await tx.outboundRoute.findUnique({
@@ -135,7 +172,7 @@ async function getRouteContext(tx: Tx, routeId: string) {
     // trunk is many-to-one → JOIN within findMany — single query
     const trunks = await tx.outboundRouteTrunk.findMany({
         where: { routeId },
-        select: { position: true, trunk: { select: { name: true, maxOutChannels: true } } },
+        select: { position: true, trunk: { select: { name: true, maxOutChannels: true, techPrefix: true } } },
         orderBy: { position: 'asc' },
     })
 
@@ -149,6 +186,7 @@ export async function resyncAllPatterns(tx: Tx, routeId: string) {
     const trunkOpts: TrunkOpt[] = ctx.trunks.map((rt) => ({
         astId: trunkAsteriskId(ctx.company.asteriskId, rt.trunk.name),
         maxOut: rt.trunk.maxOutChannels,
+        techPrefix: rt.trunk.techPrefix,
     }))
     for (const p of ctx.patterns) {
         await syncPatternDialplan(tx, 'ramais', p.pattern, trunkOpts, p.prefix, p.prepend, ctx.company.asteriskId)
@@ -243,18 +281,19 @@ export const createOutboundRoute = async (data: CreateOutboundRouteInput) => {
     const company = await getCompanyById(data.companyId)
 
     const trunks = await prisma.trunk.findMany({
-        where: { id: { in: data.trunkIds }, companyId: data.companyId, registrationMode: 'outbound' },
-        select: { id: true, name: true, maxOutChannels: true },
+        where: { id: { in: data.trunkIds }, companyId: data.companyId },
+        select: { id: true, name: true, maxOutChannels: true, techPrefix: true },
     })
     if (trunks.length !== data.trunkIds.length) throw new AppError('One or more trunks not found', 404)
 
     const orderedTrunks = data.trunkIds.map((tid, i) => {
         const t = trunks.find((t) => t.id === tid)!
-        return { id: t.id, name: t.name, maxOutChannels: t.maxOutChannels, position: i }
+        return { id: t.id, name: t.name, maxOutChannels: t.maxOutChannels, techPrefix: t.techPrefix, position: i }
     })
     const trunkOpts: TrunkOpt[] = orderedTrunks.map((t) => ({
         astId: trunkAsteriskId(company.asteriskId, t.name),
         maxOut: t.maxOutChannels,
+        techPrefix: t.techPrefix,
     }))
 
     if (data.extensionIds?.length) {
@@ -264,6 +303,8 @@ export const createOutboundRoute = async (data: CreateOutboundRouteInput) => {
         })
         if (extensions.length !== data.extensionIds.length) throw new AppError('One or more extensions not found', 404)
     }
+
+    await assertPatternsAvailable(data.companyId, data.patterns.map((p) => p.pattern))
 
     let routeId: string
 
@@ -318,10 +359,14 @@ export const updateOutboundRoute = async (id: string, data: UpdateOutboundRouteI
 
     if (trunkIds) {
         const trunks = await prisma.trunk.findMany({
-            where: { id: { in: trunkIds }, companyId: existing.companyId, registrationMode: 'outbound' },
+            where: { id: { in: trunkIds }, companyId: existing.companyId },
             select: { id: true },
         })
         if (trunks.length !== trunkIds.length) throw new AppError('One or more trunks not found', 404)
+    }
+
+    if (patterns) {
+        await assertPatternsAvailable(existing.companyId, patterns.map((p) => p.pattern), { routeId: id })
     }
 
     await prisma.$transaction(async (tx) => {
@@ -396,9 +441,11 @@ export const deleteOutboundRoute = async (id: string) => {
 export const addPattern = async (routeId: string, data: AddPatternInput) => {
     const route = await prisma.outboundRoute.findUnique({
         where: { id: routeId },
-        select: { id: true },
+        select: { id: true, companyId: true },
     })
     if (!route) throw new AppError('Outbound route not found', 404)
+
+    await assertPatternsAvailable(route.companyId, [data.pattern])
 
     let patternId: string
 
@@ -422,8 +469,15 @@ export const addPattern = async (routeId: string, data: AddPatternInput) => {
 }
 
 export const updatePattern = async (routeId: string, patternId: string, data: UpdatePatternInput) => {
-    const pattern = await prisma.outboundDialPattern.findFirst({ where: { id: patternId, routeId } })
+    const pattern = await prisma.outboundDialPattern.findFirst({
+        where: { id: patternId, routeId },
+        include: { route: { select: { companyId: true } } },
+    })
     if (!pattern) throw new AppError('Pattern not found', 404)
+
+    if (data.pattern && data.pattern !== pattern.pattern) {
+        await assertPatternsAvailable(pattern.route.companyId, [data.pattern], { patternId })
+    }
 
     await prisma.$transaction(async (tx) => {
         if (pattern.pattern !== (data.pattern ?? pattern.pattern)) {
@@ -459,7 +513,7 @@ export const setTrunks = async (routeId: string, data: SetTrunksInput) => {
     if (!route) throw new AppError('Outbound route not found', 404)
 
     const trunks = await prisma.trunk.findMany({
-        where: { id: { in: data.trunkIds }, companyId: route.companyId, registrationMode: 'outbound' },
+        where: { id: { in: data.trunkIds }, companyId: route.companyId },
         select: { id: true, name: true },
     })
     if (trunks.length !== data.trunkIds.length) throw new AppError('One or more trunks not found', 404)

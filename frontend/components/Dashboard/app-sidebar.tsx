@@ -42,6 +42,7 @@ import {
     SidebarSeparator,
     useSidebar,
 } from "@/components/ui/sidebar"
+import { TooltipProvider } from "@/components/ui/tooltip"
 import { useLogout } from "@/hooks/use-logout"
 
 type NavItem = {
@@ -152,74 +153,76 @@ export function AppSidebar() {
         href === "/dashboard" ? pathname === href : pathname.startsWith(href)
 
     return (
-        <Sidebar collapsible="icon">
-            <SidebarHeader>
-                <div className="flex items-center gap-2 px-2 py-1.5">
-                    <PhoneIcon className="size-5 shrink-0" />
-                    <span className="font-semibold group-data-[collapsible=icon]:hidden">
-                        Sofon PABX
-                    </span>
-                </div>
-            </SidebarHeader>
-            <SidebarContent>
-                {NAV.map((group) => (
-                    <SidebarGroup key={group.label}>
-                        <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
-                        <SidebarGroupContent>
-                            <SidebarMenu>
-                                {group.items.map((item) => (
-                                    <SidebarMenuItem key={item.href}>
-                                        <SidebarMenuButton
-                                            isActive={isActive(item.href)}
-                                            tooltip={item.title}
-                                            render={
-                                                <Link
-                                                    href={item.href}
-                                                    onClick={() =>
-                                                        isMobile &&
-                                                        setOpenMobile(false)
-                                                    }
-                                                >
-                                                    <item.icon />
-                                                    <span>{item.title}</span>
-                                                </Link>
-                                            }
-                                        />
-                                    </SidebarMenuItem>
-                                ))}
-                            </SidebarMenu>
-                        </SidebarGroupContent>
-                    </SidebarGroup>
-                ))}
-            </SidebarContent>
-            <SidebarSeparator />
-            <SidebarFooter>
-                <SidebarMenu>
-                    <SidebarMenuItem>
-                        <SidebarMenuButton
-                            tooltip="Alternar tema"
-                            onClick={() =>
-                                setTheme(
-                                    resolvedTheme === "dark" ? "light" : "dark"
-                                )
-                            }
-                        >
-                            <span className="relative flex size-4 shrink-0 items-center justify-center">
-                                <SunIcon className="size-4 scale-100 rotate-0 transition-all dark:scale-0 dark:-rotate-90" />
-                                <MoonIcon className="absolute size-4 scale-0 rotate-90 transition-all dark:scale-100 dark:rotate-0" />
-                            </span>
-                            <span>Alternar tema</span>
-                        </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                        <SidebarMenuButton tooltip="Sair" onClick={logout}>
-                            <LogOutIcon />
-                            <span>Sair</span>
-                        </SidebarMenuButton>
-                    </SidebarMenuItem>
-                </SidebarMenu>
-            </SidebarFooter>
-            <SidebarRail />
-        </Sidebar>
+        <TooltipProvider delay={100}>
+            <Sidebar collapsible="icon">
+                <SidebarHeader>
+                    <div className="flex items-center gap-2 px-2 py-1.5">
+                        <PhoneIcon className="size-5 shrink-0" />
+                        <span className="font-semibold group-data-[collapsible=icon]:hidden">
+                            Sofon PABX
+                        </span>
+                    </div>
+                </SidebarHeader>
+                <SidebarContent>
+                    {NAV.map((group) => (
+                        <SidebarGroup key={group.label}>
+                            <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+                            <SidebarGroupContent>
+                                <SidebarMenu>
+                                    {group.items.map((item) => (
+                                        <SidebarMenuItem key={item.href}>
+                                            <SidebarMenuButton
+                                                isActive={isActive(item.href)}
+                                                tooltip={item.title}
+                                                render={
+                                                    <Link
+                                                        href={item.href}
+                                                        onClick={() =>
+                                                            isMobile &&
+                                                            setOpenMobile(false)
+                                                        }
+                                                    >
+                                                        <item.icon />
+                                                        <span>{item.title}</span>
+                                                    </Link>
+                                                }
+                                            />
+                                        </SidebarMenuItem>
+                                    ))}
+                                </SidebarMenu>
+                            </SidebarGroupContent>
+                        </SidebarGroup>
+                    ))}
+                </SidebarContent>
+                <SidebarSeparator />
+                <SidebarFooter>
+                    <SidebarMenu>
+                        <SidebarMenuItem>
+                            <SidebarMenuButton
+                                tooltip="Alternar tema"
+                                onClick={() =>
+                                    setTheme(
+                                        resolvedTheme === "dark" ? "light" : "dark"
+                                    )
+                                }
+                            >
+                                <span className="relative flex size-4 shrink-0 items-center justify-center">
+                                    <SunIcon className="size-4 scale-100 rotate-0 transition-all dark:scale-0 dark:-rotate-90" />
+                                    <MoonIcon className="absolute size-4 scale-0 rotate-90 transition-all dark:scale-100 dark:rotate-0" />
+                                </span>
+                                <span>Alternar tema</span>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        <SidebarMenuItem>
+                            <SidebarMenuButton tooltip="Sair" onClick={logout}>
+                                <LogOutIcon />
+                                <span>Sair</span>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                    </SidebarMenu>
+                </SidebarFooter>
+                <SidebarRail />
+            </Sidebar>
+        </TooltipProvider>
     )
 }

@@ -9,6 +9,7 @@ const baseTrunkShape = {
         .regex(/^[a-z0-9_-]+$/i, 'Only alphanumeric, dash and underscore allowed'),
     companyId: z.cuid2(),
     codecs: z.string().max(200).default('ulaw,alaw'),
+    techPrefix: z.string().max(20).optional(),
     maxInChannels: z.number().int().min(1).optional(),
     maxOutChannels: z.number().int().min(1).optional(),
 }
@@ -40,6 +41,7 @@ export const updateTrunkSchema = z.object({
     username: z.string().min(1).max(80).nullable().optional(),
     password: z.string().min(1).max(80).optional(),
     codecs: z.string().max(200).optional(),
+    techPrefix: z.string().max(20).nullable().optional(),
     maxInChannels: z.number().int().min(1).nullable().optional(),
     maxOutChannels: z.number().int().min(1).nullable().optional(),
 })
@@ -62,6 +64,7 @@ export const TrunkSchema = z.object({
     password: z.string().nullable(),
     context: z.string(),
     codecs: z.string(),
+    techPrefix: z.string().nullable(),
     maxInChannels: z.number().nullable(),
     maxOutChannels: z.number().nullable(),
     createdAt: timestamp,

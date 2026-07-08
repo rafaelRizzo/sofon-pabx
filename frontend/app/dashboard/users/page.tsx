@@ -9,9 +9,22 @@ import { PageHeader } from "@/components/page-header"
 import { UserFormDialog } from "@/components/Users/user-form-dialog"
 import { UsersTable } from "@/components/Users/users-table"
 import { Button } from "@/components/ui/button"
+import {
+    Combobox,
+    ComboboxContent,
+    ComboboxEmpty,
+    ComboboxInput,
+    ComboboxItem,
+    ComboboxList,
+} from "@/components/ui/combobox"
 import { Input } from "@/components/ui/input"
+import { useCompanies } from "@/hooks/use-companies"
 import { usePagination } from "@/hooks/use-pagination"
 import { useUsers, type CreateUserForm, type User } from "@/hooks/use-users"
+
+type CompanyFilterOption = { id: string; name: string }
+
+const ALL_COMPANIES: CompanyFilterOption = { id: "all", name: "Todas as empresas" }
 
 export default function UsersPage() {
     const {
@@ -23,9 +36,17 @@ export default function UsersPage() {
         updateUser,
         deleteUser,
     } = useUsers()
+    const { companies } = useCompanies()
+
+    const [companyFilter, setCompanyFilter] = useState<string>("all")
+
+    const filteredUsers =
+        companyFilter === "all"
+            ? users
+            : users.filter((u) => u.companies.some((c) => c.id === companyFilter))
 
     const { paginated, page, setPage, totalPages, total } = usePagination(
-        users,
+        filteredUsers,
         10
     )
 
@@ -58,12 +79,42 @@ export default function UsersPage() {
                 </Button>
             </PageHeader>
 
-            <Input
-                placeholder="Filtrar por nome ou e-mail..."
-                value={filter}
-                onChange={(e) => setFilter(e.target.value)}
-                className="max-w-sm"
-            />
+            <div className="flex gap-2">
+                <Input
+                    placeholder="Filtrar por nome ou e-mail..."
+                    value={filter}
+                    onChange={(e) => setFilter(e.target.value)}
+                    className="max-w-sm"
+                />
+                <Combobox<CompanyFilterOption>
+                    items={[ALL_COMPANIES, ...companies]}
+                    value={
+                        [ALL_COMPANIES, ...companies].find(
+                            (c) => c.id === companyFilter
+                        ) ?? ALL_COMPANIES
+                    }
+                    itemToStringLabel={(c) => c.name}
+                    isItemEqualToValue={(a, b) => a.id === b.id}
+                    onValueChange={(company) =>
+                        setCompanyFilter(company?.id ?? "all")
+                    }
+                >
+                    <ComboboxInput
+                        placeholder="Buscar empresa..."
+                        className="w-56"
+                    />
+                    <ComboboxContent>
+                        <ComboboxEmpty>Nenhuma empresa</ComboboxEmpty>
+                        <ComboboxList>
+                            {(company: CompanyFilterOption) => (
+                                <ComboboxItem key={company.id} value={company}>
+                                    {company.name}
+                                </ComboboxItem>
+                            )}
+                        </ComboboxList>
+                    </ComboboxContent>
+                </Combobox>
+            </div>
 
             <UsersTable
                 users={paginated}

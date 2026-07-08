@@ -33,6 +33,7 @@ export const UserSchema = z.object({
     extensionId: z.string().nullable(),
     webhookSlug: z.string(),
     createdBy: z.string().nullable(),
+    companies: z.array(z.object({ id: z.string(), name: z.string() })),
     createdAt: timestamp,
     updatedAt: timestamp,
 })

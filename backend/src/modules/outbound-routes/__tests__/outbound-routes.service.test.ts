@@ -14,7 +14,7 @@ mock.module('../cache/outbound-routes.cache', () => ({
     OutboundRoutesCache: {
         getByCompany: mock(() => null), setByCompany: mock(),
         getRoute: mock(() => null), setRoute: mock(),
-        invalidateRoute: mock(), invalidateByCompany: mock(), invalidateNamespace: mock(),
+        invalidateRoute: mock(), invalidateByCompany: mock(), invalidateNamespace: mock(), invalidateAll: mock(),
     },
 }))
 
@@ -84,6 +84,29 @@ describe('Service.createOutboundRoute', () => {
         }) as any
         expect(route).toBeDefined()
     })
+
+    it('throws 409 when pattern is duplicated within the submitted form', async () => {
+        db.company.findUnique.mockResolvedValue(COMPANY)
+        db.trunk.findMany.mockResolvedValue([TRUNK])
+        await expect(Service.createOutboundRoute({
+            name: 'X', companyId: 'c1', position: 0, trunkIds: ['t1'],
+            patterns: [{ pattern: '_X.', position: 0 }, { pattern: '_X.', position: 1 }],
+        }))
+            .rejects.toMatchObject({ statusCode: 409 })
+    })
+
+    it('throws 409 when pattern already belongs to another route in the same company', async () => {
+        db.company.findUnique.mockResolvedValue(COMPANY)
+        db.trunk.findMany.mockResolvedValue([TRUNK])
+        db.outboundDialPattern.findFirst.mockResolvedValue({
+            pattern: '_0XXXXXXXX', route: { name: 'Outra rota' },
+        })
+        await expect(Service.createOutboundRoute({
+            name: 'X', companyId: 'c1', position: 0, trunkIds: ['t1'],
+            patterns: [{ pattern: '_0XXXXXXXX', position: 0 }],
+        }))
+            .rejects.toMatchObject({ statusCode: 409 })
+    })
 })
 
 // ─── updateOutboundRoute ──────────────────────────────────────────────────────
@@ -92,6 +115,41 @@ describe('Service.updateOutboundRoute', () => {
         db.outboundRoute.findUnique.mockResolvedValue(null)
         await expect(Service.updateOutboundRoute('clxxxxxxxxxxxxxxxxxxxxxxxxx', { name: 'X' }))
             .rejects.toMatchObject({ statusCode: 404 })
+    })
+
+    it('throws 409 when pattern already belongs to another route in the same company', async () => {
+        db.outboundRoute.findUnique.mockResolvedValue({ companyId: 'c1' })
+        db.outboundDialPattern.findFirst.mockResolvedValue({
+            pattern: '_0XXXXXXXX', route: { name: 'Outra rota' },
+        })
+        await expect(Service.updateOutboundRoute('r1', {
+            patterns: [{ pattern: '_0XXXXXXXX', position: 0 }],
+        }))
+            .rejects.toMatchObject({ statusCode: 409 })
+    })
+
+    it('excludes the route being edited from the duplicate check', async () => {
+        db.outboundRoute.findUnique.mockResolvedValue({ companyId: 'c1' })
+        db.outboundDialPattern.findFirst.mockResolvedValue(null)
+        db.outboundDialPattern.findMany.mockResolvedValue([])
+        db.outboundDialPattern.deleteMany.mockResolvedValue({ count: 0 })
+        db.outboundDialPattern.create.mockResolvedValue(PATTERN)
+        db.outboundRouteTrunk.findMany.mockResolvedValue([])
+        db.outboundRouteExtension.findMany.mockResolvedValue([])
+        db.extensions.deleteMany.mockResolvedValue({ count: 0 })
+        db.extensions.createMany.mockResolvedValue({ count: 0 })
+
+        await Service.updateOutboundRoute('r1', {
+            patterns: [{ pattern: '_0XXXXXXXX', position: 0 }],
+        })
+
+        expect(db.outboundDialPattern.findFirst).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    route: expect.objectContaining({ companyId: 'c1', id: { not: 'r1' } }),
+                }),
+            })
+        )
     })
 })
 
@@ -111,6 +169,15 @@ describe('Service.addPattern', () => {
         await expect(Service.addPattern('clxxxxxxxxxxxxxxxxxxxxxxxxx', { pattern: '_0XXXXXXXX', position: 0 }))
             .rejects.toMatchObject({ statusCode: 404 })
     })
+
+    it('throws 409 when pattern already exists in the same company', async () => {
+        db.outboundRoute.findUnique.mockResolvedValue({ id: 'r1', companyId: 'c1' })
+        db.outboundDialPattern.findFirst.mockResolvedValue({
+            pattern: '_0XXXXXXXX', route: { name: 'Outra rota' },
+        })
+        await expect(Service.addPattern('r1', { pattern: '_0XXXXXXXX', position: 0 }))
+            .rejects.toMatchObject({ statusCode: 409 })
+    })
 })
 
 // ─── updatePattern ────────────────────────────────────────────────────────────
@@ -120,6 +187,28 @@ describe('Service.updatePattern', () => {
         db.outboundDialPattern.findUnique.mockResolvedValue(null)
         await expect(Service.updatePattern('r1', 'clxxxxxxxxxxxxxxxxxxxxxxxxx', { pattern: '_X.' }))
             .rejects.toMatchObject({ statusCode: 404 })
+    })
+
+    it('throws 409 when new pattern value conflicts with another pattern', async () => {
+        db.outboundDialPattern.findFirst
+            .mockResolvedValueOnce({ id: 'p1', routeId: 'r1', pattern: '_OLD', route: { companyId: 'c1' } })
+            .mockResolvedValueOnce({ pattern: '_NEW', route: { name: 'Outra rota' } })
+        await expect(Service.updatePattern('r1', 'p1', { pattern: '_NEW' }))
+            .rejects.toMatchObject({ statusCode: 409 })
+    })
+
+    it('does not re-check duplicates when the pattern value is unchanged', async () => {
+        db.outboundDialPattern.findFirst.mockResolvedValueOnce({
+            id: 'p1', routeId: 'r1', pattern: '_SAME', route: { companyId: 'c1' },
+        })
+        db.outboundDialPattern.update.mockResolvedValue({})
+        db.outboundRoute.findUnique.mockResolvedValue({ companyId: 'c1' })
+        db.outboundDialPattern.findMany.mockResolvedValue([])
+        db.outboundRouteTrunk.findMany.mockResolvedValue([])
+
+        await Service.updatePattern('r1', 'p1', { pattern: '_SAME' })
+
+        expect(db.outboundDialPattern.findFirst).toHaveBeenCalledTimes(1)
     })
 })
 

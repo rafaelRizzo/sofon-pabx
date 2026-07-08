@@ -17,6 +17,7 @@ export type User = {
     extensionId: string | null
     webhookSlug: string
     createdBy: string | null
+    companies: { id: string; name: string }[]
     createdAt: string
     updatedAt: string
 }

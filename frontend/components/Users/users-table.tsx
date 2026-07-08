@@ -43,6 +43,7 @@ export function UsersTable({
                         <TableHead>Nome</TableHead>
                         <TableHead>E-mail</TableHead>
                         <TableHead>Permissão</TableHead>
+                        <TableHead>Empresas</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead className="w-24 text-right">Ações</TableHead>
                     </TableRow>
@@ -51,7 +52,7 @@ export function UsersTable({
                     {loading ? (
                         Array.from({ length: 3 }).map((_, i) => (
                             <TableRow key={i}>
-                                {Array.from({ length: 5 }).map((_, j) => (
+                                {Array.from({ length: 6 }).map((_, j) => (
                                     <TableCell key={j}>
                                         <Skeleton className="h-4 w-full" />
                                     </TableCell>
@@ -61,7 +62,7 @@ export function UsersTable({
                     ) : users.length === 0 ? (
                         <TableRow>
                             <TableCell
-                                colSpan={5}
+                                colSpan={6}
                                 className="h-24 text-center text-muted-foreground"
                             >
                                 Nenhum usuário encontrado
@@ -84,6 +85,21 @@ export function UsersTable({
                                     >
                                         {ROLE_LABELS[user.role]}
                                     </Badge>
+                                </TableCell>
+                                <TableCell>
+                                    {user.companies.length === 0 ? (
+                                        <span className="text-sm text-muted-foreground">
+                                            {user.role === "admin" ? "Todas" : "—"}
+                                        </span>
+                                    ) : (
+                                        <div className="flex flex-wrap gap-1">
+                                            {user.companies.map((c) => (
+                                                <Badge key={c.id} variant="outline">
+                                                    {c.name}
+                                                </Badge>
+                                            ))}
+                                        </div>
+                                    )}
                                 </TableCell>
                                 <TableCell>
                                     <StatusBadge status={user.status} />

@@ -14,22 +14,29 @@ const userSelect = {
     status: true,
     extensionId: true,
     createdBy: true,
+    companies: { select: { company: { select: { id: true, name: true } } } },
     createdAt: true,
     updatedAt: true,
 } as const
 
+const mapUser = <T extends { companies: { company: { id: string; name: string } }[] }>(user: T) => ({
+    ...user,
+    companies: user.companies.map((uc) => uc.company),
+})
+
 export const getAllUsers = async (options?: { createdBy?: string }) => {
     if (options?.createdBy) {
-        return prisma.user.findMany({
+        const users = await prisma.user.findMany({
             where: { createdBy: options.createdBy },
             select: userSelect,
         })
+        return users.map(mapUser)
     }
 
     const cached = await UsersCache.getAllUsers()
     if (cached) return cached
 
-    const users = await prisma.user.findMany({ select: userSelect })
+    const users = (await prisma.user.findMany({ select: userSelect })).map(mapUser)
     await UsersCache.setAllUsers(users)
     return users
 }
@@ -38,15 +45,16 @@ export const getUserById = async (id: string) => {
     const cached = await UsersCache.getUser(id)
     if (cached) return cached
 
-    const user = await prisma.user.findUnique({
+    const found = await prisma.user.findUnique({
         where: { id },
         select: userSelect,
     })
 
-    if (!user) {
+    if (!found) {
         throw new AppError('User not found', 404)
     }
 
+    const user = mapUser(found)
     await UsersCache.setUser(id, user)
     return user
 }
@@ -59,14 +67,14 @@ export const createUser = async (data: CreateUserInput, createdBy?: string) => {
 
     const hashedPassword = await argon2.hash(data.password)
 
-    const user = await prisma.user.create({
+    const user = mapUser(await prisma.user.create({
         data: {
             ...data,
             password: hashedPassword,
             createdBy: createdBy ?? null,
         },
         select: userSelect,
-    })
+    }))
 
     await UsersCache.invalidateAllUsers()
     return user
@@ -83,11 +91,11 @@ export const updateUser = async (id: string, data: UpdateUserInput) => {
         updateData.password = await argon2.hash(data.password)
     }
 
-    const user = await prisma.user.update({
+    const user = mapUser(await prisma.user.update({
         where: { id },
         data: updateData,
         select: userSelect,
-    })
+    }))
 
     await UsersCache.invalidateUser(id)
     await UsersCache.invalidateAllUsers()
