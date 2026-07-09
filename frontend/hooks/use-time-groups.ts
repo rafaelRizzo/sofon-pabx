@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import { z } from "zod"
 
@@ -69,27 +69,25 @@ export type TimeGroupForm = z.infer<typeof createTimeGroupFormSchema>
 export type TimeGroupUpdateForm = z.infer<typeof updateTimeGroupFormSchema>
 export type TimeRangeForm = z.infer<typeof timeRangeFormSchema>
 
-export function useTimeGroups(companyId?: string) {
+// Sem companyId — busca todos os grupos no escopo do usuário (igual use-dids/use-extensions) e
+// deixa o filtro por empresa a cargo da página, evitando esperar a empresa padrão resolver antes
+// de disparar essa requisição
+export function useTimeGroups() {
     const [timeGroups, setTimeGroups] = useState<TimeGroup[]>([])
     const [loading, setLoading] = useState(true)
     const [filter, setFilter] = useState("")
 
     const fetchTimeGroups = useCallback(async () => {
-        if (!companyId) {
-            setTimeGroups([])
-            setLoading(false)
-            return
-        }
         setLoading(true)
         try {
-            const { data } = await api.get("/time-groups", { params: { companyId } })
+            const { data } = await api.get("/time-groups")
             setTimeGroups(data.timeGroups ?? [])
         } catch (err) {
             toast.error(apiError(err, "Erro ao buscar grupos de horário"))
         } finally {
             setLoading(false)
         }
-    }, [companyId])
+    }, [])
 
     // companyId do grupo vem do próprio form (campo "Empresa" do dialog), não do filtro da página
     const createTimeGroup = async (form: TimeGroupForm) => {
@@ -135,7 +133,11 @@ export function useTimeGroups(companyId?: string) {
         g.name.toLowerCase().includes(filter.toLowerCase())
     )
 
+    const fetchedRef = useRef(false)
+
     useEffect(() => {
+        if (fetchedRef.current) return
+        fetchedRef.current = true
         fetchTimeGroups()
     }, [fetchTimeGroups])
 

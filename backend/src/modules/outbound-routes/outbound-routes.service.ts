@@ -266,6 +266,56 @@ export const getOutboundRoutes = async (companyId: string) => {
     return routes
 }
 
+export const getAllOutboundRoutes = async (companyIds?: string[]) => {
+    if (companyIds && companyIds.length === 0) return []
+
+    if (!companyIds) {
+        const cached = await OutboundRoutesCache.getAll()
+        if (cached) return cached as any[]
+    }
+
+    const bases = await prisma.outboundRoute.findMany({
+        where: companyIds ? { companyId: { in: companyIds } } : undefined,
+        orderBy: { position: 'asc' },
+        select: { id: true, name: true, companyId: true, position: true, createdAt: true, updatedAt: true },
+    })
+
+    if (bases.length === 0) {
+        if (!companyIds) await OutboundRoutesCache.setAll([])
+        return []
+    }
+
+    const ids = bases.map((r) => r.id)
+
+    const allPatterns = await prisma.outboundDialPattern.findMany({
+        where: { routeId: { in: ids } },
+        orderBy: { position: 'asc' },
+    })
+    const allTrunks = await prisma.outboundRouteTrunk.findMany({
+        where: { routeId: { in: ids } },
+        orderBy: { position: 'asc' },
+        select: { id: true, trunkId: true, position: true, routeId: true },
+    })
+    const allExtensions = await prisma.outboundRouteExtension.findMany({
+        where: { routeId: { in: ids } },
+        select: { id: true, extensionId: true, routeId: true },
+    })
+
+    const routes = bases.map((r) => ({
+        ...r,
+        patterns: allPatterns.filter((p) => p.routeId === r.id),
+        trunks: allTrunks
+            .filter((t) => t.routeId === r.id)
+            .map(({ routeId: _, ...t }) => t),
+        extensions: allExtensions
+            .filter((e) => e.routeId === r.id)
+            .map(({ routeId: _, ...e }) => e),
+    }))
+
+    if (!companyIds) await OutboundRoutesCache.setAll(routes)
+    return routes
+}
+
 export const getOutboundRouteById = async (id: string) => {
     const cached = await OutboundRoutesCache.getRoute(id)
     if (cached) return cached as NonNullable<Awaited<ReturnType<typeof fetchRoute>>>
@@ -340,6 +390,7 @@ export const createOutboundRoute = async (data: CreateOutboundRouteInput) => {
     })
 
     await OutboundRoutesCache.invalidateByCompany(data.companyId)
+    await OutboundRoutesCache.invalidateAll()
     return routeId!
 }
 
@@ -411,6 +462,7 @@ export const updateOutboundRoute = async (id: string, data: UpdateOutboundRouteI
     await Promise.all([
         OutboundRoutesCache.setRoute(id, route),
         OutboundRoutesCache.invalidateByCompany(existing.companyId),
+        OutboundRoutesCache.invalidateAll(),
     ])
     return route!
 }
@@ -436,6 +488,7 @@ export const deleteOutboundRoute = async (id: string) => {
 
     await OutboundRoutesCache.invalidateRoute(id)
     await OutboundRoutesCache.invalidateByCompany(route.companyId)
+    await OutboundRoutesCache.invalidateAll()
 }
 
 export const addPattern = async (routeId: string, data: AddPatternInput) => {
@@ -528,6 +581,7 @@ export const setTrunks = async (routeId: string, data: SetTrunksInput) => {
 
     await OutboundRoutesCache.invalidateRoute(routeId)
     await OutboundRoutesCache.invalidateByCompany(route.companyId)
+    await OutboundRoutesCache.invalidateAll()
 }
 
 export const addExtension = async (routeId: string, extensionId: string) => {
@@ -543,6 +597,7 @@ export const addExtension = async (routeId: string, extensionId: string) => {
 
     await OutboundRoutesCache.invalidateRoute(routeId)
     await OutboundRoutesCache.invalidateByCompany(route.companyId)
+    await OutboundRoutesCache.invalidateAll()
     return result
 }
 
@@ -562,4 +617,5 @@ export const removeExtension = async (routeId: string, extensionId: string) => {
 
     await OutboundRoutesCache.invalidateRoute(routeId)
     if (route) await OutboundRoutesCache.invalidateByCompany(route.companyId)
+    await OutboundRoutesCache.invalidateAll()
 }

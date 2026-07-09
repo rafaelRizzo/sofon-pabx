@@ -147,9 +147,11 @@ describe('GET /time-conditions', () => {
         expect(body.timeConditions.some((tc) => tc.id === conditionId)).toBe(true)
     })
 
-    it('400 missing companyId query', async () => {
+    it('200 lists all time conditions without companyId query', async () => {
         const res = await app.inject({ method: 'GET', url: '/time-conditions', headers: auth() })
-        expect(res.statusCode).toBe(400)
+        expect(res.statusCode).toBe(200)
+        const body = ListTimeConditionsResponse.parse(res.json())
+        expect(Array.isArray(body.timeConditions)).toBe(true)
     })
 
     it('401 without token', async () => {

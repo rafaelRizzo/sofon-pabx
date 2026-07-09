@@ -59,7 +59,8 @@ describe('QueuesService.createQueue', () => {
         await expect(QueuesService.createQueue({
             name: 'test', companyId: 'clxxxxxxxxxxxxxxxxxxxxxxxxx', number: '8000',
             strategy: 'ringall', musicOnHold: 'default', timeout: 15, retry: 5,
-            maxLen: 0, wrapupTime: 0, announceFrequency: 0, joinEmpty: true, leaveWhenEmpty: false, weight: 0,
+            maxLen: 0, wrapupTime: 0, announceFrequency: 0, announcePosition: false,
+            periodicAnnounceFrequency: 60, joinEmpty: true, leaveWhenEmpty: false, weight: 0,
         }))
             .rejects.toMatchObject({ statusCode: 404 })
     })
@@ -70,7 +71,8 @@ describe('QueuesService.createQueue', () => {
         await expect(QueuesService.createQueue({
             name: 'suporte', companyId: 'c1', number: '8001',
             strategy: 'ringall', musicOnHold: 'default', timeout: 15, retry: 5,
-            maxLen: 0, wrapupTime: 0, announceFrequency: 0, joinEmpty: true, leaveWhenEmpty: false, weight: 0,
+            maxLen: 0, wrapupTime: 0, announceFrequency: 0, announcePosition: false,
+            periodicAnnounceFrequency: 60, joinEmpty: true, leaveWhenEmpty: false, weight: 0,
         }))
             .rejects.toMatchObject({ statusCode: 409 })
     })

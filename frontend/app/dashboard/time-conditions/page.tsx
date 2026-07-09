@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { PlusIcon } from "lucide-react"
 
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog"
@@ -18,19 +18,17 @@ import {
     ComboboxList,
 } from "@/components/ui/combobox"
 import { Input } from "@/components/ui/input"
-import { useCompanies, type Company } from "@/hooks/use-companies"
+import { useCompanies } from "@/hooks/use-companies"
 import { usePagination } from "@/hooks/use-pagination"
 import { useTimeConditions, type TimeCondition } from "@/hooks/use-time-conditions"
 
+type CompanyFilterOption = { id: string; name: string }
+
+const ALL_COMPANIES: CompanyFilterOption = { id: "all", name: "Todas as empresas" }
+
 export default function TimeConditionsPage() {
     const { companies } = useCompanies()
-    const [companyId, setCompanyId] = useState<string>("")
-
-    useEffect(() => {
-        if (!companyId && companies.length > 0) {
-            setCompanyId(companies[0].id)
-        }
-    }, [companies, companyId])
+    const [companyFilter, setCompanyFilter] = useState<string>("all")
 
     const {
         timeConditions,
@@ -40,13 +38,16 @@ export default function TimeConditionsPage() {
         createTimeCondition,
         updateTimeCondition,
         deleteTimeCondition,
-    } = useTimeConditions(companyId)
+    } = useTimeConditions()
+    const companyTimeConditions = timeConditions.filter(
+        (tc) => companyFilter === "all" || tc.companyId === companyFilter
+    )
 
     const [createOpen, setCreateOpen] = useState(false)
     const [editTimeCondition, setEditTimeCondition] = useState<TimeCondition | null>(null)
     const [deleteTarget, setDeleteTarget] = useState<TimeCondition | null>(null)
 
-    const { paginated, page, setPage, totalPages, total } = usePagination(timeConditions, 15)
+    const { paginated, page, setPage, totalPages, total } = usePagination(companyTimeConditions, 15)
 
     const handleDelete = async () => {
         if (!deleteTarget) return false
@@ -72,18 +73,24 @@ export default function TimeConditionsPage() {
                     onChange={(e) => setFilter(e.target.value)}
                     className="max-w-sm"
                 />
-                <Combobox<Company>
-                    items={companies}
-                    value={companies.find((c) => c.id === companyId) ?? null}
+                <Combobox<CompanyFilterOption>
+                    items={[ALL_COMPANIES, ...companies]}
+                    value={
+                        [ALL_COMPANIES, ...companies].find(
+                            (c) => c.id === companyFilter
+                        ) ?? ALL_COMPANIES
+                    }
                     itemToStringLabel={(c) => c.name}
                     isItemEqualToValue={(a, b) => a.id === b.id}
-                    onValueChange={(company) => setCompanyId(company?.id ?? "")}
+                    onValueChange={(company) =>
+                        setCompanyFilter(company?.id ?? "all")
+                    }
                 >
                     <ComboboxInput placeholder="Buscar empresa..." className="w-56" />
                     <ComboboxContent>
                         <ComboboxEmpty>Nenhuma empresa</ComboboxEmpty>
                         <ComboboxList>
-                            {(company: Company) => (
+                            {(company: CompanyFilterOption) => (
                                 <ComboboxItem key={company.id} value={company}>
                                     {company.name}
                                 </ComboboxItem>
@@ -96,7 +103,6 @@ export default function TimeConditionsPage() {
             <TimeConditionsTable
                 timeConditions={paginated}
                 loading={loading}
-                companyId={companyId}
                 onEdit={setEditTimeCondition}
                 onDelete={setDeleteTarget}
             />

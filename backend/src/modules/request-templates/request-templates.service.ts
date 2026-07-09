@@ -95,9 +95,12 @@ export const createRequestTemplate = async (data: CreateRequestTemplateInput) =>
         return created
     })
 
-    await RequestTemplateRepository.regenerate(data.companyId)
-    await RequestTemplatesCache.invalidateByCompany(data.companyId)
-    await RequestTemplatesCache.invalidateAll()
+    try {
+        await RequestTemplateRepository.regenerate(data.companyId)
+    } finally {
+        await RequestTemplatesCache.invalidateByCompany(data.companyId)
+        await RequestTemplatesCache.invalidateAll()
+    }
     return template
 }
 
@@ -145,8 +148,11 @@ export const deleteRequestTemplate = async (id: string) => {
         await tx.requestTemplate.delete({ where: { id } })
     })
 
-    await RequestTemplateRepository.regenerate(existing.companyId)
-    await RequestTemplatesCache.invalidateTemplate(id)
-    await RequestTemplatesCache.invalidateByCompany(existing.companyId)
-    await RequestTemplatesCache.invalidateAll()
+    try {
+        await RequestTemplateRepository.regenerate(existing.companyId)
+    } finally {
+        await RequestTemplatesCache.invalidateTemplate(id)
+        await RequestTemplatesCache.invalidateByCompany(existing.companyId)
+        await RequestTemplatesCache.invalidateAll()
+    }
 }

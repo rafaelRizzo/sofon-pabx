@@ -31,6 +31,20 @@ export class ExtensionsCache {
         logger.info({ event: 'cache.invalidate', namespace: NAMESPACE, key: `company:${companyId}` })
     }
 
+    // Lista de /extensions escopada por usuário não-admin com MAIS DE UMA empresa vinculada —
+    // getByCompany (1 empresa) e getAllExtensions (admin) não cobrem esse caso.
+    // Invalidada de forma ampla por invalidateAllExtensions() (prefixo "extensions:"), como os demais.
+    static async getForScope(userId: string) {
+        const cached = await cacheManager.get(`${NAMESPACE}:scope`, userId)
+        logger.info({ event: cached ? 'cache.hit' : 'cache.miss', namespace: NAMESPACE, key: `scope:${userId}` })
+        return cached
+    }
+
+    static async setForScope(userId: string, data: any, config?: CacheConfig) {
+        await cacheManager.set(`${NAMESPACE}:scope`, userId, data, config)
+        logger.info({ event: 'cache.set', namespace: NAMESPACE, key: `scope:${userId}` })
+    }
+
     static async getExtension<T = unknown>(number: string) {
         const cached = await cacheManager.get<T>(`${NAMESPACE}:ext`, number)
         logger.info({ event: cached ? 'cache.hit' : 'cache.miss', namespace: NAMESPACE, key: `ext:${number}` })

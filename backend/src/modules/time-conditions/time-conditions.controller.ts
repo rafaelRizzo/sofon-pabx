@@ -7,9 +7,21 @@ import { prisma } from '../../lib/prisma'
 
 export const getTimeConditionsByCompanyId = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
-        const { companyId } = companyQuerySchema.parse(req.query)
-        req.scope.assertAccess(companyId)
-        const conditions = await TimeConditionsService.getTimeConditionsByCompany(companyId)
+        const filter = companyQuerySchema.safeParse(req.query)
+
+        if (filter.success) {
+            req.scope.assertAccess(filter.data.companyId)
+            const conditions = await TimeConditionsService.getTimeConditionsByCompany(filter.data.companyId)
+            return reply.send({ success: true, message: 'Time conditions fetched successfully', timeConditions: conditions })
+        }
+
+        const { companyIds } = req.scope
+        if (companyIds?.length === 1) {
+            const conditions = await TimeConditionsService.getTimeConditionsByCompany(companyIds[0]!)
+            return reply.send({ success: true, message: 'Time conditions fetched successfully', timeConditions: conditions })
+        }
+
+        const conditions = await TimeConditionsService.getAllTimeConditions(companyIds ?? undefined)
         return reply.send({ success: true, message: 'Time conditions fetched successfully', timeConditions: conditions })
     } catch (error) {
         return handleError(reply, error, req)

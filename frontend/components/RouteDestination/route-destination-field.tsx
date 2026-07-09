@@ -118,7 +118,11 @@ export async function fetchDestinationOptions(
     switch (type) {
         case "extension": {
             const { data } = await api.get("/extensions", { params: { companyId } })
-            const extensions = (data.extensions ?? []) as { id: string; alias: string; name: string }[]
+            const grouped = data.extensions as {
+                sip?: { id: string; alias: string; name: string }[]
+                pjsip?: { id: string; alias: string; name: string }[]
+            }
+            const extensions = [...(grouped?.sip ?? []), ...(grouped?.pjsip ?? [])]
             return extensions.map((e) => ({ id: e.id, label: `${e.alias} — ${e.name}` }))
         }
         case "queue": {

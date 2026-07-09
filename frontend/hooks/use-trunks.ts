@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import { z } from "zod"
 
@@ -84,27 +84,25 @@ export const updateTrunkSchema = z.object({
 export type TrunkCreateForm = z.infer<typeof createTrunkSchema>
 export type TrunkUpdateForm = z.infer<typeof updateTrunkSchema>
 
-export function useTrunks(companyId?: string) {
+// Sem companyId — busca todos os troncos no escopo do usuário (igual use-dids/use-extensions) e
+// deixa o filtro por empresa a cargo da página, evitando esperar a empresa padrão resolver antes
+// de disparar essa requisição
+export function useTrunks() {
     const [trunks, setTrunks] = useState<Trunk[]>([])
     const [loading, setLoading] = useState(true)
     const [filter, setFilter] = useState("")
 
     const fetchTrunks = useCallback(async () => {
-        if (!companyId) {
-            setTrunks([])
-            setLoading(false)
-            return
-        }
         setLoading(true)
         try {
-            const { data } = await api.get("/trunks", { params: { companyId } })
+            const { data } = await api.get("/trunks")
             setTrunks(data.trunks ?? [])
         } catch (err) {
             toast.error(apiError(err, "Erro ao buscar troncos"))
         } finally {
             setLoading(false)
         }
-    }, [companyId])
+    }, [])
 
     const createTrunk = async (form: TrunkCreateForm): Promise<Trunk | null> => {
         const id = toast.loading("Criando tronco...")
@@ -157,7 +155,11 @@ export function useTrunks(companyId?: string) {
         `${t.name} ${t.host ?? ""}`.toLowerCase().includes(filter.toLowerCase())
     )
 
+    const fetchedRef = useRef(false)
+
     useEffect(() => {
+        if (fetchedRef.current) return
+        fetchedRef.current = true
         fetchTrunks()
     }, [fetchTrunks])
 

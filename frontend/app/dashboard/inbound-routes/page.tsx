@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { PlusIcon } from "lucide-react"
 
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog"
@@ -18,25 +18,33 @@ import {
     ComboboxList,
 } from "@/components/ui/combobox"
 import { Input } from "@/components/ui/input"
-import { useCompanies, type Company } from "@/hooks/use-companies"
+import { useCompanies } from "@/hooks/use-companies"
 import { useDids } from "@/hooks/use-dids"
 import { useInboundRoutes, type InboundRoute } from "@/hooks/use-inbound-routes"
 import { usePagination } from "@/hooks/use-pagination"
 import { useTrunks } from "@/hooks/use-trunks"
 
+type CompanyFilterOption = { id: string; name: string }
+
+const ALL_COMPANIES: CompanyFilterOption = { id: "all", name: "Todas as empresas" }
+
 export default function InboundRoutesPage() {
     const { companies } = useCompanies()
-    const [companyId, setCompanyId] = useState<string>("")
+    const [companyFilter, setCompanyFilter] = useState<string>("all")
 
-    useEffect(() => {
-        if (!companyId && companies.length > 0) {
-            setCompanyId(companies[0].id)
-        }
-    }, [companies, companyId])
+    const [createOpen, setCreateOpen] = useState(false)
+    const [editRoute, setEditRoute] = useState<InboundRoute | null>(null)
+    const [deleteTarget, setDeleteTarget] = useState<InboundRoute | null>(null)
+
+    // Empresa usada para escopar DIDs/troncos do formulário (o dialog não deixa escolher
+    // empresa): a da rota em edição, ou o filtro quando uma empresa específica está
+    // selecionada — "Todas as empresas" não é uma empresa válida pra criar/editar
+    const formCompanyId = editRoute?.companyId ?? (companyFilter !== "all" ? companyFilter : undefined)
 
     const { dids } = useDids()
-    const companyDids = dids.filter((d) => d.companyId === companyId)
-    const { trunks } = useTrunks(companyId)
+    const formDids = dids.filter((d) => d.companyId === formCompanyId)
+    const { trunks } = useTrunks()
+    const formTrunks = trunks.filter((t) => t.companyId === formCompanyId)
     const {
         routes,
         allRoutes,
@@ -46,13 +54,12 @@ export default function InboundRoutesPage() {
         createRoute,
         updateRoute,
         deleteRoute,
-    } = useInboundRoutes(companyId)
+    } = useInboundRoutes(formCompanyId)
+    const companyRoutes = routes.filter(
+        (r) => companyFilter === "all" || r.companyId === companyFilter
+    )
 
-    const [createOpen, setCreateOpen] = useState(false)
-    const [editRoute, setEditRoute] = useState<InboundRoute | null>(null)
-    const [deleteTarget, setDeleteTarget] = useState<InboundRoute | null>(null)
-
-    const { paginated, page, setPage, totalPages, total } = usePagination(routes, 15)
+    const { paginated, page, setPage, totalPages, total } = usePagination(companyRoutes, 15)
 
     const handleDelete = async () => {
         if (!deleteTarget) return false
@@ -65,7 +72,10 @@ export default function InboundRoutesPage() {
                 title="Rotas de entrada"
                 description="Gerencie para onde as chamadas recebidas em cada DID são direcionadas"
             >
-                <Button onClick={() => setCreateOpen(true)} disabled={!companyId}>
+                <Button
+                    onClick={() => setCreateOpen(true)}
+                    disabled={companyFilter === "all"}
+                >
                     <PlusIcon />
                     Nova rota
                 </Button>
@@ -78,18 +88,24 @@ export default function InboundRoutesPage() {
                     onChange={(e) => setFilter(e.target.value)}
                     className="max-w-sm"
                 />
-                <Combobox<Company>
-                    items={companies}
-                    value={companies.find((c) => c.id === companyId) ?? null}
+                <Combobox<CompanyFilterOption>
+                    items={[ALL_COMPANIES, ...companies]}
+                    value={
+                        [ALL_COMPANIES, ...companies].find(
+                            (c) => c.id === companyFilter
+                        ) ?? ALL_COMPANIES
+                    }
                     itemToStringLabel={(c) => c.name}
                     isItemEqualToValue={(a, b) => a.id === b.id}
-                    onValueChange={(company) => setCompanyId(company?.id ?? "")}
+                    onValueChange={(company) =>
+                        setCompanyFilter(company?.id ?? "all")
+                    }
                 >
                     <ComboboxInput placeholder="Buscar empresa..." className="w-56" />
                     <ComboboxContent>
                         <ComboboxEmpty>Nenhuma empresa</ComboboxEmpty>
                         <ComboboxList>
-                            {(company: Company) => (
+                            {(company: CompanyFilterOption) => (
                                 <ComboboxItem key={company.id} value={company}>
                                     {company.name}
                                 </ComboboxItem>
@@ -102,21 +118,20 @@ export default function InboundRoutesPage() {
             <InboundRoutesTable
                 routes={paginated}
                 loading={loading}
-                companyId={companyId}
                 onEdit={setEditRoute}
                 onDelete={setDeleteTarget}
             />
 
             <DataPagination page={page} totalPages={totalPages} total={total} onPageChange={setPage} />
 
-            {createOpen && companyId && (
+            {createOpen && companyFilter !== "all" && (
                 <InboundRouteFormDialog
                     open={createOpen}
                     onOpenChange={setCreateOpen}
                     route={null}
-                    companyId={companyId}
-                    dids={companyDids}
-                    trunks={trunks}
+                    companyId={formCompanyId!}
+                    dids={formDids}
+                    trunks={formTrunks}
                     existingRoutes={allRoutes}
                     onSave={createRoute}
                 />
@@ -127,9 +142,9 @@ export default function InboundRoutesPage() {
                     open={!!editRoute}
                     onOpenChange={(open) => !open && setEditRoute(null)}
                     route={editRoute}
-                    companyId={companyId}
-                    dids={companyDids}
-                    trunks={trunks}
+                    companyId={formCompanyId!}
+                    dids={formDids}
+                    trunks={formTrunks}
                     existingRoutes={allRoutes}
                     onSave={(form) =>
                         updateRoute(editRoute.id, { name: form.name, destination: form.destination })

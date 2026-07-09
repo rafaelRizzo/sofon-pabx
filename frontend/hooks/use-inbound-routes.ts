@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import { z } from "zod"
 
@@ -37,27 +37,25 @@ export const updateInboundRouteFormSchema = z.object({
 export type InboundRouteForm = z.infer<typeof createInboundRouteFormSchema>
 export type InboundRouteUpdateForm = z.infer<typeof updateInboundRouteFormSchema>
 
+// companyId aqui só é usado por createRoute (o POST exige companyId no body) — a busca em si não
+// depende dele: busca todas as rotas no escopo do usuário (igual use-dids/use-extensions), evitando
+// esperar a empresa padrão resolver antes de disparar essa requisição
 export function useInboundRoutes(companyId?: string) {
     const [routes, setRoutes] = useState<InboundRoute[]>([])
     const [loading, setLoading] = useState(true)
     const [filter, setFilter] = useState("")
 
     const fetchRoutes = useCallback(async () => {
-        if (!companyId) {
-            setRoutes([])
-            setLoading(false)
-            return
-        }
         setLoading(true)
         try {
-            const { data } = await api.get("/inbound-routes", { params: { companyId } })
+            const { data } = await api.get("/inbound-routes")
             setRoutes(data.inboundRoutes ?? [])
         } catch (err) {
             toast.error(apiError(err, "Erro ao buscar rotas de entrada"))
         } finally {
             setLoading(false)
         }
-    }, [companyId])
+    }, [])
 
     const createRoute = async (form: InboundRouteForm) => {
         if (!companyId) return false
@@ -103,7 +101,11 @@ export function useInboundRoutes(companyId?: string) {
         `${r.name} ${r.did.number} ${r.trunk.name}`.toLowerCase().includes(filter.toLowerCase())
     )
 
+    const fetchedRef = useRef(false)
+
     useEffect(() => {
+        if (fetchedRef.current) return
+        fetchedRef.current = true
         fetchRoutes()
     }, [fetchRoutes])
 

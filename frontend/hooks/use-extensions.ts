@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import { z } from "zod"
 
@@ -381,7 +381,11 @@ export function useExtensions() {
             .includes(filter.toLowerCase())
     )
 
+    const fetchedRef = useRef(false)
+
     useEffect(() => {
+        if (fetchedRef.current) return
+        fetchedRef.current = true
         fetchExtensions()
     }, [fetchExtensions])
 

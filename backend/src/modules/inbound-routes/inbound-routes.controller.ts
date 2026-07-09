@@ -7,9 +7,21 @@ import { prisma } from '../../lib/prisma'
 
 export const getInboundRoutesByCompanyId = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
-        const { companyId } = companyQuerySchema.parse(req.query)
-        req.scope.assertAccess(companyId)
-        const routes = await InboundRoutesService.getInboundRoutesByCompany(companyId)
+        const filter = companyQuerySchema.safeParse(req.query)
+
+        if (filter.success) {
+            req.scope.assertAccess(filter.data.companyId)
+            const routes = await InboundRoutesService.getInboundRoutesByCompany(filter.data.companyId)
+            return reply.send({ success: true, message: 'Inbound routes fetched successfully', inboundRoutes: routes })
+        }
+
+        const { companyIds } = req.scope
+        if (companyIds?.length === 1) {
+            const routes = await InboundRoutesService.getInboundRoutesByCompany(companyIds[0]!)
+            return reply.send({ success: true, message: 'Inbound routes fetched successfully', inboundRoutes: routes })
+        }
+
+        const routes = await InboundRoutesService.getAllInboundRoutes(companyIds ?? undefined)
         return reply.send({ success: true, message: 'Inbound routes fetched successfully', inboundRoutes: routes })
     } catch (error) {
         return handleError(reply, error, req)

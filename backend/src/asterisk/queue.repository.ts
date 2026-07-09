@@ -53,6 +53,9 @@ type AsteriskQueueData = {
     wrapupTime?: number
     announce?: string | null
     announceFrequency?: number
+    announcePosition?: boolean
+    periodicAnnounce?: string | null
+    periodicAnnounceFrequency?: number
     joinEmpty?: boolean
     leaveWhenEmpty?: boolean
     weight?: number
@@ -71,6 +74,9 @@ export const AsteriskQueueRepository = {
                 wrapuptime: data.wrapupTime,
                 announce: data.announce ?? null,
                 announceFreq: data.announceFrequency,
+                announcePosition: data.announcePosition ? 'yes' : 'no',
+                periodicAnnounce: data.periodicAnnounce ?? null,
+                periodicAnnounceFreq: data.periodicAnnounceFrequency,
                 joinempty: data.joinEmpty ? 'yes' : 'no',
                 leavewhenempty: data.leaveWhenEmpty ? 'yes' : 'no',
                 weight: data.weight,

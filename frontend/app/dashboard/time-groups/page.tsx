@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { PlusIcon } from "lucide-react"
 
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog"
@@ -18,19 +18,17 @@ import {
     ComboboxList,
 } from "@/components/ui/combobox"
 import { Input } from "@/components/ui/input"
-import { useCompanies, type Company } from "@/hooks/use-companies"
+import { useCompanies } from "@/hooks/use-companies"
 import { usePagination } from "@/hooks/use-pagination"
 import { useTimeGroups, type TimeGroup } from "@/hooks/use-time-groups"
 
+type CompanyFilterOption = { id: string; name: string }
+
+const ALL_COMPANIES: CompanyFilterOption = { id: "all", name: "Todas as empresas" }
+
 export default function TimeGroupsPage() {
     const { companies } = useCompanies()
-    const [companyId, setCompanyId] = useState<string>("")
-
-    useEffect(() => {
-        if (!companyId && companies.length > 0) {
-            setCompanyId(companies[0].id)
-        }
-    }, [companies, companyId])
+    const [companyFilter, setCompanyFilter] = useState<string>("all")
 
     const {
         timeGroups,
@@ -40,14 +38,17 @@ export default function TimeGroupsPage() {
         createTimeGroup,
         updateTimeGroup,
         deleteTimeGroup,
-    } = useTimeGroups(companyId)
+    } = useTimeGroups()
+    const companyTimeGroups = timeGroups.filter(
+        (g) => companyFilter === "all" || g.companyId === companyFilter
+    )
 
     const [createOpen, setCreateOpen] = useState(false)
     const [editTimeGroup, setEditTimeGroup] = useState<TimeGroup | null>(null)
     const [deleteTarget, setDeleteTarget] = useState<TimeGroup | null>(null)
 
     const { paginated, page, setPage, totalPages, total } = usePagination(
-        timeGroups,
+        companyTimeGroups,
         15
     )
 
@@ -75,18 +76,24 @@ export default function TimeGroupsPage() {
                     onChange={(e) => setFilter(e.target.value)}
                     className="max-w-sm"
                 />
-                <Combobox<Company>
-                    items={companies}
-                    value={companies.find((c) => c.id === companyId) ?? null}
+                <Combobox<CompanyFilterOption>
+                    items={[ALL_COMPANIES, ...companies]}
+                    value={
+                        [ALL_COMPANIES, ...companies].find(
+                            (c) => c.id === companyFilter
+                        ) ?? ALL_COMPANIES
+                    }
                     itemToStringLabel={(c) => c.name}
                     isItemEqualToValue={(a, b) => a.id === b.id}
-                    onValueChange={(company) => setCompanyId(company?.id ?? "")}
+                    onValueChange={(company) =>
+                        setCompanyFilter(company?.id ?? "all")
+                    }
                 >
                     <ComboboxInput placeholder="Buscar empresa..." className="w-56" />
                     <ComboboxContent>
                         <ComboboxEmpty>Nenhuma empresa</ComboboxEmpty>
                         <ComboboxList>
-                            {(company: Company) => (
+                            {(company: CompanyFilterOption) => (
                                 <ComboboxItem key={company.id} value={company}>
                                     {company.name}
                                 </ComboboxItem>

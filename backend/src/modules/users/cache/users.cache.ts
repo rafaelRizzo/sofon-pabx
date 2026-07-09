@@ -60,6 +60,36 @@ export class UsersCache {
         })
     }
 
+    // Lista de /users filtrada por createdBy (reseller só vê quem ele mesmo criou) —
+    // getAllUsers({ createdBy }) não bate no cache "list:all" (que é só pra admin)
+    static async getUsersByCreatedBy(createdBy: string) {
+        const cached = await cacheManager.get(`${NAMESPACE}:createdBy`, createdBy)
+        logger.info({
+            event: cached ? 'cache.hit' : 'cache.miss',
+            namespace: NAMESPACE,
+            key: `createdBy:${createdBy}`,
+        })
+        return cached
+    }
+
+    static async setUsersByCreatedBy(createdBy: string, data: any, config?: CacheConfig) {
+        await cacheManager.set(`${NAMESPACE}:createdBy`, createdBy, data, config)
+        logger.info({
+            event: 'cache.set',
+            namespace: NAMESPACE,
+            key: `createdBy:${createdBy}`,
+        })
+    }
+
+    static async invalidateUsersByCreatedBy(createdBy: string) {
+        await cacheManager.invalidateByKey(`${NAMESPACE}:createdBy:${createdBy}`)
+        logger.info({
+            event: 'cache.invalidate',
+            namespace: NAMESPACE,
+            key: `createdBy:${createdBy}`,
+        })
+    }
+
     static async invalidateNamespace() {
         await cacheManager.invalidate(NAMESPACE)
         logger.info({

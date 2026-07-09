@@ -119,9 +119,18 @@ model Queue {
     timeout              Int           @default(15)
     retry                Int           @default(5)
     maxLen               Int           @default(0)
-    wrapupTime           Int           @default(0)
+    wrapupTime           Int           @default(5)
+    // announce: anúncio tocado uma única vez ao entrar na fila (Asterisk `announce`)
     announce             String?
+    // announceFrequency/announcePosition: junto formam o "diz sua posição/tempo de espera" do
+    // Asterisk (`announce-frequency` + `announce-position`) — announceFrequency só tem efeito
+    // com announcePosition=true
     announceFrequency    Int           @default(0)
+    announcePosition     Boolean       @default(false)
+    // periodicAnnounce/periodicAnnounceFrequency: mensagem repetida durante a espera (Asterisk
+    // `periodic-announce` + `periodic-announce-frequency`) — diferente do announce acima, que toca só uma vez
+    periodicAnnounce     String?
+    periodicAnnounceFrequency Int      @default(60)
     joinEmpty            Boolean       @default(true)
     leaveWhenEmpty       Boolean       @default(false)
     weight               Int           @default(0)
@@ -673,22 +682,25 @@ model sip_peers {
 }
 
 // name é a PK — Asterisk identifica filas por nome, não por UUID
-// announceFreq usa @map("announce-frequency") pelo mesmo motivo do hífen em sip_peers
+// announceFreq/announcePosition/periodicAnnounce* usam @map pelo mesmo motivo do hífen em sip_peers
 model queues {
-    name           String  @id @db.VarChar(128)
-    strategy       String? @default("ringall") @db.VarChar(40)
-    musiconhold    String? @default("default") @db.VarChar(128)
-    timeout        Int?    @default(15)
-    retry          Int?    @default(5)
-    maxlen         Int?    @default(0)
-    wrapuptime     Int?    @default(0)
-    announce       String? @db.VarChar(128)
-    announceFreq   Int?    @default(0) @map("announce-frequency")
-    joinempty      String? @default("yes") @db.VarChar(40)
-    leavewhenempty String? @default("no") @db.VarChar(40)
-    weight         Int?    @default(0)
-    reportholdtime String? @default("no") @db.VarChar(10)
-    ringinuse      String? @default("yes") @db.VarChar(10)
+    name                 String  @id @db.VarChar(128)
+    strategy             String? @default("ringall") @db.VarChar(40)
+    musiconhold          String? @default("default") @db.VarChar(128)
+    timeout              Int?    @default(15)
+    retry                Int?    @default(5)
+    maxlen               Int?    @default(0)
+    wrapuptime           Int?    @default(5)
+    announce             String? @db.VarChar(128)
+    announceFreq         Int?    @default(0) @map("announce-frequency")
+    announcePosition     String? @default("no") @db.VarChar(10) @map("announce-position")
+    periodicAnnounce     String? @db.VarChar(128) @map("periodic-announce")
+    periodicAnnounceFreq Int?    @default(60) @map("periodic-announce-frequency")
+    joinempty            String? @default("yes") @db.VarChar(40)
+    leavewhenempty       String? @default("no") @db.VarChar(40)
+    weight               Int?    @default(0)
+    reportholdtime       String? @default("no") @db.VarChar(10)
+    ringinuse            String? @default("yes") @db.VarChar(10)
 }
 
 // uniqueid é o nome exato que o Asterisk Realtime espera — não renomear para id

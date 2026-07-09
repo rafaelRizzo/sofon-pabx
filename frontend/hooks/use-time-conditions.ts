@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import { z } from "zod"
 
@@ -37,27 +37,25 @@ export const updateTimeConditionFormSchema = z.object({
 export type TimeConditionForm = z.infer<typeof createTimeConditionFormSchema>
 export type TimeConditionUpdateForm = z.infer<typeof updateTimeConditionFormSchema>
 
-export function useTimeConditions(companyId?: string) {
+// Sem companyId — busca todas as condições no escopo do usuário (igual use-dids/use-extensions) e
+// deixa o filtro por empresa a cargo da página, evitando esperar a empresa padrão resolver antes
+// de disparar essa requisição
+export function useTimeConditions() {
     const [timeConditions, setTimeConditions] = useState<TimeCondition[]>([])
     const [loading, setLoading] = useState(true)
     const [filter, setFilter] = useState("")
 
     const fetchTimeConditions = useCallback(async () => {
-        if (!companyId) {
-            setTimeConditions([])
-            setLoading(false)
-            return
-        }
         setLoading(true)
         try {
-            const { data } = await api.get("/time-conditions", { params: { companyId } })
+            const { data } = await api.get("/time-conditions")
             setTimeConditions(data.timeConditions ?? [])
         } catch (err) {
             toast.error(apiError(err, "Erro ao buscar condições de horário"))
         } finally {
             setLoading(false)
         }
-    }, [companyId])
+    }, [])
 
     // companyId da condição vem do próprio form (campo "Empresa" do dialog), não do filtro da página —
     // permite criar uma condição pra empresa X enquanto a tabela lista a empresa Y
@@ -104,7 +102,11 @@ export function useTimeConditions(companyId?: string) {
         tc.name.toLowerCase().includes(filter.toLowerCase())
     )
 
+    const fetchedRef = useRef(false)
+
     useEffect(() => {
+        if (fetchedRef.current) return
+        fetchedRef.current = true
         fetchTimeConditions()
     }, [fetchTimeConditions])
 

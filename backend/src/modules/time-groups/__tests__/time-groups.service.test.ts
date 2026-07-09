@@ -9,6 +9,7 @@ mock.module('../../companies/cache/companies.cache', () => ({
 }))
 mock.module('../cache/time-groups.cache', () => ({
     TimeGroupsCache: {
+        getAll: mock(() => null), setAll: mock(),
         getByCompany: mock(() => null), setByCompany: mock(),
         invalidateByCompany: mock(),
         getTimeGroup: mock(() => null), setTimeGroup: mock(),

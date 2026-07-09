@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { PencilIcon, Trash2Icon } from "lucide-react"
+import { PencilIcon, Trash2Icon, UsersIcon } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -28,39 +28,36 @@ import {
     type RouteDestination,
     type RouteDestinationType,
 } from "@/components/RouteDestination/route-destination-field"
-import { type InboundRoute } from "@/hooks/use-inbound-routes"
+import { QUEUE_STRATEGY_LABELS, type Queue } from "@/hooks/use-queues"
 
 type Props = {
-    routes: InboundRoute[]
+    queues: Queue[]
     loading: boolean
-    onEdit: (route: InboundRoute) => void
-    onDelete: (route: InboundRoute) => void
+    onEdit: (queue: Queue) => void
+    onManageMembers: (queue: Queue) => void
+    onDelete: (queue: Queue) => void
 }
 
-// Resolve o nome de cada destino buscando a lista de cada tipo presente nas rotas
-// visíveis uma única vez (não por linha) — evita N requests repetidos pro mesmo recurso.
-// loadedTypes existe pra diferenciar "ainda buscando" (mostra "…") de "buscou e não achou"
-// (registro deletado/de outra empresa — mostra aviso em vez de ficar preso em "…" pra sempre).
-// Agrupa por (tipo, empresa da própria rota) em vez de receber uma empresa fixa, já que a
-// listagem pode mostrar rotas de "Todas as empresas" ao mesmo tempo
-function useDestinationLabels(routes: InboundRoute[]) {
+// Mesmo padrão de InboundRoutesTable/TimeConditionsTable: resolve o nome do destino buscando a
+// lista de cada tipo presente uma única vez (não por linha) — evita N requests repetidos.
+// Agrupa por (tipo, empresa da própria fila) em vez de receber uma empresa fixa, já que a
+// listagem pode mostrar filas de "Todas as empresas" ao mesmo tempo
+function useDestinationLabels(queues: Queue[]) {
     const [labels, setLabels] = useState<Record<string, string>>({})
     const [loadedTypes, setLoadedTypes] = useState<Set<FetchableDestinationType>>(new Set())
 
     useEffect(() => {
         const pairs = new Map<string, { type: FetchableDestinationType; companyId: string }>()
-        for (const r of routes) {
-            const t = r.destination?.type
-            if (t && t !== "hangup") pairs.set(`${t}:${r.companyId}`, { type: t, companyId: r.companyId })
+        for (const q of queues) {
+            const t = q.postQueueDestination?.type
+            if (t && t !== "hangup") pairs.set(`${t}:${q.companyId}`, { type: t, companyId: q.companyId })
         }
         if (pairs.size === 0) return
 
         let cancelled = false
         Promise.all(
             [...pairs.values()].map(({ type, companyId }) =>
-                fetchDestinationOptions(type, companyId).then(
-                    (opts) => [type, opts] as const
-                )
+                fetchDestinationOptions(type, companyId).then((opts) => [type, opts] as const)
             )
         )
             .then((results) => {
@@ -79,12 +76,12 @@ function useDestinationLabels(routes: InboundRoute[]) {
         return () => {
             cancelled = true
         }
-    }, [routes])
+    }, [queues])
 
     return { labels, loadedTypes }
 }
 
-function DestinationCell({
+function DestinationBadge({
     destination,
     labels,
     loadedTypes,
@@ -113,8 +110,8 @@ function DestinationCell({
     )
 }
 
-export function InboundRoutesTable({ routes, loading, onEdit, onDelete }: Props) {
-    const { labels, loadedTypes } = useDestinationLabels(routes)
+export function QueuesTable({ queues, loading, onEdit, onManageMembers, onDelete }: Props) {
+    const { labels, loadedTypes } = useDestinationLabels(queues)
 
     return (
         <div className="rounded-md border">
@@ -122,10 +119,10 @@ export function InboundRoutesTable({ routes, loading, onEdit, onDelete }: Props)
                 <TableHeader>
                     <TableRow>
                         <TableHead>Nome</TableHead>
-                        <TableHead>DID</TableHead>
-                        <TableHead>Tronco</TableHead>
-                        <TableHead>Destino</TableHead>
-                        <TableHead className="w-30 text-right">Ações</TableHead>
+                        <TableHead>Número</TableHead>
+                        <TableHead>Estratégia</TableHead>
+                        <TableHead>Destino pós-fila</TableHead>
+                        <TableHead className="w-38 text-right">Ações</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -139,21 +136,21 @@ export function InboundRoutesTable({ routes, loading, onEdit, onDelete }: Props)
                                 ))}
                             </TableRow>
                         ))
-                    ) : routes.length === 0 ? (
+                    ) : queues.length === 0 ? (
                         <TableRow>
                             <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                                Nenhuma rota de entrada encontrada
+                                Nenhuma fila encontrada
                             </TableCell>
                         </TableRow>
                     ) : (
-                        routes.map((route) => (
-                            <TableRow key={route.id}>
-                                <TableCell className="font-medium">{route.name}</TableCell>
-                                <TableCell>{route.did.number}</TableCell>
-                                <TableCell>{route.trunk.name}</TableCell>
+                        queues.map((queue) => (
+                            <TableRow key={queue.id}>
+                                <TableCell className="font-medium">{queue.name}</TableCell>
+                                <TableCell>{queue.number}</TableCell>
+                                <TableCell>{QUEUE_STRATEGY_LABELS[queue.strategy]}</TableCell>
                                 <TableCell>
-                                    <DestinationCell
-                                        destination={route.destination}
+                                    <DestinationBadge
+                                        destination={queue.postQueueDestination}
                                         labels={labels}
                                         loadedTypes={loadedTypes}
                                     />
@@ -167,14 +164,29 @@ export function InboundRoutesTable({ routes, loading, onEdit, onDelete }: Props)
                                                         <Button
                                                             variant="outline"
                                                             size="icon"
-                                                            onClick={() => onEdit(route)}
+                                                            onClick={() => onManageMembers(queue)}
+                                                        >
+                                                            <UsersIcon />
+                                                            <span className="sr-only">Membros</span>
+                                                        </Button>
+                                                    }
+                                                />
+                                                <TooltipContent>Gerenciar membros</TooltipContent>
+                                            </Tooltip>
+                                            <Tooltip>
+                                                <TooltipTrigger
+                                                    render={
+                                                        <Button
+                                                            variant="outline"
+                                                            size="icon"
+                                                            onClick={() => onEdit(queue)}
                                                         >
                                                             <PencilIcon />
                                                             <span className="sr-only">Editar</span>
                                                         </Button>
                                                     }
                                                 />
-                                                <TooltipContent>Editar rota</TooltipContent>
+                                                <TooltipContent>Editar fila</TooltipContent>
                                             </Tooltip>
                                             <Tooltip>
                                                 <TooltipTrigger
@@ -182,14 +194,14 @@ export function InboundRoutesTable({ routes, loading, onEdit, onDelete }: Props)
                                                         <Button
                                                             variant="destructive"
                                                             size="icon"
-                                                            onClick={() => onDelete(route)}
+                                                            onClick={() => onDelete(queue)}
                                                         >
                                                             <Trash2Icon />
                                                             <span className="sr-only">Deletar</span>
                                                         </Button>
                                                     }
                                                 />
-                                                <TooltipContent>Deletar rota</TooltipContent>
+                                                <TooltipContent>Deletar fila</TooltipContent>
                                             </Tooltip>
                                         </div>
                                     </TooltipProvider>

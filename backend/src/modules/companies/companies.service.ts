@@ -16,6 +16,7 @@ import { TC_CONTEXT, HOL_CONTEXT, ANNOUNCEMENT_CONTEXT, IVR_CONTEXT, REQUEST_TEM
 import { RequestTemplatesCache } from '../request-templates/cache/request-templates.cache'
 import { HolidayGroupsCache } from '../holiday-groups/cache/holiday-groups.cache'
 import { UsersCache } from '../users/cache/users.cache'
+import { invalidateUserCompanyIds } from '../../utils/auth/access'
 
 const DIALPLAN_FILE_CONTEXTS = [TC_CONTEXT, HOL_CONTEXT, ANNOUNCEMENT_CONTEXT, IVR_CONTEXT, REQUEST_TEMPLATE_CONTEXT, QUEUE_APP_CONTEXT]
 import type { CreateCompanyInput, UpdateCompanyInput } from './schemas/company.schema'
@@ -36,11 +37,14 @@ const companySelect = {
 const _byId = () => prisma.company.findUnique({ where: { id: '' }, select: companySelect })
 export type CompanyDto = NonNullable<Awaited<ReturnType<typeof _byId>>>
 
-export const getAllCompanies = async (companyIds?: string[]) => {
+export const getAllCompanies = async (companyIds?: string[], userId?: string) => {
     if (companyIds && companyIds.length === 0) return []
 
     if (!companyIds) {
         const cached = await CompaniesCache.getAllCompanies()
+        if (cached) return cached
+    } else if (userId) {
+        const cached = await CompaniesCache.getCompaniesForScope(userId)
         if (cached) return cached
     }
 
@@ -50,6 +54,7 @@ export const getAllCompanies = async (companyIds?: string[]) => {
     })
 
     if (!companyIds) await CompaniesCache.setAllCompanies(companies)
+    else if (userId) await CompaniesCache.setCompaniesForScope(userId, companies)
     return companies
 }
 
@@ -96,6 +101,8 @@ export const createCompany = async ({ userId, ...data }: Omit<CreateCompanyInput
 
     await CompaniesCache.invalidateAllCompanies()
     await CompaniesCache.invalidateCompaniesByUser(userId)
+    await CompaniesCache.invalidateCompaniesForScope(userId)
+    await invalidateUserCompanyIds(userId)
     await UsersCache.invalidateUser(userId)
     await UsersCache.invalidateAllUsers()
     return company
@@ -148,6 +155,8 @@ export const updateCompany = async (id: string, { userId, ...data }: UpdateCompa
     const affectedUsers = new Set(existing.users.map((u) => u.userId))
     if (userId) affectedUsers.add(userId)
     await Promise.all([...affectedUsers].map((uid) => CompaniesCache.invalidateCompaniesByUser(uid)))
+    await Promise.all([...affectedUsers].map((uid) => CompaniesCache.invalidateCompaniesForScope(uid)))
+    await Promise.all([...affectedUsers].map((uid) => invalidateUserCompanyIds(uid)))
     if (userId) {
         await Promise.all([...affectedUsers].map((uid) => UsersCache.invalidateUser(uid)))
         await UsersCache.invalidateAllUsers()
@@ -230,6 +239,8 @@ export const deleteCompany = async (id: string) => {
         RequestTemplatesCache.invalidateNamespace(),
         HolidayGroupsCache.invalidateNamespace(),
         ...existing.users.map((u) => CompaniesCache.invalidateCompaniesByUser(u.userId)),
+        ...existing.users.map((u) => CompaniesCache.invalidateCompaniesForScope(u.userId)),
+        ...existing.users.map((u) => invalidateUserCompanyIds(u.userId)),
         ...existing.users.map((u) => UsersCache.invalidateUser(u.userId)),
         UsersCache.invalidateAllUsers(),
     ])

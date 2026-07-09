@@ -13,7 +13,7 @@ export const getAllExtensions = async (req: FastifyRequest, reply: FastifyReply)
             return reply.send({ success: true, message: 'Extensions fetched successfully', extensions })
         }
 
-        const extensions = await ExtensionsService.getAllExtensions(req.scope.companyIds ?? undefined)
+        const extensions = await ExtensionsService.getAllExtensions(req.scope.companyIds ?? undefined, req.user!.id)
         return reply.send({ success: true, message: 'Extensions fetched successfully', extensions })
     } catch (error) {
         return handleError(reply, error, req)
@@ -30,7 +30,7 @@ export const exportExtensions = async (req: FastifyRequest, reply: FastifyReply)
             return reply.send({ success: true, message: 'Extensions exported successfully', extensions })
         }
 
-        const extensions = await ExtensionsService.getExtensionsForExport(req.scope.companyIds ?? undefined)
+        const extensions = await ExtensionsService.getExtensionsForExport(req.scope.companyIds ?? undefined, req.user!.id)
         return reply.send({ success: true, message: 'Extensions exported successfully', extensions })
     } catch (error) {
         return handleError(reply, error, req)

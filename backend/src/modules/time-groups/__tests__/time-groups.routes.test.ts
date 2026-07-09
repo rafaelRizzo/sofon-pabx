@@ -113,9 +113,11 @@ describe('GET /time-groups', () => {
         expect(body.timeGroups.some((g) => g.id === groupId)).toBe(true)
     })
 
-    it('400 missing companyId query', async () => {
+    it('200 lists all time groups without companyId query', async () => {
         const res = await app.inject({ method: 'GET', url: '/time-groups', headers: auth() })
-        expect(res.statusCode).toBe(400)
+        expect(res.statusCode).toBe(200)
+        const body = ListTimeGroupsResponse.parse(res.json())
+        expect(Array.isArray(body.timeGroups)).toBe(true)
     })
 
     it('401 without token', async () => {

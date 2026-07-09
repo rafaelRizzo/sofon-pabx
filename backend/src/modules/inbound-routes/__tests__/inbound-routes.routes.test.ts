@@ -150,9 +150,11 @@ describe('GET /inbound-routes', () => {
         expect(body.inboundRoutes.some((r) => r.id === routeId)).toBe(true)
     })
 
-    it('400 missing companyId query', async () => {
+    it('200 lists all inbound routes without companyId query', async () => {
         const res = await app.inject({ method: 'GET', url: '/inbound-routes', headers: auth() })
-        expect(res.statusCode).toBe(400)
+        expect(res.statusCode).toBe(200)
+        const body = ListInboundRoutesResponse.parse(res.json())
+        expect(Array.isArray(body.inboundRoutes)).toBe(true)
     })
 
     it('401 without token', async () => {

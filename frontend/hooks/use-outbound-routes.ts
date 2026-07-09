@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import { z } from "zod"
 
@@ -79,29 +79,25 @@ const toPayload = (form: OutboundRouteForm) => ({
     })),
 })
 
+// companyId aqui só é usado por createRoute (o POST exige companyId no body) — a busca em si não
+// depende dele: busca todas as rotas no escopo do usuário (igual use-dids/use-extensions), evitando
+// esperar a empresa padrão resolver antes de disparar essa requisição
 export function useOutboundRoutes(companyId?: string) {
     const [routes, setRoutes] = useState<OutboundRoute[]>([])
     const [loading, setLoading] = useState(true)
     const [filter, setFilter] = useState("")
 
     const fetchRoutes = useCallback(async () => {
-        if (!companyId) {
-            setRoutes([])
-            setLoading(false)
-            return
-        }
         setLoading(true)
         try {
-            const { data } = await api.get("/outbound-routes", {
-                params: { companyId },
-            })
+            const { data } = await api.get("/outbound-routes")
             setRoutes(data.routes ?? [])
         } catch (err) {
             toast.error(apiError(err, "Erro ao buscar rotas de saída"))
         } finally {
             setLoading(false)
         }
-    }, [companyId])
+    }, [])
 
     const createRoute = async (form: OutboundRouteForm) => {
         if (!companyId) return false
@@ -167,7 +163,11 @@ export function useOutboundRoutes(companyId?: string) {
         r.name.toLowerCase().includes(filter.toLowerCase())
     )
 
+    const fetchedRef = useRef(false)
+
     useEffect(() => {
+        if (fetchedRef.current) return
+        fetchedRef.current = true
         fetchRoutes()
     }, [fetchRoutes])
 

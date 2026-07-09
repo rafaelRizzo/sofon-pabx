@@ -7,9 +7,21 @@ import { prisma } from '../../lib/prisma'
 
 export const getTrunks = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
-        const { companyId } = trunkQuerySchema.parse(req.query)
-        req.scope.assertAccess(companyId)
-        const trunks = await TrunksService.getTrunks(companyId)
+        const filter = trunkQuerySchema.safeParse(req.query)
+
+        if (filter.success) {
+            req.scope.assertAccess(filter.data.companyId)
+            const trunks = await TrunksService.getTrunks(filter.data.companyId)
+            return reply.send({ success: true, message: 'Trunks fetched successfully', trunks })
+        }
+
+        const { companyIds } = req.scope
+        if (companyIds?.length === 1) {
+            const trunks = await TrunksService.getTrunks(companyIds[0]!)
+            return reply.send({ success: true, message: 'Trunks fetched successfully', trunks })
+        }
+
+        const trunks = await TrunksService.getAllTrunks(companyIds ?? undefined)
         return reply.send({ success: true, message: 'Trunks fetched successfully', trunks })
     } catch (error) {
         return handleError(reply, error, req)

@@ -39,6 +39,23 @@ export const getTimeGroupsByCompany = async (companyId: string) => {
     return groups
 }
 
+export const getAllTimeGroups = async (companyIds?: string[]) => {
+    if (companyIds && companyIds.length === 0) return []
+
+    if (!companyIds) {
+        const cached = await TimeGroupsCache.getAll()
+        if (cached) return cached
+    }
+
+    const groups = await prisma.timeGroup.findMany({
+        where: companyIds ? { companyId: { in: companyIds } } : undefined,
+        select: timeGroupSelect,
+    })
+
+    if (!companyIds) await TimeGroupsCache.setAll(groups)
+    return groups
+}
+
 export const getTimeGroupById = async (id: string): Promise<TimeGroupDto> => {
     const cached = await TimeGroupsCache.getTimeGroup(id)
     if (cached) return cached as TimeGroupDto
@@ -97,11 +114,14 @@ export const updateTimeGroup = async (id: string, data: UpdateTimeGroupInput) =>
         })
     })
 
-    if (data.ranges && affectedIds.length > 0) await TimeConditionRepository.regenerate(existing.companyId)
-    for (const tcId of affectedIds) await TimeConditionsCache.invalidateTimeCondition(tcId)
-    await TimeGroupsCache.invalidateTimeGroup(id)
-    await TimeGroupsCache.invalidateByCompany(existing.companyId)
-    await TimeGroupsCache.invalidateAll()
+    try {
+        if (data.ranges && affectedIds.length > 0) await TimeConditionRepository.regenerate(existing.companyId)
+    } finally {
+        for (const tcId of affectedIds) await TimeConditionsCache.invalidateTimeCondition(tcId)
+        await TimeGroupsCache.invalidateTimeGroup(id)
+        await TimeGroupsCache.invalidateByCompany(existing.companyId)
+        await TimeGroupsCache.invalidateAll()
+    }
     return group
 }
 
@@ -115,10 +135,13 @@ export const deleteTimeGroup = async (id: string) => {
         await tx.timeGroup.delete({ where: { id } })
     })
 
-    if (affectedIds.length > 0) await TimeConditionRepository.regenerate(existing.companyId)
-    for (const tcId of affectedIds) await TimeConditionsCache.invalidateTimeCondition(tcId)
-    await TimeConditionsCache.invalidateByCompany(existing.companyId)
-    await TimeGroupsCache.invalidateTimeGroup(id)
-    await TimeGroupsCache.invalidateByCompany(existing.companyId)
-    await TimeGroupsCache.invalidateAll()
+    try {
+        if (affectedIds.length > 0) await TimeConditionRepository.regenerate(existing.companyId)
+    } finally {
+        for (const tcId of affectedIds) await TimeConditionsCache.invalidateTimeCondition(tcId)
+        await TimeConditionsCache.invalidateByCompany(existing.companyId)
+        await TimeGroupsCache.invalidateTimeGroup(id)
+        await TimeGroupsCache.invalidateByCompany(existing.companyId)
+        await TimeGroupsCache.invalidateAll()
+    }
 }

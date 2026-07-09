@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { PlusIcon } from "lucide-react"
 
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog"
@@ -18,19 +18,17 @@ import {
     ComboboxList,
 } from "@/components/ui/combobox"
 import { Input } from "@/components/ui/input"
-import { useCompanies, type Company } from "@/hooks/use-companies"
+import { useCompanies } from "@/hooks/use-companies"
 import { usePagination } from "@/hooks/use-pagination"
 import { useTrunks, type Trunk } from "@/hooks/use-trunks"
 
+type CompanyFilterOption = { id: string; name: string }
+
+const ALL_COMPANIES: CompanyFilterOption = { id: "all", name: "Todas as empresas" }
+
 export default function TrunksPage() {
     const { companies } = useCompanies()
-    const [companyId, setCompanyId] = useState<string>("")
-
-    useEffect(() => {
-        if (!companyId && companies.length > 0) {
-            setCompanyId(companies[0].id)
-        }
-    }, [companies, companyId])
+    const [companyFilter, setCompanyFilter] = useState<string>("all")
 
     const {
         trunks,
@@ -40,14 +38,17 @@ export default function TrunksPage() {
         createTrunk,
         updateTrunk,
         deleteTrunk,
-    } = useTrunks(companyId)
+    } = useTrunks()
+    const companyTrunks = trunks.filter(
+        (t) => companyFilter === "all" || t.companyId === companyFilter
+    )
 
     const [createOpen, setCreateOpen] = useState(false)
     const [editTrunk, setEditTrunk] = useState<Trunk | null>(null)
     const [deleteTarget, setDeleteTarget] = useState<Trunk | null>(null)
 
     const { paginated, page, setPage, totalPages, total } = usePagination(
-        trunks,
+        companyTrunks,
         15
     )
 
@@ -62,10 +63,7 @@ export default function TrunksPage() {
                 title="Troncos"
                 description="Gerencie os troncos SIP de entrada e saída"
             >
-                <Button
-                    onClick={() => setCreateOpen(true)}
-                    disabled={!companyId}
-                >
+                <Button onClick={() => setCreateOpen(true)}>
                     <PlusIcon />
                     Novo tronco
                 </Button>
@@ -78,12 +76,18 @@ export default function TrunksPage() {
                     onChange={(e) => setFilter(e.target.value)}
                     className="max-w-sm"
                 />
-                <Combobox<Company>
-                    items={companies}
-                    value={companies.find((c) => c.id === companyId) ?? null}
+                <Combobox<CompanyFilterOption>
+                    items={[ALL_COMPANIES, ...companies]}
+                    value={
+                        [ALL_COMPANIES, ...companies].find(
+                            (c) => c.id === companyFilter
+                        ) ?? ALL_COMPANIES
+                    }
                     itemToStringLabel={(c) => c.name}
                     isItemEqualToValue={(a, b) => a.id === b.id}
-                    onValueChange={(company) => setCompanyId(company?.id ?? "")}
+                    onValueChange={(company) =>
+                        setCompanyFilter(company?.id ?? "all")
+                    }
                 >
                     <ComboboxInput
                         placeholder="Buscar empresa..."
@@ -92,7 +96,7 @@ export default function TrunksPage() {
                     <ComboboxContent>
                         <ComboboxEmpty>Nenhuma empresa</ComboboxEmpty>
                         <ComboboxList>
-                            {(company: Company) => (
+                            {(company: CompanyFilterOption) => (
                                 <ComboboxItem key={company.id} value={company}>
                                     {company.name}
                                 </ComboboxItem>
@@ -116,7 +120,7 @@ export default function TrunksPage() {
                 onPageChange={setPage}
             />
 
-            {createOpen && companyId && (
+            {createOpen && (
                 <TrunkFormDialog
                     open={createOpen}
                     onOpenChange={setCreateOpen}

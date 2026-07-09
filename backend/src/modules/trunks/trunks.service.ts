@@ -48,6 +48,23 @@ export const getTrunks = async (companyId: string) => {
     return trunks
 }
 
+export const getAllTrunks = async (companyIds?: string[]) => {
+    if (companyIds && companyIds.length === 0) return []
+
+    if (!companyIds) {
+        const cached = await TrunksCache.getAll()
+        if (cached) return cached
+    }
+
+    const trunks = await prisma.trunk.findMany({
+        where: companyIds ? { companyId: { in: companyIds } } : undefined,
+        select: trunkSelect,
+    })
+
+    if (!companyIds) await TrunksCache.setAll(trunks)
+    return trunks
+}
+
 export const getTrunkById = async (id: string) => {
     const cached = await TrunksCache.getTrunk(id)
     if (cached) return cached
@@ -185,6 +202,7 @@ export const updateTrunk = async (id: string, data: UpdateTrunkInput) => {
 
     await TrunksCache.invalidateTrunk(id)
     await TrunksCache.invalidateByCompany(existing.companyId)
+    await TrunksCache.invalidateAllTrunks()
     return getTrunkById(id)
 }
 

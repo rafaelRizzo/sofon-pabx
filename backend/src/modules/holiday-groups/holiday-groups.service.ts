@@ -62,9 +62,11 @@ export async function resyncAllHolidayGroupsFromUrl(year: number) {
     }
 
     const companyIds = [...new Set(groups.map((g) => g.companyId))]
-    for (const companyId of companyIds) await HolidayGroupRepository.regenerate(companyId)
-
-    if (groups.length > 0) await HolidayGroupsCache.invalidateNamespace()
+    try {
+        for (const companyId of companyIds) await HolidayGroupRepository.regenerate(companyId)
+    } finally {
+        if (groups.length > 0) await HolidayGroupsCache.invalidateNamespace()
+    }
     return groups.length
 }
 
@@ -119,8 +121,11 @@ export const createHolidayGroup = async (data: CreateHolidayGroupInput) => {
         return created
     })
 
-    await HolidayGroupRepository.regenerate(data.companyId)
-    await HolidayGroupsCache.invalidateByCompany(data.companyId)
+    try {
+        await HolidayGroupRepository.regenerate(data.companyId)
+    } finally {
+        await HolidayGroupsCache.invalidateByCompany(data.companyId)
+    }
     return hg
 }
 
@@ -173,9 +178,12 @@ export const updateHolidayGroup = async (id: string, data: UpdateHolidayGroupInp
         return updated
     })
 
-    await HolidayGroupRepository.regenerate(existing.companyId)
-    await HolidayGroupsCache.invalidateHolidayGroup(id)
-    await HolidayGroupsCache.invalidateByCompany(existing.companyId)
+    try {
+        await HolidayGroupRepository.regenerate(existing.companyId)
+    } finally {
+        await HolidayGroupsCache.invalidateHolidayGroup(id)
+        await HolidayGroupsCache.invalidateByCompany(existing.companyId)
+    }
     return hg
 }
 
@@ -187,7 +195,10 @@ export const deleteHolidayGroup = async (id: string) => {
         await tx.holidayGroup.delete({ where: { id } })
     })
 
-    await HolidayGroupRepository.regenerate(existing.companyId)
-    await HolidayGroupsCache.invalidateHolidayGroup(id)
-    await HolidayGroupsCache.invalidateByCompany(existing.companyId)
+    try {
+        await HolidayGroupRepository.regenerate(existing.companyId)
+    } finally {
+        await HolidayGroupsCache.invalidateHolidayGroup(id)
+        await HolidayGroupsCache.invalidateByCompany(existing.companyId)
+    }
 }

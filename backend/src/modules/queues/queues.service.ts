@@ -20,6 +20,9 @@ const queueSelect = {
     wrapupTime: true,
     announce: true,
     announceFrequency: true,
+    announcePosition: true,
+    periodicAnnounce: true,
+    periodicAnnounceFrequency: true,
     joinEmpty: true,
     leaveWhenEmpty: true,
     weight: true,
@@ -99,9 +102,12 @@ export const createQueue = async (data: CreateQueueInput) => {
         return q
     })
 
-    await AsteriskQueueRepository.regenerate(data.companyId)
-    await QueuesCache.invalidateByCompany(data.companyId)
-    await QueuesCache.invalidateAll()
+    try {
+        await AsteriskQueueRepository.regenerate(data.companyId)
+    } finally {
+        await QueuesCache.invalidateByCompany(data.companyId)
+        await QueuesCache.invalidateAll()
+    }
     return queue
 }
 
@@ -144,6 +150,10 @@ export const updateQueue = async (id: string, data: UpdateQueueInput) => {
     if (data.wrapupTime !== undefined) asteriskUpdate.wrapuptime = data.wrapupTime
     if (data.announce !== undefined) asteriskUpdate.announce = data.announce
     if (data.announceFrequency !== undefined) asteriskUpdate.announceFreq = data.announceFrequency
+    if (data.announcePosition !== undefined) asteriskUpdate.announcePosition = data.announcePosition ? 'yes' : 'no'
+    if (data.periodicAnnounce !== undefined) asteriskUpdate.periodicAnnounce = data.periodicAnnounce
+    if (data.periodicAnnounceFrequency !== undefined)
+        asteriskUpdate.periodicAnnounceFreq = data.periodicAnnounceFrequency
     if (data.joinEmpty !== undefined) asteriskUpdate.joinempty = data.joinEmpty ? 'yes' : 'no'
     if (data.leaveWhenEmpty !== undefined) asteriskUpdate.leavewhenempty = data.leaveWhenEmpty ? 'yes' : 'no'
     if (data.weight !== undefined) asteriskUpdate.weight = data.weight
@@ -165,10 +175,13 @@ export const updateQueue = async (id: string, data: UpdateQueueInput) => {
         return tx.queue.update({ where: { id }, data: appUpdate, select: queueSelect })
     })
 
-    if (needsResync) await AsteriskQueueRepository.regenerate(existing.companyId)
-    await QueuesCache.invalidateQueue(id)
-    await QueuesCache.invalidateByCompany(existing.companyId)
-    await QueuesCache.invalidateAll()
+    try {
+        if (needsResync) await AsteriskQueueRepository.regenerate(existing.companyId)
+    } finally {
+        await QueuesCache.invalidateQueue(id)
+        await QueuesCache.invalidateByCompany(existing.companyId)
+        await QueuesCache.invalidateAll()
+    }
     return queue
 }
 
@@ -186,9 +199,12 @@ export const deleteQueue = async (id: string) => {
         await tx.queue.delete({ where: { id } })
     })
 
-    await AsteriskQueueRepository.regenerate(existing.companyId)
-    await QueuesCache.invalidateQueue(id)
-    await QueueMembersCache.invalidateMembers(id)
-    await QueuesCache.invalidateByCompany(existing.companyId)
-    await QueuesCache.invalidateAll()
+    try {
+        await AsteriskQueueRepository.regenerate(existing.companyId)
+    } finally {
+        await QueuesCache.invalidateQueue(id)
+        await QueueMembersCache.invalidateMembers(id)
+        await QueuesCache.invalidateByCompany(existing.companyId)
+        await QueuesCache.invalidateAll()
+    }
 }

@@ -7,9 +7,21 @@ import { prisma } from '../../lib/prisma'
 
 export const getTimeGroupsByCompanyId = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
-        const { companyId } = companyQuerySchema.parse(req.query)
-        req.scope.assertAccess(companyId)
-        const groups = await TimeGroupsService.getTimeGroupsByCompany(companyId)
+        const filter = companyQuerySchema.safeParse(req.query)
+
+        if (filter.success) {
+            req.scope.assertAccess(filter.data.companyId)
+            const groups = await TimeGroupsService.getTimeGroupsByCompany(filter.data.companyId)
+            return reply.send({ success: true, message: 'Time groups fetched successfully', timeGroups: groups })
+        }
+
+        const { companyIds } = req.scope
+        if (companyIds?.length === 1) {
+            const groups = await TimeGroupsService.getTimeGroupsByCompany(companyIds[0]!)
+            return reply.send({ success: true, message: 'Time groups fetched successfully', timeGroups: groups })
+        }
+
+        const groups = await TimeGroupsService.getAllTimeGroups(companyIds ?? undefined)
         return reply.send({ success: true, message: 'Time groups fetched successfully', timeGroups: groups })
     } catch (error) {
         return handleError(reply, error, req)

@@ -88,6 +88,36 @@ export class CompaniesCache {
         })
     }
 
+    // Lista de /companies já filtrada pelo escopo (req.scope.companyIds) de um usuário não-admin —
+    // getAllCompanies() com companyIds preenchido não bate no cache "list:all" (que é só pra admin)
+    static async getCompaniesForScope(userId: string) {
+        const cached = await cacheManager.get(`${NAMESPACE}:scope`, userId)
+        logger.info({
+            event: cached ? 'cache.hit' : 'cache.miss',
+            namespace: NAMESPACE,
+            key: `scope:${userId}`,
+        })
+        return cached
+    }
+
+    static async setCompaniesForScope(userId: string, data: any, config?: CacheConfig) {
+        await cacheManager.set(`${NAMESPACE}:scope`, userId, data, config)
+        logger.info({
+            event: 'cache.set',
+            namespace: NAMESPACE,
+            key: `scope:${userId}`,
+        })
+    }
+
+    static async invalidateCompaniesForScope(userId: string) {
+        await cacheManager.invalidateByKey(`${NAMESPACE}:scope:${userId}`)
+        logger.info({
+            event: 'cache.invalidate',
+            namespace: NAMESPACE,
+            key: `scope:${userId}`,
+        })
+    }
+
     static async invalidateNamespace() {
         await cacheManager.invalidate(NAMESPACE)
         logger.info({

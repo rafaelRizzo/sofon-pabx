@@ -134,6 +134,13 @@ describe('GET /outbound-routes', () => {
         expect(body.routes.some((r) => r.id === routeId)).toBe(true)
     })
 
+    it('200 lists all routes without companyId query', async () => {
+        const res = await app.inject({ method: 'GET', url: '/outbound-routes', headers: auth() })
+        expect(res.statusCode).toBe(200)
+        const body = ListOutboundRoutesResponse.parse(res.json())
+        expect(Array.isArray(body.routes)).toBe(true)
+    })
+
     it('401 without token', async () => {
         const res = await app.inject({ method: 'GET', url: `/outbound-routes?companyId=${companyId}` })
         expect(res.statusCode).toBe(401)

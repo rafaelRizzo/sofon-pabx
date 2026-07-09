@@ -17,9 +17,19 @@ import { AppError } from '../../utils/errors/app.error'
 
 export const getRoutes = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
-        const { companyId } = companyQuerySchema.parse(req.query)
-        req.scope.assertAccess(companyId)
-        return reply.send({ success: true, routes: await Service.getOutboundRoutes(companyId) })
+        const filter = companyQuerySchema.safeParse(req.query)
+
+        if (filter.success) {
+            req.scope.assertAccess(filter.data.companyId)
+            return reply.send({ success: true, routes: await Service.getOutboundRoutes(filter.data.companyId) })
+        }
+
+        const { companyIds } = req.scope
+        if (companyIds?.length === 1) {
+            return reply.send({ success: true, routes: await Service.getOutboundRoutes(companyIds[0]!) })
+        }
+
+        return reply.send({ success: true, routes: await Service.getAllOutboundRoutes(companyIds ?? undefined) })
     } catch (e) { return handleError(reply, e, req) }
 }
 

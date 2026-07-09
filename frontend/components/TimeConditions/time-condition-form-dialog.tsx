@@ -93,7 +93,8 @@ export function TimeConditionFormDialog({
 
     // Grupos de horário disponíveis pra vincular — dependem da empresa escolhida no próprio form,
     // não do filtro da página (o dialog é independente da empresa que está sendo listada na tabela)
-    const { timeGroups } = useTimeGroups(companyId)
+    const { timeGroups: allTimeGroups } = useTimeGroups()
+    const timeGroups = allTimeGroups.filter((g) => g.companyId === companyId)
 
     useEffect(() => {
         if (!open) return

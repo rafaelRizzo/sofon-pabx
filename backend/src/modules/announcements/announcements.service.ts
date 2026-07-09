@@ -68,8 +68,11 @@ export const createAnnouncement = async (data: CreateAnnouncementInput) => {
         return created
     })
 
-    await AnnouncementRepository.regenerate(data.companyId)
-    await AnnouncementsCache.invalidateByCompany(data.companyId)
+    try {
+        await AnnouncementRepository.regenerate(data.companyId)
+    } finally {
+        await AnnouncementsCache.invalidateByCompany(data.companyId)
+    }
     return toDto(announcement)
 }
 
@@ -100,9 +103,12 @@ export const updateAnnouncement = async (id: string, data: UpdateAnnouncementInp
         return updated
     })
 
-    await AnnouncementRepository.regenerate(existing.companyId)
-    await AnnouncementsCache.invalidateAnnouncement(id)
-    await AnnouncementsCache.invalidateByCompany(existing.companyId)
+    try {
+        await AnnouncementRepository.regenerate(existing.companyId)
+    } finally {
+        await AnnouncementsCache.invalidateAnnouncement(id)
+        await AnnouncementsCache.invalidateByCompany(existing.companyId)
+    }
     return toDto(announcement)
 }
 
@@ -114,7 +120,10 @@ export const deleteAnnouncement = async (id: string) => {
         await tx.announcement.delete({ where: { id } })
     })
 
-    await AnnouncementRepository.regenerate(existing.companyId)
-    await AnnouncementsCache.invalidateAnnouncement(id)
-    await AnnouncementsCache.invalidateByCompany(existing.companyId)
+    try {
+        await AnnouncementRepository.regenerate(existing.companyId)
+    } finally {
+        await AnnouncementsCache.invalidateAnnouncement(id)
+        await AnnouncementsCache.invalidateByCompany(existing.companyId)
+    }
 }

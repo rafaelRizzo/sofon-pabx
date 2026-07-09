@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
+import { z } from 'zod'
 import * as TimeConditionsController from './time-conditions.controller'
 import { protectedRoute } from '../../middleware/scope.middleware'
 import {
@@ -8,6 +9,8 @@ import {
 } from './schemas/time-condition.schema'
 import { errors, deleted } from '../../schemas/responses'
 
+const optionalCompanyQuery = z.object({ companyId: z.cuid2().optional() })
+
 export const timeConditionsRoutes = async (app: FastifyInstance) => {
     const router = app.withTypeProvider<ZodTypeProvider>()
 
@@ -15,9 +18,10 @@ export const timeConditionsRoutes = async (app: FastifyInstance) => {
         onRequest: protectedRoute,
         schema: {
             tags: ['Time Conditions'],
-            summary: 'Listar condições de horário por empresa',
+            summary: 'Listar condições de horário',
+            description: 'Filtra por empresa via ?companyId.',
             security: [{ bearerAuth: [] }],
-            querystring: companyQuerySchema,
+            querystring: optionalCompanyQuery,
             response: {
                 200: ListTimeConditionsResponse,
                 401: errors[401],

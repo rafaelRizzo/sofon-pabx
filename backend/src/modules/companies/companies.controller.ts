@@ -7,7 +7,7 @@ import { AppError } from '../../utils/errors/app.error'
 
 export const getAllCompanies = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
-        const companies = await CompaniesService.getAllCompanies(req.scope.companyIds ?? undefined)
+        const companies = await CompaniesService.getAllCompanies(req.scope.companyIds ?? undefined, req.user!.id)
         return reply.send({
             success: true,
             message: 'Companies fetched successfully',

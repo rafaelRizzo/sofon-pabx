@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
+import { z } from 'zod'
 import * as TimeGroupsController from './time-groups.controller'
 import { protectedRoute } from '../../middleware/scope.middleware'
 import {
@@ -8,6 +9,8 @@ import {
 } from './schemas/time-group.schema'
 import { errors, deleted } from '../../schemas/responses'
 
+const optionalCompanyQuery = z.object({ companyId: z.cuid2().optional() })
+
 export const timeGroupsRoutes = async (app: FastifyInstance) => {
     const router = app.withTypeProvider<ZodTypeProvider>()
 
@@ -15,9 +18,10 @@ export const timeGroupsRoutes = async (app: FastifyInstance) => {
         onRequest: protectedRoute,
         schema: {
             tags: ['Time Groups'],
-            summary: 'Listar grupos de horário por empresa',
+            summary: 'Listar grupos de horário',
+            description: 'Filtra por empresa via ?companyId.',
             security: [{ bearerAuth: [] }],
-            querystring: companyQuerySchema,
+            querystring: optionalCompanyQuery,
             response: {
                 200: ListTimeGroupsResponse,
                 401: errors[401],

@@ -1,0 +1,530 @@
+"use client"
+
+import { useEffect, useState } from "react"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { InfoIcon } from "lucide-react"
+import { Controller, useForm } from "react-hook-form"
+
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { Button } from "@/components/ui/button"
+import {
+    Combobox,
+    ComboboxContent,
+    ComboboxEmpty,
+    ComboboxInput,
+    ComboboxItem,
+    ComboboxList,
+} from "@/components/ui/combobox"
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog"
+import {
+    Field,
+    FieldDescription,
+    FieldError,
+    FieldGroup,
+    FieldLabel,
+} from "@/components/ui/field"
+import { Input } from "@/components/ui/input"
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from "@/components/ui/tooltip"
+import { RouteDestinationField } from "@/components/RouteDestination/route-destination-field"
+import { type Audio, useAudios } from "@/hooks/use-audios"
+import { type Company } from "@/hooks/use-companies"
+import {
+    createQueueFormSchema,
+    QUEUE_STRATEGIES,
+    QUEUE_STRATEGY_DESCRIPTIONS,
+    QUEUE_STRATEGY_LABELS,
+    type Queue,
+    type QueueForm,
+} from "@/hooks/use-queues"
+
+type Props = {
+    open: boolean
+    onOpenChange: (open: boolean) => void
+    queue: Queue | null
+    companies: Company[]
+    onSave: (form: QueueForm) => Promise<boolean>
+}
+
+export function QueueFormDialog({ open, onOpenChange, queue, companies, onSave }: Props) {
+    const isEdit = !!queue
+
+    const {
+        register,
+        handleSubmit,
+        watch,
+        setValue,
+        control,
+        reset,
+        formState: { errors, isSubmitting, isDirty },
+    } = useForm<QueueForm>({
+        resolver: zodResolver(createQueueFormSchema) as any,
+        defaultValues: {
+            name: "",
+            companyId: "",
+            number: "",
+            strategy: "ringall",
+            musicOnHold: "default",
+            timeout: 15,
+            retry: 5,
+            maxLen: 0,
+            wrapupTime: 5,
+            announce: null,
+            announceFrequency: 0,
+            announcePosition: false,
+            periodicAnnounce: null,
+            periodicAnnounceFrequency: 60,
+            joinEmpty: true,
+            leaveWhenEmpty: false,
+            weight: 0,
+            postQueueDestination: { type: "hangup" },
+        },
+    })
+
+    const companyId = watch("companyId")
+    const postQueueDestination = watch("postQueueDestination")
+    const announce = watch("announce")
+    const announcePosition = watch("announcePosition")
+    const periodicAnnounce = watch("periodicAnnounce")
+    const selectedCompany = companies.find((c) => c.id === companyId) ?? null
+
+    // Anúncios referenciam um Audio já cadastrado pra essa empresa — depende do companyId do
+    // form, não do filtro da página (mesmo padrão do RouteDestinationField)
+    const { audios } = useAudios(companyId)
+    const selectedAnnounce = audios.find((a) => a.id === announce) ?? null
+    const selectedPeriodicAnnounce = audios.find((a) => a.id === periodicAnnounce) ?? null
+
+    useEffect(() => {
+        if (!open) return
+        reset({
+            name: queue?.name ?? "",
+            companyId: queue?.companyId ?? "",
+            number: queue?.number ?? "",
+            strategy: queue?.strategy ?? "ringall",
+            musicOnHold: "default",
+            timeout: queue?.timeout ?? 15,
+            retry: queue?.retry ?? 5,
+            maxLen: queue?.maxLen ?? 0,
+            wrapupTime: queue?.wrapupTime ?? 5,
+            announce: queue?.announce ?? null,
+            announceFrequency: queue?.announceFrequency ?? 0,
+            announcePosition: queue?.announcePosition ?? false,
+            periodicAnnounce: queue?.periodicAnnounce ?? null,
+            periodicAnnounceFrequency: queue?.periodicAnnounceFrequency ?? 60,
+            joinEmpty: queue?.joinEmpty ?? true,
+            leaveWhenEmpty: queue?.leaveWhenEmpty ?? false,
+            weight: queue?.weight ?? 0,
+            postQueueDestination: queue?.postQueueDestination ?? { type: "hangup" },
+        })
+    }, [open, queue, reset])
+
+    // Ao trocar de empresa na criação, destino/música/anúncios escolhidos pra empresa anterior não
+    // fazem mais sentido (IDs de outra empresa) — reseta pra evitar enviar referências inválidas
+    function handleCompanyChange(nextCompanyId: string) {
+        setValue("companyId", nextCompanyId, { shouldValidate: true, shouldDirty: true })
+        setValue("postQueueDestination", { type: "hangup" }, { shouldDirty: true })
+        setValue("announce", null, { shouldDirty: true })
+        setValue("periodicAnnounce", null, { shouldDirty: true })
+    }
+
+    const onSubmit = handleSubmit(async (form) => {
+        const ok = await onSave(form)
+        if (ok) onOpenChange(false)
+    })
+
+    // Fechar (X, Escape, clique fora, botão Cancelar) com alterações não salvas pede confirmação
+    const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false)
+    function requestClose(nextOpen: boolean) {
+        if (!nextOpen && isDirty) {
+            setConfirmDiscardOpen(true)
+            return
+        }
+        onOpenChange(nextOpen)
+    }
+
+    return (
+        <>
+            <Dialog open={open} onOpenChange={requestClose}>
+                <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>{isEdit ? "Editar fila" : "Nova fila"}</DialogTitle>
+                        <DialogDescription>
+                            {isEdit ? `Fila ${queue.name}` : "Preencha os dados para criar a fila"}
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <form id="queue-form" onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col">
+                        <div className="flex-1 overflow-x-hidden overflow-y-auto">
+                            <FieldGroup>
+                                <Field>
+                                    <FieldLabel>Nome</FieldLabel>
+                                    <Input placeholder="Ex: suporte" {...register("name")} />
+                                    {errors.name && <FieldError>{errors.name.message}</FieldError>}
+                                </Field>
+
+                                {!isEdit && (
+                                    <Field>
+                                        <FieldLabel>Empresa</FieldLabel>
+                                        <Combobox<Company>
+                                            items={companies}
+                                            value={selectedCompany}
+                                            itemToStringLabel={(c) => c.name}
+                                            isItemEqualToValue={(a, b) => a.id === b.id}
+                                            onValueChange={(c) => handleCompanyChange(c?.id ?? "")}
+                                        >
+                                            <ComboboxInput placeholder="Buscar empresa..." />
+                                            <ComboboxContent>
+                                                <ComboboxEmpty>Nenhuma empresa</ComboboxEmpty>
+                                                <ComboboxList>
+                                                    {(c: Company) => (
+                                                        <ComboboxItem key={c.id} value={c}>
+                                                            {c.name}
+                                                        </ComboboxItem>
+                                                    )}
+                                                </ComboboxList>
+                                            </ComboboxContent>
+                                        </Combobox>
+                                        {errors.companyId && (
+                                            <FieldError>{errors.companyId.message}</FieldError>
+                                        )}
+                                    </Field>
+                                )}
+
+                                <div className="grid grid-cols-2 gap-3">
+                                    <Field>
+                                        <FieldLabel>Número</FieldLabel>
+                                        <Input placeholder="Ex: 8000" {...register("number")} />
+                                        {errors.number && <FieldError>{errors.number.message}</FieldError>}
+                                    </Field>
+
+                                    <Field>
+                                        {/* div em vez de FieldLabel: um <button> dentro de <label> herda o
+                                        clique implícito do label, o que reabriria/fecharia o tooltip ao
+                                        clicar no texto "Estratégia" */}
+                                        <div className="flex items-center gap-2 text-xs/relaxed leading-none font-medium">
+                                            Estratégia
+                                            <Tooltip>
+                                                <TooltipTrigger
+                                                    render={
+                                                        <button
+                                                            type="button"
+                                                            className="inline-flex text-muted-foreground hover:text-foreground"
+                                                        />
+                                                    }
+                                                >
+                                                    <InfoIcon className="size-3" />
+                                                </TooltipTrigger>
+                                                <TooltipContent side="right">
+                                                    <ul className="flex list-none flex-col gap-1 text-left">
+                                                        {QUEUE_STRATEGIES.map((s) => (
+                                                            <li key={s}>
+                                                                <strong>{QUEUE_STRATEGY_LABELS[s]}:</strong>{" "}
+                                                                {QUEUE_STRATEGY_DESCRIPTIONS[s]}
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        </div>
+                                        <Controller
+                                            control={control}
+                                            name="strategy"
+                                            render={({ field }) => (
+                                                <Select
+                                                    items={QUEUE_STRATEGIES.map((s) => ({
+                                                        value: s,
+                                                        label: QUEUE_STRATEGY_LABELS[s],
+                                                    }))}
+                                                    value={field.value}
+                                                    onValueChange={field.onChange}
+                                                >
+                                                    <SelectTrigger className="w-full">
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {QUEUE_STRATEGIES.map((s) => (
+                                                            <SelectItem key={s} value={s}>
+                                                                {QUEUE_STRATEGY_LABELS[s]}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            )}
+                                        />
+                                    </Field>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-3">
+                                    <Field>
+                                        <FieldLabel>Timeout (s)</FieldLabel>
+                                        <Input type="number" {...register("timeout")} />
+                                        {errors.timeout && <FieldError>{errors.timeout.message}</FieldError>}
+                                    </Field>
+                                    <Field>
+                                        <FieldLabel>Retry (s)</FieldLabel>
+                                        <Input type="number" {...register("retry")} />
+                                        {errors.retry && <FieldError>{errors.retry.message}</FieldError>}
+                                    </Field>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-3">
+                                    <Field>
+                                        <FieldLabel>Tamanho máximo</FieldLabel>
+                                        <Input type="number" {...register("maxLen")} />
+                                        <FieldDescription>0 = sem limite de chamadas na fila</FieldDescription>
+                                        {errors.maxLen && <FieldError>{errors.maxLen.message}</FieldError>}
+                                    </Field>
+                                    <Field>
+                                        <FieldLabel>Wrapup (s)</FieldLabel>
+                                        <Input type="number" {...register("wrapupTime")} />
+                                        <FieldDescription>Pausa do agente após atender</FieldDescription>
+                                        {errors.wrapupTime && (
+                                            <FieldError>{errors.wrapupTime.message}</FieldError>
+                                        )}
+                                    </Field>
+                                </div>
+
+                                <Field>
+                                    <FieldLabel>Anúncio ao entrar na fila</FieldLabel>
+                                    {!companyId ? (
+                                        <FieldDescription>Selecione uma empresa primeiro.</FieldDescription>
+                                    ) : (
+                                        <Combobox<Audio>
+                                            items={audios}
+                                            value={selectedAnnounce}
+                                            itemToStringLabel={(a) => a.name}
+                                            isItemEqualToValue={(a, b) => a.id === b.id}
+                                            onValueChange={(a) =>
+                                                setValue("announce", a?.id ?? null, { shouldDirty: true })
+                                            }
+                                        >
+                                            <ComboboxInput placeholder="Nenhum" />
+                                            <ComboboxContent>
+                                                <ComboboxEmpty>
+                                                    {audios.length === 0
+                                                        ? "Nenhum áudio cadastrado para essa empresa"
+                                                        : "Nenhum resultado para essa busca"}
+                                                </ComboboxEmpty>
+                                                <ComboboxList>
+                                                    {(a: Audio) => (
+                                                        <ComboboxItem key={a.id} value={a}>
+                                                            {a.name}
+                                                        </ComboboxItem>
+                                                    )}
+                                                </ComboboxList>
+                                            </ComboboxContent>
+                                        </Combobox>
+                                    )}
+                                    <FieldDescription>Tocado uma única vez, antes de entrar na fila.</FieldDescription>
+                                    {errors.announce && <FieldError>{errors.announce.message}</FieldError>}
+                                </Field>
+
+                                <Field orientation="horizontal">
+                                    <FieldLabel htmlFor="announcePosition">Anunciar posição na fila</FieldLabel>
+                                    <Controller
+                                        control={control}
+                                        name="announcePosition"
+                                        render={({ field }) => (
+                                            <Switch
+                                                id="announcePosition"
+                                                checked={field.value}
+                                                onCheckedChange={field.onChange}
+                                            />
+                                        )}
+                                    />
+                                </Field>
+                                <Field>
+                                    <FieldLabel>Intervalo (s)</FieldLabel>
+                                    <Input
+                                        type="number"
+                                        disabled={!announcePosition}
+                                        {...register("announceFrequency")}
+                                    />
+                                    <FieldDescription>
+                                        Tempo entre os anúncios de posição/espera
+                                    </FieldDescription>
+                                    {errors.announceFrequency && (
+                                        <FieldError>{errors.announceFrequency.message}</FieldError>
+                                    )}
+                                </Field>
+
+                                <div className="grid grid-cols-2 gap-3">
+                                    <Field>
+                                        <FieldLabel>Anúncio periódico</FieldLabel>
+                                        {!companyId ? (
+                                            <FieldDescription>Selecione uma empresa primeiro.</FieldDescription>
+                                        ) : (
+                                            <Combobox<Audio>
+                                                items={audios}
+                                                value={selectedPeriodicAnnounce}
+                                                itemToStringLabel={(a) => a.name}
+                                                isItemEqualToValue={(a, b) => a.id === b.id}
+                                                onValueChange={(a) =>
+                                                    setValue("periodicAnnounce", a?.id ?? null, {
+                                                        shouldDirty: true,
+                                                    })
+                                                }
+                                            >
+                                                <ComboboxInput placeholder="Nenhum" />
+                                                <ComboboxContent>
+                                                    <ComboboxEmpty>
+                                                        {audios.length === 0
+                                                            ? "Nenhum áudio cadastrado para essa empresa"
+                                                            : "Nenhum resultado para essa busca"}
+                                                    </ComboboxEmpty>
+                                                    <ComboboxList>
+                                                        {(a: Audio) => (
+                                                            <ComboboxItem key={a.id} value={a}>
+                                                                {a.name}
+                                                            </ComboboxItem>
+                                                        )}
+                                                    </ComboboxList>
+                                                </ComboboxContent>
+                                            </Combobox>
+                                        )}
+                                        {errors.periodicAnnounce && (
+                                            <FieldError>{errors.periodicAnnounce.message}</FieldError>
+                                        )}
+                                    </Field>
+                                    <Field>
+                                        <FieldLabel>Frequência (s)</FieldLabel>
+                                        <Input type="number" {...register("periodicAnnounceFrequency")} />
+                                        <FieldDescription>Repete durante a espera</FieldDescription>
+                                        {errors.periodicAnnounceFrequency && (
+                                            <FieldError>{errors.periodicAnnounceFrequency.message}</FieldError>
+                                        )}
+                                    </Field>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-3">
+                                    <Field orientation="horizontal">
+                                        <FieldLabel htmlFor="joinEmpty">Entrar com fila vazia</FieldLabel>
+                                        <Controller
+                                            control={control}
+                                            name="joinEmpty"
+                                            render={({ field }) => (
+                                                <Switch
+                                                    id="joinEmpty"
+                                                    checked={field.value}
+                                                    onCheckedChange={field.onChange}
+                                                />
+                                            )}
+                                        />
+                                    </Field>
+                                    <Field orientation="horizontal">
+                                        <FieldLabel htmlFor="leaveWhenEmpty">Sair se ficar vazia</FieldLabel>
+                                        <Controller
+                                            control={control}
+                                            name="leaveWhenEmpty"
+                                            render={({ field }) => (
+                                                <Switch
+                                                    id="leaveWhenEmpty"
+                                                    checked={field.value}
+                                                    onCheckedChange={field.onChange}
+                                                />
+                                            )}
+                                        />
+                                    </Field>
+                                </div>
+
+                                <Field>
+                                    <FieldLabel>Peso</FieldLabel>
+                                    <Input type="number" {...register("weight")} />
+                                    <FieldDescription>
+                                        Usado para priorizar essa fila quando o agente está em várias
+                                    </FieldDescription>
+                                    {errors.weight && <FieldError>{errors.weight.message}</FieldError>}
+                                </Field>
+
+                                <Field>
+                                    <FieldLabel>Destino pós-fila</FieldLabel>
+                                    <RouteDestinationField
+                                        value={postQueueDestination}
+                                        onChange={(d) =>
+                                            setValue("postQueueDestination", d, {
+                                                shouldValidate: true,
+                                                shouldDirty: true,
+                                            })
+                                        }
+                                        companyId={companyId}
+                                    />
+                                    <FieldDescription>
+                                        Para onde a chamada é direcionada se ninguém atender e a fila estourar
+                                        timeout/tamanho máximo.
+                                    </FieldDescription>
+                                </Field>
+                            </FieldGroup>
+                        </div>
+                    </form>
+
+                    <DialogFooter className="pt-4">
+                        <Button type="button" variant="outline" onClick={() => requestClose(false)}>
+                            Cancelar
+                        </Button>
+                        <Button type="submit" form="queue-form" disabled={isSubmitting}>
+                            {isSubmitting
+                                ? isEdit
+                                    ? "Salvando..."
+                                    : "Criando..."
+                                : isEdit
+                                  ? "Salvar"
+                                  : "Criar"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <AlertDialog open={confirmDiscardOpen} onOpenChange={setConfirmDiscardOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Descartar alterações?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Você tem alterações não salvas
+                            {isEdit ? ` na fila "${queue.name}"` : " nesta fila"}. Se sair agora, elas serão
+                            perdidas.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Continuar editando</AlertDialogCancel>
+                        <AlertDialogAction
+                            variant="destructive"
+                            onClick={() => {
+                                setConfirmDiscardOpen(false)
+                                onOpenChange(false)
+                            }}
+                        >
+                            Descartar
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </>
+    )
+}

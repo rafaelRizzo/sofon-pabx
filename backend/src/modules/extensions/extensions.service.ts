@@ -138,15 +138,18 @@ async function provisionMissingAsteriskRecord(
     return password
 }
 
-export const getAllExtensions = async (companyIds?: string[]) => {
+export const getAllExtensions = async (companyIds?: string[], userId?: string) => {
     const singleCompanyId = companyIds?.length === 1 ? companyIds[0] : null
     const isAll = companyIds === undefined
+    // Não-admin com mais de uma empresa vinculada — nem singleCompanyId nem isAll cobrem esse caso
+    const isMultiCompanyScope = !singleCompanyId && !isAll && (companyIds?.length ?? 0) > 1
 
     type GroupedExtensions = { sip: any[]; pjsip: any[] }
     let grouped: GroupedExtensions | null = null
 
     if (singleCompanyId) grouped = (await ExtensionsCache.getByCompany(singleCompanyId)) as GroupedExtensions | null
     else if (isAll) grouped = (await ExtensionsCache.getAllExtensions()) as GroupedExtensions | null
+    else if (isMultiCompanyScope && userId) grouped = (await ExtensionsCache.getForScope(userId)) as GroupedExtensions | null
 
     if (grouped) return grouped
 
@@ -192,14 +195,15 @@ export const getAllExtensions = async (companyIds?: string[]) => {
 
     if (singleCompanyId) await ExtensionsCache.setByCompany(singleCompanyId, grouped)
     else if (isAll) await ExtensionsCache.setAllExtensions(grouped)
+    else if (isMultiCompanyScope && userId) await ExtensionsCache.setForScope(userId, grouped)
 
     return grouped
 }
 
 // Export em massa — única leitura que expõe secret/password de propósito, então nunca passa
 // pelo ExtensionsCache (que guarda o DTO público) e consulta sip_peers/ps_auths direto
-export const getExtensionsForExport = async (companyIds?: string[]) => {
-    const grouped = await getAllExtensions(companyIds)
+export const getExtensionsForExport = async (companyIds?: string[], userId?: string) => {
+    const grouped = await getAllExtensions(companyIds, userId)
     const all = [...grouped.sip, ...grouped.pjsip] as Array<{
         id: string
         alias: string

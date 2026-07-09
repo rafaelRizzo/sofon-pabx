@@ -39,6 +39,23 @@ export const getTimeConditionsByCompany = async (companyId: string) => {
     return conditions
 }
 
+export const getAllTimeConditions = async (companyIds?: string[]) => {
+    if (companyIds && companyIds.length === 0) return []
+
+    if (!companyIds) {
+        const cached = await TimeConditionsCache.getAll()
+        if (cached) return cached
+    }
+
+    const conditions = await prisma.timeCondition.findMany({
+        where: companyIds ? { companyId: { in: companyIds } } : undefined,
+        select: timeConditionSelect,
+    })
+
+    if (!companyIds) await TimeConditionsCache.setAll(conditions)
+    return conditions
+}
+
 export const getTimeConditionById = async (id: string): Promise<TimeConditionDto> => {
     const cached = await TimeConditionsCache.getTimeCondition(id)
     if (cached) return cached as TimeConditionDto
@@ -88,8 +105,12 @@ export const createTimeCondition = async (data: CreateTimeConditionInput) => {
         return created
     })
 
-    await TimeConditionRepository.regenerate(data.companyId)
-    await TimeConditionsCache.invalidateByCompany(data.companyId)
+    try {
+        await TimeConditionRepository.regenerate(data.companyId)
+    } finally {
+        await TimeConditionsCache.invalidateByCompany(data.companyId)
+        await TimeConditionsCache.invalidateAll()
+    }
     return tc
 }
 
@@ -121,9 +142,13 @@ export const updateTimeCondition = async (id: string, data: UpdateTimeConditionI
         return updated
     })
 
-    await TimeConditionRepository.regenerate(existing.companyId)
-    await TimeConditionsCache.invalidateTimeCondition(id)
-    await TimeConditionsCache.invalidateByCompany(existing.companyId)
+    try {
+        await TimeConditionRepository.regenerate(existing.companyId)
+    } finally {
+        await TimeConditionsCache.invalidateTimeCondition(id)
+        await TimeConditionsCache.invalidateByCompany(existing.companyId)
+        await TimeConditionsCache.invalidateAll()
+    }
     return tc
 }
 
@@ -135,7 +160,11 @@ export const deleteTimeCondition = async (id: string) => {
         await tx.timeCondition.delete({ where: { id } })
     })
 
-    await TimeConditionRepository.regenerate(existing.companyId)
-    await TimeConditionsCache.invalidateTimeCondition(id)
-    await TimeConditionsCache.invalidateByCompany(existing.companyId)
+    try {
+        await TimeConditionRepository.regenerate(existing.companyId)
+    } finally {
+        await TimeConditionsCache.invalidateTimeCondition(id)
+        await TimeConditionsCache.invalidateByCompany(existing.companyId)
+        await TimeConditionsCache.invalidateAll()
+    }
 }

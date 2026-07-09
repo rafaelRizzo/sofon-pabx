@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
+import { z } from 'zod'
 import * as InboundRoutesController from './inbound-routes.controller'
 import { protectedRoute } from '../../middleware/scope.middleware'
 import {
@@ -8,6 +9,8 @@ import {
 } from './schemas/inbound-route.schema'
 import { errors, deleted } from '../../schemas/responses'
 
+const optionalCompanyQuery = z.object({ companyId: z.cuid2().optional() })
+
 export const inboundRoutesRoutes = async (app: FastifyInstance) => {
     const router = app.withTypeProvider<ZodTypeProvider>()
 
@@ -15,9 +18,10 @@ export const inboundRoutesRoutes = async (app: FastifyInstance) => {
         onRequest: protectedRoute,
         schema: {
             tags: ['Inbound Routes'],
-            summary: 'Listar rotas de entrada por empresa',
+            summary: 'Listar rotas de entrada',
+            description: 'Filtra por empresa via ?companyId.',
             security: [{ bearerAuth: [] }],
-            querystring: companyQuerySchema,
+            querystring: optionalCompanyQuery,
             response: {
                 200: ListInboundRoutesResponse,
                 401: errors[401],

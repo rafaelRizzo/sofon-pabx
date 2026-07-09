@@ -26,11 +26,16 @@ const mapUser = <T extends { companies: { company: { id: string; name: string } 
 
 export const getAllUsers = async (options?: { createdBy?: string }) => {
     if (options?.createdBy) {
-        const users = await prisma.user.findMany({
+        const cached = await UsersCache.getUsersByCreatedBy(options.createdBy)
+        if (cached) return cached
+
+        const users = (await prisma.user.findMany({
             where: { createdBy: options.createdBy },
             select: userSelect,
-        })
-        return users.map(mapUser)
+        })).map(mapUser)
+
+        await UsersCache.setUsersByCreatedBy(options.createdBy, users)
+        return users
     }
 
     const cached = await UsersCache.getAllUsers()
@@ -77,6 +82,7 @@ export const createUser = async (data: CreateUserInput, createdBy?: string) => {
     }))
 
     await UsersCache.invalidateAllUsers()
+    if (createdBy) await UsersCache.invalidateUsersByCreatedBy(createdBy)
     return user
 }
 
@@ -99,6 +105,7 @@ export const updateUser = async (id: string, data: UpdateUserInput) => {
 
     await UsersCache.invalidateUser(id)
     await UsersCache.invalidateAllUsers()
+    if (existingUser.createdBy) await UsersCache.invalidateUsersByCreatedBy(existingUser.createdBy)
     return user
 }
 
@@ -135,5 +142,6 @@ export const deleteUser = async (id: string) => {
 
     await UsersCache.invalidateUser(id)
     await UsersCache.invalidateAllUsers()
+    if (user.createdBy) await UsersCache.invalidateUsersByCreatedBy(user.createdBy)
     return user
 }

@@ -9,6 +9,7 @@ mock.module('../../companies/cache/companies.cache', () => ({
 }))
 mock.module('../cache/inbound-routes.cache', () => ({
     InboundRoutesCache: {
+        getAll: mock(() => null), setAll: mock(), invalidateAll: mock(),
         getByCompany: mock(() => null), setByCompany: mock(),
         invalidateByCompany: mock(),
         getRoute: mock(() => null), setRoute: mock(),

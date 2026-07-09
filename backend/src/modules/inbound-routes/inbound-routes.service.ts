@@ -37,6 +37,23 @@ export const getInboundRoutesByCompany = async (companyId: string) => {
     return routes
 }
 
+export const getAllInboundRoutes = async (companyIds?: string[]) => {
+    if (companyIds && companyIds.length === 0) return []
+
+    if (!companyIds) {
+        const cached = await InboundRoutesCache.getAll()
+        if (cached) return cached
+    }
+
+    const routes = await prisma.inboundRoute.findMany({
+        where: companyIds ? { companyId: { in: companyIds } } : undefined,
+        select: inboundRouteSelect,
+    })
+
+    if (!companyIds) await InboundRoutesCache.setAll(routes)
+    return routes
+}
+
 export const getInboundRouteById = async (id: string): Promise<InboundRouteDto> => {
     const cached = await InboundRoutesCache.getRoute(id)
     if (cached) return cached as InboundRouteDto
@@ -84,6 +101,7 @@ export const createInboundRoute = async (data: CreateInboundRouteInput) => {
     })
 
     await InboundRoutesCache.invalidateByCompany(data.companyId)
+    await InboundRoutesCache.invalidateAll()
     return route
 }
 
@@ -119,6 +137,7 @@ export const updateInboundRoute = async (id: string, data: UpdateInboundRouteInp
 
     await InboundRoutesCache.invalidateRoute(id)
     await InboundRoutesCache.invalidateByCompany(existing.companyId)
+    await InboundRoutesCache.invalidateAll()
     return route
 }
 
@@ -136,4 +155,5 @@ export const deleteInboundRoute = async (id: string) => {
 
     await InboundRoutesCache.invalidateRoute(id)
     await InboundRoutesCache.invalidateByCompany(existing.companyId)
+    await InboundRoutesCache.invalidateAll()
 }

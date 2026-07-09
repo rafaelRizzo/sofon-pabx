@@ -98,8 +98,11 @@ export const createIvrMenu = async (data: CreateIvrMenuInput) => {
         return tx.ivrMenu.findUniqueOrThrow({ where: { id: created.id }, select: ivrMenuSelect })
     })
 
-    await IvrRepository.regenerate(data.companyId)
-    await IvrCache.invalidateByCompany(data.companyId)
+    try {
+        await IvrRepository.regenerate(data.companyId)
+    } finally {
+        await IvrCache.invalidateByCompany(data.companyId)
+    }
     return toDto(menu)
 }
 
@@ -152,9 +155,12 @@ export const updateIvrMenu = async (id: string, data: UpdateIvrMenuInput) => {
         return await tx.ivrMenu.findUniqueOrThrow({ where: { id }, select: ivrMenuSelect })
     })
 
-    await IvrRepository.regenerate(existing.companyId)
-    await IvrCache.invalidateMenu(id)
-    await IvrCache.invalidateByCompany(existing.companyId)
+    try {
+        await IvrRepository.regenerate(existing.companyId)
+    } finally {
+        await IvrCache.invalidateMenu(id)
+        await IvrCache.invalidateByCompany(existing.companyId)
+    }
     return toDto(menu)
 }
 
@@ -166,7 +172,10 @@ export const deleteIvrMenu = async (id: string) => {
         await tx.ivrMenu.delete({ where: { id } })
     })
 
-    await IvrRepository.regenerate(existing.companyId)
-    await IvrCache.invalidateMenu(id)
-    await IvrCache.invalidateByCompany(existing.companyId)
+    try {
+        await IvrRepository.regenerate(existing.companyId)
+    } finally {
+        await IvrCache.invalidateMenu(id)
+        await IvrCache.invalidateByCompany(existing.companyId)
+    }
 }

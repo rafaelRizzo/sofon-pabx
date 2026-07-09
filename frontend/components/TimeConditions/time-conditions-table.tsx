@@ -33,31 +33,33 @@ import { type TimeCondition } from "@/hooks/use-time-conditions"
 type Props = {
     timeConditions: TimeCondition[]
     loading: boolean
-    companyId: string
     onEdit: (timeCondition: TimeCondition) => void
     onDelete: (timeCondition: TimeCondition) => void
 }
 
 // Mesmo padrão de InboundRoutesTable: resolve o nome de cada destino buscando a lista de
-// cada tipo presente uma única vez (não por linha/campo) — aqui olhando trueRoute e falseRoute
-function useDestinationLabels(timeConditions: TimeCondition[], companyId: string) {
+// cada tipo presente uma única vez (não por linha/campo) — aqui olhando trueRoute e falseRoute.
+// Agrupa por (tipo, empresa da própria condição) em vez de receber uma empresa fixa, já que a
+// listagem pode mostrar condições de "Todas as empresas" ao mesmo tempo
+function useDestinationLabels(timeConditions: TimeCondition[]) {
     const [labels, setLabels] = useState<Record<string, string>>({})
     const [loadedTypes, setLoadedTypes] = useState<Set<FetchableDestinationType>>(new Set())
 
     useEffect(() => {
-        if (!companyId) return
-        const types = new Set<FetchableDestinationType>()
+        const pairs = new Map<string, { type: FetchableDestinationType; companyId: string }>()
         for (const tc of timeConditions) {
             for (const dest of [tc.trueRoute, tc.falseRoute]) {
                 const t = dest?.type
-                if (t && t !== "hangup") types.add(t)
+                if (t && t !== "hangup") pairs.set(`${t}:${tc.companyId}`, { type: t, companyId: tc.companyId })
             }
         }
-        if (types.size === 0) return
+        if (pairs.size === 0) return
 
         let cancelled = false
         Promise.all(
-            [...types].map((t) => fetchDestinationOptions(t, companyId).then((opts) => [t, opts] as const))
+            [...pairs.values()].map(({ type, companyId }) =>
+                fetchDestinationOptions(type, companyId).then((opts) => [type, opts] as const)
+            )
         )
             .then((results) => {
                 if (cancelled) return
@@ -75,7 +77,7 @@ function useDestinationLabels(timeConditions: TimeCondition[], companyId: string
         return () => {
             cancelled = true
         }
-    }, [timeConditions, companyId])
+    }, [timeConditions])
 
     return { labels, loadedTypes }
 }
@@ -109,8 +111,8 @@ function DestinationBadge({
     )
 }
 
-export function TimeConditionsTable({ timeConditions, loading, companyId, onEdit, onDelete }: Props) {
-    const { labels, loadedTypes } = useDestinationLabels(timeConditions, companyId)
+export function TimeConditionsTable({ timeConditions, loading, onEdit, onDelete }: Props) {
+    const { labels, loadedTypes } = useDestinationLabels(timeConditions)
 
     return (
         <div className="rounded-md border">

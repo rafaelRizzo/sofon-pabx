@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { PlusIcon } from "lucide-react"
 
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog"
@@ -18,25 +18,33 @@ import {
     ComboboxList,
 } from "@/components/ui/combobox"
 import { Input } from "@/components/ui/input"
-import { useCompanies, type Company } from "@/hooks/use-companies"
+import { useCompanies } from "@/hooks/use-companies"
 import { useExtensions } from "@/hooks/use-extensions"
 import { useOutboundRoutes, type OutboundRoute } from "@/hooks/use-outbound-routes"
 import { usePagination } from "@/hooks/use-pagination"
 import { useTrunks } from "@/hooks/use-trunks"
 
+type CompanyFilterOption = { id: string; name: string }
+
+const ALL_COMPANIES: CompanyFilterOption = { id: "all", name: "Todas as empresas" }
+
 export default function OutboundRoutesPage() {
     const { companies } = useCompanies()
-    const [companyId, setCompanyId] = useState<string>("")
+    const [companyFilter, setCompanyFilter] = useState<string>("all")
 
-    useEffect(() => {
-        if (!companyId && companies.length > 0) {
-            setCompanyId(companies[0].id)
-        }
-    }, [companies, companyId])
+    const [createOpen, setCreateOpen] = useState(false)
+    const [editRoute, setEditRoute] = useState<OutboundRoute | null>(null)
+    const [deleteTarget, setDeleteTarget] = useState<OutboundRoute | null>(null)
 
-    const { trunks } = useTrunks(companyId)
+    // Empresa usada para escopar troncos/ramais/rotas existentes do formulário (o dialog não
+    // deixa escolher empresa): a da rota em edição, ou o filtro quando uma empresa específica
+    // está selecionada — "Todas as empresas" não é uma empresa válida pra criar/editar
+    const formCompanyId = editRoute?.companyId ?? (companyFilter !== "all" ? companyFilter : undefined)
+
+    const { trunks } = useTrunks()
+    const formTrunks = trunks.filter((t) => t.companyId === formCompanyId)
     const { extensions } = useExtensions()
-    const companyExtensions = extensions.filter((e) => e.companyId === companyId)
+    const formExtensions = extensions.filter((e) => e.companyId === formCompanyId)
     const {
         routes,
         allRoutes,
@@ -46,14 +54,16 @@ export default function OutboundRoutesPage() {
         createRoute,
         updateRoute,
         deleteRoute,
-    } = useOutboundRoutes(companyId)
-
-    const [createOpen, setCreateOpen] = useState(false)
-    const [editRoute, setEditRoute] = useState<OutboundRoute | null>(null)
-    const [deleteTarget, setDeleteTarget] = useState<OutboundRoute | null>(null)
+    } = useOutboundRoutes(formCompanyId)
+    const companyRoutes = routes.filter(
+        (r) => companyFilter === "all" || r.companyId === companyFilter
+    )
+    // Conflito de padrão de discagem é escopado por empresa (ver outbound-route-form-dialog) —
+    // nunca passar allRoutes (todas as empresas) pra esse form
+    const companyAllRoutes = allRoutes.filter((r) => r.companyId === formCompanyId)
 
     const { paginated, page, setPage, totalPages, total } = usePagination(
-        routes,
+        companyRoutes,
         15
     )
 
@@ -68,7 +78,10 @@ export default function OutboundRoutesPage() {
                 title="Rotas de saída"
                 description="Gerencie as rotas de discagem de saída das empresas"
             >
-                <Button onClick={() => setCreateOpen(true)} disabled={!companyId}>
+                <Button
+                    onClick={() => setCreateOpen(true)}
+                    disabled={companyFilter === "all"}
+                >
                     <PlusIcon />
                     Nova rota
                 </Button>
@@ -81,18 +94,24 @@ export default function OutboundRoutesPage() {
                     onChange={(e) => setFilter(e.target.value)}
                     className="max-w-sm"
                 />
-                <Combobox<Company>
-                    items={companies}
-                    value={companies.find((c) => c.id === companyId) ?? null}
+                <Combobox<CompanyFilterOption>
+                    items={[ALL_COMPANIES, ...companies]}
+                    value={
+                        [ALL_COMPANIES, ...companies].find(
+                            (c) => c.id === companyFilter
+                        ) ?? ALL_COMPANIES
+                    }
                     itemToStringLabel={(c) => c.name}
                     isItemEqualToValue={(a, b) => a.id === b.id}
-                    onValueChange={(company) => setCompanyId(company?.id ?? "")}
+                    onValueChange={(company) =>
+                        setCompanyFilter(company?.id ?? "all")
+                    }
                 >
                     <ComboboxInput placeholder="Buscar empresa..." className="w-56" />
                     <ComboboxContent>
                         <ComboboxEmpty>Nenhuma empresa</ComboboxEmpty>
                         <ComboboxList>
-                            {(company: Company) => (
+                            {(company: CompanyFilterOption) => (
                                 <ComboboxItem key={company.id} value={company}>
                                     {company.name}
                                 </ComboboxItem>
@@ -117,14 +136,14 @@ export default function OutboundRoutesPage() {
                 onPageChange={setPage}
             />
 
-            {createOpen && companyId && (
+            {createOpen && companyFilter !== "all" && (
                 <OutboundRouteFormDialog
                     open={createOpen}
                     onOpenChange={setCreateOpen}
                     route={null}
-                    trunks={trunks}
-                    extensions={companyExtensions}
-                    existingRoutes={allRoutes}
+                    trunks={formTrunks}
+                    extensions={formExtensions}
+                    existingRoutes={companyAllRoutes}
                     onSave={createRoute}
                 />
             )}
@@ -134,9 +153,9 @@ export default function OutboundRoutesPage() {
                     open={!!editRoute}
                     onOpenChange={(open) => !open && setEditRoute(null)}
                     route={editRoute}
-                    trunks={trunks}
-                    extensions={companyExtensions}
-                    existingRoutes={allRoutes}
+                    trunks={formTrunks}
+                    extensions={formExtensions}
+                    existingRoutes={companyAllRoutes}
                     onSave={(form) => updateRoute(editRoute.id, form)}
                 />
             )}

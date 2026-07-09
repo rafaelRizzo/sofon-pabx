@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
+import { z } from 'zod'
 import * as TrunksController from './trunks.controller'
 import { protectedRoute } from '../../middleware/scope.middleware'
 import {
@@ -7,6 +8,8 @@ import {
     ListTrunksResponse, GetTrunkResponse, CreateTrunkResponse, UpdateTrunkResponse,
 } from './schemas/trunk.schema'
 import { errors, deleted } from '../../schemas/responses'
+
+const optionalCompanyQuery = z.object({ companyId: z.cuid2().optional() })
 
 export const trunksRoutes = async (app: FastifyInstance) => {
     const router = app.withTypeProvider<ZodTypeProvider>()
@@ -16,9 +19,9 @@ export const trunksRoutes = async (app: FastifyInstance) => {
         schema: {
             tags: ['Trunks'],
             summary: 'Listar trunks',
-            description: 'Query obrigatória: ?companyId.',
+            description: 'Filtra por empresa via ?companyId.',
             security: [{ bearerAuth: [] }],
-            querystring: trunkQuerySchema,
+            querystring: optionalCompanyQuery,
             response: {
                 200: ListTrunksResponse,
                 401: errors[401],
