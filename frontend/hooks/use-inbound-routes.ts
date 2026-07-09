@@ -37,9 +37,9 @@ export const updateInboundRouteFormSchema = z.object({
 export type InboundRouteForm = z.infer<typeof createInboundRouteFormSchema>
 export type InboundRouteUpdateForm = z.infer<typeof updateInboundRouteFormSchema>
 
-// companyId aqui só é usado por createRoute (o POST exige companyId no body) — a busca em si não
-// depende dele: busca todas as rotas no escopo do usuário (igual use-dids/use-extensions), evitando
-// esperar a empresa padrão resolver antes de disparar essa requisição
+// companyId opcional — omitido, busca todas as rotas no escopo do usuário, permitindo o filtro
+// "Todas as empresas" na página. Diferente da empresa do formulário de criação (que é passada
+// explicitamente para createRoute, pois pode divergir deste filtro ao editar uma rota específica)
 export function useInboundRoutes(companyId?: string) {
     const [routes, setRoutes] = useState<InboundRoute[]>([])
     const [loading, setLoading] = useState(true)
@@ -48,20 +48,21 @@ export function useInboundRoutes(companyId?: string) {
     const fetchRoutes = useCallback(async () => {
         setLoading(true)
         try {
-            const { data } = await api.get("/inbound-routes")
+            const { data } = await api.get("/inbound-routes", {
+                params: companyId ? { companyId } : undefined,
+            })
             setRoutes(data.inboundRoutes ?? [])
         } catch (err) {
             toast.error(apiError(err, "Erro ao buscar rotas de entrada"))
         } finally {
             setLoading(false)
         }
-    }, [])
+    }, [companyId])
 
-    const createRoute = async (form: InboundRouteForm) => {
-        if (!companyId) return false
+    const createRoute = async (form: InboundRouteForm, targetCompanyId: string) => {
         const id = toast.loading("Criando rota de entrada...")
         try {
-            await api.post("/inbound-routes", { ...form, companyId })
+            await api.post("/inbound-routes", { ...form, companyId: targetCompanyId })
             toast.success("Rota de entrada criada", { id })
             await fetchRoutes()
             return true
@@ -101,13 +102,13 @@ export function useInboundRoutes(companyId?: string) {
         `${r.name} ${r.did.number} ${r.trunk.name}`.toLowerCase().includes(filter.toLowerCase())
     )
 
-    const fetchedRef = useRef(false)
+    const fetchStateRef = useRef<{ key?: string; fetched: boolean }>({ fetched: false })
 
     useEffect(() => {
-        if (fetchedRef.current) return
-        fetchedRef.current = true
+        if (fetchStateRef.current.fetched && fetchStateRef.current.key === companyId) return
+        fetchStateRef.current = { key: companyId, fetched: true }
         fetchRoutes()
-    }, [fetchRoutes])
+    }, [fetchRoutes, companyId])
 
     return {
         routes: filtered,

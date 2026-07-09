@@ -51,4 +51,18 @@ export class TrunksCache {
         await cacheManager.invalidate(NAMESPACE)
         logger.info({ event: 'cache.invalidate', namespace: NAMESPACE, key: 'all' })
     }
+
+    // Lista de /trunks escopada por usuário não-admin com MAIS DE UMA empresa vinculada —
+    // getByCompany (1 empresa) e getAll (admin) não cobrem esse caso. Invalidada de forma
+    // ampla por invalidateAllTrunks() (prefixo "trunks:"), como os demais.
+    static async getForScope(userId: string) {
+        const cached = await cacheManager.get(`${NAMESPACE}:scope`, userId)
+        logger.info({ event: cached ? 'cache.hit' : 'cache.miss', namespace: NAMESPACE, key: `scope:${userId}` })
+        return cached
+    }
+
+    static async setForScope(userId: string, data: any, config?: CacheConfig) {
+        await cacheManager.set(`${NAMESPACE}:scope`, userId, data, config)
+        logger.info({ event: 'cache.set', namespace: NAMESPACE, key: `scope:${userId}` })
+    }
 }

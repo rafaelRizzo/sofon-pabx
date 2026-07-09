@@ -41,10 +41,8 @@ export default function OutboundRoutesPage() {
     // está selecionada — "Todas as empresas" não é uma empresa válida pra criar/editar
     const formCompanyId = editRoute?.companyId ?? (companyFilter !== "all" ? companyFilter : undefined)
 
-    const { trunks } = useTrunks()
-    const formTrunks = trunks.filter((t) => t.companyId === formCompanyId)
-    const { extensions } = useExtensions()
-    const formExtensions = extensions.filter((e) => e.companyId === formCompanyId)
+    const { trunks: formTrunks } = useTrunks(formCompanyId)
+    const { extensions: formExtensions } = useExtensions(formCompanyId)
     const {
         routes,
         allRoutes,
@@ -54,16 +52,13 @@ export default function OutboundRoutesPage() {
         createRoute,
         updateRoute,
         deleteRoute,
-    } = useOutboundRoutes(formCompanyId)
-    const companyRoutes = routes.filter(
-        (r) => companyFilter === "all" || r.companyId === companyFilter
-    )
-    // Conflito de padrão de discagem é escopado por empresa (ver outbound-route-form-dialog) —
-    // nunca passar allRoutes (todas as empresas) pra esse form
+    } = useOutboundRoutes(companyFilter === "all" ? undefined : companyFilter)
+    // allRoutes já vem escopado pelo companyId da própria requisição (fetch por companyFilter) —
+    // conflito de padrão de discagem é validado dentro dessa mesma empresa
     const companyAllRoutes = allRoutes.filter((r) => r.companyId === formCompanyId)
 
     const { paginated, page, setPage, totalPages, total } = usePagination(
-        companyRoutes,
+        routes,
         15
     )
 
@@ -123,7 +118,7 @@ export default function OutboundRoutesPage() {
 
             <OutboundRoutesTable
                 routes={paginated}
-                trunks={trunks}
+                trunks={formTrunks}
                 loading={loading}
                 onEdit={setEditRoute}
                 onDelete={setDeleteTarget}
@@ -144,7 +139,7 @@ export default function OutboundRoutesPage() {
                     trunks={formTrunks}
                     extensions={formExtensions}
                     existingRoutes={companyAllRoutes}
-                    onSave={createRoute}
+                    onSave={(form) => createRoute(form, formCompanyId!)}
                 />
             )}
 

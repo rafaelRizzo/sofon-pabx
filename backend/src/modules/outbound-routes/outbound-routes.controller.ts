@@ -29,7 +29,7 @@ export const getRoutes = async (req: FastifyRequest, reply: FastifyReply) => {
             return reply.send({ success: true, routes: await Service.getOutboundRoutes(companyIds[0]!) })
         }
 
-        return reply.send({ success: true, routes: await Service.getAllOutboundRoutes(companyIds ?? undefined) })
+        return reply.send({ success: true, routes: await Service.getAllOutboundRoutes(companyIds ?? undefined, req.user!.id) })
     } catch (e) { return handleError(reply, e, req) }
 }
 

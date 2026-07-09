@@ -21,7 +21,7 @@ export const getTrunks = async (req: FastifyRequest, reply: FastifyReply) => {
             return reply.send({ success: true, message: 'Trunks fetched successfully', trunks })
         }
 
-        const trunks = await TrunksService.getAllTrunks(companyIds ?? undefined)
+        const trunks = await TrunksService.getAllTrunks(companyIds ?? undefined, req.user!.id)
         return reply.send({ success: true, message: 'Trunks fetched successfully', trunks })
     } catch (error) {
         return handleError(reply, error, req)

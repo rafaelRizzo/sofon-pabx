@@ -38,17 +38,14 @@ export default function TrunksPage() {
         createTrunk,
         updateTrunk,
         deleteTrunk,
-    } = useTrunks()
-    const companyTrunks = trunks.filter(
-        (t) => companyFilter === "all" || t.companyId === companyFilter
-    )
+    } = useTrunks(companyFilter === "all" ? undefined : companyFilter)
 
     const [createOpen, setCreateOpen] = useState(false)
     const [editTrunk, setEditTrunk] = useState<Trunk | null>(null)
     const [deleteTarget, setDeleteTarget] = useState<Trunk | null>(null)
 
     const { paginated, page, setPage, totalPages, total } = usePagination(
-        companyTrunks,
+        trunks,
         15
     )
 

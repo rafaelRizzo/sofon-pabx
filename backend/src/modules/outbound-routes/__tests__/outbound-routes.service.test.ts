@@ -14,6 +14,7 @@ mock.module('../cache/outbound-routes.cache', () => ({
     OutboundRoutesCache: {
         getAll: mock(() => null), setAll: mock(),
         getByCompany: mock(() => null), setByCompany: mock(),
+        getForScope: mock(() => null), setForScope: mock(),
         getRoute: mock(() => null), setRoute: mock(),
         invalidateRoute: mock(), invalidateByCompany: mock(), invalidateNamespace: mock(), invalidateAll: mock(),
     },

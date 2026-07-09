@@ -21,7 +21,7 @@ export const getInboundRoutesByCompanyId = async (req: FastifyRequest, reply: Fa
             return reply.send({ success: true, message: 'Inbound routes fetched successfully', inboundRoutes: routes })
         }
 
-        const routes = await InboundRoutesService.getAllInboundRoutes(companyIds ?? undefined)
+        const routes = await InboundRoutesService.getAllInboundRoutes(companyIds ?? undefined, req.user!.id)
         return reply.send({ success: true, message: 'Inbound routes fetched successfully', inboundRoutes: routes })
     } catch (error) {
         return handleError(reply, error, req)

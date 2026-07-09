@@ -28,10 +28,12 @@ import {
     type RouteDestination,
     type RouteDestinationType,
 } from "@/components/RouteDestination/route-destination-field"
+import { type Company } from "@/hooks/use-companies"
 import { QUEUE_STRATEGY_LABELS, type Queue } from "@/hooks/use-queues"
 
 type Props = {
     queues: Queue[]
+    companies: Company[]
     loading: boolean
     onEdit: (queue: Queue) => void
     onManageMembers: (queue: Queue) => void
@@ -110,8 +112,10 @@ function DestinationBadge({
     )
 }
 
-export function QueuesTable({ queues, loading, onEdit, onManageMembers, onDelete }: Props) {
+export function QueuesTable({ queues, companies, loading, onEdit, onManageMembers, onDelete }: Props) {
     const { labels, loadedTypes } = useDestinationLabels(queues)
+    const companyName = (companyId: string) =>
+        companies.find((c) => c.id === companyId)?.name ?? companyId
 
     return (
         <div className="rounded-md border">
@@ -120,6 +124,7 @@ export function QueuesTable({ queues, loading, onEdit, onManageMembers, onDelete
                     <TableRow>
                         <TableHead>Nome</TableHead>
                         <TableHead>Número</TableHead>
+                        <TableHead>Empresa</TableHead>
                         <TableHead>Estratégia</TableHead>
                         <TableHead>Destino pós-fila</TableHead>
                         <TableHead className="w-38 text-right">Ações</TableHead>
@@ -129,7 +134,7 @@ export function QueuesTable({ queues, loading, onEdit, onManageMembers, onDelete
                     {loading ? (
                         Array.from({ length: 3 }).map((_, i) => (
                             <TableRow key={i}>
-                                {Array.from({ length: 5 }).map((_, j) => (
+                                {Array.from({ length: 6 }).map((_, j) => (
                                     <TableCell key={j}>
                                         <Skeleton className="h-4 w-full" />
                                     </TableCell>
@@ -138,7 +143,7 @@ export function QueuesTable({ queues, loading, onEdit, onManageMembers, onDelete
                         ))
                     ) : queues.length === 0 ? (
                         <TableRow>
-                            <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                            <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
                                 Nenhuma fila encontrada
                             </TableCell>
                         </TableRow>
@@ -147,6 +152,9 @@ export function QueuesTable({ queues, loading, onEdit, onManageMembers, onDelete
                             <TableRow key={queue.id}>
                                 <TableCell className="font-medium">{queue.name}</TableCell>
                                 <TableCell>{queue.number}</TableCell>
+                                <TableCell>
+                                    <Badge variant="outline">{companyName(queue.companyId)}</Badge>
+                                </TableCell>
                                 <TableCell>{QUEUE_STRATEGY_LABELS[queue.strategy]}</TableCell>
                                 <TableCell>
                                     <DestinationBadge

@@ -37,10 +37,9 @@ export const updateTimeConditionFormSchema = z.object({
 export type TimeConditionForm = z.infer<typeof createTimeConditionFormSchema>
 export type TimeConditionUpdateForm = z.infer<typeof updateTimeConditionFormSchema>
 
-// Sem companyId — busca todas as condições no escopo do usuário (igual use-dids/use-extensions) e
-// deixa o filtro por empresa a cargo da página, evitando esperar a empresa padrão resolver antes
-// de disparar essa requisição
-export function useTimeConditions() {
+// companyId opcional — omitido, busca todas as condições no escopo do usuário, permitindo o
+// filtro "Todas as empresas" na página
+export function useTimeConditions(companyId?: string) {
     const [timeConditions, setTimeConditions] = useState<TimeCondition[]>([])
     const [loading, setLoading] = useState(true)
     const [filter, setFilter] = useState("")
@@ -48,14 +47,16 @@ export function useTimeConditions() {
     const fetchTimeConditions = useCallback(async () => {
         setLoading(true)
         try {
-            const { data } = await api.get("/time-conditions")
+            const { data } = await api.get("/time-conditions", {
+                params: companyId ? { companyId } : undefined,
+            })
             setTimeConditions(data.timeConditions ?? [])
         } catch (err) {
             toast.error(apiError(err, "Erro ao buscar condições de horário"))
         } finally {
             setLoading(false)
         }
-    }, [])
+    }, [companyId])
 
     // companyId da condição vem do próprio form (campo "Empresa" do dialog), não do filtro da página —
     // permite criar uma condição pra empresa X enquanto a tabela lista a empresa Y
@@ -102,13 +103,13 @@ export function useTimeConditions() {
         tc.name.toLowerCase().includes(filter.toLowerCase())
     )
 
-    const fetchedRef = useRef(false)
+    const fetchStateRef = useRef<{ key?: string; fetched: boolean }>({ fetched: false })
 
     useEffect(() => {
-        if (fetchedRef.current) return
-        fetchedRef.current = true
+        if (fetchStateRef.current.fetched && fetchStateRef.current.key === companyId) return
+        fetchStateRef.current = { key: companyId, fetched: true }
         fetchTimeConditions()
-    }, [fetchTimeConditions])
+    }, [fetchTimeConditions, companyId])
 
     return {
         timeConditions: filtered,

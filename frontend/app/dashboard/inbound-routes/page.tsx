@@ -41,10 +41,8 @@ export default function InboundRoutesPage() {
     // selecionada — "Todas as empresas" não é uma empresa válida pra criar/editar
     const formCompanyId = editRoute?.companyId ?? (companyFilter !== "all" ? companyFilter : undefined)
 
-    const { dids } = useDids()
-    const formDids = dids.filter((d) => d.companyId === formCompanyId)
-    const { trunks } = useTrunks()
-    const formTrunks = trunks.filter((t) => t.companyId === formCompanyId)
+    const { dids: formDids } = useDids(formCompanyId)
+    const { trunks: formTrunks } = useTrunks(formCompanyId)
     const {
         routes,
         allRoutes,
@@ -54,12 +52,9 @@ export default function InboundRoutesPage() {
         createRoute,
         updateRoute,
         deleteRoute,
-    } = useInboundRoutes(formCompanyId)
-    const companyRoutes = routes.filter(
-        (r) => companyFilter === "all" || r.companyId === companyFilter
-    )
+    } = useInboundRoutes(companyFilter === "all" ? undefined : companyFilter)
 
-    const { paginated, page, setPage, totalPages, total } = usePagination(companyRoutes, 15)
+    const { paginated, page, setPage, totalPages, total } = usePagination(routes, 15)
 
     const handleDelete = async () => {
         if (!deleteTarget) return false
@@ -133,7 +128,7 @@ export default function InboundRoutesPage() {
                     dids={formDids}
                     trunks={formTrunks}
                     existingRoutes={allRoutes}
-                    onSave={createRoute}
+                    onSave={(form) => createRoute(form, formCompanyId!)}
                 />
             )}
 

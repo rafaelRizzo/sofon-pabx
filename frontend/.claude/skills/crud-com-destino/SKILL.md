@@ -16,6 +16,10 @@ Variante de `/novo-crud` para recursos que roteiam chamada (`destination`, `true
 
 1. **Contrato primeiro** (igual `/novo-crud`): ler `../backend/src/modules/<recurso>/<recurso>.routes.ts` e `schemas/`.
    Prestar atenção especial a:
+   - Se o `GET` de listagem aceita `companyId` opcional (`optionalCompanyQuery`) — a listagem da página deve
+     sempre fazer fetch-by-company (ver passo 7), mesmo quando `companyId` só existe no `create` do recurso
+     em si (destino/vínculo m-n são create-only, mas a listagem é um endpoint separado que já suporta o filtro
+     — ver `inbound-routes.routes.ts`/`outbound-routes.routes.ts`).
    - Quais campos são `routeDestinationSchema` (destino) — no schema do backend aparecem como `Json?` no Prisma e usam `routeDestSchema`/`routeDestinationSchema` importado de `route-destination.schema.ts`.
    - Se há campo de relação m-n tipo `groupIds`/`memberIds` (array de cuid2) — **conferir se ele existe só no `create` schema ou também no `update`**. Nos módulos existentes (time-conditions) o `update` não aceita reatribuir a relação — só `name`/destinos. Se for o caso, replicar a assimetria no form: bloquear edição da relação e mostrar como badges somente leitura.
    - Como a relação m-n vem na resposta: geralmente **envolta num wrapper** (`timeGroups: [{ timeGroup: { id, name } }]`), não array plano — extrair com `.map(x => x.wrapper)`.
@@ -25,7 +29,8 @@ Variante de `/novo-crud` para recursos que roteiam chamada (`destination`, `true
    - Importar `routeDestinationSchema`/`RouteDestination`/`type` de `@/components/RouteDestination/route-destination-field` para cada campo de destino.
    - Se a relação m-n for assimétrica, criar dois schemas zod (`create<Recurso>FormSchema` com `groupIds`, `update<Recurso>FormSchema` sem).
    - `groupIds: z.array(z.string()).min(1, "Selecione ao menos um <relacionado>")` se o vínculo for obrigatório.
-   - Resto do CRUD é o template padrão do `/novo-crud` (fetch/create/update/delete + toast + filtro).
+   - **`companyId` do hook é fetch-scope, não create-scope**: o parâmetro `companyId?` do hook (`useInboundRoutes(companyId?)`) dirige só o `GET` de listagem (`?companyId=` quando informado). O `companyId` da empresa sendo criada é **outro valor**, passado como argumento explícito na hora de chamar `createRoute`/`createX` — nunca reaproveitar o parâmetro do hook pra isso, porque a empresa do form (passo 4) pode divergir da empresa que está filtrando a tabela (ex: editando um registro de uma empresa enquanto o filtro mostra outra, ou filtro em "Todas as empresas"). Assinatura: `createRoute(form: XForm, targetCompanyId: string)` — ver `hooks/use-inbound-routes.ts`/`hooks/use-outbound-routes.ts` como referência canônica.
+   - Resto do CRUD é o template padrão do `/novo-crud` (fetch/create/update/delete + toast + filtro), incluindo o `fetchStateRef` que refaz o GET quando `companyId` muda.
 
 3. **Multi-select da relação m-n**: criar `components/<Recurso>/<relacionado>s-combobox.tsx` no estilo de
    `components/TimeConditions/time-groups-combobox.tsx` — é uma **lista buscável** (`Combobox<Item, true>`
@@ -91,10 +96,16 @@ Variante de `/novo-crud` para recursos que roteiam chamada (`destination`, `true
      sumiu).
    - Coluna da relação m-n: `Badge` por item vinculado (vem pronto na resposta, não precisa resolver).
 
-7. **Página** `app/dashboard/<recurso>/page.tsx`: esqueleto igual `/novo-crud` (empresa via `Combobox` +
-   `useEffect` seleciona a primeira, filtro texto, `usePagination`, dialogs de create/edit/delete). O
-   `companyId` da página só serve pra **filtrar a tabela** — passar `companies` (lista completa) pro dialog,
-   não `companyId`/`timeGroups` já resolvidos (ver passo 4).
+7. **Página** `app/dashboard/<recurso>/page.tsx`: esqueleto igual `/novo-crud` (empresa via `Combobox`,
+   filtro texto, `usePagination`, dialogs de create/edit/delete). O `companyFilter` da página dirige o
+   `GET` de listagem (`useInboundRoutes(companyFilter === "all" ? undefined : companyFilter)`) — nunca
+   `.filter()` sobre uma lista já carregada. `formCompanyId` (empresa do form — passo 4) é uma variável
+   **separada**, derivada de `editRoute?.companyId ?? (companyFilter !== "all" ? companyFilter : undefined)`,
+   e usada em três lugares: (a) escopar hooks auxiliares do dialog (`useDids(formCompanyId)`,
+   `useTrunks(formCompanyId)` etc.), (b) passar como `targetCompanyId` explícito pro `createRoute`
+   (`onSave={(form) => createRoute(form, formCompanyId!)}`), (c) `companyId` prop do form dialog. Passar
+   `companies` (lista completa) pro dialog, não `companyId`/`timeGroups` já resolvidos (ver passo 4). Ver
+   `app/dashboard/inbound-routes/page.tsx`/`app/dashboard/outbound-routes/page.tsx` como referência canônica.
 
 7. `pnpm typecheck` ao final (não rodar lint — ver preferência do usuário).
 

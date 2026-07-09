@@ -69,10 +69,9 @@ export type TimeGroupForm = z.infer<typeof createTimeGroupFormSchema>
 export type TimeGroupUpdateForm = z.infer<typeof updateTimeGroupFormSchema>
 export type TimeRangeForm = z.infer<typeof timeRangeFormSchema>
 
-// Sem companyId — busca todos os grupos no escopo do usuário (igual use-dids/use-extensions) e
-// deixa o filtro por empresa a cargo da página, evitando esperar a empresa padrão resolver antes
-// de disparar essa requisição
-export function useTimeGroups() {
+// companyId opcional — omitido, busca todos os grupos no escopo do usuário, permitindo o
+// filtro "Todas as empresas" na página
+export function useTimeGroups(companyId?: string) {
     const [timeGroups, setTimeGroups] = useState<TimeGroup[]>([])
     const [loading, setLoading] = useState(true)
     const [filter, setFilter] = useState("")
@@ -80,14 +79,16 @@ export function useTimeGroups() {
     const fetchTimeGroups = useCallback(async () => {
         setLoading(true)
         try {
-            const { data } = await api.get("/time-groups")
+            const { data } = await api.get("/time-groups", {
+                params: companyId ? { companyId } : undefined,
+            })
             setTimeGroups(data.timeGroups ?? [])
         } catch (err) {
             toast.error(apiError(err, "Erro ao buscar grupos de horário"))
         } finally {
             setLoading(false)
         }
-    }, [])
+    }, [companyId])
 
     // companyId do grupo vem do próprio form (campo "Empresa" do dialog), não do filtro da página
     const createTimeGroup = async (form: TimeGroupForm) => {
@@ -133,13 +134,13 @@ export function useTimeGroups() {
         g.name.toLowerCase().includes(filter.toLowerCase())
     )
 
-    const fetchedRef = useRef(false)
+    const fetchStateRef = useRef<{ key?: string; fetched: boolean }>({ fetched: false })
 
     useEffect(() => {
-        if (fetchedRef.current) return
-        fetchedRef.current = true
+        if (fetchStateRef.current.fetched && fetchStateRef.current.key === companyId) return
+        fetchStateRef.current = { key: companyId, fetched: true }
         fetchTimeGroups()
-    }, [fetchTimeGroups])
+    }, [fetchTimeGroups, companyId])
 
     return {
         timeGroups: filtered,

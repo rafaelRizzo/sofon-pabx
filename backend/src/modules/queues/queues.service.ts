@@ -6,6 +6,19 @@ import type { CreateQueueInput, UpdateQueueInput } from './schemas/queue.schema'
 import { AsteriskQueueRepository, toAsteriskQueueName } from '../../asterisk/queue.repository'
 import { validateRouteDestination } from '../../schemas/route-destination.validate'
 import { AppError } from '../../utils/errors/app.error'
+import { logger } from '../../utils/logger'
+
+// Regenerar o dialplan (arquivo estático) é best-effort: se falhar aqui (disco, permissão, etc.),
+// o registro já foi commitado no Postgres (fonte da verdade) — deixar a exceção subir faria a API
+// responder erro sobre uma operação que na prática já foi persistida. O próximo CRUD dessa empresa
+// regenera o arquivo do zero a partir do estado atual do banco, então a inconsistência se autocorrige.
+const regenerateSafely = async (fn: () => Promise<void>, companyId: string) => {
+    try {
+        await fn()
+    } catch (error) {
+        logger.error({ event: 'queue.dialplan.regenerate.failed', companyId, error: error instanceof Error ? error.message : String(error) })
+    }
+}
 
 const queueSelect = {
     id: true,
@@ -34,11 +47,14 @@ const queueSelect = {
     _count: { select: { members: true } },
 } as const
 
-export const getAllQueues = async (companyIds?: string[]) => {
+export const getAllQueues = async (companyIds?: string[], userId?: string) => {
     if (companyIds && companyIds.length === 0) return []
 
     if (!companyIds) {
         const cached = await QueuesCache.getAll()
+        if (cached) return cached
+    } else if (userId) {
+        const cached = await QueuesCache.getForScope(userId)
         if (cached) return cached
     }
 
@@ -48,6 +64,7 @@ export const getAllQueues = async (companyIds?: string[]) => {
     })
 
     if (!companyIds) await QueuesCache.setAll(queues)
+    else if (userId) await QueuesCache.setForScope(userId, queues)
     return queues
 }
 
@@ -102,12 +119,9 @@ export const createQueue = async (data: CreateQueueInput) => {
         return q
     })
 
-    try {
-        await AsteriskQueueRepository.regenerate(data.companyId)
-    } finally {
-        await QueuesCache.invalidateByCompany(data.companyId)
-        await QueuesCache.invalidateAll()
-    }
+    await regenerateSafely(() => AsteriskQueueRepository.regenerate(data.companyId), data.companyId)
+    await QueuesCache.invalidateByCompany(data.companyId)
+    await QueuesCache.invalidateNamespace()
     return queue
 }
 
@@ -175,13 +189,10 @@ export const updateQueue = async (id: string, data: UpdateQueueInput) => {
         return tx.queue.update({ where: { id }, data: appUpdate, select: queueSelect })
     })
 
-    try {
-        if (needsResync) await AsteriskQueueRepository.regenerate(existing.companyId)
-    } finally {
-        await QueuesCache.invalidateQueue(id)
-        await QueuesCache.invalidateByCompany(existing.companyId)
-        await QueuesCache.invalidateAll()
-    }
+    if (needsResync) await regenerateSafely(() => AsteriskQueueRepository.regenerate(existing.companyId), existing.companyId)
+    await QueuesCache.invalidateQueue(id)
+    await QueuesCache.invalidateByCompany(existing.companyId)
+    await QueuesCache.invalidateNamespace()
     return queue
 }
 
@@ -199,12 +210,9 @@ export const deleteQueue = async (id: string) => {
         await tx.queue.delete({ where: { id } })
     })
 
-    try {
-        await AsteriskQueueRepository.regenerate(existing.companyId)
-    } finally {
-        await QueuesCache.invalidateQueue(id)
-        await QueueMembersCache.invalidateMembers(id)
-        await QueuesCache.invalidateByCompany(existing.companyId)
-        await QueuesCache.invalidateAll()
-    }
+    await regenerateSafely(() => AsteriskQueueRepository.regenerate(existing.companyId), existing.companyId)
+    await QueuesCache.invalidateQueue(id)
+    await QueueMembersCache.invalidateMembers(id)
+    await QueuesCache.invalidateByCompany(existing.companyId)
+    await QueuesCache.invalidateNamespace()
 }

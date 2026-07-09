@@ -84,10 +84,9 @@ export const updateTrunkSchema = z.object({
 export type TrunkCreateForm = z.infer<typeof createTrunkSchema>
 export type TrunkUpdateForm = z.infer<typeof updateTrunkSchema>
 
-// Sem companyId — busca todos os troncos no escopo do usuário (igual use-dids/use-extensions) e
-// deixa o filtro por empresa a cargo da página, evitando esperar a empresa padrão resolver antes
-// de disparar essa requisição
-export function useTrunks() {
+// companyId opcional — omitido, busca todos os troncos no escopo do usuário, permitindo o
+// filtro "Todas as empresas" na página
+export function useTrunks(companyId?: string) {
     const [trunks, setTrunks] = useState<Trunk[]>([])
     const [loading, setLoading] = useState(true)
     const [filter, setFilter] = useState("")
@@ -95,14 +94,16 @@ export function useTrunks() {
     const fetchTrunks = useCallback(async () => {
         setLoading(true)
         try {
-            const { data } = await api.get("/trunks")
+            const { data } = await api.get("/trunks", {
+                params: companyId ? { companyId } : undefined,
+            })
             setTrunks(data.trunks ?? [])
         } catch (err) {
             toast.error(apiError(err, "Erro ao buscar troncos"))
         } finally {
             setLoading(false)
         }
-    }, [])
+    }, [companyId])
 
     const createTrunk = async (form: TrunkCreateForm): Promise<Trunk | null> => {
         const id = toast.loading("Criando tronco...")
@@ -155,13 +156,13 @@ export function useTrunks() {
         `${t.name} ${t.host ?? ""}`.toLowerCase().includes(filter.toLowerCase())
     )
 
-    const fetchedRef = useRef(false)
+    const fetchStateRef = useRef<{ key?: string; fetched: boolean }>({ fetched: false })
 
     useEffect(() => {
-        if (fetchedRef.current) return
-        fetchedRef.current = true
+        if (fetchStateRef.current.fetched && fetchStateRef.current.key === companyId) return
+        fetchStateRef.current = { key: companyId, fetched: true }
         fetchTrunks()
-    }, [fetchTrunks])
+    }, [fetchTrunks, companyId])
 
     return {
         trunks: filtered,

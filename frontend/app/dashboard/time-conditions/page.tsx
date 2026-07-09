@@ -38,16 +38,13 @@ export default function TimeConditionsPage() {
         createTimeCondition,
         updateTimeCondition,
         deleteTimeCondition,
-    } = useTimeConditions()
-    const companyTimeConditions = timeConditions.filter(
-        (tc) => companyFilter === "all" || tc.companyId === companyFilter
-    )
+    } = useTimeConditions(companyFilter === "all" ? undefined : companyFilter)
 
     const [createOpen, setCreateOpen] = useState(false)
     const [editTimeCondition, setEditTimeCondition] = useState<TimeCondition | null>(null)
     const [deleteTarget, setDeleteTarget] = useState<TimeCondition | null>(null)
 
-    const { paginated, page, setPage, totalPages, total } = usePagination(companyTimeConditions, 15)
+    const { paginated, page, setPage, totalPages, total } = usePagination(timeConditions, 15)
 
     const handleDelete = async () => {
         if (!deleteTarget) return false

@@ -31,7 +31,7 @@ export const updateDidSchema = z.object({
 export type DidCreateForm = z.infer<typeof createDidSchema>
 export type DidUpdateForm = z.infer<typeof updateDidSchema>
 
-export function useDids() {
+export function useDids(companyId?: string) {
     const [dids, setDids] = useState<Did[]>([])
     const [loading, setLoading] = useState(true)
     const [filter, setFilter] = useState("")
@@ -39,14 +39,16 @@ export function useDids() {
     const fetchDids = useCallback(async () => {
         setLoading(true)
         try {
-            const { data } = await api.get("/dids")
+            const { data } = await api.get("/dids", {
+                params: companyId ? { companyId } : undefined,
+            })
             setDids(data.dids ?? [])
         } catch (err) {
             toast.error(apiError(err, "Erro ao buscar DIDs"))
         } finally {
             setLoading(false)
         }
-    }, [])
+    }, [companyId])
 
     const createDid = async (form: DidCreateForm) => {
         const id = toast.loading("Criando DID...")
@@ -91,13 +93,13 @@ export function useDids() {
         d.number.toLowerCase().includes(filter.toLowerCase())
     )
 
-    const fetchedRef = useRef(false)
+    const fetchStateRef = useRef<{ key?: string; fetched: boolean }>({ fetched: false })
 
     useEffect(() => {
-        if (fetchedRef.current) return
-        fetchedRef.current = true
+        if (fetchStateRef.current.fetched && fetchStateRef.current.key === companyId) return
+        fetchStateRef.current = { key: companyId, fetched: true }
         fetchDids()
-    }, [fetchDids])
+    }, [fetchDids, companyId])
 
     return {
         dids: filtered,

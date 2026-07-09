@@ -21,7 +21,7 @@ export const getQueues = async (req: FastifyRequest, reply: FastifyReply) => {
             return reply.send({ success: true, message: 'Queues fetched successfully', queues })
         }
 
-        const queues = await QueuesService.getAllQueues(companyIds ?? undefined)
+        const queues = await QueuesService.getAllQueues(companyIds ?? undefined, req.user!.id)
         return reply.send({ success: true, message: 'Queues fetched successfully', queues })
     } catch (error) {
         return handleError(reply, error, req)

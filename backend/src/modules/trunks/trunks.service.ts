@@ -48,11 +48,14 @@ export const getTrunks = async (companyId: string) => {
     return trunks
 }
 
-export const getAllTrunks = async (companyIds?: string[]) => {
+export const getAllTrunks = async (companyIds?: string[], userId?: string) => {
     if (companyIds && companyIds.length === 0) return []
 
     if (!companyIds) {
         const cached = await TrunksCache.getAll()
+        if (cached) return cached
+    } else if (userId) {
+        const cached = await TrunksCache.getForScope(userId)
         if (cached) return cached
     }
 
@@ -62,6 +65,7 @@ export const getAllTrunks = async (companyIds?: string[]) => {
     })
 
     if (!companyIds) await TrunksCache.setAll(trunks)
+    else if (userId) await TrunksCache.setForScope(userId, trunks)
     return trunks
 }
 

@@ -16,11 +16,14 @@ const select = {
     updatedAt: true,
 }
 
-export const getAllDids = async (companyIds?: string[]) => {
+export const getAllDids = async (companyIds?: string[], userId?: string) => {
     if (companyIds && companyIds.length === 0) return []
 
     if (!companyIds) {
         const cached = await DidsCache.getAll()
+        if (cached) return cached
+    } else if (userId) {
+        const cached = await DidsCache.getForScope(userId)
         if (cached) return cached
     }
 
@@ -30,6 +33,7 @@ export const getAllDids = async (companyIds?: string[]) => {
     })
 
     if (!companyIds) await DidsCache.setAll(dids)
+    else if (userId) await DidsCache.setForScope(userId, dids)
     return dids
 }
 
@@ -67,7 +71,7 @@ export const createDid = async (data: CreateDidInput) => {
     const did = await prisma.did.create({ data, select })
 
     await DidsCache.invalidateDidsByCompany(data.companyId)
-    await DidsCache.invalidateAll()
+    await DidsCache.invalidateNamespace()
     return did
 }
 
@@ -105,7 +109,7 @@ export const updateDid = async (id: string, data: UpdateDidInput) => {
     if (inboundRoutes.length > 0) await InboundRoutesCache.invalidateByCompany(existing.companyId)
     await DidsCache.invalidateDid(id)
     await DidsCache.invalidateDidsByCompany(existing.companyId)
-    await DidsCache.invalidateAll()
+    await DidsCache.invalidateNamespace()
     return did
 }
 
@@ -133,5 +137,5 @@ export const deleteDid = async (id: string) => {
     await InboundRoutesCache.invalidateByCompany(existing.companyId)
     await DidsCache.invalidateDid(id)
     await DidsCache.invalidateDidsByCompany(existing.companyId)
-    await DidsCache.invalidateAll()
+    await DidsCache.invalidateNamespace()
 }

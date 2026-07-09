@@ -28,21 +28,17 @@ const ALL_COMPANIES: CompanyFilterOption = { id: "all", name: "Todas as empresas
 
 export default function DidsPage() {
     const { companies } = useCompanies()
+    const [companyFilter, setCompanyFilter] = useState<string>("all")
+
     const { dids, loading, filter, setFilter, createDid, updateDid, deleteDid } =
-        useDids()
+        useDids(companyFilter === "all" ? undefined : companyFilter)
 
     const [createOpen, setCreateOpen] = useState(false)
     const [editDid, setEditDid] = useState<Did | null>(null)
     const [deleteTarget, setDeleteTarget] = useState<Did | null>(null)
-    const [companyFilter, setCompanyFilter] = useState<string>("all")
-
-    const filteredDids =
-        companyFilter === "all"
-            ? dids
-            : dids.filter((d) => d.companyId === companyFilter)
 
     const { paginated, page, setPage, totalPages, total } = usePagination(
-        filteredDids,
+        dids,
         15
     )
 

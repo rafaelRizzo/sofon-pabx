@@ -11,6 +11,7 @@ mock.module('../cache/queues.cache', () => ({
     QueuesCache: {
         getAll: mock(() => null), setAll: mock(),
         getByCompany: mock(() => null), setByCompany: mock(),
+        getForScope: mock(() => null), setForScope: mock(),
         getQueue: mock(() => null), setQueue: mock(),
         invalidateQueue: mock(), invalidateByCompany: mock(), invalidateNamespace: mock(),
         invalidateAll: mock(),

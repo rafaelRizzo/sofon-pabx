@@ -228,7 +228,7 @@ export function QueueFormDialog({ open, onOpenChange, queue, companies, onSave }
                                         {/* div em vez de FieldLabel: um <button> dentro de <label> herda o
                                         clique implícito do label, o que reabriria/fecharia o tooltip ao
                                         clicar no texto "Estratégia" */}
-                                        <div className="flex items-center gap-2 text-xs/relaxed leading-none font-medium">
+                                        <div className="flex items-center gap-2 text-xs/relaxed leading-snug font-medium">
                                             Estratégia
                                             <Tooltip>
                                                 <TooltipTrigger

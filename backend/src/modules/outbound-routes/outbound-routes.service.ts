@@ -266,11 +266,14 @@ export const getOutboundRoutes = async (companyId: string) => {
     return routes
 }
 
-export const getAllOutboundRoutes = async (companyIds?: string[]) => {
+export const getAllOutboundRoutes = async (companyIds?: string[], userId?: string) => {
     if (companyIds && companyIds.length === 0) return []
 
     if (!companyIds) {
         const cached = await OutboundRoutesCache.getAll()
+        if (cached) return cached as any[]
+    } else if (userId) {
+        const cached = await OutboundRoutesCache.getForScope(userId)
         if (cached) return cached as any[]
     }
 
@@ -282,6 +285,7 @@ export const getAllOutboundRoutes = async (companyIds?: string[]) => {
 
     if (bases.length === 0) {
         if (!companyIds) await OutboundRoutesCache.setAll([])
+        else if (userId) await OutboundRoutesCache.setForScope(userId, [])
         return []
     }
 
@@ -313,6 +317,7 @@ export const getAllOutboundRoutes = async (companyIds?: string[]) => {
     }))
 
     if (!companyIds) await OutboundRoutesCache.setAll(routes)
+    else if (userId) await OutboundRoutesCache.setForScope(userId, routes)
     return routes
 }
 

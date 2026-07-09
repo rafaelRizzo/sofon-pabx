@@ -33,16 +33,13 @@ export default function QueuesPage() {
 
     const { queues, loading, filter, setFilter, createQueue, updateQueue, deleteQueue } =
         useQueues(companyFilter === "all" ? undefined : companyFilter)
-    const filteredQueues = queues.filter(
-        (q) => companyFilter === "all" || q.companyId === companyFilter
-    )
 
     const [createOpen, setCreateOpen] = useState(false)
     const [editQueue, setEditQueue] = useState<Queue | null>(null)
     const [membersQueue, setMembersQueue] = useState<Queue | null>(null)
     const [deleteTarget, setDeleteTarget] = useState<Queue | null>(null)
 
-    const { paginated, page, setPage, totalPages, total } = usePagination(filteredQueues, 15)
+    const { paginated, page, setPage, totalPages, total } = usePagination(queues, 15)
 
     const handleDelete = async () => {
         if (!deleteTarget) return false
@@ -97,6 +94,7 @@ export default function QueuesPage() {
 
             <QueuesTable
                 queues={paginated}
+                companies={companies}
                 loading={loading}
                 onEdit={setEditQueue}
                 onManageMembers={setMembersQueue}

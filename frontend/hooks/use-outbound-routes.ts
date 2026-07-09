@@ -79,9 +79,9 @@ const toPayload = (form: OutboundRouteForm) => ({
     })),
 })
 
-// companyId aqui só é usado por createRoute (o POST exige companyId no body) — a busca em si não
-// depende dele: busca todas as rotas no escopo do usuário (igual use-dids/use-extensions), evitando
-// esperar a empresa padrão resolver antes de disparar essa requisição
+// companyId opcional — omitido, busca todas as rotas no escopo do usuário, permitindo o filtro
+// "Todas as empresas" na página. Diferente da empresa do formulário de criação (que é passada
+// explicitamente para createRoute, pois pode divergir deste filtro ao editar uma rota específica)
 export function useOutboundRoutes(companyId?: string) {
     const [routes, setRoutes] = useState<OutboundRoute[]>([])
     const [loading, setLoading] = useState(true)
@@ -90,22 +90,23 @@ export function useOutboundRoutes(companyId?: string) {
     const fetchRoutes = useCallback(async () => {
         setLoading(true)
         try {
-            const { data } = await api.get("/outbound-routes")
+            const { data } = await api.get("/outbound-routes", {
+                params: companyId ? { companyId } : undefined,
+            })
             setRoutes(data.routes ?? [])
         } catch (err) {
             toast.error(apiError(err, "Erro ao buscar rotas de saída"))
         } finally {
             setLoading(false)
         }
-    }, [])
+    }, [companyId])
 
-    const createRoute = async (form: OutboundRouteForm) => {
-        if (!companyId) return false
+    const createRoute = async (form: OutboundRouteForm, targetCompanyId: string) => {
         const id = toast.loading("Criando rota de saída...")
         try {
             await api.post("/outbound-routes", {
                 ...toPayload(form),
-                companyId,
+                companyId: targetCompanyId,
                 extensionIds: form.extensionIds?.length ? form.extensionIds : undefined,
             })
             toast.success("Rota de saída criada", { id })
@@ -163,13 +164,13 @@ export function useOutboundRoutes(companyId?: string) {
         r.name.toLowerCase().includes(filter.toLowerCase())
     )
 
-    const fetchedRef = useRef(false)
+    const fetchStateRef = useRef<{ key?: string; fetched: boolean }>({ fetched: false })
 
     useEffect(() => {
-        if (fetchedRef.current) return
-        fetchedRef.current = true
+        if (fetchStateRef.current.fetched && fetchStateRef.current.key === companyId) return
+        fetchStateRef.current = { key: companyId, fetched: true }
         fetchRoutes()
-    }, [fetchRoutes])
+    }, [fetchRoutes, companyId])
 
     return {
         routes: filtered,

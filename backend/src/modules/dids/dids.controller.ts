@@ -21,7 +21,7 @@ export const getDids = async (req: FastifyRequest, reply: FastifyReply) => {
             return reply.send({ success: true, message: 'DIDs fetched successfully', dids })
         }
 
-        const dids = await DidsService.getAllDids(companyIds ?? undefined)
+        const dids = await DidsService.getAllDids(companyIds ?? undefined, req.user!.id)
         return reply.send({ success: true, message: 'DIDs fetched successfully', dids })
     } catch (error) {
         return handleError(reply, error, req)

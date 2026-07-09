@@ -59,6 +59,10 @@ const TYPE_FILTERS = [
 ]
 
 export default function ExtensionsPage() {
+    const { companies } = useCompanies()
+    const [typeFilter, setTypeFilter] = useState<ExtensionType | "all">("all")
+    const [companyFilter, setCompanyFilter] = useState<string>("all")
+
     const {
         extensions,
         loading,
@@ -69,8 +73,7 @@ export default function ExtensionsPage() {
         resetPassword,
         deleteExtension,
         exportExtensions,
-    } = useExtensions()
-    const { companies } = useCompanies()
+    } = useExtensions(companyFilter === "all" ? undefined : companyFilter)
 
     const [createOpen, setCreateOpen] = useState(false)
     const [editExtension, setEditExtension] = useState<Extension | null>(null)
@@ -79,12 +82,10 @@ export default function ExtensionsPage() {
     const [resetting, setResetting] = useState(false)
     const [passwordReveal, setPasswordReveal] =
         useState<PasswordReveal | null>(null)
-    const [typeFilter, setTypeFilter] = useState<ExtensionType | "all">("all")
-    const [companyFilter, setCompanyFilter] = useState<string>("all")
 
-    const filteredExtensions = extensions
-        .filter((e) => typeFilter === "all" || e.type === typeFilter)
-        .filter((e) => companyFilter === "all" || e.companyId === companyFilter)
+    const filteredExtensions = extensions.filter(
+        (e) => typeFilter === "all" || e.type === typeFilter
+    )
 
     const { paginated, page, setPage, totalPages, total } = usePagination(
         filteredExtensions,

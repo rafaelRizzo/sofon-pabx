@@ -37,11 +37,14 @@ export const getInboundRoutesByCompany = async (companyId: string) => {
     return routes
 }
 
-export const getAllInboundRoutes = async (companyIds?: string[]) => {
+export const getAllInboundRoutes = async (companyIds?: string[], userId?: string) => {
     if (companyIds && companyIds.length === 0) return []
 
     if (!companyIds) {
         const cached = await InboundRoutesCache.getAll()
+        if (cached) return cached
+    } else if (userId) {
+        const cached = await InboundRoutesCache.getForScope(userId)
         if (cached) return cached
     }
 
@@ -51,6 +54,7 @@ export const getAllInboundRoutes = async (companyIds?: string[]) => {
     })
 
     if (!companyIds) await InboundRoutesCache.setAll(routes)
+    else if (userId) await InboundRoutesCache.setForScope(userId, routes)
     return routes
 }
 
@@ -101,7 +105,7 @@ export const createInboundRoute = async (data: CreateInboundRouteInput) => {
     })
 
     await InboundRoutesCache.invalidateByCompany(data.companyId)
-    await InboundRoutesCache.invalidateAll()
+    await InboundRoutesCache.invalidateNamespace()
     return route
 }
 
@@ -137,7 +141,7 @@ export const updateInboundRoute = async (id: string, data: UpdateInboundRouteInp
 
     await InboundRoutesCache.invalidateRoute(id)
     await InboundRoutesCache.invalidateByCompany(existing.companyId)
-    await InboundRoutesCache.invalidateAll()
+    await InboundRoutesCache.invalidateNamespace()
     return route
 }
 
@@ -155,5 +159,5 @@ export const deleteInboundRoute = async (id: string) => {
 
     await InboundRoutesCache.invalidateRoute(id)
     await InboundRoutesCache.invalidateByCompany(existing.companyId)
-    await InboundRoutesCache.invalidateAll()
+    await InboundRoutesCache.invalidateNamespace()
 }

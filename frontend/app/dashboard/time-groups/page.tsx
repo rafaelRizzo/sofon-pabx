@@ -38,17 +38,14 @@ export default function TimeGroupsPage() {
         createTimeGroup,
         updateTimeGroup,
         deleteTimeGroup,
-    } = useTimeGroups()
-    const companyTimeGroups = timeGroups.filter(
-        (g) => companyFilter === "all" || g.companyId === companyFilter
-    )
+    } = useTimeGroups(companyFilter === "all" ? undefined : companyFilter)
 
     const [createOpen, setCreateOpen] = useState(false)
     const [editTimeGroup, setEditTimeGroup] = useState<TimeGroup | null>(null)
     const [deleteTarget, setDeleteTarget] = useState<TimeGroup | null>(null)
 
     const { paginated, page, setPage, totalPages, total } = usePagination(
-        companyTimeGroups,
+        timeGroups,
         15
     )
 

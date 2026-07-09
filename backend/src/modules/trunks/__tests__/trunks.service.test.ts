@@ -11,6 +11,7 @@ mock.module('../cache/trunks.cache', () => ({
     TrunksCache: {
         getAll: mock(() => null), setAll: mock(),
         getByCompany: mock(() => null), setByCompany: mock(),
+        getForScope: mock(() => null), setForScope: mock(),
         getTrunk: mock(() => null), setTrunk: mock(),
         invalidateAllTrunks: mock(), invalidateTrunk: mock(), invalidateByCompany: mock(),
     },

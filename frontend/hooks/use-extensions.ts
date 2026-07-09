@@ -247,7 +247,7 @@ const COMMON_KEYS = new Set([
     "allowOutbound",
 ])
 
-export function useExtensions() {
+export function useExtensions(companyId?: string) {
     const [extensions, setExtensions] = useState<Extension[]>([])
     const [loading, setLoading] = useState(true)
     const [filter, setFilter] = useState("")
@@ -255,7 +255,9 @@ export function useExtensions() {
     const fetchExtensions = useCallback(async () => {
         setLoading(true)
         try {
-            const { data } = await api.get("/extensions")
+            const { data } = await api.get("/extensions", {
+                params: companyId ? { companyId } : undefined,
+            })
             const all = [
                 ...(data.extensions?.sip ?? []),
                 ...(data.extensions?.pjsip ?? []),
@@ -266,7 +268,7 @@ export function useExtensions() {
         } finally {
             setLoading(false)
         }
-    }, [])
+    }, [companyId])
 
     const getExtensionById = useCallback(async (id: string): Promise<Extension | null> => {
         try {
@@ -381,13 +383,13 @@ export function useExtensions() {
             .includes(filter.toLowerCase())
     )
 
-    const fetchedRef = useRef(false)
+    const fetchStateRef = useRef<{ key?: string; fetched: boolean }>({ fetched: false })
 
     useEffect(() => {
-        if (fetchedRef.current) return
-        fetchedRef.current = true
+        if (fetchStateRef.current.fetched && fetchStateRef.current.key === companyId) return
+        fetchStateRef.current = { key: companyId, fetched: true }
         fetchExtensions()
-    }, [fetchExtensions])
+    }, [fetchExtensions, companyId])
 
     return {
         extensions: filtered,
