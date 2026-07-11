@@ -3,7 +3,8 @@ import { QueuesCache } from '../queues/cache/queues.cache'
 import { QueueMembersCache } from './cache/queue-members.cache'
 import { getQueueById, type QueueDto } from '../queues/queues.service'
 import { getExtensionDto } from '../extensions/extensions.service'
-import { AsteriskQueueRepository } from '../../asterisk/queue.repository'
+import { assertAgentEligible } from '../callcenter/agents/agents.service'
+import { AsteriskQueueRepository, toAsteriskInterface } from '../../asterisk/queue.repository'
 import type { AddMemberInput, UpdateMemberInput } from './schemas/queue-member.schema'
 import { AppError } from '../../utils/errors/app.error'
 
@@ -22,7 +23,6 @@ const memberSelect = {
 } as const
 
 const toAsteriskQueueName = (asteriskId: string, queueName: string) => `${asteriskId}-${queueName}`
-const toAsteriskInterface = (type: string, number: string) => `${type.toUpperCase()}/${number}`
 
 export const getQueueMembers = async (queueId: string) => {
     const cached = await QueueMembersCache.getMembers(queueId)
@@ -42,6 +42,8 @@ export const addMember = async (queueId: string, data: AddMemberInput) => {
     const extension = await getExtensionDto(data.extensionId)
     if (extension.companyId !== queue.companyId)
         throw new AppError('Extension does not belong to the same company as the queue', 403)
+
+    await assertAgentEligible(data.extensionId, queue.companyId)
 
     const alreadyMember = await prisma.queueMember.findUnique({
         where: { queueId_extensionId: { queueId, extensionId: data.extensionId } },

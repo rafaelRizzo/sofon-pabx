@@ -62,6 +62,13 @@ export type Queue = {
     joinEmpty: boolean
     leaveWhenEmpty: boolean
     postQueueDestination: RouteDestination
+    // Pesquisa de satisfação pós-atendimento (módulo callcenter) — surveyAudioId é o áudio
+    // vinculado (null = desligada), hasSurveyAudio é derivado (surveyAudioId !== null)
+    surveyAudioId: string | null
+    hasSurveyAudio: boolean
+    // Liga, só nessa fila, prioridade dinâmica (RoutingRule) e roteamento por afinidade (penalty) —
+    // motor opcional do módulo Callcenter (regras/notas configuradas por empresa em /dashboard/callcenter)
+    callcenterEnabled: boolean
     createdAt: string
     updatedAt: string
 }
@@ -107,6 +114,10 @@ const baseQueueFields = {
     leaveWhenEmpty: z.boolean().default(false),
     weight: intWithDefault(0, Number.MAX_SAFE_INTEGER, 0),
     postQueueDestination: routeDestinationSchema,
+    // Áudio da pesquisa de satisfação pós-atendimento (null = pesquisa desligada)
+    surveyAudioId: z.string().nullable(),
+    // Liga o motor Callcenter (prioridade dinâmica + afinidade) só nessa fila
+    callcenterEnabled: z.boolean().default(false),
 }
 
 export const createQueueFormSchema = z.object({

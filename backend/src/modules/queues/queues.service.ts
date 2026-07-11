@@ -4,7 +4,9 @@ import { QueuesCache } from './cache/queues.cache'
 import { QueueMembersCache } from '../queue-members/cache/queue-members.cache'
 import type { CreateQueueInput, UpdateQueueInput } from './schemas/queue.schema'
 import { AsteriskQueueRepository, toAsteriskQueueName } from '../../asterisk/queue.repository'
+import { CallcenterSurveyRepository } from '../../asterisk/callcenter-survey.repository'
 import { validateRouteDestination } from '../../schemas/route-destination.validate'
+import { assertAudioBelongsToCompany } from '../audios/audios.service'
 import { AppError } from '../../utils/errors/app.error'
 import { logger } from '../../utils/logger'
 
@@ -41,11 +43,15 @@ const queueSelect = {
     weight: true,
     metadata: true,
     postQueueDestination: true,
+    surveyAudioId: true,
+    callcenterEnabled: true,
     createdAt: true,
     updatedAt: true,
     company: { select: { asteriskId: true } },
     _count: { select: { members: true } },
 } as const
+
+const toDto = <T extends { surveyAudioId: string | null }>(q: T) => ({ ...q, hasSurveyAudio: q.surveyAudioId !== null })
 
 export const getAllQueues = async (companyIds?: string[], userId?: string) => {
     if (companyIds && companyIds.length === 0) return []
@@ -58,10 +64,10 @@ export const getAllQueues = async (companyIds?: string[], userId?: string) => {
         if (cached) return cached
     }
 
-    const queues = await prisma.queue.findMany({
+    const queues = (await prisma.queue.findMany({
         where: companyIds ? { companyId: { in: companyIds } } : undefined,
         select: queueSelect,
-    })
+    })).map(toDto)
 
     if (!companyIds) await QueuesCache.setAll(queues)
     else if (userId) await QueuesCache.setForScope(userId, queues)
@@ -74,13 +80,13 @@ export const getQueuesByCompany = async (companyId: string) => {
 
     await getCompanyById(companyId)
 
-    const queues = await prisma.queue.findMany({ where: { companyId }, select: queueSelect })
+    const queues = (await prisma.queue.findMany({ where: { companyId }, select: queueSelect })).map(toDto)
     await QueuesCache.setByCompany(companyId, queues)
     return queues
 }
 
 const _queueByIdQuery = () => prisma.queue.findUnique({ where: { id: '' }, select: queueSelect })
-export type QueueDto = NonNullable<Awaited<ReturnType<typeof _queueByIdQuery>>>
+export type QueueDto = ReturnType<typeof toDto<NonNullable<Awaited<ReturnType<typeof _queueByIdQuery>>>>>
 
 export const getQueueById = async (id: string): Promise<QueueDto> => {
     const cached = await QueuesCache.getQueue(id)
@@ -89,8 +95,9 @@ export const getQueueById = async (id: string): Promise<QueueDto> => {
     const queue = await prisma.queue.findUnique({ where: { id }, select: queueSelect })
     if (!queue) throw new AppError('Queue not found', 404)
 
-    await QueuesCache.setQueue(id, queue)
-    return queue
+    const dto = toDto(queue)
+    await QueuesCache.setQueue(id, dto)
+    return dto
 }
 
 export const createQueue = async (data: CreateQueueInput) => {
@@ -107,6 +114,7 @@ export const createQueue = async (data: CreateQueueInput) => {
     if (duplicateNumber) throw new AppError('Queue number already in use for this company', 409)
 
     await validateRouteDestination(data.postQueueDestination ?? null, data.companyId, 'postQueueDestination')
+    await assertAudioBelongsToCompany(data.surveyAudioId, data.companyId)
 
     const asteriskName = toAsteriskQueueName(company.asteriskId, data.name)
 
@@ -120,9 +128,10 @@ export const createQueue = async (data: CreateQueueInput) => {
     })
 
     await regenerateSafely(() => AsteriskQueueRepository.regenerate(data.companyId), data.companyId)
+    if (data.surveyAudioId) await regenerateSafely(() => CallcenterSurveyRepository.regenerate(data.companyId), data.companyId)
     await QueuesCache.invalidateByCompany(data.companyId)
     await QueuesCache.invalidateNamespace()
-    return queue
+    return toDto(queue)
 }
 
 export const updateQueue = async (id: string, data: UpdateQueueInput) => {
@@ -155,6 +164,8 @@ export const updateQueue = async (id: string, data: UpdateQueueInput) => {
     if (data.postQueueDestination !== undefined)
         await validateRouteDestination(data.postQueueDestination, existing.companyId, 'postQueueDestination')
 
+    if (data.surveyAudioId !== undefined) await assertAudioBelongsToCompany(data.surveyAudioId, existing.companyId)
+
     const asteriskUpdate: Record<string, any> = {}
     if (data.strategy !== undefined) asteriskUpdate.strategy = data.strategy
     if (data.musicOnHold !== undefined) asteriskUpdate.musiconhold = data.musicOnHold
@@ -180,7 +191,9 @@ export const updateQueue = async (id: string, data: UpdateQueueInput) => {
     const newNumber = data.number === undefined ? existing.number : data.number
     const numberChanged = newNumber !== existing.number
     const destChanged = data.postQueueDestination !== undefined
-    const needsResync = numberChanged || nameChanged || destChanged
+    const callcenterToggled = data.callcenterEnabled !== undefined && data.callcenterEnabled !== existing.callcenterEnabled
+    const needsResync = numberChanged || nameChanged || destChanged || callcenterToggled
+    const surveyChanged = data.surveyAudioId !== undefined && data.surveyAudioId !== existing.surveyAudioId
 
     const queue = await prisma.$transaction(async (tx) => {
         if (nameChanged) await AsteriskQueueRepository.renameQueue(tx, oldAsteriskName, newAsteriskName)
@@ -190,10 +203,11 @@ export const updateQueue = async (id: string, data: UpdateQueueInput) => {
     })
 
     if (needsResync) await regenerateSafely(() => AsteriskQueueRepository.regenerate(existing.companyId), existing.companyId)
+    if (surveyChanged) await regenerateSafely(() => CallcenterSurveyRepository.regenerate(existing.companyId), existing.companyId)
     await QueuesCache.invalidateQueue(id)
     await QueuesCache.invalidateByCompany(existing.companyId)
     await QueuesCache.invalidateNamespace()
-    return queue
+    return toDto(queue)
 }
 
 export const deleteQueue = async (id: string) => {
@@ -211,6 +225,7 @@ export const deleteQueue = async (id: string) => {
     })
 
     await regenerateSafely(() => AsteriskQueueRepository.regenerate(existing.companyId), existing.companyId)
+    if (existing.surveyAudioId) await regenerateSafely(() => CallcenterSurveyRepository.regenerate(existing.companyId), existing.companyId)
     await QueuesCache.invalidateQueue(id)
     await QueueMembersCache.invalidateMembers(id)
     await QueuesCache.invalidateByCompany(existing.companyId)

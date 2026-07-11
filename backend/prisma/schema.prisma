@@ -34,6 +34,10 @@ model Company {
     requestTemplates RequestTemplate[]
     audios           Audio[]
     holidayGroups    HolidayGroup[]
+    agentCompanyScopes AgentCompanyScope[]
+    routingRules       RoutingRule[]
+    callRatings        CallRating[]
+    agentAffinities    AgentAffinity[]
 
     @@unique([name, doc])
     @@map("companies")
@@ -102,6 +106,9 @@ model Extension {
     queueMemberships QueueMember[]
     user             User?
     outboundRoutes   OutboundRouteExtension[]
+    agentCompanyScopes AgentCompanyScope[]
+    callRatings        CallRating[]
+    agentAffinities    AgentAffinity[]
 
     @@unique([alias, companyId])
     @@index([companyId])
@@ -139,6 +146,16 @@ model Queue {
     // ou agente desliga primeiro) — route destination compartilhado (ver route-destination.schema.ts).
     // null/omitido = Hangup (comportamento atual)
     postQueueDestination Json?
+    // Áudio da pesquisa de satisfação pós-atendimento ("digite uma nota de 1 a 5") — mesmo padrão
+    // audioId nullable de Announcement/IvrMenu: null = pesquisa desligada pra essa fila (hasAudio: false)
+    surveyAudioId        String?
+    surveyAudio          Audio?        @relation(fields: [surveyAudioId], references: [id], onDelete: SetNull)
+    // Liga prioridade dinâmica (RoutingRule via QUEUE_PRIO) e roteamento por afinidade (penalty
+    // recalculado por agent-affinity-recalc.job.ts) pra essa fila. false = comportamento nativo
+    // puro, sem AGI de pré-roteamento e sem o job mexendo no penalty dos membros. Pesquisa de
+    // satisfação (surveyAudioId) e elegibilidade agente×empresa (AgentCompanyScope) têm toggle
+    // próprio, independente deste
+    callcenterEnabled    Boolean       @default(false)
     createdAt            DateTime      @default(now()) @db.Timestamptz(3)
     updatedAt            DateTime      @updatedAt @db.Timestamptz(3)
     members              QueueMember[]
@@ -146,6 +163,7 @@ model Queue {
     @@unique([name, companyId])
     @@unique([number, companyId])
     @@index([companyId])
+    @@index([surveyAudioId])
     @@map("queues_app")
 }
 
@@ -386,6 +404,7 @@ model Audio {
 
     announcements Announcement[]
     ivrMenus      IvrMenu[]
+    surveyQueues  Queue[]
 
     @@unique([name, companyId])
     @@index([companyId])
@@ -458,6 +477,79 @@ model RequestTemplate {
     @@unique([name, companyId])
     @@index([companyId])
     @@map("request_templates")
+}
+
+// ─── Callcenter (Queue Engine) ─────────────────────────────────────────────────
+
+// Allow-list explícita de quais empresas cada atendente pode atender — permite ramais
+// compartilhados entre empresas (cenário BPO), diferente da membership estática de QueueMember.
+// Consumido pelo motor de roteamento (AGI de pré-fila) para filtrar agentes elegíveis por chamada.
+model AgentCompanyScope {
+    id          String    @id @default(cuid())
+    extensionId String
+    extension   Extension @relation(fields: [extensionId], references: [id], onDelete: Cascade)
+    companyId   String
+    company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+    active      Boolean   @default(true)
+    createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+    updatedAt   DateTime  @updatedAt @db.Timestamptz(3)
+
+    @@unique([extensionId, companyId])
+    @@index([companyId])
+    @@map("agent_company_scopes")
+}
+
+// Motor de prioridade configurável — avaliado pelo AGI de pré-roteamento antes do Queue() nativo
+// assumir. `conditions` casa com o vocabulário de Time Groups (weekdays/startTime/endTime HH:MM).
+model RoutingRule {
+    id         String   @id @default(cuid())
+    companyId  String
+    company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+    name       String   @db.VarChar(80)
+    priority   Int      @default(0) // maior = mais prioridade
+    conditions Json     @default("{}") // { trunkId?, callerIdPattern?, weekdays?, startTime?, endTime? }
+    active     Boolean  @default(true)
+    createdAt  DateTime @default(now()) @db.Timestamptz(3)
+    updatedAt  DateTime @updatedAt @db.Timestamptz(3)
+
+    @@unique([name, companyId])
+    @@index([companyId])
+    @@map("routing_rules")
+}
+
+// Nota de atendimento (1-5) capturada via IVR de pesquisa pós-chamada — fonte de dado para
+// AgentAffinity (Fase 2 recalcula a partir daqui).
+model CallRating {
+    id          String    @id @default(cuid())
+    companyId   String
+    company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+    extensionId String
+    extension   Extension @relation(fields: [extensionId], references: [id], onDelete: Cascade)
+    number      String    @db.VarChar(80) // número do cliente (CALLERID)
+    uniqueid    String?   @db.VarChar(150) // referência solta ao CDR, sem FK (cdr é fonte nativa do Asterisk)
+    score       Int
+    createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+
+    @@index([companyId, createdAt])
+    @@index([extensionId, createdAt])
+    @@map("call_ratings")
+}
+
+// Afinidade agente×empresa derivada de CallRating — recálculo automático (job) e consumo pelo
+// motor de roteamento entram na Fase 2. Nesta fase o model existe só como base de dados.
+model AgentAffinity {
+    id          String    @id @default(cuid())
+    extensionId String
+    extension   Extension @relation(fields: [extensionId], references: [id], onDelete: Cascade)
+    companyId   String
+    company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+    score       Float     @default(0)
+    sampleSize  Int       @default(0)
+    updatedAt   DateTime  @updatedAt @db.Timestamptz(3)
+
+    @@unique([extensionId, companyId])
+    @@index([companyId])
+    @@map("agent_affinities")
 }
 
 // ─── Asterisk Realtime Models ─────────────────────────────────────────────────

@@ -35,6 +35,7 @@ import {
     FieldLabel,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import { NumberInput } from "@/components/ui/number-input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
@@ -91,7 +92,7 @@ function NumInput({
     return (
         <Field>
             <FieldLabel>{label}</FieldLabel>
-            <Input type="number" {...register(name)} />
+            <NumberInput {...register(name)} />
         </Field>
     )
 }

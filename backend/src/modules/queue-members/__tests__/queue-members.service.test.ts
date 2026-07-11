@@ -24,6 +24,7 @@ mock.module('../../../asterisk/queue.repository', () => ({
         updateMember: mock(() => Promise.resolve()),
         removeMember: mock(() => Promise.resolve()),
     },
+    toAsteriskInterface: (type: string, number: string) => `${type.toUpperCase()}/${number}`,
 }))
 
 import * as QueueMembersService from '../queue-members.service'
@@ -92,6 +93,36 @@ describe('QueueMembersService.addMember', () => {
     it('adds member', async () => {
         db.queue.findUnique.mockResolvedValue(QUEUE)
         db.extension.findUnique.mockResolvedValue(EXT)
+        db.queueMember.findUnique.mockResolvedValue(null)
+        db.queueMember.create.mockResolvedValue(MEMBER)
+        const member = await QueueMembersService.addMember('q1', { extensionId: 'e1', penalty: 0, paused: false }) as any
+        expect(member.extensionId).toBe('e1')
+    })
+
+    it('allows add when company has no AgentCompanyScope at all (opt-in, backward compatible)', async () => {
+        db.queue.findUnique.mockResolvedValue(QUEUE)
+        db.extension.findUnique.mockResolvedValue(EXT)
+        db.agentCompanyScope.findFirst.mockResolvedValue(null)
+        db.queueMember.findUnique.mockResolvedValue(null)
+        db.queueMember.create.mockResolvedValue(MEMBER)
+        const member = await QueueMembersService.addMember('q1', { extensionId: 'e1', penalty: 0, paused: false }) as any
+        expect(member.extensionId).toBe('e1')
+    })
+
+    it('throws 403 when company opted into scopes and extension has no active scope', async () => {
+        db.queue.findUnique.mockResolvedValue(QUEUE)
+        db.extension.findUnique.mockResolvedValue(EXT)
+        db.agentCompanyScope.findFirst.mockResolvedValue({ id: 's1' })
+        db.agentCompanyScope.findUnique.mockResolvedValue(null)
+        await expect(QueueMembersService.addMember('q1', { extensionId: 'e1', penalty: 0, paused: false }))
+            .rejects.toMatchObject({ statusCode: 403 })
+    })
+
+    it('allows add when company opted into scopes and extension has an active scope', async () => {
+        db.queue.findUnique.mockResolvedValue(QUEUE)
+        db.extension.findUnique.mockResolvedValue(EXT)
+        db.agentCompanyScope.findFirst.mockResolvedValue({ id: 's1' })
+        db.agentCompanyScope.findUnique.mockResolvedValue({ id: 's1', extensionId: 'e1', companyId: 'c1', active: true })
         db.queueMember.findUnique.mockResolvedValue(null)
         db.queueMember.create.mockResolvedValue(MEMBER)
         const member = await QueueMembersService.addMember('q1', { extensionId: 'e1', penalty: 0, paused: false }) as any

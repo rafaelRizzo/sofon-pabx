@@ -9,10 +9,12 @@ function model() {
         create: mock(),
         createMany: mock(() => Promise.resolve({ count: 0 })),
         update: mock(),
+        updateMany: mock(() => Promise.resolve({ count: 0 })),
         delete: mock(),
         deleteMany: mock(() => Promise.resolve({ count: 0 })),
         upsert: mock(),
         count: mock(() => Promise.resolve(0)),
+        groupBy: mock(() => Promise.resolve([])),
     }
 }
 
@@ -42,6 +44,10 @@ export function createPrismaMock() {
         ivrOption: model(),
         requestTemplate: model(),
         audio: model(),
+        agentCompanyScope: model(),
+        routingRule: model(),
+        callRating: model(),
+        agentAffinity: model(),
         // Asterisk realtime
         ps_endpoints: model(),
         ps_auths: model(),

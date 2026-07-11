@@ -1,0 +1,242 @@
+"use client"
+
+import { useState } from "react"
+import { format } from "date-fns"
+import { ptBR } from "date-fns/locale"
+import { CalendarIcon, StarIcon } from "lucide-react"
+import type { DateRange } from "react-day-picker"
+
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Calendar } from "@/components/ui/calendar"
+import {
+    Combobox,
+    ComboboxContent,
+    ComboboxEmpty,
+    ComboboxInput,
+    ComboboxItem,
+    ComboboxList,
+} from "@/components/ui/combobox"
+import { Input } from "@/components/ui/input"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select"
+import { Skeleton } from "@/components/ui/skeleton"
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table"
+import { useCallRatings } from "@/hooks/use-call-ratings"
+import { useExtensions, type Extension } from "@/hooks/use-extensions"
+
+// "YYYY-MM-DD" -> Date local (evita o shift de fuso de "new Date(string)", que interpreta como UTC)
+function parseDateOnly(value: string): Date | undefined {
+    if (!value) return undefined
+    const [y, m, d] = value.split("-").map(Number)
+    return new Date(y, m - 1, d)
+}
+
+type Props = {
+    companyId: string
+}
+
+const ORDER_OPTIONS = [
+    { value: "desc", label: "Mais recentes" },
+    { value: "asc", label: "Mais antigas" },
+] as const
+
+const SCORE_OPTIONS = [
+    { value: "all", label: "Todas as notas" },
+    { value: "5", label: "5 estrelas" },
+    { value: "4", label: "4 estrelas" },
+    { value: "3", label: "3 estrelas" },
+    { value: "2", label: "2 estrelas" },
+    { value: "1", label: "1 estrela" },
+] as const
+
+export function CallRatingsPanel({ companyId }: Props) {
+    const { extensions } = useExtensions(companyId)
+    const [extensionId, setExtensionId] = useState<string>("")
+    const [number, setNumber] = useState("")
+    const [score, setScore] = useState<string>("all")
+    const [startDate, setStartDate] = useState("")
+    const [endDate, setEndDate] = useState("")
+    const [order, setOrder] = useState<"asc" | "desc">("desc")
+
+    const { ratings, total, loading } = useCallRatings(companyId, {
+        extensionId: extensionId || undefined,
+        number: number || undefined,
+        score: score !== "all" ? Number(score) : undefined,
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
+        order,
+    })
+
+    const selectedExtension = extensions.find((e) => e.id === extensionId) ?? null
+    const extensionLabel = (id: string) => {
+        const ext = extensions.find((e) => e.id === id)
+        return ext ? `${ext.alias} — ${ext.name}` : id
+    }
+
+    const dateRange: DateRange | undefined = {
+        from: parseDateOnly(startDate),
+        to: parseDateOnly(endDate),
+    }
+    const dateRangeLabel = dateRange.from
+        ? dateRange.to
+            ? `${format(dateRange.from, "dd/MM/yy")} – ${format(dateRange.to, "dd/MM/yy")}`
+            : format(dateRange.from, "dd/MM/yy")
+        : "Período"
+
+    function handleDateRangeChange(range: DateRange | undefined) {
+        setStartDate(range?.from ? format(range.from, "yyyy-MM-dd") : "")
+        setEndDate(range?.to ? format(range.to, "yyyy-MM-dd") : "")
+    }
+
+    return (
+        <div className="flex flex-col gap-4">
+            <p className="text-sm text-muted-foreground">
+                Notas de 1 a 5 dadas pelo cliente na pesquisa de satisfação pós-atendimento
+                {total > 0 && ` — ${total} registro(s)`}.
+            </p>
+
+            <div className="flex flex-wrap items-end gap-2">
+                <Combobox<Extension>
+                    items={extensions}
+                    value={selectedExtension}
+                    itemToStringLabel={(e) => `${e.alias} — ${e.name}`}
+                    isItemEqualToValue={(a, b) => a.id === b.id}
+                    onValueChange={(e) => setExtensionId(e?.id ?? "")}
+                >
+                    <ComboboxInput placeholder="Filtrar por ramal..." className="w-56" />
+                    <ComboboxContent>
+                        <ComboboxEmpty>Nenhum ramal</ComboboxEmpty>
+                        <ComboboxList>
+                            {(e: Extension) => (
+                                <ComboboxItem key={e.id} value={e}>
+                                    {e.alias} — {e.name}
+                                </ComboboxItem>
+                            )}
+                        </ComboboxList>
+                    </ComboboxContent>
+                </Combobox>
+                <Input
+                    placeholder="Número do cliente..."
+                    value={number}
+                    onChange={(e) => setNumber(e.target.value)}
+                    className="w-40"
+                />
+                <Popover>
+                    <PopoverTrigger
+                        render={
+                            <Button variant="outline" className="w-48 justify-start font-normal">
+                                <CalendarIcon />
+                                {dateRangeLabel}
+                            </Button>
+                        }
+                    />
+                    <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                            mode="range"
+                            locale={ptBR}
+                            numberOfMonths={2}
+                            selected={dateRange}
+                            onSelect={handleDateRangeChange}
+                        />
+                    </PopoverContent>
+                </Popover>
+                <Select
+                    items={SCORE_OPTIONS}
+                    value={score}
+                    onValueChange={(v) => setScore(v ?? "all")}
+                >
+                    <SelectTrigger className="w-36">
+                        <SelectValue placeholder="Todas as notas" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {SCORE_OPTIONS.map((o) => (
+                            <SelectItem key={o.value} value={o.value}>
+                                {o.label}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+                <Select
+                    items={ORDER_OPTIONS}
+                    value={order}
+                    onValueChange={(v) => setOrder(v as "asc" | "desc")}
+                >
+                    <SelectTrigger className="w-40">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {ORDER_OPTIONS.map((o) => (
+                            <SelectItem key={o.value} value={o.value}>
+                                {o.label}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+
+            <div className="rounded-md border">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Ramal</TableHead>
+                            <TableHead>Número</TableHead>
+                            <TableHead>Nota</TableHead>
+                            <TableHead>Data</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {loading ? (
+                            Array.from({ length: 3 }).map((_, i) => (
+                                <TableRow key={i}>
+                                    {Array.from({ length: 4 }).map((_, j) => (
+                                        <TableCell key={j}>
+                                            <Skeleton className="h-4 w-full" />
+                                        </TableCell>
+                                    ))}
+                                </TableRow>
+                            ))
+                        ) : ratings.length === 0 ? (
+                            <TableRow>
+                                <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
+                                    Nenhuma nota registrada
+                                </TableCell>
+                            </TableRow>
+                        ) : (
+                            ratings.map((rating) => (
+                                <TableRow key={rating.id}>
+                                    <TableCell className="font-medium">
+                                        {extensionLabel(rating.extensionId)}
+                                    </TableCell>
+                                    <TableCell>{rating.number}</TableCell>
+                                    <TableCell>
+                                        <Badge variant="outline" className="gap-1.5">
+                                            <StarIcon className="size-3" />
+                                            {rating.score}/5
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-muted-foreground">
+                                        {new Date(rating.createdAt).toLocaleString("pt-BR")}
+                                    </TableCell>
+                                </TableRow>
+                            ))
+                        )}
+                    </TableBody>
+                </Table>
+            </div>
+        </div>
+    )
+}

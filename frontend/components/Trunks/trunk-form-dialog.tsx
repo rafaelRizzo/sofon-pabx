@@ -30,6 +30,7 @@ import {
     FieldLabel,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import { NumberInput } from "@/components/ui/number-input"
 import {
     Select,
     SelectContent,
@@ -307,8 +308,7 @@ export function TrunkFormDialog({
                             </Field>
                             <Field>
                                 <FieldLabel>Porta</FieldLabel>
-                                <Input
-                                    type="number"
+                                <NumberInput
                                     placeholder="5060"
                                     {...r("port")}
                                 />
@@ -378,8 +378,7 @@ export function TrunkFormDialog({
                         <div className="grid grid-cols-2 gap-3">
                             <Field>
                                 <FieldLabel>Canais de entrada (máx)</FieldLabel>
-                                <Input
-                                    type="number"
+                                <NumberInput
                                     placeholder="Ilimitado"
                                     {...r("maxInChannels")}
                                 />
@@ -391,8 +390,7 @@ export function TrunkFormDialog({
                             </Field>
                             <Field>
                                 <FieldLabel>Canais de saída (máx)</FieldLabel>
-                                <Input
-                                    type="number"
+                                <NumberInput
                                     placeholder="Ilimitado"
                                     {...r("maxOutChannels")}
                                 />

@@ -26,21 +26,22 @@ src/modules/<name>/
   schemas/<name>.schema.ts  # Zod schemas de input/output + response types
   cache/<name>.cache.ts     # wrapper de CacheManager para o módulo
 ```
-Módulos: auth, users, companies, dids, extensions, queues, queue-members, trunks, outbound-routes, inbound-routes, time-groups, time-conditions, holiday-groups, cdr, announcements, ivr, request-templates, audios
+Módulos: auth, users, companies, dids, extensions, queues, queue-members, trunks, outbound-routes, inbound-routes, time-groups, time-conditions, holiday-groups, cdr, announcements, ivr, request-templates, audios, callcenter (agents, routing-rules, ratings, affinity — ver seção "Callcenter (Queue Engine)")
 
 ## Repositórios Asterisk (`src/asterisk/`)
 Cada repositório escreve direto nas tabelas realtime do Asterisk via Prisma:
 - `sip.repository.ts` → `sip_peers`
 - `pjsip.repository.ts` → `ps_endpoints`, `ps_auths`, `ps_aors`, `ps_identifies`, `ps_registrations`
-- `queue.repository.ts` → `queues`, `queue_members`
+- `queue.repository.ts` → `queues`, `queue_members` + dialplan estático do contexto `queues-app` (ver "Callcenter (Queue Engine)")
+- `callcenter-survey.repository.ts` → arquivo estático via `dialplan-file.repository.ts` — contexto `callcenter-surveys`, exten `survey-<queueId>`, `Read()` de 1 dígito (1-5) — pesquisa de satisfação pós-atendimento
 - `dialplan.repository.ts` → tabela `extensions` via Realtime — contextos `ramais` e `from-trunk-routed` (alta escrita; permanecem no banco)
-- `inboundroute.repository.ts` → tabela `extensions` via Realtime — contexto `from-trunk-routed`, exten `<did>_<trunkId>`
+- `inboundroute.repository.ts` → tabela `extensions` via Realtime — contexto `from-trunk-routed`, exten `<did>_<trunkId>`. Priority 1 sempre `Set(ROUTING_TRUNK_ID=<trunkId>)` — variável de canal lida pelo AGI `queue-route` pra casar `RoutingRule.conditions.trunkId`, sobrevive a qualquer `Goto` intermediário (timecondition/holiday/ivr) até a chamada cair numa fila
 - `timecondition.repository.ts` → arquivo estático via `dialplan-file.repository.ts` — contexto `timeconditions`, exten `tc-<tcId>`/`tc-<tcId>-matched`, `GotoIfTime` em OR lógico sobre todos os ranges dos TGs vinculados
 - `announcement.repository.ts` → arquivo estático via `dialplan-file.repository.ts` — contexto `announcements`, exten `ann-<id>`, `Playback` + destino final
 - `ivr.repository.ts` → arquivo estático via `dialplan-file.repository.ts` — contexto `ivrs`, exten `ivr-<id>`, state machine `Read()+GotoIf` com prioridades numéricas
 - `holidaygroup.repository.ts` → arquivo estático via `dialplan-file.repository.ts` — contexto `holidays`, exten `hol-<id>`, `GotoIfTime` por datas (month/day)
 - `audio.repository.ts` → só paths de áudio (`/var/lib/asterisk/sounds/<asteriskId>/<audioId>.wav`) — único lugar que grava arquivo físico; Announcement/IvrMenu só referenciam um `Audio.id`, sem dialplan próprio
-- `dialplan-file.repository.ts` → infraestrutura de materialização: gera `/etc/asterisk/dialplan-extra/<context>/<asteriskId>.conf` a partir de linhas `DialplanRow[]`. Escrita atômica via `rename()` no mesmo filesystem. Lock por chave `<context>/<asteriskId>` serializa CRUDs simultâneos. Após cada escrita chama `asterisk -rx 'dialplan reload'`. Contextos gerenciados: `timeconditions`, `announcements`, `ivrs`, `queues-app`, `request-templates`, `holidays` — zero query ao banco em tempo de chamada para esses contextos.
+- `dialplan-file.repository.ts` → infraestrutura de materialização: gera `/etc/asterisk/dialplan-extra/<context>/<asteriskId>.conf` a partir de linhas `DialplanRow[]`. Escrita atômica via `rename()` no mesmo filesystem. Lock por chave `<context>/<asteriskId>` serializa CRUDs simultâneos. Após cada escrita chama `asterisk -rx 'dialplan reload'`. Contextos gerenciados: `timeconditions`, `announcements`, `ivrs`, `queues-app`, `request-templates`, `holidays`, `callcenter-surveys` — zero query ao banco em tempo de chamada para esses contextos.
 
 ---
 
@@ -192,11 +193,14 @@ Vars: `DATABASE_URL`, `JWT_SECRET`, `REFRESH_SECRET`, `JWT_EXPIRES_IN` (15m), `R
 - Batch: `{ extensions: CreateExtension[] }` (max 50, sem alias duplicado por empresa)
 - Update: `{ name?, allowOutbound? }`; `PATCH /:id/password` reseta senha
 
-**Queues** — `{ name(alphanum/dash/_), number(^\d+$), companyId, strategy?, musicOnHold?, timeout?, retry?, maxLen?, wrapupTime?, announce?, announceFrequency?, joinEmpty?, leaveWhenEmpty?, weight? }`
+**Queues** — `{ name(alphanum/dash/_), number(^\d+$), companyId, strategy?, musicOnHold?, timeout?, retry?, maxLen?, wrapupTime?, announce?, announceFrequency?, joinEmpty?, leaveWhenEmpty?, weight?, surveyAudioId?, callcenterEnabled? }`
 - `number` obrigatório no create, único por empresa (`UNIQUE(number, companyId)`) — usado como destino de inbound routes/time conditions (`Goto(queues-app,<asteriskId>-<number>,1)`)
 - strategies: `ringall|leastrecent|fewestcalls|random|rrmemory|linear|wrandom`
 - Member add: `{ extensionId, penalty?(0-100), paused? }`; update: `{ penalty?, paused?, pauseReason? }`
 - `pauseReason`: persiste em `queue_members.reason_paused` (realtime) só enquanto `paused=true`; some ao despausar
+- `surveyAudioId`: mesmo padrão `hasAudio` de Announcement/IvrMenu — `null`/omitido desliga a pesquisa de satisfação pós-atendimento pra essa fila (ver "Callcenter (Queue Engine)"). Toggle independente de `callcenterEnabled` — funciona mesmo com o engine desligado
+- `callcenterEnabled` (default `false`): liga, **só nessa fila**, o AGI de prioridade dinâmica (`RoutingRule`→`QUEUE_PRIO`) e a participação no recálculo periódico de afinidade (`agent-affinity-recalc.job.ts` só reescreve `penalty` de filas com esse flag `true`). `false` = fila 100% nativa (sem hop de AGI de pré-roteamento, penalty nunca tocado pelo job) mesmo que a empresa já tenha `RoutingRule`/`CallRating` configurados — a config é por empresa, o toggle é por fila. Mudar o flag força regeneração do dialplan (muda o número de priorities da exten)
+- `AgentCompanyScope` (módulo `callcenter/agents`) vira gate opt-in em `POST /queues/:id/members`: se a empresa da fila já tem qualquer scope cadastrado, só aceita a extensão como membro se ela tiver scope ativo pra essa empresa — empresa sem nenhum scope não é afetada (100% retrocompatível). Esse gate é por empresa, não tem toggle por fila
 
 **Trunks** — discriminatedUnion por `registrationMode: "outbound"|"inbound"`
 - outbound: `{ name, companyId, type(sip|pjsip), host, username, password, context?, codecs? }`
@@ -264,6 +268,42 @@ Vars: `DATABASE_URL`, `JWT_SECRET`, `REFRESH_SECRET`, `JWT_EXPIRES_IN` (15m), `R
 - `callStatus` na query mapeia pra coluna `disposition` no banco; na resposta o campo também sai como `callStatus` (não `disposition`) — nome escolhido por ser mais intuitivo pro consumidor da API
 - `startTime`/`answerTime`/`endTime`: ver seção Timezone — são hora local naive do CDR nativo do Asterisk, formatados na saída via `formatNaiveLocalISOString`, nunca como UTC direto. Filtro por data não precisa de conversão de tz: os dígitos de `startDate`/`endDate` já batem 1:1 com o storage naive local
 
+**Callcenter (Queue Engine)** — motor de distribuição de chamadas de fila além do `app_queue` nativo: prioridade dinâmica por regra configurável, elegibilidade agente×empresa e roteamento por afinidade (nota de atendimento). Mantém o `app_queue` nativo fazendo o trabalho de distribuição em si (ring/MOH/timeout/estratégia) — sem AMI/ARI, tudo via 2 mecanismos nativos do Asterisk + AGI de curta duração (`src/asterisk/agi-server.ts`).
+
+**`Queue.callcenterEnabled`** (default `false`) — toggle **por fila** que liga prioridade dinâmica + afinidade (ver passos 1/2/5 abaixo). `false` = fila roda 100% nativa, mesmo que a empresa já tenha `RoutingRule`/`CallRating` configurados pra outras filas — a config (regra, nota) é por empresa, mas o efeito na distribuição só existe nas filas com o flag ligado. Pesquisa de satisfação (`surveyAudioId`) e elegibilidade agente×empresa (`AgentCompanyScope`) **não** dependem desse flag — têm toggle próprio (ver seção Queues e passo 7).
+
+**Como funciona (fluxo de uma chamada, passo a passo):**
+1. Chamada chega em `queues-app`, exten da fila. Se `callcenterEnabled=true`, priority 1 → `AGI(queue-route)`: o handler (`handleQueueRoute`) lê `CALLERID(num)` + `ROUTING_TRUNK_ID` (setado desde a entrada em `from-trunk-routed`, ver `inboundroute.repository.ts`), chama `RoutingRulesService.resolveActiveRule(companyId, {callerId, at, timezone, trunkId})`, e se alguma `RoutingRule` ativa bater (por `trunkId`/`callerIdPattern`/`weekdays`/`startTime`-`endTime`), faz `SET VARIABLE QUEUE_PRIO=<priority>` no canal. Não achou regra → não seta nada. Se `callcenterEnabled=false`, esse priority nem existe no dialplan gerado (`regenerate()` pula a linha).
+2. Priority seguinte → `Queue(<asteriskName>)`, o `app_queue` nativo de sempre. Ele já lê `QUEUE_PRIO` sozinho pra furar a fila (prioridade maior = atendido antes de quem tem prioridade menor/sem prioridade) e já tenta os membros em ordem de `penalty` crescente (menor primeiro) — **independente da strategy** configurada (ringall/leastrecent/etc). O `penalty` de cada membro é o que o job de afinidade mantém atualizado (passo 5, só pra filas com `callcenterEnabled=true`) — é assim que a fila "prefere" o agente com melhor nota daquele cliente sem precisar de fila-tier nem lógica nova de distribuição.
+3. Quando um agente atende e depois desliga primeiro, o `Queue()` retorna e o dialplan segue pra próxima priority → `AGI(queue-survey)` (se o *cliente* desligar primeiro, o canal dele já não existe mais e a fila para aqui — pesquisa não dispara, ver bullet de limitação abaixo). Essa linha existe **independente** de `callcenterEnabled`. O handler (`handleQueueSurvey`) lê `MEMBERINTERFACE` (variável nativa que o `Queue()` seta com quem atendeu, ex. `PJSIP/2002_ast1`), resolve a `Extension` por `number`, confere se a fila tem `surveyAudioId` configurado — se sim, guarda `extensionId`/`companyId` em variáveis de canal e dá `Goto` pro contexto `callcenter-surveys`.
+4. `callcenter-surveys` toca o áudio configurado e faz `Read()` de 1 dígito (1-5). Ao digitar, o dialplan gerado chama `AGI(survey-result,<queueId>,<digito>)` → `handleSurveyResult` recupera as variáveis salvas no passo 3 + `CALLERID(num)` e persiste um `CallRating` (`companyId, extensionId, number, score`) direto em processo via `RatingsService.createRating`.
+5. A cada 5min, `agent-affinity-recalc.job.ts` roda `AffinityService.recalculateAffinity()`: agrupa `CallRating` por `extensionId`×`companyId` (`groupBy` + média), faz upsert em `AgentAffinity` (sempre, pra todo agente com nota — é só dado agregado). Pra cada empresa afetada chama `recalculatePenaltiesForCompany`, que só ranqueia/reescreve `penalty` dos membros de filas com `callcenterEnabled=true` daquela empresa. Fecha o loop com o passo 2.
+6. Se não houver agente disponível, o comportamento é o `joinEmpty`/`leaveWhenEmpty` nativo do `Queue` (campos já existentes no model) — sem lógica de fallback adicional, é o próprio `app_queue` decidindo.
+7. Em paralelo, na hora de **adicionar** um agente numa fila (`POST /queues/:id/members`), `assertAgentEligible` bloqueia (403) se a empresa da fila já tiver algum `AgentCompanyScope` cadastrado e a extensão não tiver um scope ativo pra ela — é o controle de "quais empresas esse atendente pode atender". Empresa sem nenhum scope cadastrado não é afetada (feature opt-in), e essa checagem independe de `callcenterEnabled`.
+
+- **`AgentCompanyScope`** (`/callcenter/agents`) — `{ extensionId, companyId, active }`, `UNIQUE(extensionId, companyId)`. Allow-list de quais empresas um ramal pode atender — permite ramal compartilhado entre empresas (cenário BPO). Gate opt-in em `POST /queues/:id/members` (ver seção Queues).
+- **`RoutingRule`** (`/callcenter/routing-rules`) — `{ name, companyId, priority(int), conditions, active }`, `UNIQUE(name, companyId)`. `conditions`: `{ trunkId?, callerIdPattern?, weekdays?(mon-sun[]), startTime?/endTime?(HH:MM) }` — mesmo vocabulário de Time Groups. `trunkId` validado contra a mesma `companyId` da regra (`assertTrunkBelongsToCompany`). Avaliado por `RoutingRulesService.resolveActiveRule(companyId, {callerId, at, timezone, trunkId})`: maior `priority` entre as regras ativas cujas conditions batem (trunkId por igualdade; callerIdPattern via regex contra `CALLERID(num)`; weekday/horário via `Intl.DateTimeFormat` no timezone da empresa).
+- **`CallRating`** (`/callcenter/ratings`) — `{ companyId, extensionId, number, uniqueid?, score(1-5) }`. `GET` com filtro `companyId`(obrigatório)/`extensionId`/`number`/`score`(1-5)/`startDate`/`endDate`/`limit`/`order` — mesmo padrão de filtro do CDR. Populado pela pesquisa de satisfação IVR pós-atendimento (ver dialplan abaixo), não por webhook externo.
+- **`AgentAffinity`** — `{ extensionId, companyId, score, sampleSize }`, `UNIQUE(extensionId, companyId)`. Só leitura/derivado — recalculado periodicamente por `src/jobs/agent-affinity-recalc.job.ts` (a cada 5min, mesmo padrão `setInterval` de `holiday-resync.job.ts`) a partir da média de `CallRating` por extensão×empresa (`AffinityService.recalculateAffinity`, `src/modules/callcenter/affinity/affinity.service.ts`). Não tem CRUD/rota própria.
+
+**Dialplan de `queues-app` (`src/asterisk/queue.repository.ts`, `AsteriskQueueRepository.regenerate`)** — priorities geradas dinamicamente conforme `callcenterEnabled` (era fixo 1-2 antes do Callcenter):
+```
+; callcenterEnabled=true
+exten,1,AGI(agi://HOST:PORT/queue-route,<queueId>)    ; seta QUEUE_PRIO a partir de RoutingRule
+exten,2,Queue(<asteriskName>)                          ; app_queue nativo, inalterado
+exten,3,AGI(agi://HOST:PORT/queue-survey,<queueId>)   ; captura MEMBERINTERFACE p/ pesquisa
+exten,4,<postQueueDestination app/appdata>             ; mesmo destino de sempre
+
+; callcenterEnabled=false (default) — sem o AGI de pré-roteamento, prioridades renumeradas
+exten,1,Queue(<asteriskName>)
+exten,2,AGI(agi://HOST:PORT/queue-survey,<queueId>)   ; pesquisa continua independente do toggle
+exten,3,<postQueueDestination app/appdata>
+```
+- `QUEUE_PRIO`: variável nativa que `Queue()` já lê pra furar a fila — não precisa fila-tier física.
+- Afinidade/skill: **não** é feita por fila-tier — `app_queue` agrupa membros por `penalty` (menor tentado primeiro, **independente da strategy**), então `agent-affinity-recalc.job.ts` só recalcula `queue_members.penalty` (realtime) por rank de `AgentAffinity.score` dentro de cada fila com `callcenterEnabled=true`. Zero mudança de dialplan pra isso.
+- Pesquisa de satisfação só dispara quando o **agente desliga primeiro** (`MEMBERINTERFACE` só populado nesse caso — comportamento nativo do `Queue()`, mesmo motivo do `postQueueDestination` já existente). Se o **cliente** desligar primeiro, a pesquisa não roda — limitação física de qualquer IVR pós-chamada (canal já não existe), não um bug. Cobertura parcial é o comportamento esperado; 100% de cobertura exigiria callback outbound via AMI/ARI (fora de escopo).
+- `agi-server.ts` despacha por `agi_network_script` (segmento de path da URL `agi://host:port/<script>,<args>`): `queue-route` (seta `QUEUE_PRIO`), `queue-survey` (captura agente, Goto pra `callcenter-surveys`), `survey-result` (persiste a nota via `RatingsService.createRating` direto em processo), default (sem script reconhecido) = Request Template, comportamento antigo preservado.
+
 ---
 
 ## Status de implementação
@@ -291,6 +331,13 @@ Legend: `[x]` implementado + testado (unit + integration) | `[~]` implementado, 
 | IVR Menus | GET list/:id · POST · PUT · DELETE | `[~]` | `[ ]` |
 | Request Templates | GET list/:id · POST · PUT · DELETE | `[~]` | `[ ]` |
 | Audios | GET list/:id · POST · PATCH · DELETE | `[~]` | `[ ]` |
+| Callcenter Agents | GET list/company/:id · POST · PATCH · DELETE | `[x]` | `[ ]` |
+| Callcenter Routing Rules | GET list/company/:id/:id · POST · PUT · DELETE | `[x]` | `[ ]` |
+| Callcenter Ratings | GET /callcenter/ratings · POST | `[x]` | `[ ]` |
+| Callcenter Engine (AGI route/survey + job de afinidade) | sem rota HTTP própria | `[~]`¹ | `[ ]` |
+
+¹ `resolveActiveRule`, `parseMemberInterface` e `recalculateAffinity`/`recalculatePenaltiesForCompany` têm teste unit; os handlers AGI em si (`handleQueueRoute`/`handleQueueSurvey`/`handleSurveyResult`) não têm teste — mesma limitação de `handleRequestTemplate`, nunca testado neste projeto (protocolo AGI via socket TCP cru).
 
 **Pendências de teste:**
-- `[ ]` Integration tests: Queue Members, Trunks, Holiday Groups, CDR, Announcements, IVR Menus, Request Templates, Audios
+- `[ ]` Integration tests: Queue Members, Trunks, Holiday Groups, CDR, Announcements, IVR Menus, Request Templates, Audios, Callcenter (todos os submódulos)
+- `[ ]` Smoke ao vivo do fluxo AGI de fila (`queue-route`/`queue-survey`/`survey-result`) contra um Asterisk real — `QUEUE_PRIO`/`MEMBERINTERFACE` validados por conhecimento de Asterisk, não testados neste projeto ainda

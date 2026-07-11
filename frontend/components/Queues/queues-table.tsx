@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { PencilIcon, Trash2Icon, UsersIcon } from "lucide-react"
+import { HeadsetIcon, PencilIcon, StarIcon, Trash2Icon, UsersIcon } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -127,6 +127,8 @@ export function QueuesTable({ queues, companies, loading, onEdit, onManageMember
                         <TableHead>Empresa</TableHead>
                         <TableHead>Estratégia</TableHead>
                         <TableHead>Destino pós-fila</TableHead>
+                        <TableHead>Pesquisa</TableHead>
+                        <TableHead>Callcenter</TableHead>
                         <TableHead className="w-38 text-right">Ações</TableHead>
                     </TableRow>
                 </TableHeader>
@@ -134,7 +136,7 @@ export function QueuesTable({ queues, companies, loading, onEdit, onManageMember
                     {loading ? (
                         Array.from({ length: 3 }).map((_, i) => (
                             <TableRow key={i}>
-                                {Array.from({ length: 6 }).map((_, j) => (
+                                {Array.from({ length: 8 }).map((_, j) => (
                                     <TableCell key={j}>
                                         <Skeleton className="h-4 w-full" />
                                     </TableCell>
@@ -143,7 +145,7 @@ export function QueuesTable({ queues, companies, loading, onEdit, onManageMember
                         ))
                     ) : queues.length === 0 ? (
                         <TableRow>
-                            <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                            <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
                                 Nenhuma fila encontrada
                             </TableCell>
                         </TableRow>
@@ -162,6 +164,26 @@ export function QueuesTable({ queues, companies, loading, onEdit, onManageMember
                                         labels={labels}
                                         loadedTypes={loadedTypes}
                                     />
+                                </TableCell>
+                                <TableCell>
+                                    {queue.hasSurveyAudio ? (
+                                        <Badge variant="outline" className="gap-1.5">
+                                            <StarIcon className="size-3" />
+                                            Ativa
+                                        </Badge>
+                                    ) : (
+                                        <span className="text-muted-foreground">—</span>
+                                    )}
+                                </TableCell>
+                                <TableCell>
+                                    {queue.callcenterEnabled ? (
+                                        <Badge variant="outline" className="gap-1.5">
+                                            <HeadsetIcon className="size-3" />
+                                            Ativo
+                                        </Badge>
+                                    ) : (
+                                        <span className="text-muted-foreground">—</span>
+                                    )}
                                 </TableCell>
                                 <TableCell>
                                     <TooltipProvider delay={100}>

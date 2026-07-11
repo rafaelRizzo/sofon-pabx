@@ -15,3 +15,11 @@ export const ivrExten = (id: string) => `ivr-${id}`
 
 export const REQUEST_TEMPLATE_CONTEXT = 'request-templates'
 export const requestTemplateExten = (id: string) => `req-${id}`
+
+export const SURVEY_CONTEXT = 'callcenter-surveys'
+export const surveyExten = (queueId: string) => `survey-${queueId}`
+
+// setado no entry point de from-trunk-routed (inboundroute.repository.ts), lido pelo AGI
+// queue-route (agi-server.ts) pra casar RoutingRule.conditions.trunkId — variável de canal
+// sobrevive a qualquer Goto intermediário (timecondition/holiday/ivr) até chegar na fila
+export const ROUTING_TRUNK_VAR = 'ROUTING_TRUNK_ID'

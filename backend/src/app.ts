@@ -32,6 +32,9 @@ import { announcementsRoutes } from './modules/announcements/announcements.route
 import { ivrRoutes } from './modules/ivr/ivr.routes'
 import { requestTemplatesRoutes } from './modules/request-templates/request-templates.routes'
 import { audiosRoutes } from './modules/audios/audios.routes'
+import { callcenterAgentsRoutes } from './modules/callcenter/agents/agents.routes'
+import { routingRulesRoutes } from './modules/callcenter/routing-rules/routing-rules.routes'
+import { callcenterRatingsRoutes } from './modules/callcenter/ratings/ratings.routes'
 
 const env = validateEnv()
 
@@ -183,6 +186,9 @@ app.register(announcementsRoutes)
 app.register(ivrRoutes)
 app.register(requestTemplatesRoutes)
 app.register(audiosRoutes)
+app.register(callcenterAgentsRoutes)
+app.register(routingRulesRoutes)
+app.register(callcenterRatingsRoutes)
 
 // Health check
 app.get('/health', async (req, reply) => {

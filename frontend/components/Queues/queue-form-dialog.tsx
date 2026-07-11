@@ -40,6 +40,7 @@ import {
     FieldLabel,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import { NumberInput } from "@/components/ui/number-input"
 import {
     Select,
     SelectContent,
@@ -105,6 +106,8 @@ export function QueueFormDialog({ open, onOpenChange, queue, companies, onSave }
             leaveWhenEmpty: false,
             weight: 0,
             postQueueDestination: { type: "hangup" },
+            surveyAudioId: null,
+            callcenterEnabled: false,
         },
     })
 
@@ -113,6 +116,7 @@ export function QueueFormDialog({ open, onOpenChange, queue, companies, onSave }
     const announce = watch("announce")
     const announcePosition = watch("announcePosition")
     const periodicAnnounce = watch("periodicAnnounce")
+    const surveyAudioId = watch("surveyAudioId")
     const selectedCompany = companies.find((c) => c.id === companyId) ?? null
 
     // Anúncios referenciam um Audio já cadastrado pra essa empresa — depende do companyId do
@@ -120,6 +124,7 @@ export function QueueFormDialog({ open, onOpenChange, queue, companies, onSave }
     const { audios } = useAudios(companyId)
     const selectedAnnounce = audios.find((a) => a.id === announce) ?? null
     const selectedPeriodicAnnounce = audios.find((a) => a.id === periodicAnnounce) ?? null
+    const selectedSurveyAudio = audios.find((a) => a.id === surveyAudioId) ?? null
 
     useEffect(() => {
         if (!open) return
@@ -142,6 +147,8 @@ export function QueueFormDialog({ open, onOpenChange, queue, companies, onSave }
             leaveWhenEmpty: queue?.leaveWhenEmpty ?? false,
             weight: queue?.weight ?? 0,
             postQueueDestination: queue?.postQueueDestination ?? { type: "hangup" },
+            surveyAudioId: queue?.surveyAudioId ?? null,
+            callcenterEnabled: queue?.callcenterEnabled ?? false,
         })
     }, [open, queue, reset])
 
@@ -152,6 +159,7 @@ export function QueueFormDialog({ open, onOpenChange, queue, companies, onSave }
         setValue("postQueueDestination", { type: "hangup" }, { shouldDirty: true })
         setValue("announce", null, { shouldDirty: true })
         setValue("periodicAnnounce", null, { shouldDirty: true })
+        setValue("surveyAudioId", null, { shouldDirty: true })
     }
 
     const onSubmit = handleSubmit(async (form) => {
@@ -284,12 +292,12 @@ export function QueueFormDialog({ open, onOpenChange, queue, companies, onSave }
                                 <div className="grid grid-cols-2 gap-3">
                                     <Field>
                                         <FieldLabel>Timeout (s)</FieldLabel>
-                                        <Input type="number" {...register("timeout")} />
+                                        <NumberInput {...register("timeout")} />
                                         {errors.timeout && <FieldError>{errors.timeout.message}</FieldError>}
                                     </Field>
                                     <Field>
                                         <FieldLabel>Retry (s)</FieldLabel>
-                                        <Input type="number" {...register("retry")} />
+                                        <NumberInput {...register("retry")} />
                                         {errors.retry && <FieldError>{errors.retry.message}</FieldError>}
                                     </Field>
                                 </div>
@@ -297,13 +305,13 @@ export function QueueFormDialog({ open, onOpenChange, queue, companies, onSave }
                                 <div className="grid grid-cols-2 gap-3">
                                     <Field>
                                         <FieldLabel>Tamanho máximo</FieldLabel>
-                                        <Input type="number" {...register("maxLen")} />
+                                        <NumberInput {...register("maxLen")} />
                                         <FieldDescription>0 = sem limite de chamadas na fila</FieldDescription>
                                         {errors.maxLen && <FieldError>{errors.maxLen.message}</FieldError>}
                                     </Field>
                                     <Field>
                                         <FieldLabel>Wrapup (s)</FieldLabel>
-                                        <Input type="number" {...register("wrapupTime")} />
+                                        <NumberInput {...register("wrapupTime")} />
                                         <FieldDescription>Pausa do agente após atender</FieldDescription>
                                         {errors.wrapupTime && (
                                             <FieldError>{errors.wrapupTime.message}</FieldError>
@@ -362,8 +370,7 @@ export function QueueFormDialog({ open, onOpenChange, queue, companies, onSave }
                                 </Field>
                                 <Field>
                                     <FieldLabel>Intervalo (s)</FieldLabel>
-                                    <Input
-                                        type="number"
+                                    <NumberInput
                                         disabled={!announcePosition}
                                         {...register("announceFrequency")}
                                     />
@@ -415,7 +422,7 @@ export function QueueFormDialog({ open, onOpenChange, queue, companies, onSave }
                                     </Field>
                                     <Field>
                                         <FieldLabel>Frequência (s)</FieldLabel>
-                                        <Input type="number" {...register("periodicAnnounceFrequency")} />
+                                        <NumberInput {...register("periodicAnnounceFrequency")} />
                                         <FieldDescription>Repete durante a espera</FieldDescription>
                                         {errors.periodicAnnounceFrequency && (
                                             <FieldError>{errors.periodicAnnounceFrequency.message}</FieldError>
@@ -456,11 +463,46 @@ export function QueueFormDialog({ open, onOpenChange, queue, companies, onSave }
 
                                 <Field>
                                     <FieldLabel>Peso</FieldLabel>
-                                    <Input type="number" {...register("weight")} />
+                                    <NumberInput {...register("weight")} />
                                     <FieldDescription>
                                         Usado para priorizar essa fila quando o agente está em várias
                                     </FieldDescription>
                                     {errors.weight && <FieldError>{errors.weight.message}</FieldError>}
+                                </Field>
+
+                                <Field orientation="horizontal">
+                                    <div className="flex items-center gap-2 text-xs/relaxed leading-snug font-medium">
+                                        <FieldLabel htmlFor="callcenterEnabled">Módulo Callcenter</FieldLabel>
+                                        <Tooltip>
+                                            <TooltipTrigger
+                                                render={
+                                                    <button
+                                                        type="button"
+                                                        className="inline-flex text-muted-foreground hover:text-foreground"
+                                                    />
+                                                }
+                                            >
+                                                <InfoIcon className="size-3" />
+                                            </TooltipTrigger>
+                                            <TooltipContent side="right" className="max-w-64">
+                                                Liga, só nessa fila, prioridade dinâmica por regra e
+                                                roteamento por afinidade (nota de atendimento). As regras
+                                                de prioridade e as notas são configuradas por empresa em
+                                                Callcenter. Desligado = fila 100% nativa.
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </div>
+                                    <Controller
+                                        control={control}
+                                        name="callcenterEnabled"
+                                        render={({ field }) => (
+                                            <Switch
+                                                id="callcenterEnabled"
+                                                checked={field.value}
+                                                onCheckedChange={field.onChange}
+                                            />
+                                        )}
+                                    />
                                 </Field>
 
                                 <Field>
@@ -479,6 +521,46 @@ export function QueueFormDialog({ open, onOpenChange, queue, companies, onSave }
                                         Para onde a chamada é direcionada se ninguém atender e a fila estourar
                                         timeout/tamanho máximo.
                                     </FieldDescription>
+                                </Field>
+
+                                <Field>
+                                    <FieldLabel>Pesquisa de satisfação</FieldLabel>
+                                    {!companyId ? (
+                                        <FieldDescription>Selecione uma empresa primeiro.</FieldDescription>
+                                    ) : (
+                                        <Combobox<Audio>
+                                            items={audios}
+                                            value={selectedSurveyAudio}
+                                            itemToStringLabel={(a) => a.name}
+                                            isItemEqualToValue={(a, b) => a.id === b.id}
+                                            onValueChange={(a) =>
+                                                setValue("surveyAudioId", a?.id ?? null, { shouldDirty: true })
+                                            }
+                                        >
+                                            <ComboboxInput placeholder="Nenhuma (desligada)" />
+                                            <ComboboxContent>
+                                                <ComboboxEmpty>
+                                                    {audios.length === 0
+                                                        ? "Nenhum áudio cadastrado para essa empresa"
+                                                        : "Nenhum resultado para essa busca"}
+                                                </ComboboxEmpty>
+                                                <ComboboxList>
+                                                    {(a: Audio) => (
+                                                        <ComboboxItem key={a.id} value={a}>
+                                                            {a.name}
+                                                        </ComboboxItem>
+                                                    )}
+                                                </ComboboxList>
+                                            </ComboboxContent>
+                                        </Combobox>
+                                    )}
+                                    <FieldDescription>
+                                        Áudio que pede uma nota de 1 a 5 ao cliente após o atendimento. Deixe
+                                        vazio para não fazer pesquisa nessa fila.
+                                    </FieldDescription>
+                                    {errors.surveyAudioId && (
+                                        <FieldError>{errors.surveyAudioId.message}</FieldError>
+                                    )}
                                 </Field>
                             </FieldGroup>
                         </div>

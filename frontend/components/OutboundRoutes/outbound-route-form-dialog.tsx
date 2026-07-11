@@ -34,6 +34,7 @@ import {
     FieldLabel,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import { NumberInput } from "@/components/ui/number-input"
 import {
     Tooltip,
     TooltipContent,
@@ -278,8 +279,7 @@ export function OutboundRouteFormDialog({
                                     </Field>
                                     <Field>
                                         <FieldLabel>Posição</FieldLabel>
-                                        <Input
-                                            type="number"
+                                        <NumberInput
                                             placeholder="0"
                                             {...register("position")}
                                         />

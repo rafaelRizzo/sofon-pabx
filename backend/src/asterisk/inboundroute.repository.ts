@@ -3,7 +3,7 @@ import type { InboundDest } from '../modules/inbound-routes/schemas/inbound-rout
 import { queueAppExten } from './queue.repository'
 import {
     TC_CONTEXT, tcEntry, ANNOUNCEMENT_CONTEXT, announcementExten, IVR_CONTEXT, ivrExten,
-    REQUEST_TEMPLATE_CONTEXT, requestTemplateExten, HOL_CONTEXT, holEntry,
+    REQUEST_TEMPLATE_CONTEXT, requestTemplateExten, HOL_CONTEXT, holEntry, ROUTING_TRUNK_VAR,
 } from './dialplan-names'
 
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
@@ -56,16 +56,18 @@ function buildInboundEntries(
 ): Array<{ context: string; exten: string; priority: number; app: string; appdata: string | null }> {
     if (maxIn != null) {
         return [
-            { context: TRUNK_ROUTED_CONTEXT, exten, priority: 1, app: 'Set', appdata: `GROUP()=in-${trunkId}` },
-            { context: TRUNK_ROUTED_CONTEXT, exten, priority: 2, app: 'GotoIf', appdata: `$[\${GROUP_COUNT(in-${trunkId})} > ${maxIn}]?5` },
-            { context: TRUNK_ROUTED_CONTEXT, exten, priority: 3, app: 'Answer', appdata: null },
-            { context: TRUNK_ROUTED_CONTEXT, exten, priority: 4, app, appdata },
-            { context: TRUNK_ROUTED_CONTEXT, exten, priority: 5, app: 'Congestion', appdata: null },
+            { context: TRUNK_ROUTED_CONTEXT, exten, priority: 1, app: 'Set', appdata: `${ROUTING_TRUNK_VAR}=${trunkId}` },
+            { context: TRUNK_ROUTED_CONTEXT, exten, priority: 2, app: 'Set', appdata: `GROUP()=in-${trunkId}` },
+            { context: TRUNK_ROUTED_CONTEXT, exten, priority: 3, app: 'GotoIf', appdata: `$[\${GROUP_COUNT(in-${trunkId})} > ${maxIn}]?6` },
+            { context: TRUNK_ROUTED_CONTEXT, exten, priority: 4, app: 'Answer', appdata: null },
+            { context: TRUNK_ROUTED_CONTEXT, exten, priority: 5, app, appdata },
+            { context: TRUNK_ROUTED_CONTEXT, exten, priority: 6, app: 'Congestion', appdata: null },
         ]
     }
     return [
-        { context: TRUNK_ROUTED_CONTEXT, exten, priority: 1, app: 'Answer', appdata: null },
-        { context: TRUNK_ROUTED_CONTEXT, exten, priority: 2, app, appdata },
+        { context: TRUNK_ROUTED_CONTEXT, exten, priority: 1, app: 'Set', appdata: `${ROUTING_TRUNK_VAR}=${trunkId}` },
+        { context: TRUNK_ROUTED_CONTEXT, exten, priority: 2, app: 'Answer', appdata: null },
+        { context: TRUNK_ROUTED_CONTEXT, exten, priority: 3, app, appdata },
     ]
 }
 

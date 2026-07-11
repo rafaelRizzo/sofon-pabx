@@ -138,6 +138,8 @@ export default function QueuesPage() {
                             leaveWhenEmpty: form.leaveWhenEmpty,
                             weight: form.weight,
                             postQueueDestination: form.postQueueDestination,
+                            surveyAudioId: form.surveyAudioId,
+                            callcenterEnabled: form.callcenterEnabled,
                         })
                     }
                 />

@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma'
+import { validateEnv } from '../config/env'
 import type { RouteDestination } from '../schemas/route-destination.schema'
 import {
     TC_CONTEXT, tcEntry, ANNOUNCEMENT_CONTEXT, announcementExten, IVR_CONTEXT, ivrExten,
@@ -8,10 +9,30 @@ import { resolveAsteriskId, withDialplanLock, writeContextFile, reloadDialplan, 
 
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 
+const env = validateEnv()
+
 export const QUEUE_APP_CONTEXT = 'queues-app'
 
 export const toAsteriskQueueName = (asteriskId: string, queueName: string) => `${asteriskId}-${queueName}`
 export const queueAppExten = (asteriskId: string, number: string) => `${asteriskId}-${number}`
+
+export const toAsteriskInterface = (type: string, number: string) => `${type.toUpperCase()}/${number}`
+
+// Inverso de toAsteriskInterface: "PJSIP/2002_ast1" -> { type: 'pjsip',
+// number: '2002_ast1' }. MEMBERINTERFACE (setado nativamente pelo Queue() no canal do caller após
+// o bridge) vem exatamente nesse formato, sem sufixo de canal (diferente de nome de canal tipo
+// "PJSIP/2002_ast1-00000a1b") — não precisa strip de sufixo hex.
+export function parseMemberInterface(iface: string): { type: string; number: string } | null {
+    const idx = iface.indexOf('/')
+    if (idx === -1) return null
+    return { type: iface.slice(0, idx).toLowerCase(), number: iface.slice(idx + 1) }
+}
+
+// AGI de pré-roteamento (seta QUEUE_PRIO a partir de RoutingRule, ver handleQueueRoute em agi-server.ts)
+// e AGI de pós-fila (captura MEMBERINTERFACE pra pesquisa de satisfação, ver handleQueueSurvey) —
+// mesmo padrão de buildAgiUrl de request-template.repository.ts, só variando o script.
+const buildQueueRouteAgiUrl = (queueId: string) => `agi://${env.AGI_HOST}:${env.AGI_PORT}/queue-route,${queueId}`
+const buildQueueSurveyAgiUrl = (queueId: string) => `agi://${env.AGI_HOST}:${env.AGI_PORT}/queue-survey,${queueId}`
 
 // Pra onde o cliente vai quando a fila termina sem ele ter desligado (timeout, sem agente, ou
 // agente desliga primeiro) — mesmo RouteDestination usado por Inbound Routes/Time Conditions
@@ -167,9 +188,17 @@ export const AsteriskQueueRepository = {
                 const exten = queueAppExten(asteriskId, q.number)
                 const asteriskName = toAsteriskQueueName(asteriskId, q.name)
                 const { app, appdata } = await resolvePostQueueDestination(q.postQueueDestination as RouteDestination)
+
+                // callcenterEnabled=false: fila roda 100% nativa, sem o AGI de pré-roteamento
+                // (RoutingRule/QUEUE_PRIO) — pesquisa (priority AGI queue-survey) segue independente,
+                // gated pelo próprio surveyAudioId dentro do handler
+                let priority = 1
+                if (q.callcenterEnabled)
+                    entries.push({ context: QUEUE_APP_CONTEXT, exten, priority: priority++, app: 'AGI', appdata: buildQueueRouteAgiUrl(q.id) })
                 entries.push(
-                    { context: QUEUE_APP_CONTEXT, exten, priority: 1, app: 'Queue', appdata: asteriskName },
-                    { context: QUEUE_APP_CONTEXT, exten, priority: 2, app, appdata },
+                    { context: QUEUE_APP_CONTEXT, exten, priority: priority++, app: 'Queue', appdata: asteriskName },
+                    { context: QUEUE_APP_CONTEXT, exten, priority: priority++, app: 'AGI', appdata: buildQueueSurveyAgiUrl(q.id) },
+                    { context: QUEUE_APP_CONTEXT, exten, priority: priority++, app, appdata },
                 )
             }
             await writeContextFile(QUEUE_APP_CONTEXT, asteriskId, entries)

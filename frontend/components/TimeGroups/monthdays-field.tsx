@@ -1,6 +1,6 @@
 "use client"
 
-import { Input } from "@/components/ui/input"
+import { NumberInput } from "@/components/ui/number-input"
 import { Switch } from "@/components/ui/switch"
 
 function parseRange(value: string): [string, string] {
@@ -35,8 +35,7 @@ export function MonthdaysField({
             </label>
             {!isAll && (
                 <div className="flex items-center gap-2">
-                    <Input
-                        type="number"
+                    <NumberInput
                         min={1}
                         max={31}
                         placeholder="Dia"
@@ -45,8 +44,7 @@ export function MonthdaysField({
                         onChange={(e) => setRange(e.target.value, end)}
                     />
                     <span className="text-xs text-muted-foreground">até (opcional)</span>
-                    <Input
-                        type="number"
+                    <NumberInput
                         min={1}
                         max={31}
                         placeholder="Dia"

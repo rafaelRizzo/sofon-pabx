@@ -5,7 +5,7 @@ const db = createPrismaMock()
 
 mock.module('../../../lib/prisma', () => ({ prisma: db }))
 mock.module('../cache/users.cache', () => ({
-    UsersCache: { getAllUsers: mock(() => null), setAllUsers: mock(), getUser: mock(() => null), setUser: mock(), invalidateUser: mock(), invalidateAllUsers: mock() },
+    UsersCache: { getAllUsers: mock(() => null), setAllUsers: mock(), getUser: mock(() => null), setUser: mock(), invalidateUser: mock(), invalidateAllUsers: mock(), getUsersByCreatedBy: mock(() => null), setUsersByCreatedBy: mock(), invalidateUsersByCreatedBy: mock() },
 }))
 mock.module('../../companies/cache/companies.cache', () => ({
     CompaniesCache: { getCompaniesByUser: mock(() => null), setCompaniesByUser: mock(), invalidateCompaniesByUser: mock() },
