@@ -38,6 +38,8 @@ model Company {
     routingRules       RoutingRule[]
     callRatings        CallRating[]
     agentAffinities    AgentAffinity[]
+    variableSets       VariableSet[]
+    variableConditions VariableCondition[]
 
     @@unique([name, doc])
     @@map("companies")
@@ -477,6 +479,46 @@ model RequestTemplate {
     @@unique([name, companyId])
     @@index([companyId])
     @@map("request_templates")
+}
+
+// usada como RouteDestination (type: "variable-set") — seta 1+ variáveis de canal via Set() e segue
+// pro destino configurado. value pode conter interpolação nativa do Asterisk (${OUTRAVAR}), resolvida
+// em tempo de chamada pelo próprio Set() — sem AGI, ao contrário de RequestTemplate.variableMappings.
+model VariableSet {
+    id          String   @id @default(cuid())
+    name        String   @db.VarChar(80)
+    companyId   String
+    company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+    // [{ variable: "MYVAR", value: "algum valor ou ${OUTRAVAR}" }]
+    assignments Json     @default("[]")
+    destination Json?
+    createdAt   DateTime @default(now()) @db.Timestamptz(3)
+    updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+    @@unique([name, companyId])
+    @@index([companyId])
+    @@map("variable_sets")
+}
+
+// usada como RouteDestination (type: "variable-condition") — valida variável(is) de canal (preenchida,
+// tamanho, igualdade, regex, numérica) e direciona por trueRoute/falseRoute, combinando as regras por
+// combinator ("and": todas devem bater | "or": qualquer uma).
+model VariableCondition {
+    id          String   @id @default(cuid())
+    name        String   @db.VarChar(80)
+    companyId   String
+    company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+    combinator  String   @default("and")
+    // [{ variable: "CALLERID(num)", operator: "length_gte", value: "11" }]
+    rules       Json     @default("[]")
+    trueRoute   Json?
+    falseRoute  Json?
+    createdAt   DateTime @default(now()) @db.Timestamptz(3)
+    updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+    @@unique([name, companyId])
+    @@index([companyId])
+    @@map("variable_conditions")
 }
 
 // ─── Callcenter (Queue Engine) ─────────────────────────────────────────────────

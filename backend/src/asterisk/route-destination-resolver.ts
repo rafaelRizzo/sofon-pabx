@@ -4,6 +4,7 @@ import { QUEUE_APP_CONTEXT, queueAppExten } from './queue.repository'
 import {
     TC_CONTEXT, tcEntry, ANNOUNCEMENT_CONTEXT, announcementExten, IVR_CONTEXT, ivrExten,
     REQUEST_TEMPLATE_CONTEXT, requestTemplateExten, HOL_CONTEXT, holEntry,
+    VAR_CONTEXT, varEntry, VARCOND_CONTEXT, varCondEntry,
 } from './dialplan-names'
 
 export type DialplanTarget = { context: string; exten: string; priority: number }
@@ -36,5 +37,9 @@ export async function resolveRouteDestinationToDialplan(dest: RouteDestination):
             return { context: IVR_CONTEXT, exten: ivrExten(dest.id), priority: 1 }
         case 'request':
             return { context: REQUEST_TEMPLATE_CONTEXT, exten: requestTemplateExten(dest.id), priority: 1 }
+        case 'variable-set':
+            return { context: VAR_CONTEXT, exten: varEntry(dest.id), priority: 1 }
+        case 'variable-condition':
+            return { context: VARCOND_CONTEXT, exten: varCondEntry(dest.id), priority: 1 }
     }
 }

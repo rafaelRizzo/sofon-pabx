@@ -58,5 +58,17 @@ export async function validateRouteDestination(dest: RouteDestination, companyId
             if (tpl.companyId !== companyId) throw new AppError(`${prefix}Request template belongs to different company`, 403)
             break
         }
+        case 'variable-set': {
+            const vs = await prisma.variableSet.findUnique({ where: { id: dest.id }, select: { companyId: true } })
+            if (!vs) throw new AppError(`${prefix}Variable set not found`, 404)
+            if (vs.companyId !== companyId) throw new AppError(`${prefix}Variable set belongs to different company`, 403)
+            break
+        }
+        case 'variable-condition': {
+            const vc = await prisma.variableCondition.findUnique({ where: { id: dest.id }, select: { companyId: true } })
+            if (!vc) throw new AppError(`${prefix}Variable condition not found`, 404)
+            if (vc.companyId !== companyId) throw new AppError(`${prefix}Variable condition belongs to different company`, 403)
+            break
+        }
     }
 }

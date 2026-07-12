@@ -13,7 +13,7 @@
 - Nunca rodar DELETE/migrate/drop sem confirmação explícita do usuário
 - Nunca editar schema.prisma e mandar rodar migration — orientar o usuário a rodar ele mesmo
 - Ao validar mudanças, rodar só `bun run test:unit` — nunca `test:integration` (lento, sobe app+Redis) a menos que o usuário peça explicitamente
-- Ao criar um módulo novo, rodar `bun run build` e `bun run test:unit` para validar que não há import quebrado e que os testes passam
+- Ao criar um módulo novo, rodar `bun run build` e `bun run test:unit` para validar que não há import quebrado e que os testes passam. `bun run build` é só o bundler (`bun build`) — não faz type-check; pra validar tipos (ex: exaustividade de switch num discriminated union) rodar `bunx tsc --noEmit`
 
 ---
 
@@ -26,7 +26,7 @@ src/modules/<name>/
   schemas/<name>.schema.ts  # Zod schemas de input/output + response types
   cache/<name>.cache.ts     # wrapper de CacheManager para o módulo
 ```
-Módulos: auth, users, companies, dids, extensions, queues, queue-members, trunks, outbound-routes, inbound-routes, time-groups, time-conditions, holiday-groups, cdr, announcements, ivr, request-templates, audios, callcenter (agents, routing-rules, ratings, affinity — ver seção "Callcenter (Queue Engine)")
+Módulos: auth, users, companies, dids, extensions, queues, queue-members, trunks, outbound-routes, inbound-routes, time-groups, time-conditions, holiday-groups, cdr, announcements, ivr, request-templates, audios, variables, variable-conditions, callcenter (agents, routing-rules, ratings, affinity — ver seção "Callcenter (Queue Engine)")
 
 ## Repositórios Asterisk (`src/asterisk/`)
 Cada repositório escreve direto nas tabelas realtime do Asterisk via Prisma:
@@ -41,7 +41,9 @@ Cada repositório escreve direto nas tabelas realtime do Asterisk via Prisma:
 - `ivr.repository.ts` → arquivo estático via `dialplan-file.repository.ts` — contexto `ivrs`, exten `ivr-<id>`, state machine `Read()+GotoIf` com prioridades numéricas
 - `holidaygroup.repository.ts` → arquivo estático via `dialplan-file.repository.ts` — contexto `holidays`, exten `hol-<id>`, `GotoIfTime` por datas (month/day)
 - `audio.repository.ts` → só paths de áudio (`/var/lib/asterisk/sounds/<asteriskId>/<audioId>.wav`) — único lugar que grava arquivo físico; Announcement/IvrMenu só referenciam um `Audio.id`, sem dialplan próprio
-- `dialplan-file.repository.ts` → infraestrutura de materialização: gera `/etc/asterisk/dialplan-extra/<context>/<asteriskId>.conf` a partir de linhas `DialplanRow[]`. Escrita atômica via `rename()` no mesmo filesystem. Lock por chave `<context>/<asteriskId>` serializa CRUDs simultâneos. Após cada escrita chama `asterisk -rx 'dialplan reload'`. Contextos gerenciados: `timeconditions`, `announcements`, `ivrs`, `queues-app`, `request-templates`, `holidays`, `callcenter-surveys` — zero query ao banco em tempo de chamada para esses contextos.
+- `variable.repository.ts` → arquivo estático via `dialplan-file.repository.ts` — contexto `variables`, exten `var-<id>`, `Set()` de 1+ variáveis de canal seguido do destino configurado
+- `variablecondition.repository.ts` → arquivo estático via `dialplan-file.repository.ts` — contexto `variable-conditions`, exten `varcond-<id>`, `GotoIf` por regra (preenchida/tamanho/igualdade/regex/numérica) combinadas em AND ou OR, trueRoute/falseRoute
+- `dialplan-file.repository.ts` → infraestrutura de materialização: gera `/etc/asterisk/dialplan-extra/<context>/<asteriskId>.conf` a partir de linhas `DialplanRow[]`. Escrita atômica via `rename()` no mesmo filesystem. Lock por chave `<context>/<asteriskId>` serializa CRUDs simultâneos. Após cada escrita chama `asterisk -rx 'dialplan reload'`. Contextos gerenciados: `timeconditions`, `announcements`, `ivrs`, `queues-app`, `request-templates`, `holidays`, `callcenter-surveys`, `variables`, `variable-conditions` — zero query ao banco em tempo de chamada para esses contextos.
 
 ---
 
@@ -162,7 +164,7 @@ Vars: `DATABASE_URL`, `JWT_SECRET`, `REFRESH_SECRET`, `JWT_EXPIRES_IN` (15m), `R
 - `PUT /outbound-routes/:id/trunks`: substitui lista completa (não aditivo)
 - `allowOutbound` em Extension: persiste `ALLOW_OUTBOUND=1/0` em `sip_peers.setvar` / `ps_endpoints.setvar`
 - Time Conditions: ao criar/atualizar/deletar, regenera o arquivo estático do contexto `timeconditions` para a empresa via `dialplan-file.repository.ts` — exten `tc-<tcId>`/`tc-<tcId>-matched`, `GotoIfTime` em OR lógico sobre todos os ranges de todos os TGs vinculados. Arquivo em `/etc/asterisk/dialplan-extra/timeconditions/<asteriskId>.conf`, incluído pelo `extensions.conf` estático — sem queries ao banco em tempo de chamada.
-- **Route destination** (`src/schemas/route-destination.schema.ts`) — shape compartilhado por Inbound Routes (`destination`), Time Conditions (`trueRoute`/`falseRoute`), Holiday Groups (`trueRoute`/`falseRoute`), Queues (`postQueueDestination`), IVR Menus (`invalidDestination`/`timeoutDestination`/`longDestination`/opção de dígito), Announcements (`destination`) e Request Templates (`onSuccess`/`onError`): `{ type: "extension"|"queue"|"voicemail"|"timecondition"|"holiday"|"announcement"|"ivr"|"request"|"hangup", id?: cuid2 } | null` (`id` obrigatório exceto hangup; `null`/omitido = hangup). Validação de existência/posse centralizada em `validateRouteDestination()` (`src/schemas/route-destination.validate.ts`), usada por todos os services acima — não duplicar esse switch-case ao adicionar novo tipo
+- **Route destination** (`src/schemas/route-destination.schema.ts`) — shape compartilhado por Inbound Routes (`destination`), Time Conditions (`trueRoute`/`falseRoute`), Holiday Groups (`trueRoute`/`falseRoute`), Queues (`postQueueDestination`), IVR Menus (`invalidDestination`/`timeoutDestination`/`longDestination`/opção de dígito), Announcements (`destination`), Request Templates (`onSuccess`/`onError`), Variables (`destination`) e Variable Conditions (`trueRoute`/`falseRoute`): `{ type: "extension"|"queue"|"voicemail"|"timecondition"|"holiday"|"announcement"|"ivr"|"request"|"variable-set"|"variable-condition"|"hangup", id?: cuid2 } | null` (`id` obrigatório exceto hangup; `null`/omitido = hangup). Validação de existência/posse centralizada em `validateRouteDestination()` (`src/schemas/route-destination.validate.ts`), usada por todos os services acima — não duplicar esse switch-case ao adicionar novo tipo. **Atenção:** todo novo tipo exige 2 `case` novos em 9 arquivos (`route-destination.validate.ts`, `route-destination-resolver.ts`, `queue.repository.ts`, `announcement.repository.ts`, `inboundroute.repository.ts`, `ivr.repository.ts`, `timecondition.repository.ts`, `holidaygroup.repository.ts` + o próprio novo repositório) — nenhum desses switches tem `default:`, então `bunx tsc --noEmit` aponta os que faltarem assim que o literal entra no union (`bun run build`/`bun build` **não pega isso** — é só bundler, não faz type-check)
 - Áudio (`Audio` model, módulo `audios`) é desacoplado de quem o usa: upload é feito uma vez via `POST /audios` (multipart, por empresa) e o `audioId` retornado é referenciado por `Announcement.audioId`/`IvrMenu.audioId` — o mesmo Audio pode ser reaproveitado por mais de um registro. Áudio é convertido automaticamente pra WAV PCM 16-bit mono 8kHz (slin) via `sox` — qualidade sem perdas, compatível com os codecs das trunks (ulaw/alaw) sem resample na chamada. Único arquivo físico por Audio, em `/var/lib/asterisk/sounds/<asteriskId>/<audioId>.wav`
   - `DELETE /audios/:id` desvincula automaticamente (`SetNull`) qualquer Announcement/IvrMenu que o referencie, removendo o dialplan deles na mesma operação (senão ficaria um Playback/Read apontando pro arquivo apagado) — não bloqueia com 409
   - Announcement/IvrMenu usados como destino de rota (`type: "announcement"|"ivr"`) exigem `audioId` vinculado (`hasAudio: true`), senão 400 em `validateRouteDestination`
@@ -261,6 +263,27 @@ Vars: `DATABASE_URL`, `JWT_SECRET`, `REFRESH_SECRET`, `JWT_EXPIRES_IN` (15m), `R
 - Executado em tempo de chamada via AGI server (`src/asterisk/agi-server.ts`); placeholders `{{VAR}}` em `url`/`headers`/`body` resolvidos via `AGI GET VARIABLE`
 - `timeoutMs` default 5000; `UNIQUE(name, companyId)`
 
+**Variables** (`/variables`) — `{ id, name, companyId, assignments[{variable, value}], destination, createdAt, updatedAt }`
+- Create: `{ name, companyId, assignments[{variable, value}](1-20), destination? }` → `{ variableSetId }`
+- Update: `{ name?, assignments?, destination? }` (min 1)
+- `assignments`: `variable` = identificador simples (`^[A-Za-z_][A-Za-z0-9_]*$`); `value` pode conter interpolação nativa do Asterisk (`${OUTRAVAR}`), resolvida em tempo de chamada pelo próprio `Set()` — sem AGI. `value` só bloqueia aspas/backslash (não pode quebrar a linha de dialplan gerada)
+- `destination`: route destination compartilhado — para onde vai depois de setar as variáveis (null/omitido = Hangup)
+- Dialplan: contexto fixo `variables`, exten `var-<id>`, um `Set()` por assignment seguido do Goto/Hangup
+- `UNIQUE(name, companyId)`
+- Delete Company → cascade Variables (dialplan)
+
+**Variable Conditions** (`/variable-conditions`) — `{ id, name, companyId, combinator, rules[{variable, operator, value?}], trueRoute, falseRoute, createdAt, updatedAt }`
+- Create: `{ name, companyId, combinator?("and"), rules[{variable, operator, value?}](1-20), trueRoute?, falseRoute? }` → `{ variableConditionId }`
+- Update: `{ name?, combinator?, rules?, trueRoute?, falseRoute? }` (min 1)
+- `operator`: `filled|empty` (sem `value`) · `length_eq|length_neq|length_gt|length_gte|length_lt|length_lte` (`value` numérico, compara `LEN()` da variável) · `eq|neq` (`value` string) · `contains|regex` (`value` = substring literal/pattern POSIX ERE, avaliado via `REGEX()`) · `gt|gte|lt|lte` (`value` numérico, compara a variável cru)
+- `variable`: identificador simples ou chamada de função Asterisk (`CALLERID(num)`, `DB(family/key)`)
+- `combinator`: `"and"` (todas as regras devem bater) ou `"or"` (qualquer uma) — combina via `GotoIf(cond?label1:label2)` (destino omitido = continua na próxima priority), mesmo truque do `GotoIfTime` de Time Conditions
+- `value`: só bloqueia aspas/backslash (evita quebrar a expressão Asterisk montada); `contains` escapa metacaracteres regex internamente antes de virar pattern
+- `trueRoute`/`falseRoute`: route destination compartilhado
+- Dialplan: contexto fixo `variable-conditions`, exten `varcond-<id>` (+ `-matched` no combinator `or`, `-fail` no `and`)
+- `UNIQUE(name, companyId)`
+- Delete Company → cascade Variable Conditions (dialplan)
+
 **CDR** — `GET /cdr` — `{ records[], total, limit }`
 - Query obrigatória: `companyId`; opcionais: `startDate`/`endDate` (`YYYY-MM-DD`, cobrem o dia inteiro 00:00:00–23:59:59.999, sem offset/hora), `src`, `dst`, `callStatus` (enum disposition), `limit`(max 200), `order`(asc|desc, default desc — aplica em startTime+id)
 - Sem paginação por cursor — só `limit`/`order`, sem navegação por página
@@ -331,6 +354,8 @@ Legend: `[x]` implementado + testado (unit + integration) | `[~]` implementado, 
 | IVR Menus | GET list/:id · POST · PUT · DELETE | `[~]` | `[ ]` |
 | Request Templates | GET list/:id · POST · PUT · DELETE | `[~]` | `[ ]` |
 | Audios | GET list/:id · POST · PATCH · DELETE | `[~]` | `[ ]` |
+| Variables | GET list/:id · POST · PATCH · DELETE | `[~]` | `[ ]` |
+| Variable Conditions | GET list/:id · POST · PUT · DELETE | `[~]` | `[ ]` |
 | Callcenter Agents | GET list/company/:id · POST · PATCH · DELETE | `[x]` | `[ ]` |
 | Callcenter Routing Rules | GET list/company/:id/:id · POST · PUT · DELETE | `[x]` | `[ ]` |
 | Callcenter Ratings | GET /callcenter/ratings · POST | `[x]` | `[ ]` |
@@ -339,5 +364,5 @@ Legend: `[x]` implementado + testado (unit + integration) | `[~]` implementado, 
 ¹ `resolveActiveRule`, `parseMemberInterface` e `recalculateAffinity`/`recalculatePenaltiesForCompany` têm teste unit; os handlers AGI em si (`handleQueueRoute`/`handleQueueSurvey`/`handleSurveyResult`) não têm teste — mesma limitação de `handleRequestTemplate`, nunca testado neste projeto (protocolo AGI via socket TCP cru).
 
 **Pendências de teste:**
-- `[ ]` Integration tests: Queue Members, Trunks, Holiday Groups, CDR, Announcements, IVR Menus, Request Templates, Audios, Callcenter (todos os submódulos)
+- `[ ]` Integration tests: Queue Members, Trunks, Holiday Groups, CDR, Announcements, IVR Menus, Request Templates, Audios, Variables, Variable Conditions, Callcenter (todos os submódulos)
 - `[ ]` Smoke ao vivo do fluxo AGI de fila (`queue-route`/`queue-survey`/`survey-result`) contra um Asterisk real — `QUEUE_PRIO`/`MEMBERINTERFACE` validados por conhecimento de Asterisk, não testados neste projeto ainda

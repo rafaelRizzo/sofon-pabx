@@ -21,6 +21,10 @@ import { z } from 'zod'
  * | ivr             | ✔              | Goto(ivrs,ivr-<id>,1)                                          | mesma empresa; requer audioId preenchido        |
  * | request         | ✔              | AGI síncrono → trava chamada até resposta HTTP; roteamento     |                                                 |
  * |                 |                | continua por onSuccess/onError do template                     | mesma empresa                                   |
+ * | variable-set    | ✔              | Goto(variables,var-<id>,1) → Set() de 1+ variáveis, depois     | mesma empresa                                   |
+ * |                 |                | segue pro destination configurado no VariableSet                |                                                  |
+ * | variable-condition | ✔           | Goto(variable-conditions,varcond-<id>,1) → valida variável(is) | mesma empresa                                   |
+ * |                 |                | (preenchida/tamanho/igualdade/regex/numérica), trueRoute/falseRoute |                                             |
  * | hangup          | ✗              | Hangup()                                                       | —                                               |
  *
  * `null` ou campo omitido equivale a `{ type: "hangup" }`.
@@ -28,7 +32,10 @@ import { z } from 'zod'
  * Validação de existência/posse centralizada em `validateRouteDestination()`
  * (src/schemas/route-destination.validate.ts) — não duplicar o switch-case.
  */
-export const ROUTE_DEST_TYPES = ['extension', 'queue', 'voicemail', 'timecondition', 'holiday', 'announcement', 'ivr', 'request', 'hangup'] as const
+export const ROUTE_DEST_TYPES = [
+    'extension', 'queue', 'voicemail', 'timecondition', 'holiday', 'announcement', 'ivr', 'request',
+    'variable-set', 'variable-condition', 'hangup',
+] as const
 
 const variants = <T extends z.ZodTypeAny>(idSchema: T) => [
     z.object({
@@ -63,6 +70,19 @@ const variants = <T extends z.ZodTypeAny>(idSchema: T) => [
         type: z.literal('request').describe(
             'Executa um Request Template via AGI (síncrono, trava a chamada até a resposta HTTP) — ' +
             'variáveis extraídas do response ficam disponíveis no canal; roteamento continua por onSuccess/onError do template',
+        ),
+        id: idSchema,
+    }),
+    z.object({
+        type: z.literal('variable-set').describe(
+            'Seta uma ou mais variáveis de canal (Set) e segue pro destino configurado no VariableSet',
+        ),
+        id: idSchema,
+    }),
+    z.object({
+        type: z.literal('variable-condition').describe(
+            'Valida variável(is) de canal (preenchida, tamanho, igualdade, regex, numérica) e direciona ' +
+            'por trueRoute/falseRoute do VariableCondition',
         ),
         id: idSchema,
     }),

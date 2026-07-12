@@ -484,7 +484,8 @@ switch => Realtime/from-trunk-routed@extensions
 exten => i,1,Noop(DID sem rota: ${EXTEN})
  same => n,Hangup(1)
 
-; queues-app, timeconditions, announcements, ivrs, holidays e request-templates são contextos
+; queues-app, timeconditions, announcements, ivrs, holidays, request-templates, variables,
+; variable-conditions e callcenter-surveys são contextos
 ; compartilhados de BAIXA escrita (só mudam por CRUD via API, nunca por ligação) — em vez de
 ; Realtime (query no Postgres a cada Goto, pbx_realtime não tem cache), o dialplan é materializado
 ; em arquivo estático por empresa em /etc/asterisk/dialplan-extra/<contexto>/<asteriskId>.conf,
@@ -509,6 +510,15 @@ exten => i,1,Noop(DID sem rota: ${EXTEN})
 
 [request-templates]
 #tryinclude "dialplan-extra/request-templates/*.conf"
+
+[variables]
+#tryinclude "dialplan-extra/variables/*.conf"
+
+[variable-conditions]
+#tryinclude "dialplan-extra/variable-conditions/*.conf"
+
+[callcenter-surveys]
+#tryinclude "dialplan-extra/callcenter-surveys/*.conf"
 EOF
 
 # modules.conf — garante chan_sip carregado se necessário
@@ -649,9 +659,9 @@ chmod 755 /var/lib/asterisk/sounds
 log "Diretório de anúncios criado → /var/lib/asterisk/sounds"
 
 # --- Dialplan estático por empresa (queues-app/timeconditions/announcements/ivrs/holidays/
-# request-templates) — arquivos gerados pela API, incluídos via #include em extensions.conf
+# request-templates/variables/variable-conditions/callcenter-surveys) — arquivos gerados pela API, incluídos via #include em extensions.conf
 # (ver src/asterisk/dialplan-file.repository.ts) ---
-mkdir -p /etc/asterisk/dialplan-extra/{queues-app,timeconditions,announcements,ivrs,holidays,request-templates}
+mkdir -p /etc/asterisk/dialplan-extra/{queues-app,timeconditions,announcements,ivrs,holidays,request-templates,variables,variable-conditions,callcenter-surveys}
 chown -R asterisk:asterisk /etc/asterisk/dialplan-extra
 chmod 755 /etc/asterisk/dialplan-extra
 log "Diretório de dialplan estático criado → /etc/asterisk/dialplan-extra"

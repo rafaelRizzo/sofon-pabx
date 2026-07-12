@@ -1,16 +1,19 @@
 import { prisma } from '../lib/prisma'
 import type { RouteDestination } from '../schemas/route-destination.schema'
 import { queueAppExten } from './queue.repository'
-import { audioSoundPath } from './audio.repository'
 import {
-    ANNOUNCEMENT_CONTEXT, announcementExten, TC_CONTEXT, tcEntry, IVR_CONTEXT, ivrExten,
+    TC_CONTEXT, tcEntry, ANNOUNCEMENT_CONTEXT, announcementExten, IVR_CONTEXT, ivrExten,
     REQUEST_TEMPLATE_CONTEXT, requestTemplateExten, HOL_CONTEXT, holEntry,
     VAR_CONTEXT, varEntry, VARCOND_CONTEXT, varCondEntry,
 } from './dialplan-names'
 import { resolveAsteriskId, withDialplanLock, writeContextFile, reloadDialplan, type DialplanRow } from './dialplan-file.repository'
 
-export { ANNOUNCEMENT_CONTEXT, announcementExten }
+export { VAR_CONTEXT, varEntry }
 
+type Assignment = { variable: string; value: string }
+
+// "context,exten,priority" para destinos fora do exten atual, ou null para hangup —
+// mesmo contrato de resolveRoute() em timecondition.repository.ts
 async function resolveTarget(dest: RouteDestination): Promise<string | null> {
     if (!dest || dest.type === 'hangup') return null
 
@@ -45,34 +48,36 @@ async function resolveTarget(dest: RouteDestination): Promise<string | null> {
     }
 }
 
-// soundPath: caminho absoluto SEM extensão (Playback resolve o formato sozinho), ou null quando não
-// há áudio vinculado — nesse caso grava só o destino para evitar "invalid extension"
-function buildDialplan(id: string, soundPath: string | null, target: string | null): DialplanRow[] {
-    const exten = announcementExten(id)
-    return soundPath
-        ? [
-            { context: ANNOUNCEMENT_CONTEXT, exten, priority: 1, app: 'Playback', appdata: soundPath },
-            { context: ANNOUNCEMENT_CONTEXT, exten, priority: 2, app: target ? 'Goto' : 'Hangup', appdata: target },
-          ]
-        : [
-            { context: ANNOUNCEMENT_CONTEXT, exten, priority: 1, app: target ? 'Goto' : 'Hangup', appdata: target },
-          ]
+// value pode conter interpolação nativa do Asterisk (${OUTRAVAR}) — resolvida em tempo de chamada
+// pelo próprio Set(), sem precisar de AGI (diferente de RequestTemplate.variableMappings)
+export function buildDialplan(id: string, name: string, assignments: Assignment[], target: string | null): DialplanRow[] {
+    const context = VAR_CONTEXT
+    const exten = varEntry(id)
+    const entries: DialplanRow[] = [{ context, exten, priority: 1, app: 'NoOp', appdata: `VariableSet: ${name}` }]
+
+    let priority = 2
+    for (const a of assignments) {
+        entries.push({ context, exten, priority, app: 'Set', appdata: `${a.variable}=${a.value}` })
+        priority++
+    }
+
+    entries.push({ context, exten, priority, app: target ? 'Goto' : 'Hangup', appdata: target })
+    return entries
 }
 
-export const AnnouncementRepository = {
+export const VariableRepository = {
     // Reconstrói o arquivo de dialplan da empresa inteira pra esse contexto, a partir do estado
-    // atual em banco — chamado depois de qualquer create/update/delete de Announcement.
+    // atual em banco — chamado depois de qualquer create/update/delete de VariableSet.
     async regenerate(companyId: string) {
         const asteriskId = await resolveAsteriskId(companyId)
-        return withDialplanLock(`${ANNOUNCEMENT_CONTEXT}:${asteriskId}`, async () => {
-            const announcements = await prisma.announcement.findMany({ where: { companyId } })
+        return withDialplanLock(`${VAR_CONTEXT}:${asteriskId}`, async () => {
+            const sets = await prisma.variableSet.findMany({ where: { companyId } })
             const entries: DialplanRow[] = []
-            for (const a of announcements) {
-                const soundPath = a.audioId ? audioSoundPath(asteriskId, a.audioId) : null
-                const target = await resolveTarget(a.destination as RouteDestination)
-                entries.push(...buildDialplan(a.id, soundPath, target))
+            for (const s of sets) {
+                const target = await resolveTarget(s.destination as RouteDestination)
+                entries.push(...buildDialplan(s.id, s.name, s.assignments as Assignment[], target))
             }
-            await writeContextFile(ANNOUNCEMENT_CONTEXT, asteriskId, entries)
+            await writeContextFile(VAR_CONTEXT, asteriskId, entries)
             reloadDialplan()
         })
     },

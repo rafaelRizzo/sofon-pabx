@@ -19,6 +19,12 @@ export const requestTemplateExten = (id: string) => `req-${id}`
 export const SURVEY_CONTEXT = 'callcenter-surveys'
 export const surveyExten = (queueId: string) => `survey-${queueId}`
 
+export const VAR_CONTEXT = 'variables'
+export const varEntry = (id: string) => `var-${id}`
+
+export const VARCOND_CONTEXT = 'variable-conditions'
+export const varCondEntry = (id: string) => `varcond-${id}`
+
 // setado no entry point de from-trunk-routed (inboundroute.repository.ts), lido pelo AGI
 // queue-route (agi-server.ts) pra casar RoutingRule.conditions.trunkId — variável de canal
 // sobrevive a qualquer Goto intermediário (timecondition/holiday/ivr) até chegar na fila

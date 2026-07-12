@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react"
 import {
+    BracesIcon,
     CalendarDaysIcon,
+    FilterIcon,
     GlobeIcon,
     ListTreeIcon,
     MegaphoneIcon,
@@ -44,6 +46,8 @@ export const ROUTE_DEST_TYPES = [
     "announcement",
     "ivr",
     "request",
+    "variable-set",
+    "variable-condition",
 ] as const
 
 export type RouteDestinationType = (typeof ROUTE_DEST_TYPES)[number]
@@ -57,6 +61,8 @@ export const ROUTE_DEST_LABELS: Record<RouteDestinationType, string> = {
     announcement: "Anúncio",
     ivr: "URA",
     request: "Request Template",
+    "variable-set": "Setar variável",
+    "variable-condition": "Validar variável",
 }
 
 // Passado como `items` pro Select — sem isso o trigger mostra o value cru (ex: "extension")
@@ -72,6 +78,8 @@ export const ROUTE_DEST_ICONS: Record<RouteDestinationType, LucideIcon> = {
     announcement: MegaphoneIcon,
     ivr: ListTreeIcon,
     request: GlobeIcon,
+    "variable-set": BracesIcon,
+    "variable-condition": FilterIcon,
 }
 
 const idSchema = z.string().min(1, "Campo obrigatório")
@@ -85,6 +93,8 @@ export const routeDestinationSchema = z
         z.object({ type: z.literal("announcement"), id: idSchema }),
         z.object({ type: z.literal("ivr"), id: idSchema }),
         z.object({ type: z.literal("request"), id: idSchema }),
+        z.object({ type: z.literal("variable-set"), id: idSchema }),
+        z.object({ type: z.literal("variable-condition"), id: idSchema }),
         z.object({ type: z.literal("hangup") }),
     ])
     .nullable()
@@ -106,6 +116,8 @@ export const ROUTE_DEST_EMPTY_MESSAGES: Record<FetchableDestinationType, string>
     announcement: "Nenhum anúncio cadastrado ainda",
     ivr: "Nenhuma URA cadastrada ainda",
     request: "Nenhum request template cadastrado ainda",
+    "variable-set": "Nenhuma variável cadastrada ainda",
+    "variable-condition": "Nenhuma condição de variável cadastrada ainda",
 }
 
 // Cada tipo com FK busca sua própria lista (filtrada por empresa) — sem hook de CRUD
@@ -162,6 +174,16 @@ export async function fetchDestinationOptions(
             const { data } = await api.get("/request-templates", { params: { companyId } })
             const requestTemplates = (data.requestTemplates ?? []) as { id: string; name: string }[]
             return requestTemplates.map((r) => ({ id: r.id, label: r.name }))
+        }
+        case "variable-set": {
+            const { data } = await api.get("/variables", { params: { companyId } })
+            const variableSets = (data.variableSets ?? []) as { id: string; name: string }[]
+            return variableSets.map((v) => ({ id: v.id, label: v.name }))
+        }
+        case "variable-condition": {
+            const { data } = await api.get("/variable-conditions", { params: { companyId } })
+            const variableConditions = (data.variableConditions ?? []) as { id: string; name: string }[]
+            return variableConditions.map((v) => ({ id: v.id, label: v.name }))
         }
     }
 }

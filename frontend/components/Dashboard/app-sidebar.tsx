@@ -3,12 +3,14 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
+    BracesIcon,
     Building2Icon,
     CalendarClockIcon,
     CalendarDaysIcon,
     ClockIcon,
     FileAudioIcon,
     FileClockIcon,
+    FilterIcon,
     HashIcon,
     HeadsetIcon,
     LayoutDashboardIcon,
@@ -144,6 +146,16 @@ const NAV: NavGroup[] = [
                 title: "Templates de requisição",
                 href: "/dashboard/request-templates",
                 icon: WebhookIcon,
+            },
+            {
+                title: "Variáveis",
+                href: "/dashboard/variables",
+                icon: BracesIcon,
+            },
+            {
+                title: "Condições de variável",
+                href: "/dashboard/variable-conditions",
+                icon: FilterIcon,
             },
         ],
     },

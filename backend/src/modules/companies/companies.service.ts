@@ -12,13 +12,18 @@ import { AsteriskQueueRepository, QUEUE_APP_CONTEXT } from '../../asterisk/queue
 import { InboundRouteRepository } from '../../asterisk/inboundroute.repository'
 import { audioSoundDir } from '../../asterisk/audio.repository'
 import { removeCompanyDialplanFiles } from '../../asterisk/dialplan-file.repository'
-import { TC_CONTEXT, HOL_CONTEXT, ANNOUNCEMENT_CONTEXT, IVR_CONTEXT, REQUEST_TEMPLATE_CONTEXT } from '../../asterisk/dialplan-names'
+import { TC_CONTEXT, HOL_CONTEXT, ANNOUNCEMENT_CONTEXT, IVR_CONTEXT, REQUEST_TEMPLATE_CONTEXT, VAR_CONTEXT, VARCOND_CONTEXT } from '../../asterisk/dialplan-names'
 import { RequestTemplatesCache } from '../request-templates/cache/request-templates.cache'
 import { HolidayGroupsCache } from '../holiday-groups/cache/holiday-groups.cache'
+import { VariablesCache } from '../variables/cache/variables.cache'
+import { VariableConditionsCache } from '../variable-conditions/cache/variable-conditions.cache'
 import { UsersCache } from '../users/cache/users.cache'
 import { invalidateUserCompanyIds } from '../../utils/auth/access'
 
-const DIALPLAN_FILE_CONTEXTS = [TC_CONTEXT, HOL_CONTEXT, ANNOUNCEMENT_CONTEXT, IVR_CONTEXT, REQUEST_TEMPLATE_CONTEXT, QUEUE_APP_CONTEXT]
+const DIALPLAN_FILE_CONTEXTS = [
+    TC_CONTEXT, HOL_CONTEXT, ANNOUNCEMENT_CONTEXT, IVR_CONTEXT, REQUEST_TEMPLATE_CONTEXT, QUEUE_APP_CONTEXT,
+    VAR_CONTEXT, VARCOND_CONTEXT,
+]
 import type { CreateCompanyInput, UpdateCompanyInput } from './schemas/company.schema'
 import { AppError } from '../../utils/errors/app.error'
 
@@ -238,6 +243,8 @@ export const deleteCompany = async (id: string) => {
         AudiosCache.invalidateNamespace(),
         RequestTemplatesCache.invalidateNamespace(),
         HolidayGroupsCache.invalidateNamespace(),
+        VariablesCache.invalidateNamespace(),
+        VariableConditionsCache.invalidateNamespace(),
         ...existing.users.map((u) => CompaniesCache.invalidateCompaniesByUser(u.userId)),
         ...existing.users.map((u) => CompaniesCache.invalidateCompaniesForScope(u.userId)),
         ...existing.users.map((u) => invalidateUserCompanyIds(u.userId)),

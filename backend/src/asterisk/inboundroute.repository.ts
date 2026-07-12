@@ -4,6 +4,7 @@ import { queueAppExten } from './queue.repository'
 import {
     TC_CONTEXT, tcEntry, ANNOUNCEMENT_CONTEXT, announcementExten, IVR_CONTEXT, ivrExten,
     REQUEST_TEMPLATE_CONTEXT, requestTemplateExten, HOL_CONTEXT, holEntry, ROUTING_TRUNK_VAR,
+    VAR_CONTEXT, varEntry, VARCOND_CONTEXT, varCondEntry,
 } from './dialplan-names'
 
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
@@ -34,6 +35,10 @@ async function resolveDestination(tx: Tx, dest: InboundDest): Promise<{ app: str
             return { app: 'Goto', appdata: `${IVR_CONTEXT},${ivrExten(dest.id)},1` }
         case 'request':
             return { app: 'Goto', appdata: `${REQUEST_TEMPLATE_CONTEXT},${requestTemplateExten(dest.id)},1` }
+        case 'variable-set':
+            return { app: 'Goto', appdata: `${VAR_CONTEXT},${varEntry(dest.id)},1` }
+        case 'variable-condition':
+            return { app: 'Goto', appdata: `${VARCOND_CONTEXT},${varCondEntry(dest.id)},1` }
     }
 }
 

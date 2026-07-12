@@ -48,6 +48,8 @@ export function createPrismaMock() {
         routingRule: model(),
         callRating: model(),
         agentAffinity: model(),
+        variableSet: model(),
+        variableCondition: model(),
         // Asterisk realtime
         ps_endpoints: model(),
         ps_auths: model(),

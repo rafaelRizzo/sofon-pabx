@@ -4,6 +4,7 @@ import { queueAppExten } from './queue.repository'
 import {
     TC_CONTEXT, tcEntry, ANNOUNCEMENT_CONTEXT, announcementExten, IVR_CONTEXT, ivrExten,
     REQUEST_TEMPLATE_CONTEXT, requestTemplateExten, HOL_CONTEXT, holEntry,
+    VAR_CONTEXT, varEntry, VARCOND_CONTEXT, varCondEntry,
 } from './dialplan-names'
 import { resolveAsteriskId, withDialplanLock, writeContextFile, reloadDialplan, type DialplanRow } from './dialplan-file.repository'
 
@@ -45,6 +46,10 @@ async function resolveRoute(route: RouteDest): Promise<string | null> {
             return `${IVR_CONTEXT},${ivrExten(route.id)},1`
         case 'request':
             return `${REQUEST_TEMPLATE_CONTEXT},${requestTemplateExten(route.id)},1`
+        case 'variable-set':
+            return `${VAR_CONTEXT},${varEntry(route.id)},1`
+        case 'variable-condition':
+            return `${VARCOND_CONTEXT},${varCondEntry(route.id)},1`
         case 'hangup':
             return null
     }
