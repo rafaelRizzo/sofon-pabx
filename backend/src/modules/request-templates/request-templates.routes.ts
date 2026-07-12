@@ -3,7 +3,7 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import * as RequestTemplatesController from './request-templates.controller'
 import { protectedRoute } from '../../middleware/scope.middleware'
 import {
-    createRequestTemplateSchema, updateRequestTemplateSchema, idParamSchema, companyQuerySchema,
+    createRequestTemplateSchema, updateRequestTemplateSchema, idParamSchema, optionalCompanyQuery,
     ListRequestTemplatesResponse, GetRequestTemplateResponse, CreateRequestTemplateResponse, UpdateRequestTemplateResponse,
 } from './schemas/request-template.schema'
 import { errors, deleted } from '../../schemas/responses'
@@ -17,7 +17,7 @@ export const requestTemplatesRoutes = async (app: FastifyInstance) => {
             tags: ['Request Templates'],
             summary: 'Listar request templates por empresa',
             security: [{ bearerAuth: [] }],
-            querystring: companyQuerySchema,
+            querystring: optionalCompanyQuery,
             response: {
                 200: ListRequestTemplatesResponse,
                 401: errors[401],

@@ -69,8 +69,8 @@ export type TimeGroupForm = z.infer<typeof createTimeGroupFormSchema>
 export type TimeGroupUpdateForm = z.infer<typeof updateTimeGroupFormSchema>
 export type TimeRangeForm = z.infer<typeof timeRangeFormSchema>
 
-// companyId opcional — omitido, busca todos os grupos no escopo do usuário, permitindo o
-// filtro "Todas as empresas" na página
+// companyId opcional — enquanto não informado, a lista não é buscada (filtro de
+// empresa da página exige seleção antes de consultar o backend)
 export function useTimeGroups(companyId?: string) {
     const [timeGroups, setTimeGroups] = useState<TimeGroup[]>([])
     const [loading, setLoading] = useState(true)
@@ -137,6 +137,12 @@ export function useTimeGroups(companyId?: string) {
     const fetchStateRef = useRef<{ key?: string; fetched: boolean }>({ fetched: false })
 
     useEffect(() => {
+        if (!companyId) {
+            setTimeGroups([])
+            setLoading(false)
+            fetchStateRef.current = { fetched: false }
+            return
+        }
         if (fetchStateRef.current.fetched && fetchStateRef.current.key === companyId) return
         fetchStateRef.current = { key: companyId, fetched: true }
         fetchTimeGroups()

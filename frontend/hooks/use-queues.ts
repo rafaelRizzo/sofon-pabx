@@ -53,11 +53,14 @@ export type Queue = {
     retry: number
     maxLen: number
     wrapupTime: number
+    // Anúncio tocado uma única vez pro cliente ao entrar na fila ("join announcement")
     announce: string | null
     announceFrequency: number
     announcePosition: boolean
     periodicAnnounce: string | null
     periodicAnnounceFrequency: number
+    // Anúncio tocado pro atendente bem antes de a ligação ser conectada ("agent announcement")
+    agentAnnounce: string | null
     weight: number
     joinEmpty: boolean
     leaveWhenEmpty: boolean
@@ -110,6 +113,8 @@ const baseQueueFields = {
     // Mensagem repetida periodicamente durante a espera — diferente do announce acima
     periodicAnnounce: z.string().nullable(),
     periodicAnnounceFrequency: intWithDefault(0, Number.MAX_SAFE_INTEGER, 60),
+    // Anúncio tocado pro atendente antes do bridge — diferente do announce (que é pro cliente)
+    agentAnnounce: z.string().nullable(),
     joinEmpty: z.boolean().default(true),
     leaveWhenEmpty: z.boolean().default(false),
     weight: intWithDefault(0, Number.MAX_SAFE_INTEGER, 0),
@@ -130,8 +135,8 @@ export const updateQueueFormSchema = z.object(baseQueueFields)
 export type QueueForm = z.infer<typeof createQueueFormSchema>
 export type QueueUpdateForm = z.infer<typeof updateQueueFormSchema>
 
-// companyId opcional — omitido, busca todas as filas no escopo do usuário (igual
-// use-dids/use-extensions), permitindo o filtro "Todas as empresas" na página
+// companyId opcional — enquanto não informado, a lista não é buscada (filtro de
+// empresa da página exige seleção antes de consultar o backend)
 export function useQueues(companyId?: string) {
     const [queues, setQueues] = useState<Queue[]>([])
     const [loading, setLoading] = useState(true)
@@ -199,6 +204,12 @@ export function useQueues(companyId?: string) {
     const fetchStateRef = useRef<{ key?: string; fetched: boolean }>({ fetched: false })
 
     useEffect(() => {
+        if (!companyId) {
+            setQueues([])
+            setLoading(false)
+            fetchStateRef.current = { fetched: false }
+            return
+        }
         if (fetchStateRef.current.fetched && fetchStateRef.current.key === companyId) return
         fetchStateRef.current = { key: companyId, fetched: true }
         fetchQueues()

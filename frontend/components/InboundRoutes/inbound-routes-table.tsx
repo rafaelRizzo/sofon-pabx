@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react"
 import { PencilIcon, Trash2Icon } from "lucide-react"
 
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
@@ -22,12 +21,9 @@ import {
 } from "@/components/ui/tooltip"
 import {
     fetchDestinationOptions,
-    ROUTE_DEST_ICONS,
-    ROUTE_DEST_LABELS,
     type FetchableDestinationType,
-    type RouteDestination,
-    type RouteDestinationType,
 } from "@/components/RouteDestination/route-destination-field"
+import { RouteDestinationBadge } from "@/components/RouteDestination/route-destination-badge"
 import { type InboundRoute } from "@/hooks/use-inbound-routes"
 
 type Props = {
@@ -84,35 +80,6 @@ function useDestinationLabels(routes: InboundRoute[]) {
     return { labels, loadedTypes }
 }
 
-function DestinationCell({
-    destination,
-    labels,
-    loadedTypes,
-}: {
-    destination: RouteDestination
-    labels: Record<string, string>
-    loadedTypes: Set<FetchableDestinationType>
-}) {
-    const type: RouteDestinationType = destination?.type ?? "hangup"
-    const Icon = ROUTE_DEST_ICONS[type]
-
-    let detail: string | null = null
-    if (destination && "id" in destination) {
-        const key = `${type}:${destination.id}`
-        if (labels[key]) detail = labels[key]
-        else if (loadedTypes.has(type as FetchableDestinationType)) detail = "registro não encontrado"
-        else detail = "…"
-    }
-
-    return (
-        <Badge variant="outline" className="gap-1.5">
-            <Icon className="size-3" />
-            {ROUTE_DEST_LABELS[type]}
-            {detail && <span className="text-muted-foreground">— {detail}</span>}
-        </Badge>
-    )
-}
-
 export function InboundRoutesTable({ routes, loading, onEdit, onDelete }: Props) {
     const { labels, loadedTypes } = useDestinationLabels(routes)
 
@@ -152,7 +119,7 @@ export function InboundRoutesTable({ routes, loading, onEdit, onDelete }: Props)
                                 <TableCell>{route.did.number}</TableCell>
                                 <TableCell>{route.trunk.name}</TableCell>
                                 <TableCell>
-                                    <DestinationCell
+                                    <RouteDestinationBadge
                                         destination={route.destination}
                                         labels={labels}
                                         loadedTypes={loadedTypes}

@@ -7,6 +7,7 @@ import { AsteriskQueueRepository, toAsteriskQueueName } from '../../asterisk/que
 import { CallcenterSurveyRepository } from '../../asterisk/callcenter-survey.repository'
 import { validateRouteDestination } from '../../schemas/route-destination.validate'
 import { assertAudioBelongsToCompany } from '../audios/audios.service'
+import { audioSoundPath } from '../../asterisk/audio.repository'
 import { AppError } from '../../utils/errors/app.error'
 import { logger } from '../../utils/logger'
 
@@ -38,6 +39,7 @@ const queueSelect = {
     announcePosition: true,
     periodicAnnounce: true,
     periodicAnnounceFrequency: true,
+    agentAnnounce: true,
     joinEmpty: true,
     leaveWhenEmpty: true,
     weight: true,
@@ -115,15 +117,29 @@ export const createQueue = async (data: CreateQueueInput) => {
 
     await validateRouteDestination(data.postQueueDestination ?? null, data.companyId, 'postQueueDestination')
     await assertAudioBelongsToCompany(data.surveyAudioId, data.companyId)
+    await assertAudioBelongsToCompany(data.announce, data.companyId)
+    await assertAudioBelongsToCompany(data.periodicAnnounce, data.companyId)
+    await assertAudioBelongsToCompany(data.agentAnnounce, data.companyId)
 
     const asteriskName = toAsteriskQueueName(company.asteriskId, data.name)
+
+    // App guarda o audioId (data.periodicAnnounce/agentAnnounce) — a tabela realtime do Asterisk
+    // precisa do path absoluto do arquivo (ver AsteriskQueueRepository/audioSoundPath). `announce`
+    // (join announcement, tocado ao caller uma única vez ao entrar) NÃO vai pra cá: vira um
+    // Playback no dialplan (ver AsteriskQueueRepository.regenerate) — quem grava na coluna
+    // realtime `announce` (nativa do Asterisk, tocada pro AGENTE antes do bridge) é agentAnnounce
+    const asteriskData = {
+        ...data,
+        announce: data.agentAnnounce ? audioSoundPath(company.asteriskId, data.agentAnnounce) : null,
+        periodicAnnounce: data.periodicAnnounce ? audioSoundPath(company.asteriskId, data.periodicAnnounce) : null,
+    }
 
     const queue = await prisma.$transaction(async (tx) => {
         const q = await tx.queue.create({
             data: { ...data, postQueueDestination: data.postQueueDestination ?? undefined },
             select: queueSelect,
         })
-        await AsteriskQueueRepository.createQueue(tx, asteriskName, data)
+        await AsteriskQueueRepository.createQueue(tx, asteriskName, asteriskData)
         return q
     })
 
@@ -165,6 +181,9 @@ export const updateQueue = async (id: string, data: UpdateQueueInput) => {
         await validateRouteDestination(data.postQueueDestination, existing.companyId, 'postQueueDestination')
 
     if (data.surveyAudioId !== undefined) await assertAudioBelongsToCompany(data.surveyAudioId, existing.companyId)
+    if (data.announce !== undefined) await assertAudioBelongsToCompany(data.announce, existing.companyId)
+    if (data.periodicAnnounce !== undefined) await assertAudioBelongsToCompany(data.periodicAnnounce, existing.companyId)
+    if (data.agentAnnounce !== undefined) await assertAudioBelongsToCompany(data.agentAnnounce, existing.companyId)
 
     const asteriskUpdate: Record<string, any> = {}
     if (data.strategy !== undefined) asteriskUpdate.strategy = data.strategy
@@ -173,12 +192,21 @@ export const updateQueue = async (id: string, data: UpdateQueueInput) => {
     if (data.retry !== undefined) asteriskUpdate.retry = data.retry
     if (data.maxLen !== undefined) asteriskUpdate.maxlen = data.maxLen
     if (data.wrapupTime !== undefined) asteriskUpdate.wrapuptime = data.wrapupTime
-    if (data.announce !== undefined) asteriskUpdate.announce = data.announce
+    // `announce` (join announcement) não vai pra tabela realtime (ver comentário em createQueue) —
+    // só dispara regenerate do dialplan via announceChanged, abaixo. Quem grava na coluna nativa
+    // `announce` é agentAnnounce (agent announcement, tocado pro atendente antes do bridge)
     if (data.announceFrequency !== undefined) asteriskUpdate.announceFreq = data.announceFrequency
     if (data.announcePosition !== undefined) asteriskUpdate.announcePosition = data.announcePosition ? 'yes' : 'no'
-    if (data.periodicAnnounce !== undefined) asteriskUpdate.periodicAnnounce = data.periodicAnnounce
+    if (data.periodicAnnounce !== undefined)
+        asteriskUpdate.periodicAnnounce = data.periodicAnnounce
+            ? audioSoundPath(existing.company.asteriskId, data.periodicAnnounce)
+            : null
     if (data.periodicAnnounceFrequency !== undefined)
         asteriskUpdate.periodicAnnounceFreq = data.periodicAnnounceFrequency
+    if (data.agentAnnounce !== undefined)
+        asteriskUpdate.announce = data.agentAnnounce
+            ? audioSoundPath(existing.company.asteriskId, data.agentAnnounce)
+            : null
     if (data.joinEmpty !== undefined) asteriskUpdate.joinempty = data.joinEmpty ? 'yes' : 'no'
     if (data.leaveWhenEmpty !== undefined) asteriskUpdate.leavewhenempty = data.leaveWhenEmpty ? 'yes' : 'no'
     if (data.weight !== undefined) asteriskUpdate.weight = data.weight
@@ -192,7 +220,8 @@ export const updateQueue = async (id: string, data: UpdateQueueInput) => {
     const numberChanged = newNumber !== existing.number
     const destChanged = data.postQueueDestination !== undefined
     const callcenterToggled = data.callcenterEnabled !== undefined && data.callcenterEnabled !== existing.callcenterEnabled
-    const needsResync = numberChanged || nameChanged || destChanged || callcenterToggled
+    const announceChanged = data.announce !== undefined && data.announce !== existing.announce
+    const needsResync = numberChanged || nameChanged || destChanged || callcenterToggled || announceChanged
     const surveyChanged = data.surveyAudioId !== undefined && data.surveyAudioId !== existing.surveyAudioId
 
     const queue = await prisma.$transaction(async (tx) => {

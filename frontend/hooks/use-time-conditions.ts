@@ -37,8 +37,8 @@ export const updateTimeConditionFormSchema = z.object({
 export type TimeConditionForm = z.infer<typeof createTimeConditionFormSchema>
 export type TimeConditionUpdateForm = z.infer<typeof updateTimeConditionFormSchema>
 
-// companyId opcional — omitido, busca todas as condições no escopo do usuário, permitindo o
-// filtro "Todas as empresas" na página
+// companyId opcional — enquanto não informado, a lista não é buscada (filtro de
+// empresa da página exige seleção antes de consultar o backend)
 export function useTimeConditions(companyId?: string) {
     const [timeConditions, setTimeConditions] = useState<TimeCondition[]>([])
     const [loading, setLoading] = useState(true)
@@ -106,6 +106,12 @@ export function useTimeConditions(companyId?: string) {
     const fetchStateRef = useRef<{ key?: string; fetched: boolean }>({ fetched: false })
 
     useEffect(() => {
+        if (!companyId) {
+            setTimeConditions([])
+            setLoading(false)
+            fetchStateRef.current = { fetched: false }
+            return
+        }
         if (fetchStateRef.current.fetched && fetchStateRef.current.key === companyId) return
         fetchStateRef.current = { key: companyId, fetched: true }
         fetchTimeConditions()

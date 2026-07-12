@@ -386,6 +386,12 @@ export function useExtensions(companyId?: string) {
     const fetchStateRef = useRef<{ key?: string; fetched: boolean }>({ fetched: false })
 
     useEffect(() => {
+        if (!companyId) {
+            setExtensions([])
+            setLoading(false)
+            fetchStateRef.current = { fetched: false }
+            return
+        }
         if (fetchStateRef.current.fetched && fetchStateRef.current.key === companyId) return
         fetchStateRef.current = { key: companyId, fetched: true }
         fetchExtensions()

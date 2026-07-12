@@ -102,6 +102,7 @@ export function QueueFormDialog({ open, onOpenChange, queue, companies, onSave }
             announcePosition: false,
             periodicAnnounce: null,
             periodicAnnounceFrequency: 60,
+            agentAnnounce: null,
             joinEmpty: true,
             leaveWhenEmpty: false,
             weight: 0,
@@ -116,6 +117,7 @@ export function QueueFormDialog({ open, onOpenChange, queue, companies, onSave }
     const announce = watch("announce")
     const announcePosition = watch("announcePosition")
     const periodicAnnounce = watch("periodicAnnounce")
+    const agentAnnounce = watch("agentAnnounce")
     const surveyAudioId = watch("surveyAudioId")
     const selectedCompany = companies.find((c) => c.id === companyId) ?? null
 
@@ -124,6 +126,7 @@ export function QueueFormDialog({ open, onOpenChange, queue, companies, onSave }
     const { audios } = useAudios(companyId)
     const selectedAnnounce = audios.find((a) => a.id === announce) ?? null
     const selectedPeriodicAnnounce = audios.find((a) => a.id === periodicAnnounce) ?? null
+    const selectedAgentAnnounce = audios.find((a) => a.id === agentAnnounce) ?? null
     const selectedSurveyAudio = audios.find((a) => a.id === surveyAudioId) ?? null
 
     useEffect(() => {
@@ -143,6 +146,7 @@ export function QueueFormDialog({ open, onOpenChange, queue, companies, onSave }
             announcePosition: queue?.announcePosition ?? false,
             periodicAnnounce: queue?.periodicAnnounce ?? null,
             periodicAnnounceFrequency: queue?.periodicAnnounceFrequency ?? 60,
+            agentAnnounce: queue?.agentAnnounce ?? null,
             joinEmpty: queue?.joinEmpty ?? true,
             leaveWhenEmpty: queue?.leaveWhenEmpty ?? false,
             weight: queue?.weight ?? 0,
@@ -159,6 +163,7 @@ export function QueueFormDialog({ open, onOpenChange, queue, companies, onSave }
         setValue("postQueueDestination", { type: "hangup" }, { shouldDirty: true })
         setValue("announce", null, { shouldDirty: true })
         setValue("periodicAnnounce", null, { shouldDirty: true })
+        setValue("agentAnnounce", null, { shouldDirty: true })
         setValue("surveyAudioId", null, { shouldDirty: true })
     }
 
@@ -350,7 +355,10 @@ export function QueueFormDialog({ open, onOpenChange, queue, companies, onSave }
                                             </ComboboxContent>
                                         </Combobox>
                                     )}
-                                    <FieldDescription>Tocado uma única vez, antes de entrar na fila.</FieldDescription>
+                                    <FieldDescription>
+                                        Tocado uma única vez pro cliente, ao entrar na fila (antes da música
+                                        de espera).
+                                    </FieldDescription>
                                     {errors.announce && <FieldError>{errors.announce.message}</FieldError>}
                                 </Field>
 
@@ -429,6 +437,46 @@ export function QueueFormDialog({ open, onOpenChange, queue, companies, onSave }
                                         )}
                                     </Field>
                                 </div>
+
+                                <Field>
+                                    <FieldLabel>Anúncio pro atendente</FieldLabel>
+                                    {!companyId ? (
+                                        <FieldDescription>Selecione uma empresa primeiro.</FieldDescription>
+                                    ) : (
+                                        <Combobox<Audio>
+                                            items={audios}
+                                            value={selectedAgentAnnounce}
+                                            itemToStringLabel={(a) => a.name}
+                                            isItemEqualToValue={(a, b) => a.id === b.id}
+                                            onValueChange={(a) =>
+                                                setValue("agentAnnounce", a?.id ?? null, { shouldDirty: true })
+                                            }
+                                        >
+                                            <ComboboxInput placeholder="Nenhum" />
+                                            <ComboboxContent>
+                                                <ComboboxEmpty>
+                                                    {audios.length === 0
+                                                        ? "Nenhum áudio cadastrado para essa empresa"
+                                                        : "Nenhum resultado para essa busca"}
+                                                </ComboboxEmpty>
+                                                <ComboboxList>
+                                                    {(a: Audio) => (
+                                                        <ComboboxItem key={a.id} value={a}>
+                                                            {a.name}
+                                                        </ComboboxItem>
+                                                    )}
+                                                </ComboboxList>
+                                            </ComboboxContent>
+                                        </Combobox>
+                                    )}
+                                    <FieldDescription>
+                                        Tocado só pro atendente, bem antes de a ligação ser conectada a ele —
+                                        o cliente não ouve isso.
+                                    </FieldDescription>
+                                    {errors.agentAnnounce && (
+                                        <FieldError>{errors.agentAnnounce.message}</FieldError>
+                                    )}
+                                </Field>
 
                                 <div className="grid grid-cols-2 gap-3">
                                     <Field orientation="horizontal">

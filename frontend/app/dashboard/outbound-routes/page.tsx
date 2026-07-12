@@ -3,43 +3,32 @@
 import { useState } from "react"
 import { PlusIcon } from "lucide-react"
 
+import { CompanyFilter } from "@/components/company-filter"
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog"
 import { DataPagination } from "@/components/data-pagination"
 import { OutboundRouteFormDialog } from "@/components/OutboundRoutes/outbound-route-form-dialog"
 import { OutboundRoutesTable } from "@/components/OutboundRoutes/outbound-routes-table"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
-import {
-    Combobox,
-    ComboboxContent,
-    ComboboxEmpty,
-    ComboboxInput,
-    ComboboxItem,
-    ComboboxList,
-} from "@/components/ui/combobox"
 import { Input } from "@/components/ui/input"
 import { useCompanies } from "@/hooks/use-companies"
+import { useCompanyFilter } from "@/hooks/use-company-filter"
 import { useExtensions } from "@/hooks/use-extensions"
 import { useOutboundRoutes, type OutboundRoute } from "@/hooks/use-outbound-routes"
 import { usePagination } from "@/hooks/use-pagination"
 import { useTrunks } from "@/hooks/use-trunks"
 
-type CompanyFilterOption = { id: string; name: string }
-
-const ALL_COMPANIES: CompanyFilterOption = { id: "all", name: "Todas as empresas" }
-
 export default function OutboundRoutesPage() {
     const { companies } = useCompanies()
-    const [companyFilter, setCompanyFilter] = useState<string>("all")
+    const [companyFilter, setCompanyFilter] = useCompanyFilter()
 
     const [createOpen, setCreateOpen] = useState(false)
     const [editRoute, setEditRoute] = useState<OutboundRoute | null>(null)
     const [deleteTarget, setDeleteTarget] = useState<OutboundRoute | null>(null)
 
     // Empresa usada para escopar troncos/ramais/rotas existentes do formulário (o dialog não
-    // deixa escolher empresa): a da rota em edição, ou o filtro quando uma empresa específica
-    // está selecionada — "Todas as empresas" não é uma empresa válida pra criar/editar
-    const formCompanyId = editRoute?.companyId ?? (companyFilter !== "all" ? companyFilter : undefined)
+    // deixa escolher empresa): a da rota em edição, ou o filtro da tabela
+    const formCompanyId = editRoute?.companyId ?? companyFilter
 
     const { trunks: formTrunks } = useTrunks(formCompanyId)
     const { extensions: formExtensions } = useExtensions(formCompanyId)
@@ -52,7 +41,7 @@ export default function OutboundRoutesPage() {
         createRoute,
         updateRoute,
         deleteRoute,
-    } = useOutboundRoutes(companyFilter === "all" ? undefined : companyFilter)
+    } = useOutboundRoutes(companyFilter)
     // allRoutes já vem escopado pelo companyId da própria requisição (fetch por companyFilter) —
     // conflito de padrão de discagem é validado dentro dessa mesma empresa
     const companyAllRoutes = allRoutes.filter((r) => r.companyId === formCompanyId)
@@ -75,7 +64,7 @@ export default function OutboundRoutesPage() {
             >
                 <Button
                     onClick={() => setCreateOpen(true)}
-                    disabled={companyFilter === "all"}
+                    disabled={!companyFilter}
                 >
                     <PlusIcon />
                     Nova rota
@@ -89,31 +78,11 @@ export default function OutboundRoutesPage() {
                     onChange={(e) => setFilter(e.target.value)}
                     className="max-w-sm"
                 />
-                <Combobox<CompanyFilterOption>
-                    items={[ALL_COMPANIES, ...companies]}
-                    value={
-                        [ALL_COMPANIES, ...companies].find(
-                            (c) => c.id === companyFilter
-                        ) ?? ALL_COMPANIES
-                    }
-                    itemToStringLabel={(c) => c.name}
-                    isItemEqualToValue={(a, b) => a.id === b.id}
-                    onValueChange={(company) =>
-                        setCompanyFilter(company?.id ?? "all")
-                    }
-                >
-                    <ComboboxInput placeholder="Buscar empresa..." className="w-56" />
-                    <ComboboxContent>
-                        <ComboboxEmpty>Nenhuma empresa</ComboboxEmpty>
-                        <ComboboxList>
-                            {(company: CompanyFilterOption) => (
-                                <ComboboxItem key={company.id} value={company}>
-                                    {company.name}
-                                </ComboboxItem>
-                            )}
-                        </ComboboxList>
-                    </ComboboxContent>
-                </Combobox>
+                <CompanyFilter
+                    companies={companies}
+                    value={companyFilter}
+                    onValueChange={setCompanyFilter}
+                />
             </div>
 
             <OutboundRoutesTable
@@ -131,7 +100,7 @@ export default function OutboundRoutesPage() {
                 onPageChange={setPage}
             />
 
-            {createOpen && companyFilter !== "all" && (
+            {createOpen && companyFilter && (
                 <OutboundRouteFormDialog
                     open={createOpen}
                     onOpenChange={setCreateOpen}

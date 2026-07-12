@@ -19,7 +19,6 @@ export type VariableRuleOperator =
 export type VariableRule = { variable: string; operator: VariableRuleOperator; value?: string }
 export type Combinator = 'and' | 'or'
 
-const varFail = (entry: string) => `${entry}-fail`
 const varMatched = (entry: string) => `${entry}-matched`
 
 // escapa metacaracteres de regex POSIX ERE (usado pelo Asterisk REGEX()) — só usado internamente
@@ -92,7 +91,9 @@ export function buildExpr(rule: VariableRule): string {
 // GotoIf(condition?label1:label2) — destino omitido = continua na próxima priority do mesmo exten.
 // "or": qualquer regra batendo já pula pro "-matched" (mesmo truque de GotoIfTime em
 // timecondition.repository.ts); nenhuma bateu = cai no falseRoute.
-// "and": cada regra que falhar pula direto pro "-fail" (falseRoute); todas passando = cai no trueRoute.
+// "and": cada regra que falhar pula direto pro "-matched" (mesmo exten de destino do "or" — o nome
+// não indica true/false, é só o alvo de convergência do loop; ver NoOp logo antes de cada Goto/Hangup
+// pra saber qual branch foi de fato tomado sem precisar interpretar o appdata do GotoIf no log)
 export function buildDialplan(
     id: string,
     name: string,
@@ -103,26 +104,29 @@ export function buildDialplan(
 ): DialplanRow[] {
     const context = VARCOND_CONTEXT
     const entry = varCondEntry(id)
+    const matched = varMatched(entry)
     const entries: DialplanRow[] = [{ context, exten: entry, priority: 1, app: 'NoOp', appdata: `VariableCondition: ${name}` }]
 
     let priority = 2
 
     if (combinator === 'or') {
-        const matched = varMatched(entry)
         for (const rule of rules) {
             entries.push({ context, exten: entry, priority, app: 'GotoIf', appdata: `$[${buildExpr(rule)}]?${matched},1` })
             priority++
         }
-        entries.push({ context, exten: entry, priority, app: falseAsterisk ? 'Goto' : 'Hangup', appdata: falseAsterisk })
-        entries.push({ context, exten: matched, priority: 1, app: trueAsterisk ? 'Goto' : 'Hangup', appdata: trueAsterisk })
+        entries.push({ context, exten: entry, priority, app: 'NoOp', appdata: 'VariableCondition: NOT MATCHED' })
+        entries.push({ context, exten: entry, priority: priority + 1, app: falseAsterisk ? 'Goto' : 'Hangup', appdata: falseAsterisk })
+        entries.push({ context, exten: matched, priority: 1, app: 'NoOp', appdata: 'VariableCondition: MATCHED' })
+        entries.push({ context, exten: matched, priority: 2, app: trueAsterisk ? 'Goto' : 'Hangup', appdata: trueAsterisk })
     } else {
-        const fail = varFail(entry)
         for (const rule of rules) {
-            entries.push({ context, exten: entry, priority, app: 'GotoIf', appdata: `$[${buildExpr(rule)}]?:${fail},1` })
+            entries.push({ context, exten: entry, priority, app: 'GotoIf', appdata: `$[${buildExpr(rule)}]?:${matched},1` })
             priority++
         }
-        entries.push({ context, exten: entry, priority, app: trueAsterisk ? 'Goto' : 'Hangup', appdata: trueAsterisk })
-        entries.push({ context, exten: fail, priority: 1, app: falseAsterisk ? 'Goto' : 'Hangup', appdata: falseAsterisk })
+        entries.push({ context, exten: entry, priority, app: 'NoOp', appdata: 'VariableCondition: MATCHED' })
+        entries.push({ context, exten: entry, priority: priority + 1, app: trueAsterisk ? 'Goto' : 'Hangup', appdata: trueAsterisk })
+        entries.push({ context, exten: matched, priority: 1, app: 'NoOp', appdata: 'VariableCondition: NOT MATCHED' })
+        entries.push({ context, exten: matched, priority: 2, app: falseAsterisk ? 'Goto' : 'Hangup', appdata: falseAsterisk })
     }
 
     return entries

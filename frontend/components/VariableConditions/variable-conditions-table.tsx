@@ -22,12 +22,9 @@ import {
 } from "@/components/ui/tooltip"
 import {
     fetchDestinationOptions,
-    ROUTE_DEST_ICONS,
-    ROUTE_DEST_LABELS,
     type FetchableDestinationType,
-    type RouteDestination,
-    type RouteDestinationType,
 } from "@/components/RouteDestination/route-destination-field"
+import { RouteDestinationBadge } from "@/components/RouteDestination/route-destination-badge"
 import { VARIABLE_RULE_OPERATOR_LABELS, type VariableCondition } from "@/hooks/use-variable-conditions"
 
 type Props = {
@@ -82,35 +79,6 @@ function useDestinationLabels(variableConditions: VariableCondition[]) {
     return { labels, loadedTypes }
 }
 
-function DestinationBadge({
-    destination,
-    labels,
-    loadedTypes,
-}: {
-    destination: RouteDestination
-    labels: Record<string, string>
-    loadedTypes: Set<FetchableDestinationType>
-}) {
-    const type: RouteDestinationType = destination?.type ?? "hangup"
-    const Icon = ROUTE_DEST_ICONS[type]
-
-    let detail: string | null = null
-    if (destination && "id" in destination) {
-        const key = `${type}:${destination.id}`
-        if (labels[key]) detail = labels[key]
-        else if (loadedTypes.has(type as FetchableDestinationType)) detail = "registro não encontrado"
-        else detail = "…"
-    }
-
-    return (
-        <Badge variant="outline" className="gap-1.5">
-            <Icon className="size-3" />
-            {ROUTE_DEST_LABELS[type]}
-            {detail && <span className="text-muted-foreground">— {detail}</span>}
-        </Badge>
-    )
-}
-
 export function VariableConditionsTable({ variableConditions, loading, onEdit, onDelete }: Props) {
     const { labels, loadedTypes } = useDestinationLabels(variableConditions)
 
@@ -161,17 +129,19 @@ export function VariableConditionsTable({ variableConditions, loading, onEdit, o
                                     </span>
                                 </TableCell>
                                 <TableCell>
-                                    <DestinationBadge
+                                    <RouteDestinationBadge
                                         destination={vc.trueRoute}
                                         labels={labels}
                                         loadedTypes={loadedTypes}
+                                        tone="true"
                                     />
                                 </TableCell>
                                 <TableCell>
-                                    <DestinationBadge
+                                    <RouteDestinationBadge
                                         destination={vc.falseRoute}
                                         labels={labels}
                                         loadedTypes={loadedTypes}
+                                        tone="false"
                                     />
                                 </TableCell>
                                 <TableCell>

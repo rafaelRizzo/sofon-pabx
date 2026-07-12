@@ -38,14 +38,16 @@ export const createQueueSchema = z.object({
     retry: z.number().int().min(1).max(300).default(5),
     maxLen: z.number().int().min(0).default(0),
     wrapupTime: z.number().int().min(0).default(5),
-    // Anúncio tocado uma única vez ao entrar na fila
-    announce: z.string().max(128).nullable().optional(),
+    // id de um Audio (POST /audios) tocado uma única vez pro CLIENTE ao entrar na fila ("join announcement")
+    announce: z.cuid2().nullable().optional(),
     // Frequência/toggle do "diz sua posição na fila" (só tem efeito com announcePosition=true)
     announceFrequency: z.number().int().min(0).default(0),
     announcePosition: z.boolean().default(false),
-    // Mensagem repetida periodicamente durante a espera (diferente do announce acima)
-    periodicAnnounce: z.string().max(128).nullable().optional(),
+    // id de um Audio repetido periodicamente durante a espera (diferente do announce acima)
+    periodicAnnounce: z.cuid2().nullable().optional(),
     periodicAnnounceFrequency: z.number().int().min(0).default(60),
+    // id de um Audio tocado pro ATENDENTE bem antes de a ligação ser conectada ("agent announcement")
+    agentAnnounce: z.cuid2().nullable().optional(),
     joinEmpty: z.boolean().default(true),
     leaveWhenEmpty: z.boolean().default(false),
     weight: z.number().int().min(0).default(0),
@@ -72,11 +74,12 @@ export const updateQueueSchema = z.object({
     retry: z.number().int().min(1).max(300).optional(),
     maxLen: z.number().int().min(0).optional(),
     wrapupTime: z.number().int().min(0).optional(),
-    announce: z.string().max(128).nullable().optional(),
+    announce: z.cuid2().nullable().optional(),
     announceFrequency: z.number().int().min(0).optional(),
     announcePosition: z.boolean().optional(),
-    periodicAnnounce: z.string().max(128).nullable().optional(),
+    periodicAnnounce: z.cuid2().nullable().optional(),
     periodicAnnounceFrequency: z.number().int().min(0).optional(),
+    agentAnnounce: z.cuid2().nullable().optional(),
     joinEmpty: z.boolean().optional(),
     leaveWhenEmpty: z.boolean().optional(),
     weight: z.number().int().min(0).optional(),
@@ -104,6 +107,7 @@ export const QueueSchema = z.object({
     announcePosition: z.boolean(),
     periodicAnnounce: z.string().nullable(),
     periodicAnnounceFrequency: z.number(),
+    agentAnnounce: z.string().nullable(),
     weight: z.number(),
     joinEmpty: z.boolean(),
     leaveWhenEmpty: z.boolean(),

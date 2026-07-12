@@ -46,8 +46,8 @@ export const updateVariableSetFormSchema = createVariableSetFormSchema.omit({ co
 export type VariableSetForm = z.infer<typeof createVariableSetFormSchema>
 export type VariableSetUpdateForm = z.infer<typeof updateVariableSetFormSchema>
 
-// companyId opcional — omitido, busca todas as variáveis no escopo do usuário, permitindo o
-// filtro "Todas as empresas" na página
+// companyId opcional — enquanto não informado, a lista não é buscada (filtro de
+// empresa da página exige seleção antes de consultar o backend)
 export function useVariables(companyId?: string) {
     const [variableSets, setVariableSets] = useState<VariableSet[]>([])
     const [loading, setLoading] = useState(true)
@@ -114,6 +114,12 @@ export function useVariables(companyId?: string) {
     const fetchStateRef = useRef<{ key?: string; fetched: boolean }>({ fetched: false })
 
     useEffect(() => {
+        if (!companyId) {
+            setVariableSets([])
+            setLoading(false)
+            fetchStateRef.current = { fetched: false }
+            return
+        }
         if (fetchStateRef.current.fetched && fetchStateRef.current.key === companyId) return
         fetchStateRef.current = { key: companyId, fetched: true }
         fetchVariableSets()

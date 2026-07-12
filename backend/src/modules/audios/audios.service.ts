@@ -8,8 +8,10 @@ import { AudiosCache } from './cache/audios.cache'
 import { audioSoundDir, audioSoundPath } from '../../asterisk/audio.repository'
 import { AnnouncementRepository } from '../../asterisk/announcement.repository'
 import { IvrRepository } from '../../asterisk/ivr.repository'
+import { AsteriskQueueRepository, toAsteriskQueueName } from '../../asterisk/queue.repository'
 import { AnnouncementsCache } from '../announcements/cache/announcements.cache'
 import { IvrCache } from '../ivr/cache/ivr.cache'
+import { QueuesCache } from '../queues/cache/queues.cache'
 import { convertToAsteriskWav } from '../../utils/audio-convert'
 import type { UpdateAudioInput } from './schemas/audio.schema'
 import { AppError } from '../../utils/errors/app.error'
@@ -106,17 +108,40 @@ export const deleteAudio = async (id: string) => {
     })
     if (!existing) throw new AppError('Audio not found', 404)
 
-    const [announcements, ivrMenus] = await Promise.all([
+    const [announcements, ivrMenus, queuesWithAudio] = await Promise.all([
         prisma.announcement.findMany({ where: { audioId: id }, select: { id: true, companyId: true } }),
         prisma.ivrMenu.findMany({ where: { audioId: id }, select: { id: true, companyId: true } }),
+        prisma.queue.findMany({
+            where: { OR: [{ announce: id }, { periodicAnnounce: id }, { agentAnnounce: id }] },
+            select: {
+                id: true, name: true, companyId: true,
+                announce: true, periodicAnnounce: true, agentAnnounce: true,
+                company: { select: { asteriskId: true } },
+            },
+        }),
     ])
 
     await prisma.$transaction(async (tx) => {
         await tx.audio.delete({ where: { id } })
+        // FK onDelete:SetNull já zera Queue.announce/periodicAnnounce/agentAnnounce no Prisma —
+        // mas a tabela realtime do Asterisk (queues) guarda o path absoluto resolvido, não o
+        // audioId, e não tem relação com Audio, então precisa ser zerada manualmente aqui.
+        // `announce` (join, tocado pro caller) não tem coluna realtime — é um Playback no
+        // dialplan, resolvido via regenerate() abaixo. `periodicAnnounce`/`agentAnnounce` viram
+        // as colunas realtime `periodicAnnounce`/`announce`, respectivamente
+        for (const q of queuesWithAudio) {
+            const update: Record<string, null> = {}
+            if (q.periodicAnnounce === id) update.periodicAnnounce = null
+            if (q.agentAnnounce === id) update.announce = null
+            if (Object.keys(update).length > 0)
+                await AsteriskQueueRepository.updateQueue(tx, toAsteriskQueueName(q.company.asteriskId, q.name), update)
+        }
     })
 
     if (announcements.length > 0) await AnnouncementRepository.regenerate(existing.companyId)
     if (ivrMenus.length > 0) await IvrRepository.regenerate(existing.companyId)
+    const queueDialplanCompanyIds = [...new Set(queuesWithAudio.filter((q) => q.announce === id).map((q) => q.companyId))]
+    for (const companyId of queueDialplanCompanyIds) await AsteriskQueueRepository.regenerate(companyId)
     await rm(`${audioSoundPath(existing.company.asteriskId, id)}.wav`, { force: true })
 
     await Promise.all([
@@ -124,5 +149,7 @@ export const deleteAudio = async (id: string) => {
         AudiosCache.invalidateByCompany(existing.companyId),
         ...announcements.flatMap((a) => [AnnouncementsCache.invalidateAnnouncement(a.id), AnnouncementsCache.invalidateByCompany(a.companyId)]),
         ...ivrMenus.flatMap((m) => [IvrCache.invalidateMenu(m.id), IvrCache.invalidateByCompany(m.companyId)]),
+        ...queuesWithAudio.flatMap((q) => [QueuesCache.invalidateQueue(q.id), QueuesCache.invalidateByCompany(q.companyId)]),
     ])
+    if (queuesWithAudio.length > 0) await QueuesCache.invalidateNamespace()
 }

@@ -7,6 +7,7 @@ import {
     VAR_CONTEXT, varEntry, VARCOND_CONTEXT, varCondEntry,
 } from './dialplan-names'
 import { resolveAsteriskId, withDialplanLock, writeContextFile, reloadDialplan, type DialplanRow } from './dialplan-file.repository'
+import { audioSoundPath } from './audio.repository'
 
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 
@@ -77,6 +78,10 @@ type AsteriskQueueData = {
     retry?: number
     maxLen?: number
     wrapupTime?: number
+    // `announce` aqui é o `announce` NATIVO de queues.conf/tabela realtime — tocado pro AGENTE
+    // antes do bridge (agent announcement), resolvido a partir de Queue.agentAnnounce pelo
+    // service. O "join announcement" (Queue.announce, tocado pro caller ao entrar) é um Playback
+    // no dialplan antes do Queue() (ver regenerate() abaixo), não essa coluna
     announce?: string | null
     announceFrequency?: number
     announcePosition?: boolean
@@ -200,6 +205,10 @@ export const AsteriskQueueRepository = {
                 let priority = 1
                 if (q.callcenterEnabled)
                     entries.push({ context: QUEUE_APP_CONTEXT, exten, priority: priority++, app: 'AGI', appdata: buildQueueRouteAgiUrl(q.id) })
+                // Anúncio tocado uma única vez pro caller antes de entrar na fila — Playback direto
+                // no dialplan, não o `announce` nativo do Asterisk (esse é pro agente, ver acima)
+                if (q.announce)
+                    entries.push({ context: QUEUE_APP_CONTEXT, exten, priority: priority++, app: 'Playback', appdata: audioSoundPath(asteriskId, q.announce) })
                 entries.push(
                     { context: QUEUE_APP_CONTEXT, exten, priority: priority++, app: 'Queue', appdata: asteriskName },
                     { context: QUEUE_APP_CONTEXT, exten, priority: priority++, app: 'AGI', appdata: buildQueueSurveyAgiUrl(q.id) },

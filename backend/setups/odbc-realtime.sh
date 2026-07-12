@@ -41,7 +41,7 @@ PG_ADMIN="postgres"
 PG_DB="asterisk"
 PG_USER="asterisk"
 PG_PASS=""
-DOCKER_CONTAINER="postgres_rafael"
+DOCKER_CONTAINER="postgres_sofon"
 
 # ============================================================
 # HELPERS PSQL

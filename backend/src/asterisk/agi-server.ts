@@ -140,6 +140,8 @@ async function handleRequestTemplate(conn: AgiConn, templateId: string) {
     const body = bodyRaw ? await resolvePlaceholdersDeep(conn, bodyRaw) : undefined
 
     let success = false
+    let status: number | undefined
+    let rawBody = ''
     let parsed: unknown = null
 
     try {
@@ -155,7 +157,10 @@ async function handleRequestTemplate(conn: AgiConn, templateId: string) {
                 signal: controller.signal,
             })
             success = res.ok
-            try { parsed = await res.json() } catch { parsed = null }
+            status = res.status
+            // Captura o texto primeiro pra logar o body cru mesmo quando o JSON.parse falha
+            rawBody = await res.text()
+            try { parsed = JSON.parse(rawBody) } catch { parsed = null }
         } finally {
             clearTimeout(timeout)
         }
@@ -169,11 +174,28 @@ async function handleRequestTemplate(conn: AgiConn, templateId: string) {
     }
 
     const mappings = (template.variableMappings as VariableMapping[] | null) ?? []
+    const unresolved: Array<{ variable: string; path: string }> = []
     for (const mapping of mappings) {
         const value = evalResponsePath(parsed, mapping.path)
         if (value !== undefined) {
             await agiSetVariable(conn, mapping.variable, typeof value === 'string' ? value : JSON.stringify(value))
+        } else {
+            unresolved.push({ variable: mapping.variable, path: mapping.path })
         }
+    }
+
+    // unresolved.length > 0 sobe pra warn (visível em produção) com o body truncado — sem isso
+    // não dá pra saber se o path da mapping está errado ou se a API devolveu um shape diferente
+    if (unresolved.length > 0) {
+        logger.warn({
+            event: 'agi.request_template.unresolved_mapping',
+            templateId,
+            url,
+            status,
+            jsonParsed: parsed !== null,
+            responseSample: rawBody.slice(0, 1000),
+            unresolved,
+        })
     }
 
     logger.info({ event: 'agi.request_template.done', templateId, success, mappings: mappings.length })

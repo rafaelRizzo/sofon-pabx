@@ -4,6 +4,7 @@ import { routeDestinationSchema, routeDestinationResponseSchema } from '../../..
 
 export const idParamSchema = z.object({ id: cuidParam })
 export const companyQuerySchema = z.object({ companyId: z.cuid2() })
+export const optionalCompanyQuery = z.object({ companyId: z.cuid2().optional() })
 
 export const HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const
 

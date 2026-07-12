@@ -84,8 +84,8 @@ export const updateTrunkSchema = z.object({
 export type TrunkCreateForm = z.infer<typeof createTrunkSchema>
 export type TrunkUpdateForm = z.infer<typeof updateTrunkSchema>
 
-// companyId opcional — omitido, busca todos os troncos no escopo do usuário, permitindo o
-// filtro "Todas as empresas" na página
+// companyId opcional — enquanto não informado, a lista não é buscada (filtro de
+// empresa da página exige seleção antes de consultar o backend)
 export function useTrunks(companyId?: string) {
     const [trunks, setTrunks] = useState<Trunk[]>([])
     const [loading, setLoading] = useState(true)
@@ -159,6 +159,12 @@ export function useTrunks(companyId?: string) {
     const fetchStateRef = useRef<{ key?: string; fetched: boolean }>({ fetched: false })
 
     useEffect(() => {
+        if (!companyId) {
+            setTrunks([])
+            setLoading(false)
+            fetchStateRef.current = { fetched: false }
+            return
+        }
         if (fetchStateRef.current.fetched && fetchStateRef.current.key === companyId) return
         fetchStateRef.current = { key: companyId, fetched: true }
         fetchTrunks()

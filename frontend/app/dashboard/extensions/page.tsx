@@ -4,6 +4,7 @@ import { useState } from "react"
 import { CopyIcon, DownloadIcon, PlusIcon } from "lucide-react"
 import { toast } from "sonner"
 
+import { CompanyFilter } from "@/components/company-filter"
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog"
 import { DataPagination } from "@/components/data-pagination"
 import { ExtensionFormDialog } from "@/components/Extensions/extension-form-dialog"
@@ -20,14 +21,6 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
-import {
-    Combobox,
-    ComboboxContent,
-    ComboboxEmpty,
-    ComboboxInput,
-    ComboboxItem,
-    ComboboxList,
-} from "@/components/ui/combobox"
 import { Input } from "@/components/ui/input"
 import {
     Select,
@@ -37,6 +30,7 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { useCompanies, type Company } from "@/hooks/use-companies"
+import { useCompanyFilter } from "@/hooks/use-company-filter"
 import {
     useExtensions,
     type Extension,
@@ -48,10 +42,6 @@ import { usePagination } from "@/hooks/use-pagination"
 
 type PasswordReveal = { alias: string; username: string; password: string }
 
-type CompanyFilterOption = { id: string; name: string }
-
-const ALL_COMPANIES: CompanyFilterOption = { id: "all", name: "Todas as empresas" }
-
 const TYPE_FILTERS = [
     { value: "all", label: "Todos os tipos" },
     { value: "sip", label: "SIP" },
@@ -61,7 +51,7 @@ const TYPE_FILTERS = [
 export default function ExtensionsPage() {
     const { companies } = useCompanies()
     const [typeFilter, setTypeFilter] = useState<ExtensionType | "all">("all")
-    const [companyFilter, setCompanyFilter] = useState<string>("all")
+    const [companyFilter, setCompanyFilter] = useCompanyFilter()
 
     const {
         extensions,
@@ -73,7 +63,7 @@ export default function ExtensionsPage() {
         resetPassword,
         deleteExtension,
         exportExtensions,
-    } = useExtensions(companyFilter === "all" ? undefined : companyFilter)
+    } = useExtensions(companyFilter)
 
     const [createOpen, setCreateOpen] = useState(false)
     const [editExtension, setEditExtension] = useState<Extension | null>(null)
@@ -193,34 +183,11 @@ export default function ExtensionsPage() {
                     onChange={(e) => setFilter(e.target.value)}
                     className="max-w-sm"
                 />
-                <Combobox<CompanyFilterOption>
-                    items={[ALL_COMPANIES, ...companies]}
-                    value={
-                        [ALL_COMPANIES, ...companies].find(
-                            (c) => c.id === companyFilter
-                        ) ?? ALL_COMPANIES
-                    }
-                    itemToStringLabel={(c) => c.name}
-                    isItemEqualToValue={(a, b) => a.id === b.id}
-                    onValueChange={(company) =>
-                        setCompanyFilter(company?.id ?? "all")
-                    }
-                >
-                    <ComboboxInput
-                        placeholder="Buscar empresa..."
-                        className="w-56"
-                    />
-                    <ComboboxContent>
-                        <ComboboxEmpty>Nenhuma empresa</ComboboxEmpty>
-                        <ComboboxList>
-                            {(company: CompanyFilterOption) => (
-                                <ComboboxItem key={company.id} value={company}>
-                                    {company.name}
-                                </ComboboxItem>
-                            )}
-                        </ComboboxList>
-                    </ComboboxContent>
-                </Combobox>
+                <CompanyFilter
+                    companies={companies}
+                    value={companyFilter}
+                    onValueChange={setCompanyFilter}
+                />
                 <Select
                     items={TYPE_FILTERS}
                     value={typeFilter}

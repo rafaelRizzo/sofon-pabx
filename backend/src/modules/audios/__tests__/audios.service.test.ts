@@ -24,6 +24,13 @@ mock.module('../../../asterisk/announcement.repository', () => ({
 mock.module('../../../asterisk/ivr.repository', () => ({
     IvrRepository: { regenerate: mock(() => Promise.resolve()) },
 }))
+mock.module('../../../asterisk/queue.repository', () => ({
+    AsteriskQueueRepository: {
+        updateQueue: mock(() => Promise.resolve()),
+        regenerate: mock(() => Promise.resolve()),
+    },
+    toAsteriskQueueName: (asteriskId: string, queueName: string) => `${asteriskId}-${queueName}`,
+}))
 mock.module('../../announcements/cache/announcements.cache', () => ({
     AnnouncementsCache: {
         invalidateAnnouncement: mock(), invalidateByCompany: mock(),
@@ -32,6 +39,11 @@ mock.module('../../announcements/cache/announcements.cache', () => ({
 mock.module('../../ivr/cache/ivr.cache', () => ({
     IvrCache: {
         invalidateMenu: mock(), invalidateByCompany: mock(),
+    },
+}))
+mock.module('../../queues/cache/queues.cache', () => ({
+    QueuesCache: {
+        invalidateQueue: mock(), invalidateByCompany: mock(), invalidateNamespace: mock(),
     },
 }))
 mock.module('../../../utils/audio-convert', () => ({
@@ -46,12 +58,17 @@ mock.module('fs/promises', () => ({
 import * as AudiosService from '../audios.service'
 import { AnnouncementRepository } from '../../../asterisk/announcement.repository'
 import { IvrRepository } from '../../../asterisk/ivr.repository'
+import { AsteriskQueueRepository } from '../../../asterisk/queue.repository'
 import { convertToAsteriskWav } from '../../../utils/audio-convert'
 
 const COMPANY = { id: 'c1', name: 'ACME', asteriskId: 'ast1' }
 const AUDIO = { id: 'audio1', name: 'saudação', companyId: 'c1', createdAt: new Date(), updatedAt: new Date() }
 
-beforeEach(() => clearPrismaMock(db))
+beforeEach(() => {
+    clearPrismaMock(db)
+    ;(AsteriskQueueRepository.updateQueue as any).mockClear()
+    ;(AsteriskQueueRepository.regenerate as any).mockClear()
+})
 
 // ─── assertAudioBelongsToCompany ────────────────────────────────────────────────
 describe('AudiosService.assertAudioBelongsToCompany', () => {
@@ -145,6 +162,7 @@ describe('AudiosService.deleteAudio', () => {
         db.audio.findUnique.mockResolvedValue({ ...AUDIO, company: { asteriskId: 'ast1' } })
         db.announcement.findMany.mockResolvedValue([])
         db.ivrMenu.findMany.mockResolvedValue([])
+        db.queue.findMany.mockResolvedValue([])
         await AudiosService.deleteAudio('audio1')
         expect(db.audio.delete).toHaveBeenCalledWith({ where: { id: 'audio1' } })
         expect(AnnouncementRepository.regenerate).not.toHaveBeenCalled()
@@ -155,10 +173,49 @@ describe('AudiosService.deleteAudio', () => {
         db.audio.findUnique.mockResolvedValue({ ...AUDIO, company: { asteriskId: 'ast1' } })
         db.announcement.findMany.mockResolvedValue([{ id: 'a1', companyId: 'c1' }])
         db.ivrMenu.findMany.mockResolvedValue([{ id: 'ivr1', companyId: 'c1' }])
+        db.queue.findMany.mockResolvedValue([])
         await AudiosService.deleteAudio('audio1')
         expect(AnnouncementRepository.regenerate).toHaveBeenCalledWith('c1')
         expect(IvrRepository.regenerate).toHaveBeenCalledWith('c1')
         expect(db.audio.delete).toHaveBeenCalledWith({ where: { id: 'audio1' } })
+    })
+
+    it('unlinks queues referencing the audio as periodicAnnounce/agentAnnounce in the Asterisk realtime table', async () => {
+        const { AsteriskQueueRepository } = await import('../../../asterisk/queue.repository')
+        db.audio.findUnique.mockResolvedValue({ ...AUDIO, company: { asteriskId: 'ast1' } })
+        db.announcement.findMany.mockResolvedValue([])
+        db.ivrMenu.findMany.mockResolvedValue([])
+        db.queue.findMany.mockResolvedValue([
+            {
+                id: 'q1', name: 'suporte', companyId: 'c1',
+                announce: null, periodicAnnounce: 'audio1', agentAnnounce: 'audio1',
+                company: { asteriskId: 'ast1' },
+            },
+        ])
+        await AudiosService.deleteAudio('audio1')
+        expect(AsteriskQueueRepository.updateQueue).toHaveBeenCalledWith(
+            expect.anything(),
+            'ast1-suporte',
+            { periodicAnnounce: null, announce: null }
+        )
+        expect(AsteriskQueueRepository.regenerate).not.toHaveBeenCalled()
+    })
+
+    it('regenerates the queue dialplan when the audio was used as the join announcement', async () => {
+        const { AsteriskQueueRepository } = await import('../../../asterisk/queue.repository')
+        db.audio.findUnique.mockResolvedValue({ ...AUDIO, company: { asteriskId: 'ast1' } })
+        db.announcement.findMany.mockResolvedValue([])
+        db.ivrMenu.findMany.mockResolvedValue([])
+        db.queue.findMany.mockResolvedValue([
+            {
+                id: 'q1', name: 'suporte', companyId: 'c1',
+                announce: 'audio1', periodicAnnounce: null, agentAnnounce: null,
+                company: { asteriskId: 'ast1' },
+            },
+        ])
+        await AudiosService.deleteAudio('audio1')
+        expect(AsteriskQueueRepository.updateQueue).not.toHaveBeenCalled()
+        expect(AsteriskQueueRepository.regenerate).toHaveBeenCalledWith('c1')
     })
 
     it('throws 404 with non-existent id', async () => {

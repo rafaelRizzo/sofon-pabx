@@ -3,32 +3,22 @@
 import { useState } from "react"
 import { PlusIcon } from "lucide-react"
 
+import { CompanyFilter } from "@/components/company-filter"
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog"
 import { DataPagination } from "@/components/data-pagination"
 import { PageHeader } from "@/components/page-header"
 import { TimeGroupFormDialog } from "@/components/TimeGroups/time-group-form-dialog"
 import { TimeGroupsTable } from "@/components/TimeGroups/time-groups-table"
 import { Button } from "@/components/ui/button"
-import {
-    Combobox,
-    ComboboxContent,
-    ComboboxEmpty,
-    ComboboxInput,
-    ComboboxItem,
-    ComboboxList,
-} from "@/components/ui/combobox"
 import { Input } from "@/components/ui/input"
 import { useCompanies } from "@/hooks/use-companies"
+import { useCompanyFilter } from "@/hooks/use-company-filter"
 import { usePagination } from "@/hooks/use-pagination"
 import { useTimeGroups, type TimeGroup } from "@/hooks/use-time-groups"
 
-type CompanyFilterOption = { id: string; name: string }
-
-const ALL_COMPANIES: CompanyFilterOption = { id: "all", name: "Todas as empresas" }
-
 export default function TimeGroupsPage() {
     const { companies } = useCompanies()
-    const [companyFilter, setCompanyFilter] = useState<string>("all")
+    const [companyFilter, setCompanyFilter] = useCompanyFilter()
 
     const {
         timeGroups,
@@ -38,7 +28,7 @@ export default function TimeGroupsPage() {
         createTimeGroup,
         updateTimeGroup,
         deleteTimeGroup,
-    } = useTimeGroups(companyFilter === "all" ? undefined : companyFilter)
+    } = useTimeGroups(companyFilter)
 
     const [createOpen, setCreateOpen] = useState(false)
     const [editTimeGroup, setEditTimeGroup] = useState<TimeGroup | null>(null)
@@ -73,31 +63,11 @@ export default function TimeGroupsPage() {
                     onChange={(e) => setFilter(e.target.value)}
                     className="max-w-sm"
                 />
-                <Combobox<CompanyFilterOption>
-                    items={[ALL_COMPANIES, ...companies]}
-                    value={
-                        [ALL_COMPANIES, ...companies].find(
-                            (c) => c.id === companyFilter
-                        ) ?? ALL_COMPANIES
-                    }
-                    itemToStringLabel={(c) => c.name}
-                    isItemEqualToValue={(a, b) => a.id === b.id}
-                    onValueChange={(company) =>
-                        setCompanyFilter(company?.id ?? "all")
-                    }
-                >
-                    <ComboboxInput placeholder="Buscar empresa..." className="w-56" />
-                    <ComboboxContent>
-                        <ComboboxEmpty>Nenhuma empresa</ComboboxEmpty>
-                        <ComboboxList>
-                            {(company: CompanyFilterOption) => (
-                                <ComboboxItem key={company.id} value={company}>
-                                    {company.name}
-                                </ComboboxItem>
-                            )}
-                        </ComboboxList>
-                    </ComboboxContent>
-                </Combobox>
+                <CompanyFilter
+                    companies={companies}
+                    value={companyFilter}
+                    onValueChange={setCompanyFilter}
+                />
             </div>
 
             <TimeGroupsTable

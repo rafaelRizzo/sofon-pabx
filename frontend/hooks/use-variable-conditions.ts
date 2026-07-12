@@ -103,8 +103,8 @@ export const updateVariableConditionFormSchema = createVariableConditionFormSche
 export type VariableConditionForm = z.infer<typeof createVariableConditionFormSchema>
 export type VariableConditionUpdateForm = z.infer<typeof updateVariableConditionFormSchema>
 
-// companyId opcional — omitido, busca todas as condições no escopo do usuário, permitindo o
-// filtro "Todas as empresas" na página
+// companyId opcional — enquanto não informado, a lista não é buscada (filtro de
+// empresa da página exige seleção antes de consultar o backend)
 export function useVariableConditions(companyId?: string) {
     const [variableConditions, setVariableConditions] = useState<VariableCondition[]>([])
     const [loading, setLoading] = useState(true)
@@ -171,6 +171,12 @@ export function useVariableConditions(companyId?: string) {
     const fetchStateRef = useRef<{ key?: string; fetched: boolean }>({ fetched: false })
 
     useEffect(() => {
+        if (!companyId) {
+            setVariableConditions([])
+            setLoading(false)
+            fetchStateRef.current = { fetched: false }
+            return
+        }
         if (fetchStateRef.current.fetched && fetchStateRef.current.key === companyId) return
         fetchStateRef.current = { key: companyId, fetched: true }
         fetchVariableConditions()

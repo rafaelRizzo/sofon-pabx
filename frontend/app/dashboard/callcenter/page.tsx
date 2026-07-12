@@ -1,27 +1,17 @@
 "use client"
 
-import { useState } from "react"
-
+import { CompanyFilter } from "@/components/company-filter"
 import { PageHeader } from "@/components/page-header"
 import { AgentScopesPanel } from "@/components/Callcenter/agent-scopes-panel"
 import { CallRatingsPanel } from "@/components/Callcenter/call-ratings-panel"
 import { RoutingRulesPanel } from "@/components/Callcenter/routing-rules-panel"
-import {
-    Combobox,
-    ComboboxContent,
-    ComboboxEmpty,
-    ComboboxInput,
-    ComboboxItem,
-    ComboboxList,
-} from "@/components/ui/combobox"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { type Company, useCompanies } from "@/hooks/use-companies"
+import { useCompanies } from "@/hooks/use-companies"
+import { useCompanyFilter } from "@/hooks/use-company-filter"
 
 export default function CallcenterPage() {
     const { companies } = useCompanies()
-    const [companyId, setCompanyId] = useState<string>("")
-
-    const selectedCompany = companies.find((c) => c.id === companyId) ?? null
+    const [companyId, setCompanyId] = useCompanyFilter()
 
     return (
         <div className="flex flex-col gap-4">
@@ -30,25 +20,13 @@ export default function CallcenterPage() {
                 description="Elegibilidade de agentes, regras de prioridade e notas de atendimento por empresa"
             />
 
-            <Combobox<Company>
-                items={companies}
-                value={selectedCompany}
-                itemToStringLabel={(c) => c.name}
-                isItemEqualToValue={(a, b) => a.id === b.id}
-                onValueChange={(c) => setCompanyId(c?.id ?? "")}
-            >
-                <ComboboxInput placeholder="Selecione uma empresa..." className="w-72" />
-                <ComboboxContent>
-                    <ComboboxEmpty>Nenhuma empresa</ComboboxEmpty>
-                    <ComboboxList>
-                        {(c: Company) => (
-                            <ComboboxItem key={c.id} value={c}>
-                                {c.name}
-                            </ComboboxItem>
-                        )}
-                    </ComboboxList>
-                </ComboboxContent>
-            </Combobox>
+            <CompanyFilter
+                companies={companies}
+                value={companyId}
+                onValueChange={setCompanyId}
+                placeholder="Selecione uma empresa..."
+                className="w-72"
+            />
 
             {!companyId ? (
                 <p className="text-sm text-muted-foreground">

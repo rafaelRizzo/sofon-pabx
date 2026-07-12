@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { HeadsetIcon, PencilIcon, StarIcon, Trash2Icon, UsersIcon } from "lucide-react"
+import { PencilIcon, Trash2Icon } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -25,31 +25,28 @@ import {
     type FetchableDestinationType,
 } from "@/components/RouteDestination/route-destination-field"
 import { RouteDestinationBadge } from "@/components/RouteDestination/route-destination-badge"
-import { type Company } from "@/hooks/use-companies"
-import { QUEUE_STRATEGY_LABELS, type Queue } from "@/hooks/use-queues"
+import { type Announcement } from "@/hooks/use-announcements"
 
 type Props = {
-    queues: Queue[]
-    companies: Company[]
+    announcements: Announcement[]
     loading: boolean
-    onEdit: (queue: Queue) => void
-    onManageMembers: (queue: Queue) => void
-    onDelete: (queue: Queue) => void
+    onEdit: (announcement: Announcement) => void
+    onDelete: (announcement: Announcement) => void
 }
 
-// Mesmo padrão de InboundRoutesTable/TimeConditionsTable: resolve o nome do destino buscando a
-// lista de cada tipo presente uma única vez (não por linha) — evita N requests repetidos.
-// Agrupa por (tipo, empresa da própria fila) em vez de receber uma empresa fixa, já que a
-// listagem pode mostrar filas de "Todas as empresas" ao mesmo tempo
-function useDestinationLabels(queues: Queue[]) {
+// Resolve o nome de cada destino buscando a lista de cada tipo presente nos anúncios
+// visíveis uma única vez (não por linha) — evita N requests repetidos pro mesmo recurso.
+// loadedTypes existe pra diferenciar "ainda buscando" (mostra "…") de "buscou e não achou"
+// (registro deletado/de outra empresa — mostra aviso em vez de ficar preso em "…" pra sempre).
+function useDestinationLabels(announcements: Announcement[]) {
     const [labels, setLabels] = useState<Record<string, string>>({})
     const [loadedTypes, setLoadedTypes] = useState<Set<FetchableDestinationType>>(new Set())
 
     useEffect(() => {
         const pairs = new Map<string, { type: FetchableDestinationType; companyId: string }>()
-        for (const q of queues) {
-            const t = q.postQueueDestination?.type
-            if (t && t !== "hangup") pairs.set(`${t}:${q.companyId}`, { type: t, companyId: q.companyId })
+        for (const a of announcements) {
+            const t = a.destination?.type
+            if (t && t !== "hangup") pairs.set(`${t}:${a.companyId}`, { type: t, companyId: a.companyId })
         }
         if (pairs.size === 0) return
 
@@ -75,15 +72,13 @@ function useDestinationLabels(queues: Queue[]) {
         return () => {
             cancelled = true
         }
-    }, [queues])
+    }, [announcements])
 
     return { labels, loadedTypes }
 }
 
-export function QueuesTable({ queues, companies, loading, onEdit, onManageMembers, onDelete }: Props) {
-    const { labels, loadedTypes } = useDestinationLabels(queues)
-    const companyName = (companyId: string) =>
-        companies.find((c) => c.id === companyId)?.name ?? companyId
+export function AnnouncementsTable({ announcements, loading, onEdit, onDelete }: Props) {
+    const { labels, loadedTypes } = useDestinationLabels(announcements)
 
     return (
         <div className="rounded-md border">
@@ -91,67 +86,49 @@ export function QueuesTable({ queues, companies, loading, onEdit, onManageMember
                 <TableHeader>
                     <TableRow>
                         <TableHead>Nome</TableHead>
-                        <TableHead>Número</TableHead>
-                        <TableHead>Empresa</TableHead>
-                        <TableHead>Estratégia</TableHead>
-                        <TableHead>Destino pós-fila</TableHead>
-                        <TableHead>Pesquisa</TableHead>
-                        <TableHead>Callcenter</TableHead>
-                        <TableHead className="w-38 text-right">Ações</TableHead>
+                        <TableHead>Áudio</TableHead>
+                        <TableHead>Destino</TableHead>
+                        <TableHead className="w-30 text-right">Ações</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
                     {loading ? (
                         Array.from({ length: 3 }).map((_, i) => (
                             <TableRow key={i}>
-                                {Array.from({ length: 8 }).map((_, j) => (
+                                {Array.from({ length: 4 }).map((_, j) => (
                                     <TableCell key={j}>
                                         <Skeleton className="h-4 w-full" />
                                     </TableCell>
                                 ))}
                             </TableRow>
                         ))
-                    ) : queues.length === 0 ? (
+                    ) : announcements.length === 0 ? (
                         <TableRow>
-                            <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
-                                Nenhuma fila encontrada
+                            <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
+                                Nenhum anúncio encontrado
                             </TableCell>
                         </TableRow>
                     ) : (
-                        queues.map((queue) => (
-                            <TableRow key={queue.id}>
-                                <TableCell className="font-medium">{queue.name}</TableCell>
-                                <TableCell>{queue.number}</TableCell>
+                        announcements.map((announcement) => (
+                            <TableRow key={announcement.id}>
+                                <TableCell className="font-medium">{announcement.name}</TableCell>
                                 <TableCell>
-                                    <Badge variant="outline">{companyName(queue.companyId)}</Badge>
+                                    {announcement.hasAudio ? (
+                                        <Badge variant="outline" className="gap-1.5 border-transparent bg-emerald-500/15 text-emerald-600 dark:bg-emerald-400/20 dark:text-emerald-300">
+                                            Vinculado
+                                        </Badge>
+                                    ) : (
+                                        <Badge variant="outline" className="text-muted-foreground">
+                                            Sem áudio
+                                        </Badge>
+                                    )}
                                 </TableCell>
-                                <TableCell>{QUEUE_STRATEGY_LABELS[queue.strategy]}</TableCell>
                                 <TableCell>
                                     <RouteDestinationBadge
-                                        destination={queue.postQueueDestination}
+                                        destination={announcement.destination}
                                         labels={labels}
                                         loadedTypes={loadedTypes}
                                     />
-                                </TableCell>
-                                <TableCell>
-                                    {queue.hasSurveyAudio ? (
-                                        <Badge variant="outline" className="gap-1.5">
-                                            <StarIcon className="size-3" />
-                                            Ativa
-                                        </Badge>
-                                    ) : (
-                                        <span className="text-muted-foreground">—</span>
-                                    )}
-                                </TableCell>
-                                <TableCell>
-                                    {queue.callcenterEnabled ? (
-                                        <Badge variant="outline" className="gap-1.5">
-                                            <HeadsetIcon className="size-3" />
-                                            Ativo
-                                        </Badge>
-                                    ) : (
-                                        <span className="text-muted-foreground">—</span>
-                                    )}
                                 </TableCell>
                                 <TableCell>
                                     <TooltipProvider delay={100}>
@@ -162,29 +139,14 @@ export function QueuesTable({ queues, companies, loading, onEdit, onManageMember
                                                         <Button
                                                             variant="outline"
                                                             size="icon"
-                                                            onClick={() => onManageMembers(queue)}
-                                                        >
-                                                            <UsersIcon />
-                                                            <span className="sr-only">Membros</span>
-                                                        </Button>
-                                                    }
-                                                />
-                                                <TooltipContent>Gerenciar membros</TooltipContent>
-                                            </Tooltip>
-                                            <Tooltip>
-                                                <TooltipTrigger
-                                                    render={
-                                                        <Button
-                                                            variant="outline"
-                                                            size="icon"
-                                                            onClick={() => onEdit(queue)}
+                                                            onClick={() => onEdit(announcement)}
                                                         >
                                                             <PencilIcon />
                                                             <span className="sr-only">Editar</span>
                                                         </Button>
                                                     }
                                                 />
-                                                <TooltipContent>Editar fila</TooltipContent>
+                                                <TooltipContent>Editar anúncio</TooltipContent>
                                             </Tooltip>
                                             <Tooltip>
                                                 <TooltipTrigger
@@ -192,14 +154,14 @@ export function QueuesTable({ queues, companies, loading, onEdit, onManageMember
                                                         <Button
                                                             variant="destructive"
                                                             size="icon"
-                                                            onClick={() => onDelete(queue)}
+                                                            onClick={() => onDelete(announcement)}
                                                         >
                                                             <Trash2Icon />
                                                             <span className="sr-only">Deletar</span>
                                                         </Button>
                                                     }
                                                 />
-                                                <TooltipContent>Deletar fila</TooltipContent>
+                                                <TooltipContent>Deletar anúncio</TooltipContent>
                                             </Tooltip>
                                         </div>
                                     </TooltipProvider>

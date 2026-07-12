@@ -37,9 +37,10 @@ export const updateInboundRouteFormSchema = z.object({
 export type InboundRouteForm = z.infer<typeof createInboundRouteFormSchema>
 export type InboundRouteUpdateForm = z.infer<typeof updateInboundRouteFormSchema>
 
-// companyId opcional — omitido, busca todas as rotas no escopo do usuário, permitindo o filtro
-// "Todas as empresas" na página. Diferente da empresa do formulário de criação (que é passada
-// explicitamente para createRoute, pois pode divergir deste filtro ao editar uma rota específica)
+// companyId opcional — enquanto não informado, a lista não é buscada (filtro de empresa
+// da página exige seleção antes de consultar o backend). Diferente da empresa do formulário
+// de criação (que é passada explicitamente para createRoute, pois pode divergir deste filtro
+// ao editar uma rota específica)
 export function useInboundRoutes(companyId?: string) {
     const [routes, setRoutes] = useState<InboundRoute[]>([])
     const [loading, setLoading] = useState(true)
@@ -105,6 +106,12 @@ export function useInboundRoutes(companyId?: string) {
     const fetchStateRef = useRef<{ key?: string; fetched: boolean }>({ fetched: false })
 
     useEffect(() => {
+        if (!companyId) {
+            setRoutes([])
+            setLoading(false)
+            fetchStateRef.current = { fetched: false }
+            return
+        }
         if (fetchStateRef.current.fetched && fetchStateRef.current.key === companyId) return
         fetchStateRef.current = { key: companyId, fetched: true }
         fetchRoutes()

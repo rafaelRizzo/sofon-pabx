@@ -129,16 +129,26 @@ model Queue {
     retry                Int           @default(5)
     maxLen               Int           @default(0)
     wrapupTime           Int           @default(5)
-    // announce: anúncio tocado uma única vez ao entrar na fila (Asterisk `announce`)
+    // announce ("join announcement"): id de um Audio tocado uma única vez pro CLIENTE ao entrar na
+    // fila — vira um Playback no dialplan antes do Queue() (ver AsteriskQueueRepository.regenerate),
+    // não a coluna `announce` nativa do Asterisk (essa é o agentAnnounce abaixo)
     announce             String?
+    announceAudio        Audio?        @relation("QueueAnnounceAudio", fields: [announce], references: [id], onDelete: SetNull)
+    // agentAnnounce ("agent announcement"): id de um Audio tocado pro ATENDENTE bem antes de a
+    // ligação ser conectada a ele — é o `announce` nativo do Asterisk em queues.conf/tabela
+    // realtime (grava como path absoluto resolvido, ver AsteriskQueueRepository/audioSoundPath)
+    agentAnnounce        String?
+    agentAnnounceAudio   Audio?        @relation("QueueAgentAnnounceAudio", fields: [agentAnnounce], references: [id], onDelete: SetNull)
     // announceFrequency/announcePosition: junto formam o "diz sua posição/tempo de espera" do
     // Asterisk (`announce-frequency` + `announce-position`) — announceFrequency só tem efeito
     // com announcePosition=true
     announceFrequency    Int           @default(0)
     announcePosition     Boolean       @default(false)
-    // periodicAnnounce/periodicAnnounceFrequency: mensagem repetida durante a espera (Asterisk
-    // `periodic-announce` + `periodic-announce-frequency`) — diferente do announce acima, que toca só uma vez
+    // periodicAnnounce/periodicAnnounceFrequency: id de um Audio repetido periodicamente durante a
+    // espera (Asterisk `periodic-announce` + `periodic-announce-frequency`) — diferente do announce
+    // acima, que toca só uma vez
     periodicAnnounce     String?
+    periodicAnnounceAudio Audio?       @relation("QueuePeriodicAnnounceAudio", fields: [periodicAnnounce], references: [id], onDelete: SetNull)
     periodicAnnounceFrequency Int      @default(60)
     joinEmpty            Boolean       @default(true)
     leaveWhenEmpty       Boolean       @default(false)
@@ -151,7 +161,7 @@ model Queue {
     // Áudio da pesquisa de satisfação pós-atendimento ("digite uma nota de 1 a 5") — mesmo padrão
     // audioId nullable de Announcement/IvrMenu: null = pesquisa desligada pra essa fila (hasAudio: false)
     surveyAudioId        String?
-    surveyAudio          Audio?        @relation(fields: [surveyAudioId], references: [id], onDelete: SetNull)
+    surveyAudio          Audio?        @relation("QueueSurveyAudio", fields: [surveyAudioId], references: [id], onDelete: SetNull)
     // Liga prioridade dinâmica (RoutingRule via QUEUE_PRIO) e roteamento por afinidade (penalty
     // recalculado por agent-affinity-recalc.job.ts) pra essa fila. false = comportamento nativo
     // puro, sem AGI de pré-roteamento e sem o job mexendo no penalty dos membros. Pesquisa de
@@ -166,6 +176,9 @@ model Queue {
     @@unique([number, companyId])
     @@index([companyId])
     @@index([surveyAudioId])
+    @@index([announce])
+    @@index([periodicAnnounce])
+    @@index([agentAnnounce])
     @@map("queues_app")
 }
 
@@ -406,7 +419,10 @@ model Audio {
 
     announcements Announcement[]
     ivrMenus      IvrMenu[]
-    surveyQueues  Queue[]
+    surveyQueues  Queue[] @relation("QueueSurveyAudio")
+    announceQueues Queue[] @relation("QueueAnnounceAudio")
+    periodicAnnounceQueues Queue[] @relation("QueuePeriodicAnnounceAudio")
+    agentAnnounceQueues Queue[] @relation("QueueAgentAnnounceAudio")
 
     @@unique([name, companyId])
     @@index([companyId])

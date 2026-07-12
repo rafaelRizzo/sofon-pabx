@@ -39,34 +39,38 @@ describe('buildExpr', () => {
 })
 
 describe('buildDialplan', () => {
-    it('or combinator: each rule GotoIf jumps to -matched, falls through to falseRoute', () => {
+    it('or combinator: each rule GotoIf jumps to -matched, falls through to falseRoute — both branches NoOp before the final Goto', () => {
         const rows = buildDialplan('c1', 'Tem CPF valido', 'or', [
             { variable: 'CPF', operator: 'filled' },
         ], 'ramais,1001,1', 'ramais,1002,1')
 
         expect(rows[0]).toMatchObject({ exten: 'varcond-c1', priority: 1, app: 'NoOp' })
         expect(rows[1]).toMatchObject({ exten: 'varcond-c1', priority: 2, app: 'GotoIf', appdata: '$["${CPF}" != ""]?varcond-c1-matched,1' })
-        expect(rows[2]).toMatchObject({ exten: 'varcond-c1', priority: 3, app: 'Goto', appdata: 'ramais,1002,1' })
-        expect(rows[3]).toMatchObject({ exten: 'varcond-c1-matched', priority: 1, app: 'Goto', appdata: 'ramais,1001,1' })
+        expect(rows[2]).toMatchObject({ exten: 'varcond-c1', priority: 3, app: 'NoOp', appdata: 'VariableCondition: NOT MATCHED' })
+        expect(rows[3]).toMatchObject({ exten: 'varcond-c1', priority: 4, app: 'Goto', appdata: 'ramais,1002,1' })
+        expect(rows[4]).toMatchObject({ exten: 'varcond-c1-matched', priority: 1, app: 'NoOp', appdata: 'VariableCondition: MATCHED' })
+        expect(rows[5]).toMatchObject({ exten: 'varcond-c1-matched', priority: 2, app: 'Goto', appdata: 'ramais,1001,1' })
     })
 
-    it('and combinator: each rule GotoIf jumps to -fail on false, falls through to trueRoute', () => {
+    it('and combinator: each rule GotoIf jumps to -matched on false, falls through to trueRoute — both branches NoOp before the final Goto', () => {
         const rows = buildDialplan('c2', 'CPF valido e preenchido', 'and', [
             { variable: 'CPF', operator: 'filled' },
             { variable: 'CPF', operator: 'length_eq', value: '11' },
         ], 'ramais,1001,1', 'ramais,1002,1')
 
         expect(rows[0]).toMatchObject({ exten: 'varcond-c2', priority: 1, app: 'NoOp' })
-        expect(rows[1]).toMatchObject({ exten: 'varcond-c2', priority: 2, app: 'GotoIf', appdata: '$["${CPF}" != ""]?:varcond-c2-fail,1' })
-        expect(rows[2]).toMatchObject({ exten: 'varcond-c2', priority: 3, app: 'GotoIf', appdata: '$[${LEN(${CPF})} = 11]?:varcond-c2-fail,1' })
-        expect(rows[3]).toMatchObject({ exten: 'varcond-c2', priority: 4, app: 'Goto', appdata: 'ramais,1001,1' })
-        expect(rows[4]).toMatchObject({ exten: 'varcond-c2-fail', priority: 1, app: 'Goto', appdata: 'ramais,1002,1' })
+        expect(rows[1]).toMatchObject({ exten: 'varcond-c2', priority: 2, app: 'GotoIf', appdata: '$["${CPF}" != ""]?:varcond-c2-matched,1' })
+        expect(rows[2]).toMatchObject({ exten: 'varcond-c2', priority: 3, app: 'GotoIf', appdata: '$[${LEN(${CPF})} = 11]?:varcond-c2-matched,1' })
+        expect(rows[3]).toMatchObject({ exten: 'varcond-c2', priority: 4, app: 'NoOp', appdata: 'VariableCondition: MATCHED' })
+        expect(rows[4]).toMatchObject({ exten: 'varcond-c2', priority: 5, app: 'Goto', appdata: 'ramais,1001,1' })
+        expect(rows[5]).toMatchObject({ exten: 'varcond-c2-matched', priority: 1, app: 'NoOp', appdata: 'VariableCondition: NOT MATCHED' })
+        expect(rows[6]).toMatchObject({ exten: 'varcond-c2-matched', priority: 2, app: 'Goto', appdata: 'ramais,1002,1' })
     })
 
     it('hangs up when a route is not configured', () => {
         const rows = buildDialplan('c3', 'sem rotas', 'or', [{ variable: 'X', operator: 'filled' }], null, null)
-        expect(rows.find((r) => r.exten === 'varcond-c3-matched')).toMatchObject({ app: 'Hangup', appdata: null })
+        expect(rows.find((r) => r.exten === 'varcond-c3-matched' && r.priority === 2)).toMatchObject({ app: 'Hangup', appdata: null })
         expect(rows.find((r) => r.app === 'Goto' && r.exten === 'varcond-c3')).toBeUndefined()
-        expect(rows.find((r) => r.exten === 'varcond-c3' && r.priority === 3)).toMatchObject({ app: 'Hangup', appdata: null })
+        expect(rows.find((r) => r.exten === 'varcond-c3' && r.priority === 4)).toMatchObject({ app: 'Hangup', appdata: null })
     })
 })
