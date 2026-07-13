@@ -42,7 +42,6 @@ import {
     type CompanyForm,
     type CompanyStatus,
 } from "@/hooks/use-companies"
-import { type User } from "@/hooks/use-users"
 
 const TIMEZONES = Intl.supportedValuesOf("timeZone")
 const DEFAULT_TIMEZONE = "America/Sao_Paulo"
@@ -57,7 +56,6 @@ type CompanyFormDialogProps = {
     open: boolean
     onOpenChange: (open: boolean) => void
     company: Company | null
-    users: User[]
     onSave: (form: CompanyForm) => Promise<boolean>
 }
 
@@ -65,18 +63,9 @@ export function CompanyFormDialog({
     open,
     onOpenChange,
     company,
-    users,
     onSave,
 }: CompanyFormDialogProps) {
     const isEdit = !!company
-
-    const userItems = [
-        { value: null, label: "Nenhum" },
-        ...users.map((u) => ({
-            value: u.id,
-            label: `${u.name} (${u.username})`,
-        })),
-    ]
 
     const {
         register,
@@ -91,7 +80,6 @@ export function CompanyFormDialog({
             doc: "",
             status: "active",
             timezone: DEFAULT_TIMEZONE,
-            userId: "",
             metadata: [],
         },
     })
@@ -105,7 +93,6 @@ export function CompanyFormDialog({
                 doc: company?.doc ?? "",
                 status: company?.status ?? "active",
                 timezone: company?.timezone ?? DEFAULT_TIMEZONE,
-                userId: "",
                 metadata: Object.entries(company?.metadata ?? {}).map(
                     ([key, value]) => ({ key, value: String(value) })
                 ),
@@ -193,58 +180,6 @@ export function CompanyFormDialog({
                                     {errors.timezone.message}
                                 </FieldError>
                             )}
-                        </Field>
-                        <Field>
-                            <FieldLabel>
-                                Vincular a um usuário (opcional)
-                            </FieldLabel>
-                            <Controller
-                                control={control}
-                                name="userId"
-                                render={({ field }) => {
-                                    const userLabels = userItems.map(
-                                        (u) => u.label
-                                    )
-                                    const selectedLabel =
-                                        userItems.find(
-                                            (u) => u.value === field.value
-                                        )?.label ?? ""
-                                    return (
-                                        <Combobox
-                                            items={userLabels}
-                                            value={selectedLabel || null}
-                                            onValueChange={(label) => {
-                                                const found = userItems.find(
-                                                    (u) => u.label === label
-                                                )
-                                                field.onChange(
-                                                    found?.value ?? ""
-                                                )
-                                            }}
-                                        >
-                                            <ComboboxInput
-                                                placeholder="Buscar usuário..."
-                                                showClear
-                                            />
-                                            <ComboboxContent>
-                                                <ComboboxEmpty>
-                                                    Nenhum usuário encontrado
-                                                </ComboboxEmpty>
-                                                <ComboboxList>
-                                                    {(label: string) => (
-                                                        <ComboboxItem
-                                                            key={label}
-                                                            value={label}
-                                                        >
-                                                            {label}
-                                                        </ComboboxItem>
-                                                    )}
-                                                </ComboboxList>
-                                            </ComboboxContent>
-                                        </Combobox>
-                                    )
-                                }}
-                            />
                         </Field>
                         {isEdit && (
                             <Field>

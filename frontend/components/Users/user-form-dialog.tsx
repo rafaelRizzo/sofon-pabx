@@ -1,11 +1,12 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { Fragment, useEffect, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { EyeIcon, EyeOffIcon, WandSparklesIcon } from "lucide-react"
-import { Controller, useForm } from "react-hook-form"
+import { Controller, useForm, useWatch } from "react-hook-form"
 
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
     Dialog,
     DialogContent,
@@ -34,6 +35,8 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { PERMISSION_RESOURCES } from "@/hooks/use-auth"
+import { useCompanies } from "@/hooks/use-companies"
 import {
     createUserSchema,
     updateUserSchema,
@@ -41,6 +44,7 @@ import {
     type User,
     type UserRole,
 } from "@/hooks/use-users"
+import { CompanySelect } from "./company-select"
 
 const ROLES: { value: UserRole; label: string }[] = [
     { value: "user", label: "Usuário" },
@@ -64,6 +68,7 @@ export function UserFormDialog({
     const isEdit = !!user
 
     const [showPassword, setShowPassword] = useState(false)
+    const { companies } = useCompanies()
 
     const {
         register,
@@ -77,8 +82,20 @@ export function UserFormDialog({
         resolver: isEdit
             ? zodResolver(updateUserSchema)
             : zodResolver(createUserSchema),
-        defaultValues: { name: "", username: "", password: "", role: "user" },
+        defaultValues: {
+            name: "",
+            username: "",
+            password: "",
+            role: "user",
+            permissions: [],
+            companyIds: [],
+        },
     })
+
+    // no edit, role não é editável (campo oculto); a visibilidade dos checkboxes segue o role
+    // atual do usuário; no create, segue o role selecionado no form
+    const watchedRole = useWatch({ control, name: "role" })
+    const showPermissions = (isEdit ? user?.role : watchedRole) === "user"
 
     const generatePassword = () => {
         const charset =
@@ -107,6 +124,8 @@ export function UserFormDialog({
                 username: user?.username ?? "",
                 password: "",
                 role: user?.role ?? "user",
+                permissions: user?.permissions ?? [],
+                companyIds: user?.companies.map((c) => c.id) ?? [],
             })
         }
     }, [open, user, reset])
@@ -219,6 +238,25 @@ export function UserFormDialog({
                                 </FieldError>
                             )}
                         </Field>
+                        <Field>
+                            <FieldLabel>Empresas</FieldLabel>
+                            <Controller
+                                control={control}
+                                name="companyIds"
+                                render={({ field }) => (
+                                    <CompanySelect
+                                        companies={companies}
+                                        value={field.value ?? []}
+                                        onChange={field.onChange}
+                                    />
+                                )}
+                            />
+                            {errors.companyIds && (
+                                <FieldError>
+                                    {errors.companyIds.message}
+                                </FieldError>
+                            )}
+                        </Field>
                         {!isEdit && (
                             <Field>
                                 <FieldLabel>Permissão</FieldLabel>
@@ -252,6 +290,145 @@ export function UserFormDialog({
                                         {errors.role.message}
                                     </FieldError>
                                 )}
+                            </Field>
+                        )}
+                        {showPermissions && (
+                            <Field>
+                                <FieldLabel>Permissões de acesso</FieldLabel>
+                                <Controller
+                                    control={control}
+                                    name="permissions"
+                                    render={({ field }) => {
+                                        const perms = field.value ?? []
+                                        const has = (key: string) =>
+                                            perms.includes(key)
+                                        const setView = (
+                                            resource: string,
+                                            checked: boolean
+                                        ) => {
+                                            const next = checked
+                                                ? [
+                                                      ...perms,
+                                                      `${resource}:view`,
+                                                  ]
+                                                : perms.filter(
+                                                      (p) =>
+                                                          p !==
+                                                              `${resource}:view` &&
+                                                          p !==
+                                                              `${resource}:manage`
+                                                  )
+                                            field.onChange([
+                                                ...new Set(next),
+                                            ])
+                                        }
+                                        const setManage = (
+                                            resource: string,
+                                            checked: boolean
+                                        ) => {
+                                            const next = checked
+                                                ? [
+                                                      ...perms,
+                                                      `${resource}:view`,
+                                                      `${resource}:manage`,
+                                                  ]
+                                                : perms.filter(
+                                                      (p) =>
+                                                          p !==
+                                                          `${resource}:manage`
+                                                  )
+                                            field.onChange([
+                                                ...new Set(next),
+                                            ])
+                                        }
+                                        return (
+                                            <div className="rounded-md border p-3">
+                                                <div className="grid grid-cols-[1fr_auto_auto] items-center gap-x-3 gap-y-2 text-sm">
+                                                    <span className="text-muted-foreground font-medium">
+                                                        Recurso
+                                                    </span>
+                                                    <span className="text-muted-foreground justify-self-center font-medium">
+                                                        Ver
+                                                    </span>
+                                                    <span className="text-muted-foreground justify-self-center font-medium">
+                                                        Gerenciar
+                                                    </span>
+                                                    <span>CDR</span>
+                                                    <Checkbox
+                                                        className="justify-self-center"
+                                                        checked={has(
+                                                            "cdr:view"
+                                                        )}
+                                                        onCheckedChange={(
+                                                            c
+                                                        ) =>
+                                                            field.onChange(
+                                                                c === true
+                                                                    ? [
+                                                                          ...new Set(
+                                                                              [
+                                                                                  ...perms,
+                                                                                  "cdr:view",
+                                                                              ]
+                                                                          ),
+                                                                      ]
+                                                                    : perms.filter(
+                                                                          (
+                                                                              p
+                                                                          ) =>
+                                                                              p !==
+                                                                              "cdr:view"
+                                                                      )
+                                                            )
+                                                        }
+                                                    />
+                                                    <span />
+                                                    {PERMISSION_RESOURCES.map(
+                                                        (r) => (
+                                                            <Fragment
+                                                                key={r.key}
+                                                            >
+                                                                <span>
+                                                                    {r.label}
+                                                                </span>
+                                                                <Checkbox
+                                                                    className="justify-self-center"
+                                                                    checked={has(
+                                                                        `${r.key}:view`
+                                                                    )}
+                                                                    onCheckedChange={(
+                                                                        c
+                                                                    ) =>
+                                                                        setView(
+                                                                            r.key,
+                                                                            c ===
+                                                                                true
+                                                                        )
+                                                                    }
+                                                                />
+                                                                <Checkbox
+                                                                    className="justify-self-center"
+                                                                    checked={has(
+                                                                        `${r.key}:manage`
+                                                                    )}
+                                                                    onCheckedChange={(
+                                                                        c
+                                                                    ) =>
+                                                                        setManage(
+                                                                            r.key,
+                                                                            c ===
+                                                                                true
+                                                                        )
+                                                                    }
+                                                                />
+                                                            </Fragment>
+                                                        )
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )
+                                    }}
+                                />
                             </Field>
                         )}
                     </FieldGroup>

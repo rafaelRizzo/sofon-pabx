@@ -305,7 +305,7 @@ export function VariableConditionFormDialog({
                                                         </div>
                                                         <div>
                                                             <Input
-                                                                placeholder={needsValue ? "11" : "—"}
+                                                                placeholder={needsValue ? "11" : "-"}
                                                                 disabled={!needsValue}
                                                                 {...register(`rules.${index}.value`)}
                                                             />

@@ -30,6 +30,7 @@ import { type Announcement } from "@/hooks/use-announcements"
 type Props = {
     announcements: Announcement[]
     loading: boolean
+    companySelected: boolean
     onEdit: (announcement: Announcement) => void
     onDelete: (announcement: Announcement) => void
 }
@@ -77,7 +78,7 @@ function useDestinationLabels(announcements: Announcement[]) {
     return { labels, loadedTypes }
 }
 
-export function AnnouncementsTable({ announcements, loading, onEdit, onDelete }: Props) {
+export function AnnouncementsTable({ announcements, loading, companySelected, onEdit, onDelete }: Props) {
     const { labels, loadedTypes } = useDestinationLabels(announcements)
 
     return (
@@ -105,7 +106,7 @@ export function AnnouncementsTable({ announcements, loading, onEdit, onDelete }:
                     ) : announcements.length === 0 ? (
                         <TableRow>
                             <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
-                                Nenhum anúncio encontrado
+                                {companySelected ? "Nenhum anúncio encontrado" : "Selecione uma empresa para listar"}
                             </TableCell>
                         </TableRow>
                     ) : (

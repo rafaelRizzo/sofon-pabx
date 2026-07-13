@@ -81,11 +81,12 @@ function useDestinationLabels(requestTemplates: RequestTemplate[]) {
 type Props = {
     requestTemplates: RequestTemplate[]
     loading: boolean
+    companySelected: boolean
     onEdit: (requestTemplate: RequestTemplate) => void
     onDelete: (requestTemplate: RequestTemplate) => void
 }
 
-export function RequestTemplatesTable({ requestTemplates, loading, onEdit, onDelete }: Props) {
+export function RequestTemplatesTable({ requestTemplates, loading, companySelected, onEdit, onDelete }: Props) {
     const { labels, loadedTypes } = useDestinationLabels(requestTemplates)
 
     return (
@@ -115,7 +116,7 @@ export function RequestTemplatesTable({ requestTemplates, loading, onEdit, onDel
                     ) : requestTemplates.length === 0 ? (
                         <TableRow>
                             <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                                Nenhum template de requisição encontrado
+                                {companySelected ? "Nenhum template de requisição encontrado" : "Selecione uma empresa para listar"}
                             </TableCell>
                         </TableRow>
                     ) : (
@@ -136,7 +137,7 @@ export function RequestTemplatesTable({ requestTemplates, loading, onEdit, onDel
                                     {rt.variableMappings.length > 0 ? (
                                         <Badge variant="secondary">{rt.variableMappings.length}</Badge>
                                     ) : (
-                                        <span className="text-muted-foreground">—</span>
+                                        <span className="text-muted-foreground">-</span>
                                     )}
                                 </TableCell>
                                 <TableCell>

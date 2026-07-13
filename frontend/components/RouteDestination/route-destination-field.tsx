@@ -135,7 +135,7 @@ export async function fetchDestinationOptions(
                 pjsip?: { id: string; alias: string; name: string }[]
             }
             const extensions = [...(grouped?.sip ?? []), ...(grouped?.pjsip ?? [])]
-            return extensions.map((e) => ({ id: e.id, label: `${e.alias} — ${e.name}` }))
+            return extensions.map((e) => ({ id: e.id, label: `${e.alias} - ${e.name}` }))
         }
         case "queue": {
             const { data } = await api.get("/queues", { params: { companyId } })

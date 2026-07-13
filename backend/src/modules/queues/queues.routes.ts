@@ -3,6 +3,7 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import * as QueuesController from './queues.controller'
 import { protectedRoute } from '../../middleware/scope.middleware'
+import { requirePermission } from '../../middleware/permission.middleware'
 import {
     createQueueSchema, updateQueueSchema, idParamSchema, companyIdParamSchema,
     ListQueuesResponse, GetQueueResponse, CreateQueueResponse, UpdateQueueResponse,
@@ -15,7 +16,7 @@ export const queuesRoutes = async (app: FastifyInstance) => {
     const router = app.withTypeProvider<ZodTypeProvider>()
 
     router.get('/queues', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('queues', 'view')],
         schema: {
             tags: ['Queues'],
             summary: 'Listar filas',
@@ -30,7 +31,7 @@ export const queuesRoutes = async (app: FastifyInstance) => {
     }, QueuesController.getQueues as any)
 
     router.get('/queues/company/:id_company', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('queues', 'view')],
         schema: {
             tags: ['Queues'],
             summary: 'Listar filas por empresa',
@@ -45,7 +46,7 @@ export const queuesRoutes = async (app: FastifyInstance) => {
     }, QueuesController.getQueuesByCompanyId as any)
 
     router.get('/queues/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('queues', 'view')],
         schema: {
             tags: ['Queues'],
             summary: 'Buscar fila',
@@ -61,7 +62,7 @@ export const queuesRoutes = async (app: FastifyInstance) => {
     }, QueuesController.getQueueById as any)
 
     router.post('/queues', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('queues', 'manage')],
         schema: {
             tags: ['Queues'],
             summary: 'Criar fila',
@@ -77,7 +78,7 @@ export const queuesRoutes = async (app: FastifyInstance) => {
     }, QueuesController.createQueue as any)
 
     router.put('/queues/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('queues', 'manage')],
         schema: {
             tags: ['Queues'],
             summary: 'Atualizar fila',
@@ -94,7 +95,7 @@ export const queuesRoutes = async (app: FastifyInstance) => {
     }, QueuesController.updateQueue as any)
 
     router.delete('/queues/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('queues', 'manage')],
         schema: {
             tags: ['Queues'],
             summary: 'Remover fila',

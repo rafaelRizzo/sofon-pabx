@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import * as IvrController from './ivr.controller'
 import { protectedRoute } from '../../middleware/scope.middleware'
+import { requirePermission } from '../../middleware/permission.middleware'
 import {
     createIvrMenuSchema, updateIvrMenuSchema, idParamSchema, companyQuerySchema,
     ListIvrMenusResponse, GetIvrMenuResponse, CreateIvrMenuResponse, UpdateIvrMenuResponse,
@@ -12,7 +13,7 @@ export const ivrRoutes = async (app: FastifyInstance) => {
     const router = app.withTypeProvider<ZodTypeProvider>()
 
     router.get('/ivr-menus', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('ivr', 'view')],
         schema: {
             tags: ['IVR'],
             summary: 'Listar menus de URA por empresa',
@@ -28,7 +29,7 @@ export const ivrRoutes = async (app: FastifyInstance) => {
     }, IvrController.getIvrMenus as any)
 
     router.get('/ivr-menus/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('ivr', 'view')],
         schema: {
             tags: ['IVR'],
             summary: 'Buscar menu de URA',
@@ -44,7 +45,7 @@ export const ivrRoutes = async (app: FastifyInstance) => {
     }, IvrController.getIvrMenuById as any)
 
     router.post('/ivr-menus', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('ivr', 'manage')],
         schema: {
             tags: ['IVR'],
             summary: 'Criar menu de URA',
@@ -102,7 +103,7 @@ export const ivrRoutes = async (app: FastifyInstance) => {
     }, IvrController.createIvrMenu as any)
 
     router.put('/ivr-menus/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('ivr', 'manage')],
         schema: {
             tags: ['IVR'],
             summary: 'Atualizar menu de URA',
@@ -121,7 +122,7 @@ export const ivrRoutes = async (app: FastifyInstance) => {
     }, IvrController.updateIvrMenu as any)
 
     router.delete('/ivr-menus/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('ivr', 'manage')],
         schema: {
             tags: ['IVR'],
             summary: 'Remover menu de URA',

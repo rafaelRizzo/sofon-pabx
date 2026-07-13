@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import * as Controller from './cdr.controller'
 import { protectedRoute } from '../../middleware/scope.middleware'
+import { requirePermission } from '../../middleware/permission.middleware'
 import { cdrQuerySchema, ListCdrResponse } from './schemas/cdr.schema'
 import { errors } from '../../schemas/responses'
 
@@ -9,7 +10,7 @@ export const cdrRoutes = async (app: FastifyInstance) => {
     const router = app.withTypeProvider<ZodTypeProvider>()
 
     router.get('/cdr', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('cdr', 'view')],
         schema: {
             tags: ['CDR'],
             summary: 'Listar registros de chamadas (CDR)',

@@ -70,6 +70,7 @@ export default function VariableConditionsPage() {
             <VariableConditionsTable
                 variableConditions={paginated}
                 loading={loading}
+                companySelected={!!companyFilter}
                 onEdit={setEditVariableCondition}
                 onDelete={setDeleteTarget}
             />

@@ -3,6 +3,7 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import * as InboundRoutesController from './inbound-routes.controller'
 import { protectedRoute } from '../../middleware/scope.middleware'
+import { requirePermission } from '../../middleware/permission.middleware'
 import {
     createInboundRouteSchema, updateInboundRouteSchema, idParamSchema, companyQuerySchema,
     ListInboundRoutesResponse, GetInboundRouteResponse, CreateInboundRouteResponse, UpdateInboundRouteResponse,
@@ -15,7 +16,7 @@ export const inboundRoutesRoutes = async (app: FastifyInstance) => {
     const router = app.withTypeProvider<ZodTypeProvider>()
 
     router.get('/inbound-routes', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('inbound-routes', 'view')],
         schema: {
             tags: ['Inbound Routes'],
             summary: 'Listar rotas de entrada',
@@ -32,7 +33,7 @@ export const inboundRoutesRoutes = async (app: FastifyInstance) => {
     }, InboundRoutesController.getInboundRoutesByCompanyId as any)
 
     router.get('/inbound-routes/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('inbound-routes', 'view')],
         schema: {
             tags: ['Inbound Routes'],
             summary: 'Buscar rota de entrada',
@@ -48,7 +49,7 @@ export const inboundRoutesRoutes = async (app: FastifyInstance) => {
     }, InboundRoutesController.getInboundRouteById as any)
 
     router.post('/inbound-routes', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('inbound-routes', 'manage')],
         schema: {
             tags: ['Inbound Routes'],
             summary: 'Criar rota de entrada',
@@ -65,7 +66,7 @@ export const inboundRoutesRoutes = async (app: FastifyInstance) => {
     }, InboundRoutesController.createInboundRoute as any)
 
     router.put('/inbound-routes/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('inbound-routes', 'manage')],
         schema: {
             tags: ['Inbound Routes'],
             summary: 'Atualizar rota de entrada',
@@ -83,7 +84,7 @@ export const inboundRoutesRoutes = async (app: FastifyInstance) => {
     }, InboundRoutesController.updateInboundRoute as any)
 
     router.delete('/inbound-routes/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('inbound-routes', 'manage')],
         schema: {
             tags: ['Inbound Routes'],
             summary: 'Remover rota de entrada',

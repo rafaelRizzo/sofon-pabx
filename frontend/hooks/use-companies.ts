@@ -19,15 +19,13 @@ export type Company = {
     updatedAt: string
 }
 
-// Espelha create/updateCompanySchema do backend.
-// metadata é array no form (useFieldArray) e vira Record no payload;
-// userId só é aceito no create (vincula a empresa a um usuário dono).
+// Espelha create/updateCompanySchema do backend. metadata é array no form (useFieldArray)
+// e vira Record no payload. Vínculo empresa↔usuário é gerenciado só pela tela de Usuários.
 export const companyFormSchema = z.object({
     name: z.string().min(1, "Informe o nome"),
     doc: z.string().optional(),
     status: z.enum(["active", "inactive", "blocked"], "Selecione um status"),
     timezone: z.string().min(1, "Selecione um fuso horário"),
-    userId: z.string().optional(),
     metadata: z.array(
         z.object({
             key: z.string().min(1, "Informe a chave"),
@@ -65,7 +63,6 @@ export function useCompanies() {
                 ...form,
                 doc: form.doc || undefined,
                 status: undefined, // status só faz sentido no edit (default active)
-                userId: form.userId || undefined,
                 metadata: toMetadataRecord(form.metadata),
             })
             toast.success("Empresa criada", { id })
@@ -85,7 +82,6 @@ export function useCompanies() {
                 doc: form.doc || undefined,
                 status: form.status,
                 timezone: form.timezone,
-                userId: form.userId || undefined,
                 metadata: toMetadataRecord(form.metadata),
             })
             toast.success("Empresa atualizada", { id })

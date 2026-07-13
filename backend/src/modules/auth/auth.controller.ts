@@ -5,6 +5,7 @@ import { loginSchema } from './schemas/auth.schema'
 import { createUserSchema } from '../users/schemas/user.schema'
 import { handleError } from '../../utils/errors/handler.error'
 import { jtiManager } from '../../lib/jti'
+import { prisma } from '../../lib/prisma'
 
 export const login = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
@@ -87,6 +88,23 @@ export const logout = async (req: FastifyRequest, reply: FastifyReply) => {
             success: true,
             message: 'Logout successful',
         })
+    } catch (error) {
+        return handleError(reply, error, req)
+    }
+}
+
+export const me = async (req: FastifyRequest, reply: FastifyReply) => {
+    try {
+        const user = await prisma.user.findUnique({
+            where: { id: req.user!.id },
+            select: { id: true, name: true, username: true, role: true, permissions: true },
+        })
+
+        if (!user) {
+            return reply.status(404).send({ success: false, message: 'User not found' })
+        }
+
+        return reply.send({ success: true, message: 'User fetched successfully', user })
     } catch (error) {
         return handleError(reply, error, req)
     }

@@ -57,7 +57,6 @@ import { InboundRouteRepository } from '../../../asterisk/inboundroute.repositor
 import { removeCompanyDialplanFiles } from '../../../asterisk/dialplan-file.repository'
 
 const COMPANY = { id: 'c1', name: 'ACME', doc: null, asteriskId: 'ast1', timezone: 'America/Sao_Paulo', metadata: {}, createdAt: new Date(), updatedAt: new Date() }
-const USER = { id: 'u1', name: 'Admin', username: 'admin@test.com' }
 
 beforeEach(() => clearPrismaMock(db))
 
@@ -92,43 +91,36 @@ describe('CompaniesService.getCompanyById', () => {
 
 // ─── createCompany ────────────────────────────────────────────────────────────
 describe('CompaniesService.createCompany', () => {
-    it('creates company and links user', async () => {
-        db.user.findUnique.mockResolvedValue(USER)
+    it('creates company and links the creating user', async () => {
         db.company.create.mockResolvedValue(COMPANY)
         db.userCompany.create.mockResolvedValue({})
-        const company = await CompaniesService.createCompany({ name: 'ACME', userId: 'u1', metadata: {} }) as any
+        const company = await CompaniesService.createCompany({ name: 'ACME', metadata: {} }, 'u1') as any
         expect(company.id).toBe('c1')
-    })
-
-    it('throws 404 with non-existent userId', async () => {
-        db.user.findUnique.mockResolvedValue(null)
-        await expect(CompaniesService.createCompany({ name: 'X', userId: 'clxxxxxxxxxxxxxxxxxxxxxxxxx', metadata: {} }))
-            .rejects.toMatchObject({ statusCode: 404 })
+        expect(db.userCompany.create).toHaveBeenCalledWith(expect.objectContaining({
+            data: { userId: 'u1', companyId: 'c1' },
+        }))
     })
 
     it('passes timezone through to prisma when provided', async () => {
-        db.user.findUnique.mockResolvedValue(USER)
         db.company.create.mockResolvedValue({ ...COMPANY, timezone: 'Europe/Lisbon' })
         db.userCompany.create.mockResolvedValue({})
-        await CompaniesService.createCompany({ name: 'ACME', userId: 'u1', metadata: {}, timezone: 'Europe/Lisbon' })
+        await CompaniesService.createCompany({ name: 'ACME', metadata: {}, timezone: 'Europe/Lisbon' }, 'u1')
         expect(db.company.create).toHaveBeenCalledWith(expect.objectContaining({
             data: expect.objectContaining({ timezone: 'Europe/Lisbon' }),
         }))
     })
 
     it('throws 409 when name+doc already exists', async () => {
-        db.user.findUnique.mockResolvedValue(USER)
         db.company.findUnique.mockResolvedValue({ ...COMPANY, doc: '12345678900' })
-        await expect(CompaniesService.createCompany({ name: 'ACME', doc: '12345678900', userId: 'u1', metadata: {} }))
+        await expect(CompaniesService.createCompany({ name: 'ACME', doc: '12345678900', metadata: {} }, 'u1'))
             .rejects.toMatchObject({ statusCode: 409 })
         expect(db.company.create).not.toHaveBeenCalled()
     })
 
     it('allows create without doc even if name is duplicated', async () => {
-        db.user.findUnique.mockResolvedValue(USER)
         db.company.create.mockResolvedValue(COMPANY)
         db.userCompany.create.mockResolvedValue({})
-        await CompaniesService.createCompany({ name: 'ACME', userId: 'u1', metadata: {} })
+        await CompaniesService.createCompany({ name: 'ACME', metadata: {} }, 'u1')
         expect(db.company.findUnique).not.toHaveBeenCalledWith(expect.objectContaining({ where: { name_doc: expect.anything() } }))
         expect(db.company.create).toHaveBeenCalled()
     })

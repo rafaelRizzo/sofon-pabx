@@ -14,6 +14,8 @@ export type User = {
     username: string
     role: UserRole
     status: string
+    // relevante só quando role === "user" (admin/reseller têm acesso irrestrito)
+    permissions: string[]
     extensionId: string | null
     webhookSlug: string
     createdBy: string | null
@@ -28,6 +30,9 @@ export const createUserSchema = z.object({
     username: z.email("E-mail inválido"),
     password: z.string().min(6, "A senha deve ter no mínimo 6 caracteres"),
     role: z.enum(["admin", "reseller", "user"], "Selecione uma permissão"),
+    permissions: z.array(z.string()),
+    // todo usuário precisa estar vinculado a >=1 empresa (ver users.schema.ts do backend)
+    companyIds: z.array(z.string()).min(1, "Selecione ao menos uma empresa"),
 })
 
 // Mesmo shape do create para o form; senha em branco = manter a atual.
@@ -78,6 +83,9 @@ export function useUsers() {
                 name: form.name,
                 username: form.username,
                 password: form.password || undefined,
+                // só admin altera; backend rejeita 403 se um "user" tentar (ver users.controller.ts)
+                permissions: form.permissions,
+                companyIds: form.companyIds,
             })
             toast.success("Usuário atualizado", { id })
             await fetchUsers()

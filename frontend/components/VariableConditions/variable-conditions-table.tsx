@@ -30,6 +30,7 @@ import { VARIABLE_RULE_OPERATOR_LABELS, type VariableCondition } from "@/hooks/u
 type Props = {
     variableConditions: VariableCondition[]
     loading: boolean
+    companySelected: boolean
     onEdit: (variableCondition: VariableCondition) => void
     onDelete: (variableCondition: VariableCondition) => void
 }
@@ -79,7 +80,7 @@ function useDestinationLabels(variableConditions: VariableCondition[]) {
     return { labels, loadedTypes }
 }
 
-export function VariableConditionsTable({ variableConditions, loading, onEdit, onDelete }: Props) {
+export function VariableConditionsTable({ variableConditions, loading, companySelected, onEdit, onDelete }: Props) {
     const { labels, loadedTypes } = useDestinationLabels(variableConditions)
 
     return (
@@ -108,7 +109,7 @@ export function VariableConditionsTable({ variableConditions, loading, onEdit, o
                     ) : variableConditions.length === 0 ? (
                         <TableRow>
                             <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                                Nenhuma condição de variável encontrada
+                                {companySelected ? "Nenhuma condição de variável encontrada" : "Selecione uma empresa para listar"}
                             </TableCell>
                         </TableRow>
                     ) : (

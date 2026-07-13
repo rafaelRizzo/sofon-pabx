@@ -54,11 +54,14 @@ export function useVariables(companyId?: string) {
     const [filter, setFilter] = useState("")
 
     const fetchVariableSets = useCallback(async () => {
+        if (!companyId) {
+            setVariableSets([])
+            setLoading(false)
+            return
+        }
         setLoading(true)
         try {
-            const { data } = await api.get("/variables", {
-                params: companyId ? { companyId } : undefined,
-            })
+            const { data } = await api.get("/variables", { params: { companyId } })
             setVariableSets(data.variableSets ?? [])
         } catch (err) {
             toast.error(apiError(err, "Erro ao buscar variáveis"))
@@ -114,12 +117,6 @@ export function useVariables(companyId?: string) {
     const fetchStateRef = useRef<{ key?: string; fetched: boolean }>({ fetched: false })
 
     useEffect(() => {
-        if (!companyId) {
-            setVariableSets([])
-            setLoading(false)
-            fetchStateRef.current = { fetched: false }
-            return
-        }
         if (fetchStateRef.current.fetched && fetchStateRef.current.key === companyId) return
         fetchStateRef.current = { key: companyId, fetched: true }
         fetchVariableSets()

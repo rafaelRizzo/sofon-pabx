@@ -1026,7 +1026,7 @@ export function ExtensionFormDialog({
                     </DialogTitle>
                     <DialogDescription>
                         {isEdit && extensionData
-                            ? `${extensionData.alias} — ${extensionData.name} (${extensionData.type.toUpperCase()})`
+                            ? `${extensionData.alias} - ${extensionData.name} (${extensionData.type.toUpperCase()})`
                             : "Preencha os dados para criar o ramal"}
                     </DialogDescription>
                 </DialogHeader>

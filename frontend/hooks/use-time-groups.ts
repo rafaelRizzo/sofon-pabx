@@ -77,10 +77,15 @@ export function useTimeGroups(companyId?: string) {
     const [filter, setFilter] = useState("")
 
     const fetchTimeGroups = useCallback(async () => {
+        if (!companyId) {
+            setTimeGroups([])
+            setLoading(false)
+            return
+        }
         setLoading(true)
         try {
             const { data } = await api.get("/time-groups", {
-                params: companyId ? { companyId } : undefined,
+                params: { companyId },
             })
             setTimeGroups(data.timeGroups ?? [])
         } catch (err) {
@@ -137,12 +142,6 @@ export function useTimeGroups(companyId?: string) {
     const fetchStateRef = useRef<{ key?: string; fetched: boolean }>({ fetched: false })
 
     useEffect(() => {
-        if (!companyId) {
-            setTimeGroups([])
-            setLoading(false)
-            fetchStateRef.current = { fetched: false }
-            return
-        }
         if (fetchStateRef.current.fetched && fetchStateRef.current.key === companyId) return
         fetchStateRef.current = { key: companyId, fetched: true }
         fetchTimeGroups()

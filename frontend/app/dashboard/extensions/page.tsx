@@ -212,6 +212,7 @@ export default function ExtensionsPage() {
                 extensions={paginated}
                 companies={companies}
                 loading={loading}
+                companySelected={!!companyFilter}
                 onEdit={setEditExtension}
                 onResetPassword={setResetTarget}
                 onDelete={setDeleteTarget}
@@ -248,7 +249,7 @@ export default function ExtensionsPage() {
                 title="Deletar ramal"
                 itemName={
                     deleteTarget
-                        ? `${deleteTarget.alias} — ${deleteTarget.name}`
+                        ? `${deleteTarget.alias} - ${deleteTarget.name}`
                         : ""
                 }
                 onConfirm={handleDelete}
@@ -266,7 +267,7 @@ export default function ExtensionsPage() {
                         <AlertDialogDescription>
                             Tem certeza que deseja resetar a senha do ramal{" "}
                             <strong>
-                                {resetTarget?.alias} — {resetTarget?.name}
+                                {resetTarget?.alias} - {resetTarget?.name}
                             </strong>
                             ? A senha atual deixará de funcionar.
                         </AlertDialogDescription>
@@ -295,7 +296,7 @@ export default function ExtensionsPage() {
                             Ramal {passwordReveal?.alias} criado
                         </AlertDialogTitle>
                         <AlertDialogDescription>
-                            Guarde as credenciais — a senha não será exibida
+                            Guarde as credenciais: a senha não será exibida
                             novamente.
                         </AlertDialogDescription>
                     </AlertDialogHeader>

@@ -23,11 +23,12 @@ import { type Audio } from "@/hooks/use-audios"
 type Props = {
     audios: Audio[]
     loading: boolean
+    companySelected: boolean
     onEdit: (audio: Audio) => void
     onDelete: (audio: Audio) => void
 }
 
-export function AudiosTable({ audios, loading, onEdit, onDelete }: Props) {
+export function AudiosTable({ audios, loading, companySelected, onEdit, onDelete }: Props) {
     return (
         <div className="rounded-md border">
             <Table>
@@ -52,7 +53,7 @@ export function AudiosTable({ audios, loading, onEdit, onDelete }: Props) {
                     ) : audios.length === 0 ? (
                         <TableRow>
                             <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">
-                                Nenhum áudio encontrado
+                                {companySelected ? "Nenhum áudio encontrado" : "Selecione uma empresa para listar"}
                             </TableCell>
                         </TableRow>
                     ) : (
@@ -60,7 +61,10 @@ export function AudiosTable({ audios, loading, onEdit, onDelete }: Props) {
                             <TableRow key={audio.id}>
                                 <TableCell className="font-medium">{audio.name}</TableCell>
                                 <TableCell>
-                                    {new Date(audio.createdAt).toLocaleDateString("pt-BR")}
+                                    {new Date(audio.createdAt).toLocaleString("pt-BR", {
+                                        dateStyle: "short",
+                                        timeStyle: "short",
+                                    })}
                                 </TableCell>
                                 <TableCell>
                                     <TooltipProvider delay={100}>

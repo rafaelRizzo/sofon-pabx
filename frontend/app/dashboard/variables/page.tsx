@@ -45,7 +45,7 @@ export default function VariablesPage() {
         <div className="flex flex-col gap-4">
             <PageHeader
                 title="Variáveis"
-                description="Seta variáveis de canal (Set) e segue pro destino configurado — encadeável em qualquer fluxo"
+                description="Seta variáveis de canal (Set) e segue pro destino configurado, encadeável em qualquer fluxo"
             >
                 <Button onClick={() => setCreateOpen(true)}>
                     <PlusIcon />
@@ -70,6 +70,7 @@ export default function VariablesPage() {
             <VariableSetsTable
                 variableSets={paginated}
                 loading={loading}
+                companySelected={!!companyFilter}
                 onEdit={setEditVariableSet}
                 onDelete={setDeleteTarget}
             />

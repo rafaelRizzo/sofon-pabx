@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import * as RoutingRulesController from './routing-rules.controller'
 import { protectedRoute } from '../../../middleware/scope.middleware'
+import { requirePermission } from '../../../middleware/permission.middleware'
 import {
     createRoutingRuleSchema, updateRoutingRuleSchema, idParamSchema, companyIdParamSchema,
     ListRoutingRulesResponse, GetRoutingRuleResponse, CreateRoutingRuleResponse, UpdateRoutingRuleResponse,
@@ -12,7 +13,7 @@ export const routingRulesRoutes = async (app: FastifyInstance) => {
     const router = app.withTypeProvider<ZodTypeProvider>()
 
     router.get('/callcenter/routing-rules/company/:id_company', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('callcenter', 'view')],
         schema: {
             tags: ['Callcenter Routing Rules'],
             summary: 'Listar regras de prioridade por empresa',
@@ -28,7 +29,7 @@ export const routingRulesRoutes = async (app: FastifyInstance) => {
     }, RoutingRulesController.getRoutingRulesByCompanyId as any)
 
     router.get('/callcenter/routing-rules/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('callcenter', 'view')],
         schema: {
             tags: ['Callcenter Routing Rules'],
             summary: 'Buscar regra de prioridade',
@@ -44,7 +45,7 @@ export const routingRulesRoutes = async (app: FastifyInstance) => {
     }, RoutingRulesController.getRoutingRuleById as any)
 
     router.post('/callcenter/routing-rules', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('callcenter', 'manage')],
         schema: {
             tags: ['Callcenter Routing Rules'],
             summary: 'Criar regra de prioridade',
@@ -60,7 +61,7 @@ export const routingRulesRoutes = async (app: FastifyInstance) => {
     }, RoutingRulesController.createRoutingRule as any)
 
     router.put('/callcenter/routing-rules/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('callcenter', 'manage')],
         schema: {
             tags: ['Callcenter Routing Rules'],
             summary: 'Atualizar regra de prioridade',
@@ -78,7 +79,7 @@ export const routingRulesRoutes = async (app: FastifyInstance) => {
     }, RoutingRulesController.updateRoutingRule as any)
 
     router.delete('/callcenter/routing-rules/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('callcenter', 'manage')],
         schema: {
             tags: ['Callcenter Routing Rules'],
             summary: 'Remover regra de prioridade',

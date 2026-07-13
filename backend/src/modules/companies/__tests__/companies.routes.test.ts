@@ -79,7 +79,7 @@ describe('POST /companies', () => {
         companyId = body.companyId
     })
 
-    it('201 admin creates company linked to another userId', async () => {
+    it('201 ignores userId in body: company links to the creator, not the given userId', async () => {
         const other = await prisma.user.create({
             data: {
                 name: 'Other',
@@ -96,6 +96,15 @@ describe('POST /companies', () => {
         })
 
         expect(res.statusCode).toBe(201)
+        const { companyId: newCompanyId } = CreateCompanyResponse.parse(res.json())
+        const ownLink = await prisma.userCompany.findUnique({
+            where: { userId_companyId: { userId, companyId: newCompanyId } },
+        })
+        const otherLink = await prisma.userCompany.findUnique({
+            where: { userId_companyId: { userId: other.id, companyId: newCompanyId } },
+        })
+        expect(ownLink).not.toBeNull()
+        expect(otherLink).toBeNull()
     })
 
     it('400 with invalid body', async () => {

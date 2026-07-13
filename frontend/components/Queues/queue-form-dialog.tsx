@@ -470,8 +470,8 @@ export function QueueFormDialog({ open, onOpenChange, queue, companies, onSave }
                                         </Combobox>
                                     )}
                                     <FieldDescription>
-                                        Tocado só pro atendente, bem antes de a ligação ser conectada a ele —
-                                        o cliente não ouve isso.
+                                        Tocado só pro atendente, bem antes de a ligação ser conectada a ele.
+                                        O cliente não ouve isso.
                                     </FieldDescription>
                                     {errors.agentAnnounce && (
                                         <FieldError>{errors.agentAnnounce.message}</FieldError>

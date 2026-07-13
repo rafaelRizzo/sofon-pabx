@@ -70,7 +70,7 @@ export function CompaniesTable({
                                 <TableCell>
                                     {company.doc || (
                                         <span className="text-muted-foreground">
-                                            —
+                                            -
                                         </span>
                                     )}
                                 </TableCell>

@@ -145,7 +145,7 @@ function MemberRow({
                     checked={!member.paused}
                     onCheckedChange={(checked) => onUpdate(member.id, { paused: !checked })}
                     aria-label={
-                        member.paused ? "Pausado — clique para reativar" : "Disponível — clique para pausar"
+                        member.paused ? "Pausado, clique para reativar" : "Disponível, clique para pausar"
                     }
                 />
                 <MemberStatusLabel paused={member.paused} />

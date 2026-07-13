@@ -52,21 +52,32 @@ describe('UsersService.getUserById', () => {
 describe('UsersService.createUser', () => {
     it('creates user with default role', async () => {
         db.user.findUnique.mockResolvedValue(null)
-        db.user.create.mockResolvedValue({ ...USER, role: 'user' })
-        const user = await UsersService.createUser({ name: 'New', username: 'new@test.com', password: 'abc123' }) as any
+        db.company.count.mockResolvedValue(1)
+        db.user.create.mockResolvedValue({ id: 'u1' })
+        db.user.findUniqueOrThrow.mockResolvedValue({ ...USER, role: 'user' })
+        const user = await UsersService.createUser({ name: 'New', username: 'new@test.com', password: 'abc123', companyIds: ['c1'] }) as any
         expect(user.role).toBe('user')
     })
 
     it('throws 409 on duplicate username', async () => {
         db.user.findUnique.mockResolvedValue(USER)
-        await expect(UsersService.createUser({ name: 'Dup', username: 'test@test.com', password: 'x' }))
+        await expect(UsersService.createUser({ name: 'Dup', username: 'test@test.com', password: 'x', companyIds: ['c1'] }))
             .rejects.toMatchObject({ statusCode: 409 })
+    })
+
+    it('throws 404 when a company does not exist', async () => {
+        db.user.findUnique.mockResolvedValue(null)
+        db.company.count.mockResolvedValue(0)
+        await expect(UsersService.createUser({ name: 'New', username: 'new2@test.com', password: 'abc123', companyIds: ['missing'] }))
+            .rejects.toMatchObject({ statusCode: 404 })
     })
 
     it('sets createdBy when provided', async () => {
         db.user.findUnique.mockResolvedValue(null)
-        db.user.create.mockResolvedValue({ ...USER, createdBy: 'reseller-id' })
-        const user = await UsersService.createUser({ name: 'Child', username: 'child@test.com', password: 'x' }, 'reseller-id') as any
+        db.company.count.mockResolvedValue(1)
+        db.user.create.mockResolvedValue({ id: 'u1' })
+        db.user.findUniqueOrThrow.mockResolvedValue({ ...USER, createdBy: 'reseller-id' })
+        const user = await UsersService.createUser({ name: 'Child', username: 'child@test.com', password: 'x', companyIds: ['c1'] }, 'reseller-id') as any
         expect(user.createdBy).toBe('reseller-id')
     })
 })
@@ -75,7 +86,7 @@ describe('UsersService.createUser', () => {
 describe('UsersService.updateUser', () => {
     it('updates user', async () => {
         db.user.findUnique.mockResolvedValue(USER)
-        db.user.update.mockResolvedValue({ ...USER, name: 'Updated' })
+        db.user.findUniqueOrThrow.mockResolvedValue({ ...USER, name: 'Updated' })
         const user = await UsersService.updateUser('u1', { name: 'Updated' })
         expect(user.name).toBe('Updated')
     })

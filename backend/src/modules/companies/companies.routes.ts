@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import * as CompaniesController from './companies.controller'
 import { protectedRoute } from '../../middleware/scope.middleware'
+import { requirePermission } from '../../middleware/permission.middleware'
 import {
     createCompanySchema, updateCompanySchema, idParamSchema, userIdParamSchema,
     ListCompaniesResponse, GetCompanyResponse, CreateCompanyResponse, UpdateCompanyResponse,
@@ -12,7 +13,7 @@ export const companiesRoutes = async (app: FastifyInstance) => {
     const router = app.withTypeProvider<ZodTypeProvider>()
 
     router.get('/companies', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('companies', 'view')],
         schema: {
             tags: ['Companies'],
             summary: 'Listar empresas',
@@ -26,7 +27,7 @@ export const companiesRoutes = async (app: FastifyInstance) => {
     }, CompaniesController.getAllCompanies as any)
 
     router.get('/companies/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('companies', 'view')],
         schema: {
             tags: ['Companies'],
             summary: 'Buscar empresa',
@@ -42,7 +43,7 @@ export const companiesRoutes = async (app: FastifyInstance) => {
     }, CompaniesController.getCompanyById as any)
 
     router.get('/companies/users/:id_user', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('companies', 'view')],
         schema: {
             tags: ['Companies'],
             summary: 'Listar empresas de um usuário',
@@ -57,7 +58,7 @@ export const companiesRoutes = async (app: FastifyInstance) => {
     }, CompaniesController.getCompaniesByUser as any)
 
     router.post('/companies', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('companies', 'manage')],
         schema: {
             tags: ['Companies'],
             summary: 'Criar empresa',
@@ -73,7 +74,7 @@ export const companiesRoutes = async (app: FastifyInstance) => {
     }, CompaniesController.createCompany as any)
 
     router.put('/companies/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('companies', 'manage')],
         schema: {
             tags: ['Companies'],
             summary: 'Atualizar empresa',
@@ -91,7 +92,7 @@ export const companiesRoutes = async (app: FastifyInstance) => {
     }, CompaniesController.updateCompany as any)
 
     router.delete('/companies/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('companies', 'manage')],
         schema: {
             tags: ['Companies'],
             summary: 'Remover empresa',

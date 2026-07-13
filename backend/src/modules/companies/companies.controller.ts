@@ -36,9 +36,10 @@ export const getCompanyById = async (req: FastifyRequest, reply: FastifyReply) =
 export const createCompany = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
         const data = createCompanySchema.parse(req.body)
-        const userId = req.scope.isAdmin && data.userId ? data.userId : req.user!.id
-
-        const company = await CompaniesService.createCompany({ ...data, userId })
+        // vínculo user↔empresa não é mais escolhido aqui: a empresa nasce vinculada a quem
+        // a criou (necessário pro escopo de reseller/user) e o resto do vínculo é gerenciado
+        // exclusivamente pela tela de Usuários (POST/PUT /users aceita companyIds)
+        const company = await CompaniesService.createCompany(data, req.user!.id)
         return reply.status(201).send({
             success: true,
             message: 'Company created successfully',
@@ -55,10 +56,7 @@ export const updateCompany = async (req: FastifyRequest, reply: FastifyReply) =>
         const data = updateCompanySchema.parse(req.body)
         req.scope.assertAccess(id)
 
-        // como no create: só admin pode vincular outro usuário
-        const userId = req.scope.isAdmin && data.userId ? data.userId : undefined
-
-        await CompaniesService.updateCompany(id, { ...data, userId })
+        await CompaniesService.updateCompany(id, data)
         return reply.send({
             success: true,
             message: 'Company updated successfully',

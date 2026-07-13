@@ -66,6 +66,7 @@ export default function QueuesPage() {
                 queues={paginated}
                 companies={companies}
                 loading={loading}
+                companySelected={!!companyFilter}
                 onEdit={setEditQueue}
                 onManageMembers={setMembersQueue}
                 onDelete={setDeleteTarget}

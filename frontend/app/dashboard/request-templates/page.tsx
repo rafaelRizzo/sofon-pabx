@@ -70,6 +70,7 @@ export default function RequestTemplatesPage() {
             <RequestTemplatesTable
                 requestTemplates={paginated}
                 loading={loading}
+                companySelected={!!companyFilter}
                 onEdit={setEditRequestTemplate}
                 onDelete={setDeleteTarget}
             />

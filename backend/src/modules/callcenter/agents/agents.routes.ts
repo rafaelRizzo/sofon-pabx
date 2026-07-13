@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import * as AgentsController from './agents.controller'
 import { protectedRoute } from '../../../middleware/scope.middleware'
+import { requirePermission } from '../../../middleware/permission.middleware'
 import {
     createAgentScopeSchema, updateAgentScopeSchema, idParamSchema, companyIdParamSchema,
     ListAgentScopesResponse, CreateAgentScopeResponse, UpdateAgentScopeResponse,
@@ -12,7 +13,7 @@ export const callcenterAgentsRoutes = async (app: FastifyInstance) => {
     const router = app.withTypeProvider<ZodTypeProvider>()
 
     router.get('/callcenter/agents/company/:id_company', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('callcenter', 'view')],
         schema: {
             tags: ['Callcenter Agents'],
             summary: 'Listar elegibilidade agente×empresa',
@@ -28,7 +29,7 @@ export const callcenterAgentsRoutes = async (app: FastifyInstance) => {
     }, AgentsController.getScopesByCompanyId as any)
 
     router.post('/callcenter/agents', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('callcenter', 'manage')],
         schema: {
             tags: ['Callcenter Agents'],
             summary: 'Vincular ramal a uma empresa (elegibilidade)',
@@ -45,7 +46,7 @@ export const callcenterAgentsRoutes = async (app: FastifyInstance) => {
     }, AgentsController.createScope as any)
 
     router.patch('/callcenter/agents/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('callcenter', 'manage')],
         schema: {
             tags: ['Callcenter Agents'],
             summary: 'Ativar/desativar elegibilidade',
@@ -62,7 +63,7 @@ export const callcenterAgentsRoutes = async (app: FastifyInstance) => {
     }, AgentsController.updateScope as any)
 
     router.delete('/callcenter/agents/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('callcenter', 'manage')],
         schema: {
             tags: ['Callcenter Agents'],
             summary: 'Remover elegibilidade',

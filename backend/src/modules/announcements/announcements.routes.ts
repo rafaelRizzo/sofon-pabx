@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import * as AnnouncementsController from './announcements.controller'
 import { protectedRoute } from '../../middleware/scope.middleware'
+import { requirePermission } from '../../middleware/permission.middleware'
 import {
     createAnnouncementSchema, updateAnnouncementSchema, idParamSchema, companyQuerySchema,
     ListAnnouncementsResponse, GetAnnouncementResponse, CreateAnnouncementResponse, UpdateAnnouncementResponse,
@@ -12,7 +13,7 @@ export const announcementsRoutes = async (app: FastifyInstance) => {
     const router = app.withTypeProvider<ZodTypeProvider>()
 
     router.get('/announcements', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('announcements', 'view')],
         schema: {
             tags: ['Announcements'],
             summary: 'Listar anúncios por empresa',
@@ -27,7 +28,7 @@ export const announcementsRoutes = async (app: FastifyInstance) => {
     }, AnnouncementsController.getAnnouncements as any)
 
     router.get('/announcements/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('announcements', 'view')],
         schema: {
             tags: ['Announcements'],
             summary: 'Buscar anúncio',
@@ -43,7 +44,7 @@ export const announcementsRoutes = async (app: FastifyInstance) => {
     }, AnnouncementsController.getAnnouncementById as any)
 
     router.post('/announcements', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('announcements', 'manage')],
         schema: {
             tags: ['Announcements'],
             summary: 'Criar anúncio',
@@ -60,7 +61,7 @@ export const announcementsRoutes = async (app: FastifyInstance) => {
     }, AnnouncementsController.createAnnouncement as any)
 
     router.patch('/announcements/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('announcements', 'manage')],
         schema: {
             tags: ['Announcements'],
             summary: 'Atualizar anúncio',
@@ -79,7 +80,7 @@ export const announcementsRoutes = async (app: FastifyInstance) => {
     }, AnnouncementsController.updateAnnouncement as any)
 
     router.delete('/announcements/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('announcements', 'manage')],
         schema: {
             tags: ['Announcements'],
             summary: 'Remover anúncio',

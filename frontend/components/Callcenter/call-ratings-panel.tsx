@@ -84,7 +84,7 @@ export function CallRatingsPanel({ companyId }: Props) {
     const selectedExtension = extensions.find((e) => e.id === extensionId) ?? null
     const extensionLabel = (id: string) => {
         const ext = extensions.find((e) => e.id === id)
-        return ext ? `${ext.alias} — ${ext.name}` : id
+        return ext ? `${ext.alias} - ${ext.name}` : id
     }
 
     const dateRange: DateRange | undefined = {
@@ -106,14 +106,14 @@ export function CallRatingsPanel({ companyId }: Props) {
         <div className="flex flex-col gap-4">
             <p className="text-sm text-muted-foreground">
                 Notas de 1 a 5 dadas pelo cliente na pesquisa de satisfação pós-atendimento
-                {total > 0 && ` — ${total} registro(s)`}.
+                {total > 0 && ` (${total} registro(s))`}.
             </p>
 
             <div className="flex flex-wrap items-end gap-2">
                 <Combobox<Extension>
                     items={extensions}
                     value={selectedExtension}
-                    itemToStringLabel={(e) => `${e.alias} — ${e.name}`}
+                    itemToStringLabel={(e) => `${e.alias} - ${e.name}`}
                     isItemEqualToValue={(a, b) => a.id === b.id}
                     onValueChange={(e) => setExtensionId(e?.id ?? "")}
                 >
@@ -123,7 +123,7 @@ export function CallRatingsPanel({ companyId }: Props) {
                         <ComboboxList>
                             {(e: Extension) => (
                                 <ComboboxItem key={e.id} value={e}>
-                                    {e.alias} — {e.name}
+                                    {e.alias} - {e.name}
                                 </ComboboxItem>
                             )}
                         </ComboboxList>

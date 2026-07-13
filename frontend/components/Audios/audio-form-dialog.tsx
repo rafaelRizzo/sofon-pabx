@@ -59,7 +59,14 @@ type Props = {
     onSave: (form: AudioFormValues, file: File | null) => Promise<boolean>
 }
 
-const AUDIO_ACCEPT = "audio/*"
+// .gsm não tem MIME type padrão no browser; validação cai pra extensão quando o MIME não vem
+const AUDIO_EXTENSIONS = ["wav", "mp3", "gsm"]
+const AUDIO_ACCEPT = AUDIO_EXTENSIONS.map((ext) => `.${ext}`).join(",")
+
+function isAudioFile(file: File) {
+    const ext = file.name.split(".").pop()?.toLowerCase()
+    return !!ext && AUDIO_EXTENSIONS.includes(ext)
+}
 
 export function AudioFormDialog({ open, onOpenChange, audio, companies, onSave }: Props) {
     const isEdit = !!audio
@@ -92,8 +99,8 @@ export function AudioFormDialog({ open, onOpenChange, audio, companies, onSave }
 
     function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
         const selected = e.target.files?.[0] ?? null
-        if (selected && !selected.type.startsWith("audio/")) {
-            setFileError("O arquivo precisa ser um áudio")
+        if (selected && !isAudioFile(selected)) {
+            setFileError("Formato não suportado, veja os formatos aceitos abaixo")
             setFile(null)
             return
         }
@@ -220,8 +227,9 @@ export function AudioFormDialog({ open, onOpenChange, audio, companies, onSave }
                                         )}
                                         {fileError && <FieldError>{fileError}</FieldError>}
                                         <FieldDescription>
-                                            Convertido automaticamente para o formato usado pelo Asterisk
-                                            (WAV PCM 16-bit mono 8kHz) — qualquer formato de áudio é aceito.
+                                            Formatos aceitos: WAV, MP3, GSM. Convertido automaticamente
+                                            para WAV PCM 16-bit mono 8kHz (formato usado pelo Asterisk),
+                                            sem perda de qualidade e sem resample durante a chamada.
                                         </FieldDescription>
                                     </Field>
                                 )}

@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import * as HolidayGroupsController from './holiday-groups.controller'
 import { protectedRoute } from '../../middleware/scope.middleware'
+import { requirePermission } from '../../middleware/permission.middleware'
 import {
     createHolidayGroupSchema, updateHolidayGroupSchema, idParamSchema, companyQuerySchema,
     ListHolidayGroupsResponse, GetHolidayGroupResponse, CreateHolidayGroupResponse, UpdateHolidayGroupResponse,
@@ -12,7 +13,7 @@ export const holidayGroupsRoutes = async (app: FastifyInstance) => {
     const router = app.withTypeProvider<ZodTypeProvider>()
 
     router.get('/holiday-groups', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('holiday-groups', 'view')],
         schema: {
             tags: ['Holiday Groups'],
             summary: 'Listar grupos de feriados por empresa',
@@ -28,7 +29,7 @@ export const holidayGroupsRoutes = async (app: FastifyInstance) => {
     }, HolidayGroupsController.getHolidayGroupsByCompanyId as any)
 
     router.get('/holiday-groups/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('holiday-groups', 'view')],
         schema: {
             tags: ['Holiday Groups'],
             summary: 'Buscar grupo de feriados',
@@ -44,7 +45,7 @@ export const holidayGroupsRoutes = async (app: FastifyInstance) => {
     }, HolidayGroupsController.getHolidayGroupById as any)
 
     router.post('/holiday-groups', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('holiday-groups', 'manage')],
         schema: {
             tags: ['Holiday Groups'],
             summary: 'Criar grupo de feriados — datas manuais ou auto-atualizadas por url',
@@ -61,7 +62,7 @@ export const holidayGroupsRoutes = async (app: FastifyInstance) => {
     }, HolidayGroupsController.createHolidayGroup as any)
 
     router.put('/holiday-groups/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('holiday-groups', 'manage')],
         schema: {
             tags: ['Holiday Groups'],
             summary: 'Atualizar grupo de feriados',
@@ -79,7 +80,7 @@ export const holidayGroupsRoutes = async (app: FastifyInstance) => {
     }, HolidayGroupsController.updateHolidayGroup as any)
 
     router.delete('/holiday-groups/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('holiday-groups', 'manage')],
         schema: {
             tags: ['Holiday Groups'],
             summary: 'Remover grupo de feriados',

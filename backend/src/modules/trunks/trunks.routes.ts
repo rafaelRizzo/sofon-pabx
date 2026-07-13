@@ -3,6 +3,7 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import * as TrunksController from './trunks.controller'
 import { protectedRoute } from '../../middleware/scope.middleware'
+import { requirePermission } from '../../middleware/permission.middleware'
 import {
     createTrunkSchema, updateTrunkSchema, trunkIdParamSchema, trunkQuerySchema,
     ListTrunksResponse, GetTrunkResponse, CreateTrunkResponse, UpdateTrunkResponse,
@@ -15,7 +16,7 @@ export const trunksRoutes = async (app: FastifyInstance) => {
     const router = app.withTypeProvider<ZodTypeProvider>()
 
     router.get('/trunks', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('trunks', 'view')],
         schema: {
             tags: ['Trunks'],
             summary: 'Listar trunks',
@@ -31,7 +32,7 @@ export const trunksRoutes = async (app: FastifyInstance) => {
     }, TrunksController.getTrunks as any)
 
     router.get('/trunks/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('trunks', 'view')],
         schema: {
             tags: ['Trunks'],
             summary: 'Buscar trunk',
@@ -47,7 +48,7 @@ export const trunksRoutes = async (app: FastifyInstance) => {
     }, TrunksController.getTrunkById as any)
 
     router.post('/trunks', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('trunks', 'manage')],
         schema: {
             tags: ['Trunks'],
             summary: 'Criar trunk',
@@ -64,7 +65,7 @@ export const trunksRoutes = async (app: FastifyInstance) => {
     }, TrunksController.createTrunk as any)
 
     router.put('/trunks/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('trunks', 'manage')],
         schema: {
             tags: ['Trunks'],
             summary: 'Atualizar trunk',
@@ -81,7 +82,7 @@ export const trunksRoutes = async (app: FastifyInstance) => {
     }, TrunksController.updateTrunk as any)
 
     router.delete('/trunks/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('trunks', 'manage')],
         schema: {
             tags: ['Trunks'],
             summary: 'Remover trunk',

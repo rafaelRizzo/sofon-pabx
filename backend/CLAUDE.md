@@ -90,9 +90,16 @@ requireAdmin    // lança 403 se !scope.isAdmin
 ```ts
 onRequest: protectedRoute
 onRequest: [...protectedRoute, requireAdmin]
+onRequest: [...protectedRoute, requirePermission('<resource>', 'view'|'manage')]
 ```
 
 **Roles:** `admin` | `reseller` | `user`
+
+**Permissões granulares por usuário** (`src/middleware/permission.middleware.ts` + `src/utils/auth/permissions.ts`): só se aplica a `role === "user"`; admin/reseller sempre bypassam (acesso irrestrito, sem mudança de comportamento).
+- `User.permissions: String[]`: chaves `"<recurso>:view"` / `"<recurso>:manage"`. `PERMISSION_RESOURCES` cobre `companies`, `users`, `extensions`, `queues`, `ivr`, `announcements`, `callcenter`, `dids`, `inbound-routes`, `outbound-routes`, `trunks`, `audios`, `time-groups`, `time-conditions`, `holiday-groups`, `request-templates`, `variables`, `variable-conditions`. `cdr` é caso especial: só `view` (recurso somente leitura).
+- `requirePermission(resource, action)` checa `getUserPermissions(id)` (`src/utils/auth/access.ts`, cacheado como `getUserCompanyIds`, invalidado em `updateUser`): aplicado em toda rota GET (`:view`) e POST/PUT/PATCH/DELETE (`:manage`) de todos os módulos, exceto as já `requireAdmin`-only (gate redundante ali)
+- `GET /auth/me`: `{id, name, username, role, permissions}` do token atual; base pro frontend montar menu/checkboxes
+- Guard anti-escalação: `updateUser` só aceita alterar `permissions` se `req.scope.isAdmin`, impedindo um `role="user"` de se autoconceder permissão via self-edit
 
 ---
 
@@ -178,9 +185,9 @@ Vars: `DATABASE_URL`, `JWT_SECRET`, `REFRESH_SECRET`, `JWT_EXPIRES_IN` (15m), `R
 - Refresh: `{ refreshToken }` → `{ accessToken }`
 - Logout: → 204
 
-**Users** — `{ id, name, username, role, status, extensionId?, webhookSlug(uuid), createdAt, updatedAt }`
-- Create: `{ name, username, password }` → `{ userId }`
-- Update: `{ name?, username?, password?, extensionId? }` (min 1)
+**Users**: `{ id, name, username, role, status, permissions[], extensionId?, webhookSlug(uuid), createdAt, updatedAt }`
+- Create: `{ name, username, password, permissions?[] }` → `{ userId }`
+- Update: `{ name?, username?, password?, extensionId?, permissions?[] }` (min 1); `permissions` só é aceito se quem chama for admin (ver seção "Permissões granulares" acima)
 
 **Companies** — `{ id, name, doc?, metadata(json), createdAt, updatedAt }`
 - Create: `{ name, doc?, metadata?, userId? }`
@@ -195,7 +202,7 @@ Vars: `DATABASE_URL`, `JWT_SECRET`, `REFRESH_SECRET`, `JWT_EXPIRES_IN` (15m), `R
 - Batch: `{ extensions: CreateExtension[] }` (max 50, sem alias duplicado por empresa)
 - Update: `{ name?, allowOutbound? }`; `PATCH /:id/password` reseta senha
 
-**Queues** — `{ name(alphanum/dash/_), number(^\d+$), companyId, strategy?, musicOnHold?, timeout?, retry?, maxLen?, wrapupTime?, announce?, announceFrequency?, joinEmpty?, leaveWhenEmpty?, weight?, surveyAudioId?, callcenterEnabled? }`
+**Queues** (rotas gateadas por `queues:view`/`queues:manage` — inclui `queue-members`, sem permissão própria por não ter item de menu) — `{ name(alphanum/dash/_), number(^\d+$), companyId, strategy?, musicOnHold?, timeout?, retry?, maxLen?, wrapupTime?, announce?, announceFrequency?, joinEmpty?, leaveWhenEmpty?, weight?, surveyAudioId?, callcenterEnabled? }`
 - `number` obrigatório no create, único por empresa (`UNIQUE(number, companyId)`) — usado como destino de inbound routes/time conditions (`Goto(queues-app,<asteriskId>-<number>,1)`)
 - strategies: `ringall|leastrecent|fewestcalls|random|rrmemory|linear|wrandom`
 - Member add: `{ extensionId, penalty?(0-100), paused? }`; update: `{ penalty?, paused?, pauseReason? }`
@@ -234,14 +241,14 @@ Vars: `DATABASE_URL`, `JWT_SECRET`, `REFRESH_SECRET`, `JWT_EXPIRES_IN` (15m), `R
 - Dialplan: contexto fixo `holidays`, exten `hol-<id>`, `GotoIfTime` por datas (month/day, sem hora/weekday)
 - `UNIQUE(name, companyId)`
 
-**Audios** — `{ id, name, companyId, createdAt, updatedAt }`
+**Audios** (rotas gateadas por `audios:view`/`audios:manage`, ver "Permissões granulares") — `{ id, name, companyId, createdAt, updatedAt }`
 - Create: `POST /audios` — multipart/form-data com campos de texto `name`+`companyId` **antes** do arquivo, até 15MB. Converte pra WAV slin 8kHz mono 16-bit via `sox` → `{ audioId }`
 - Update: `PATCH /:id` — `{ name }` (só rename)
 - Delete: `DELETE /:id` — remove registro e `.wav`; desvincula (não bloqueia) Announcement/IvrMenu que o referenciem, removendo o dialplan deles
 - `UNIQUE(name, companyId)`
 - Delete Company → cascade Audios (dialplan dos consumidores limpo antes; pasta `/var/lib/asterisk/sounds/<asteriskId>/` inteira removida)
 
-**Announcements** — `{ id, name, companyId, audioId, hasAudio, destination, createdAt, updatedAt }`
+**Announcements** (rotas gateadas por `announcements:view`/`announcements:manage`) — `{ id, name, companyId, audioId, hasAudio, destination, createdAt, updatedAt }`
 - Create: `{ name, companyId, audioId?, destination? }` → `{ announcementId }` (com `audioId` já sai com dialplan; sem ele fica pendente)
 - Update: `{ name?, audioId?, destination? }` (min 1; `audioId: null` desvincula e remove o dialplan)
 - `destination`: route destination compartilhado — para onde vai após o áudio tocar (null/omitido = Hangup)

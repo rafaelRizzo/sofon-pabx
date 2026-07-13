@@ -89,6 +89,7 @@ export default function OutboundRoutesPage() {
                 routes={paginated}
                 trunks={formTrunks}
                 loading={loading}
+                companySelected={!!companyFilter}
                 onEdit={setEditRoute}
                 onDelete={setDeleteTarget}
             />

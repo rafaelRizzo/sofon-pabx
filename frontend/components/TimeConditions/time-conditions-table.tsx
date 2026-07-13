@@ -30,6 +30,7 @@ import { type TimeCondition } from "@/hooks/use-time-conditions"
 type Props = {
     timeConditions: TimeCondition[]
     loading: boolean
+    companySelected: boolean
     onEdit: (timeCondition: TimeCondition) => void
     onDelete: (timeCondition: TimeCondition) => void
 }
@@ -79,7 +80,7 @@ function useDestinationLabels(timeConditions: TimeCondition[]) {
     return { labels, loadedTypes }
 }
 
-export function TimeConditionsTable({ timeConditions, loading, onEdit, onDelete }: Props) {
+export function TimeConditionsTable({ timeConditions, loading, companySelected, onEdit, onDelete }: Props) {
     const { labels, loadedTypes } = useDestinationLabels(timeConditions)
 
     return (
@@ -108,7 +109,7 @@ export function TimeConditionsTable({ timeConditions, loading, onEdit, onDelete 
                     ) : timeConditions.length === 0 ? (
                         <TableRow>
                             <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                                Nenhuma condição de horário encontrada
+                                {companySelected ? "Nenhuma condição de horário encontrada" : "Selecione uma empresa para listar"}
                             </TableCell>
                         </TableRow>
                     ) : (

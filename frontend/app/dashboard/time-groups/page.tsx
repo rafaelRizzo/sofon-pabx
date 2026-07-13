@@ -74,6 +74,7 @@ export default function TimeGroupsPage() {
                 timeGroups={paginated}
                 companies={companies}
                 loading={loading}
+                companySelected={!!companyFilter}
                 onEdit={setEditTimeGroup}
                 onDelete={setDeleteTarget}
             />

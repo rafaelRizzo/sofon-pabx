@@ -253,6 +253,11 @@ export function useExtensions(companyId?: string) {
     const [filter, setFilter] = useState("")
 
     const fetchExtensions = useCallback(async () => {
+        if (!companyId) {
+            setExtensions([])
+            setLoading(false)
+            return
+        }
         setLoading(true)
         try {
             const { data } = await api.get("/extensions", {
@@ -386,12 +391,6 @@ export function useExtensions(companyId?: string) {
     const fetchStateRef = useRef<{ key?: string; fetched: boolean }>({ fetched: false })
 
     useEffect(() => {
-        if (!companyId) {
-            setExtensions([])
-            setLoading(false)
-            fetchStateRef.current = { fetched: false }
-            return
-        }
         if (fetchStateRef.current.fetched && fetchStateRef.current.key === companyId) return
         fetchStateRef.current = { key: companyId, fetched: true }
         fetchExtensions()

@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import * as RequestTemplatesController from './request-templates.controller'
 import { protectedRoute } from '../../middleware/scope.middleware'
+import { requirePermission } from '../../middleware/permission.middleware'
 import {
     createRequestTemplateSchema, updateRequestTemplateSchema, idParamSchema, optionalCompanyQuery,
     ListRequestTemplatesResponse, GetRequestTemplateResponse, CreateRequestTemplateResponse, UpdateRequestTemplateResponse,
@@ -12,7 +13,7 @@ export const requestTemplatesRoutes = async (app: FastifyInstance) => {
     const router = app.withTypeProvider<ZodTypeProvider>()
 
     router.get('/request-templates', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('request-templates', 'view')],
         schema: {
             tags: ['Request Templates'],
             summary: 'Listar request templates por empresa',
@@ -27,7 +28,7 @@ export const requestTemplatesRoutes = async (app: FastifyInstance) => {
     }, RequestTemplatesController.getRequestTemplates as any)
 
     router.get('/request-templates/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('request-templates', 'view')],
         schema: {
             tags: ['Request Templates'],
             summary: 'Buscar request template',
@@ -43,7 +44,7 @@ export const requestTemplatesRoutes = async (app: FastifyInstance) => {
     }, RequestTemplatesController.getRequestTemplateById as any)
 
     router.post('/request-templates', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('request-templates', 'manage')],
         schema: {
             tags: ['Request Templates'],
             summary: 'Criar request template',
@@ -65,7 +66,7 @@ export const requestTemplatesRoutes = async (app: FastifyInstance) => {
     }, RequestTemplatesController.createRequestTemplate as any)
 
     router.put('/request-templates/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('request-templates', 'manage')],
         schema: {
             tags: ['Request Templates'],
             summary: 'Atualizar request template',
@@ -83,7 +84,7 @@ export const requestTemplatesRoutes = async (app: FastifyInstance) => {
     }, RequestTemplatesController.updateRequestTemplate as any)
 
     router.delete('/request-templates/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('request-templates', 'manage')],
         schema: {
             tags: ['Request Templates'],
             summary: 'Remover request template',

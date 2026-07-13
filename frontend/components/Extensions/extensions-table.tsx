@@ -32,6 +32,7 @@ type Props = {
     extensions: Extension[]
     companies: Company[]
     loading: boolean
+    companySelected: boolean
     onEdit: (extension: Extension) => void
     onResetPassword: (extension: Extension) => void
     onDelete: (extension: Extension) => void
@@ -41,6 +42,7 @@ export function ExtensionsTable({
     extensions,
     companies,
     loading,
+    companySelected,
     onEdit,
     onResetPassword,
     onDelete,
@@ -80,7 +82,9 @@ export function ExtensionsTable({
                                 colSpan={6}
                                 className="h-24 text-center text-muted-foreground"
                             >
-                                Nenhum ramal encontrado
+                                {companySelected
+                                    ? "Nenhum ramal encontrado"
+                                    : "Selecione uma empresa para listar"}
                             </TableCell>
                         </TableRow>
                     ) : (

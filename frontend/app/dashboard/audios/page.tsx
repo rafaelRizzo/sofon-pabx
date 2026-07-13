@@ -70,6 +70,7 @@ export default function AudiosPage() {
             <AudiosTable
                 audios={paginated}
                 loading={loading}
+                companySelected={!!companyFilter}
                 onEdit={setEditAudio}
                 onDelete={setDeleteTarget}
             />

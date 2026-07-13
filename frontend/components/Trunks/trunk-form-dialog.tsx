@@ -163,7 +163,7 @@ export function TrunkFormDialog({
                     </DialogTitle>
                     <DialogDescription>
                         {isEdit
-                            ? `${trunk.name} — ${
+                            ? `${trunk.name} - ${
                                   trunk.registrationMode === "outbound"
                                       ? "Outbound"
                                       : `Inbound (identificado por ${trunk.identifyBy === "username" ? "usuário" : "IP"})`

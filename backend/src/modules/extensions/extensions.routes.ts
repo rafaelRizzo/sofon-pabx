@@ -3,6 +3,7 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import * as ExtensionsController from './extensions.controller'
 import { protectedRoute } from '../../middleware/scope.middleware'
+import { requirePermission } from '../../middleware/permission.middleware'
 import {
     createExtensionSchema, createExtensionBatchSchema, updateExtensionSchema, extensionIdParamSchema,
     BatchResultSchema, ListExtensionsResponse, GetExtensionResponse,
@@ -16,7 +17,7 @@ export const extensionsRoutes = async (app: FastifyInstance) => {
     const router = app.withTypeProvider<ZodTypeProvider>()
 
     router.get('/extensions', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('extensions', 'view')],
         schema: {
             tags: ['Extensions'],
             summary: 'Listar ramais',
@@ -31,7 +32,7 @@ export const extensionsRoutes = async (app: FastifyInstance) => {
     }, ExtensionsController.getAllExtensions as any)
 
     router.get('/extensions/export', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('extensions', 'view')],
         schema: {
             tags: ['Extensions'],
             summary: 'Exportar ramais com usuário e senha',
@@ -46,7 +47,7 @@ export const extensionsRoutes = async (app: FastifyInstance) => {
     }, ExtensionsController.exportExtensions as any)
 
     router.get('/extensions/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('extensions', 'view')],
         schema: {
             tags: ['Extensions'],
             summary: 'Buscar ramal',
@@ -62,7 +63,7 @@ export const extensionsRoutes = async (app: FastifyInstance) => {
     }, ExtensionsController.getExtensionById as any)
 
     router.post('/extensions', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('extensions', 'manage')],
         schema: {
             tags: ['Extensions'],
             summary: 'Criar ramal',
@@ -79,7 +80,7 @@ export const extensionsRoutes = async (app: FastifyInstance) => {
     }, ExtensionsController.createExtension as any)
 
     router.post('/extensions/batch', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('extensions', 'manage')],
         schema: {
             tags: ['Extensions'],
             summary: 'Criar ramais em lote',
@@ -96,7 +97,7 @@ export const extensionsRoutes = async (app: FastifyInstance) => {
     }, ExtensionsController.createExtensionBatch as any)
 
     router.put('/extensions/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('extensions', 'manage')],
         schema: {
             tags: ['Extensions'],
             summary: 'Atualizar ramal',
@@ -113,7 +114,7 @@ export const extensionsRoutes = async (app: FastifyInstance) => {
     }, ExtensionsController.updateExtension as any)
 
     router.patch('/extensions/:id/password', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('extensions', 'manage')],
         schema: {
             tags: ['Extensions'],
             summary: 'Resetar senha do ramal',
@@ -130,7 +131,7 @@ export const extensionsRoutes = async (app: FastifyInstance) => {
     }, ExtensionsController.resetExtensionPassword as any)
 
     router.delete('/extensions/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('extensions', 'manage')],
         schema: {
             tags: ['Extensions'],
             summary: 'Remover ramal',

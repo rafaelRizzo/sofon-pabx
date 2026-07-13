@@ -3,6 +3,7 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import * as DidsController from './dids.controller'
 import { protectedRoute } from '../../middleware/scope.middleware'
+import { requirePermission } from '../../middleware/permission.middleware'
 import {
     createDidSchema, updateDidSchema, idParamSchema, companyIdParamSchema,
     ListDidsResponse, GetDidResponse, CreateDidResponse, UpdateDidResponse,
@@ -15,7 +16,7 @@ export const didsRoutes = async (app: FastifyInstance) => {
     const router = app.withTypeProvider<ZodTypeProvider>()
 
     router.get('/dids', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('dids', 'view')],
         schema: {
             tags: ['DIDs'],
             summary: 'Listar DIDs',
@@ -30,7 +31,7 @@ export const didsRoutes = async (app: FastifyInstance) => {
     }, DidsController.getDids as any)
 
     router.get('/dids/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('dids', 'view')],
         schema: {
             tags: ['DIDs'],
             summary: 'Buscar DID',
@@ -46,7 +47,7 @@ export const didsRoutes = async (app: FastifyInstance) => {
     }, DidsController.getDidById as any)
 
     router.get('/dids/company/:id_company', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('dids', 'view')],
         schema: {
             tags: ['DIDs'],
             summary: 'Listar DIDs por empresa',
@@ -61,7 +62,7 @@ export const didsRoutes = async (app: FastifyInstance) => {
     }, DidsController.getDidsByCompanyId as any)
 
     router.post('/dids', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('dids', 'manage')],
         schema: {
             tags: ['DIDs'],
             summary: 'Criar DID',
@@ -78,7 +79,7 @@ export const didsRoutes = async (app: FastifyInstance) => {
     }, DidsController.createDid as any)
 
     router.put('/dids/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('dids', 'manage')],
         schema: {
             tags: ['DIDs'],
             summary: 'Atualizar DID',
@@ -95,7 +96,7 @@ export const didsRoutes = async (app: FastifyInstance) => {
     }, DidsController.updateDid as any)
 
     router.delete('/dids/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('dids', 'manage')],
         schema: {
             tags: ['DIDs'],
             summary: 'Remover DID',

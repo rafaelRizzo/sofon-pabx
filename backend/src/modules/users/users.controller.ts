@@ -53,6 +53,12 @@ export const createUser = async (req: FastifyRequest, reply: FastifyReply) => {
             throw new AppError('Resellers can only create users with role "user"', 403)
         }
 
+        // reseller só vincula o novo usuário a empresas do próprio escopo; sem isso, um reseller
+        // poderia criar um usuário com acesso a empresas fora do seu escopo (IDOR)
+        if (!req.scope.isAdmin) {
+            data.companyIds.forEach((companyId) => req.scope.assertAccess(companyId))
+        }
+
         const createdBy = requesterRole !== 'admin' ? requesterId : undefined
         const user = await UsersService.createUser(data, createdBy)
 
@@ -69,12 +75,23 @@ export const updateUser = async (req: FastifyRequest, reply: FastifyReply) => {
 
         const data = updateUserSchema.parse(req.body)
 
+        // só admin altera permissions; sem isso, um "user" editando o próprio perfil (assertSelfOrAdmin
+        // permite self-edit) poderia se auto-conceder qualquer permissão (escalação de privilégio)
+        if (data.permissions !== undefined && !req.scope.isAdmin) {
+            throw new AppError('Forbidden', 403)
+        }
+
         // extensionId governa pause/unpause em filas — não-admin não pode vincular ramal fora do seu
         // escopo de empresa (IDOR). Admin (companyIds null) pode qualquer um.
         if (data.extensionId && !req.scope.isAdmin) {
             const ext = await prisma.extension.findUnique({ where: { id: data.extensionId }, select: { companyId: true } })
             if (!ext) throw new AppError('Extension not found', 404)
             req.scope.assertAccess(ext.companyId)
+        }
+
+        // mesma proteção de IDOR do create: reseller só vincula a empresas do próprio escopo
+        if (data.companyIds && !req.scope.isAdmin) {
+            data.companyIds.forEach((companyId) => req.scope.assertAccess(companyId))
         }
 
         await UsersService.updateUser(id, data)

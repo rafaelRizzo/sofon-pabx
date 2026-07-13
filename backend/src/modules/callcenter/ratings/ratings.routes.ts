@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import * as RatingsController from './ratings.controller'
 import { protectedRoute } from '../../../middleware/scope.middleware'
+import { requirePermission } from '../../../middleware/permission.middleware'
 import { ratingQuerySchema, createRatingSchema, ListRatingsResponse, CreateRatingResponse } from './schemas/call-rating.schema'
 import { errors } from '../../../schemas/responses'
 
@@ -9,7 +10,7 @@ export const callcenterRatingsRoutes = async (app: FastifyInstance) => {
     const router = app.withTypeProvider<ZodTypeProvider>()
 
     router.get('/callcenter/ratings', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('callcenter', 'view')],
         schema: {
             tags: ['Callcenter Ratings'],
             summary: 'Listar notas de atendimento',
@@ -26,7 +27,7 @@ export const callcenterRatingsRoutes = async (app: FastifyInstance) => {
     }, RatingsController.getRatings as any)
 
     router.post('/callcenter/ratings', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('callcenter', 'manage')],
         schema: {
             tags: ['Callcenter Ratings'],
             summary: 'Registrar nota de atendimento',

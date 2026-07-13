@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import * as UsersController from './users.controller'
 import { protectedRoute, requireAdmin } from '../../middleware/scope.middleware'
+import { requirePermission } from '../../middleware/permission.middleware'
 import {
     createUserSchema, updateUserSchema, idParamSchema,
     ListUsersResponse, GetUserResponse, GetUserCompaniesResponse, CreateUserResponse, UpdateUserResponse,
@@ -12,7 +13,7 @@ export const usersRoutes = async (app: FastifyInstance) => {
     const router = app.withTypeProvider<ZodTypeProvider>()
 
     router.get('/users', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('users', 'view')],
         schema: {
             tags: ['Users'],
             summary: 'Listar usuários',
@@ -27,7 +28,7 @@ export const usersRoutes = async (app: FastifyInstance) => {
     }, UsersController.getAllUsers as any)
 
     router.get('/users/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('users', 'view')],
         schema: {
             tags: ['Users'],
             summary: 'Buscar usuário',
@@ -42,7 +43,7 @@ export const usersRoutes = async (app: FastifyInstance) => {
     }, UsersController.getUserById as any)
 
     router.get('/users/:id/companies', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('users', 'view')],
         schema: {
             tags: ['Users'],
             summary: 'Listar empresas do usuário',
@@ -57,7 +58,7 @@ export const usersRoutes = async (app: FastifyInstance) => {
     }, UsersController.getCompaniesByUser as any)
 
     router.post('/users', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('users', 'manage')],
         schema: {
             tags: ['Users'],
             summary: 'Criar usuário',
@@ -74,7 +75,7 @@ export const usersRoutes = async (app: FastifyInstance) => {
     }, UsersController.createUser as any)
 
     router.put('/users/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('users', 'manage')],
         schema: {
             tags: ['Users'],
             summary: 'Atualizar usuário',

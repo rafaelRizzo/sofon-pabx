@@ -4,6 +4,7 @@ import { CompaniesCache } from '../companies/cache/companies.cache'
 import type { CreateUserInput, UpdateUserInput } from './schemas/user.schema'
 import argon2 from 'argon2'
 import { AppError } from '../../utils/errors/app.error'
+import { invalidateUserCompanyIds, invalidateUserPermissions } from '../../utils/auth/access'
 
 const userSelect = {
     id: true,
@@ -12,6 +13,7 @@ const userSelect = {
     username: true,
     role: true,
     status: true,
+    permissions: true,
     extensionId: true,
     createdBy: true,
     companies: { select: { company: { select: { id: true, name: true } } } },
@@ -64,22 +66,38 @@ export const getUserById = async (id: string) => {
     return user
 }
 
+const assertCompaniesExist = async (companyIds: string[]) => {
+    const found = await prisma.company.count({ where: { id: { in: companyIds } } })
+    if (found !== companyIds.length) {
+        throw new AppError('One or more companies not found', 404)
+    }
+}
+
 export const createUser = async (data: CreateUserInput, createdBy?: string) => {
     const existing = await prisma.user.findUnique({ where: { username: data.username } })
     if (existing) {
         throw new AppError('Username already in use', 409)
     }
 
-    const hashedPassword = await argon2.hash(data.password)
+    const { companyIds, ...rest } = data
+    await assertCompaniesExist(companyIds)
 
-    const user = mapUser(await prisma.user.create({
-        data: {
-            ...data,
-            password: hashedPassword,
-            createdBy: createdBy ?? null,
-        },
-        select: userSelect,
-    }))
+    const hashedPassword = await argon2.hash(rest.password)
+
+    // usuário nasce vinculado a >=1 empresa (garantido pelo min(1) do schema); sem isso,
+    // req.scope.companyIds fica [] e ele não enxerga nenhum recurso escopado por empresa
+    const created = await prisma.$transaction(async (tx) => {
+        const created = await tx.user.create({
+            data: { ...rest, password: hashedPassword, createdBy: createdBy ?? null },
+            select: { id: true },
+        })
+        await tx.userCompany.createMany({
+            data: companyIds.map((companyId) => ({ userId: created.id, companyId })),
+        })
+        return tx.user.findUniqueOrThrow({ where: { id: created.id }, select: userSelect })
+    })
+
+    const user = mapUser(created)
 
     await UsersCache.invalidateAllUsers()
     if (createdBy) await UsersCache.invalidateUsersByCreatedBy(createdBy)
@@ -92,20 +110,37 @@ export const updateUser = async (id: string, data: UpdateUserInput) => {
         throw new AppError('User not found', 404)
     }
 
-    const updateData = { ...data }
+    const { companyIds, ...rest } = data
+    if (companyIds) await assertCompaniesExist(companyIds)
+
+    const updateData = { ...rest }
     if (data.password) {
         updateData.password = await argon2.hash(data.password)
     }
 
-    const user = mapUser(await prisma.user.update({
-        where: { id },
-        data: updateData,
-        select: userSelect,
-    }))
+    const updated = await prisma.$transaction(async (tx) => {
+        await tx.user.update({ where: { id }, data: updateData })
+
+        // substitui a lista completa (nunca vazio, garantido pelo min(1) do schema quando enviado)
+        if (companyIds) {
+            await tx.userCompany.deleteMany({ where: { userId: id } })
+            await tx.userCompany.createMany({ data: companyIds.map((companyId) => ({ userId: id, companyId })) })
+        }
+
+        return tx.user.findUniqueOrThrow({ where: { id }, select: userSelect })
+    })
+
+    const user = mapUser(updated)
 
     await UsersCache.invalidateUser(id)
     await UsersCache.invalidateAllUsers()
     if (existingUser.createdBy) await UsersCache.invalidateUsersByCreatedBy(existingUser.createdBy)
+    if (data.permissions) await invalidateUserPermissions(id)
+    if (companyIds) {
+        await invalidateUserCompanyIds(id)
+        await CompaniesCache.invalidateCompaniesByUser(id)
+        await CompaniesCache.invalidateCompaniesForScope(id)
+    }
     return user
 }
 

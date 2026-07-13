@@ -5,7 +5,7 @@ import { useEffect, useState } from "react"
 const STORAGE_KEY = "companyFilter"
 
 /**
- * Filtro de empresa persistido em localStorage — mantém a seleção ao navegar
+ * Filtro de empresa persistido em localStorage; mantém a seleção ao navegar
  * entre páginas do dashboard ou recarregar a página.
  */
 export function useCompanyFilter() {

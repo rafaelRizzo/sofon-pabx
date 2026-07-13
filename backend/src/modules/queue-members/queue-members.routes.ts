@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import * as QueueMembersController from './queue-members.controller'
 import { protectedRoute } from '../../middleware/scope.middleware'
+import { requirePermission } from '../../middleware/permission.middleware'
 import {
     addMemberSchema, updateMemberSchema, memberIdParamSchema, queueIdParamSchema,
     ListMembersResponse, AddMemberResponse, UpdateMemberResponse,
@@ -12,7 +13,7 @@ export const queueMembersRoutes = async (app: FastifyInstance) => {
     const router = app.withTypeProvider<ZodTypeProvider>()
 
     router.get('/queues/:id/members', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('queues', 'view')],
         schema: {
             tags: ['Queue Members'],
             summary: 'Listar membros da fila',
@@ -28,7 +29,7 @@ export const queueMembersRoutes = async (app: FastifyInstance) => {
     }, QueueMembersController.getQueueMembers as any)
 
     router.post('/queues/:id/members', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('queues', 'manage')],
         schema: {
             tags: ['Queue Members'],
             summary: 'Adicionar membro',
@@ -46,7 +47,7 @@ export const queueMembersRoutes = async (app: FastifyInstance) => {
     }, QueueMembersController.addMember as any)
 
     router.put('/queues/:id/members/:memberId', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('queues', 'manage')],
         schema: {
             tags: ['Queue Members'],
             summary: 'Atualizar membro',
@@ -64,7 +65,7 @@ export const queueMembersRoutes = async (app: FastifyInstance) => {
     }, QueueMembersController.updateMember as any)
 
     router.delete('/queues/:id/members/:memberId', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('queues', 'manage')],
         schema: {
             tags: ['Queue Members'],
             summary: 'Remover membro',

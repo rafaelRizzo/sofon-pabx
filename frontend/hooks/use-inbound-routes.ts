@@ -47,10 +47,15 @@ export function useInboundRoutes(companyId?: string) {
     const [filter, setFilter] = useState("")
 
     const fetchRoutes = useCallback(async () => {
+        if (!companyId) {
+            setRoutes([])
+            setLoading(false)
+            return
+        }
         setLoading(true)
         try {
             const { data } = await api.get("/inbound-routes", {
-                params: companyId ? { companyId } : undefined,
+                params: { companyId },
             })
             setRoutes(data.inboundRoutes ?? [])
         } catch (err) {
@@ -106,12 +111,6 @@ export function useInboundRoutes(companyId?: string) {
     const fetchStateRef = useRef<{ key?: string; fetched: boolean }>({ fetched: false })
 
     useEffect(() => {
-        if (!companyId) {
-            setRoutes([])
-            setLoading(false)
-            fetchStateRef.current = { fetched: false }
-            return
-        }
         if (fetchStateRef.current.fetched && fetchStateRef.current.key === companyId) return
         fetchStateRef.current = { key: companyId, fetched: true }
         fetchRoutes()

@@ -1,16 +1,24 @@
 import { z } from 'zod'
 import { timestamp, ok } from '../../../schemas/responses'
 import { CompanySchema } from '../../companies/schemas/company.schema'
+import { PERMISSION_KEYS } from '../../../utils/auth/permissions'
 
 export const idParamSchema = z.object({
     id: z.cuid2(),
 })
 
+// Relevante só para role="user"; ignorado (mas aceito) para admin/reseller, que têm acesso irrestrito
+export const permissionsSchema = z.array(z.enum(PERMISSION_KEYS)).default([])
+
+// Todo usuário precisa estar vinculado a pelo menos 1 empresa: sem isso, req.scope.companyIds
+// fica [] e o usuário não enxerga nada (nenhum recurso escopado por empresa)
 export const createUserSchema = z.object({
     name: z.string().min(1),
     username: z.email(),
     password: z.string().min(6),
     role: z.enum(['admin', 'reseller', 'user']).default('user'),
+    permissions: permissionsSchema,
+    companyIds: z.array(z.cuid2()).min(1, 'Select at least one company'),
 })
 
 export const updateUserSchema = z.object({
@@ -18,6 +26,9 @@ export const updateUserSchema = z.object({
     username: z.email().optional(),
     password: z.string().min(6).optional(),
     extensionId: z.cuid2().nullable().optional(),
+    permissions: permissionsSchema.optional(),
+    // omitido = mantém vínculos atuais; se enviado, substitui a lista completa (nunca vazio)
+    companyIds: z.array(z.cuid2()).min(1, 'Select at least one company').optional(),
 })
 
 export type IdParam = z.infer<typeof idParamSchema>
@@ -30,6 +41,7 @@ export const UserSchema = z.object({
     username: z.string(),
     role: z.enum(['admin', 'reseller', 'user']),
     status: z.string(),
+    permissions: z.array(z.string()),
     extensionId: z.string().nullable(),
     webhookSlug: z.string(),
     createdBy: z.string().nullable(),

@@ -26,6 +26,7 @@ type Props = {
     routes: OutboundRoute[]
     trunks: Trunk[]
     loading: boolean
+    companySelected: boolean
     onEdit: (route: OutboundRoute) => void
     onDelete: (route: OutboundRoute) => void
 }
@@ -34,6 +35,7 @@ export function OutboundRoutesTable({
     routes,
     trunks,
     loading,
+    companySelected,
     onEdit,
     onDelete,
 }: Props) {
@@ -69,7 +71,9 @@ export function OutboundRoutesTable({
                                 colSpan={5}
                                 className="h-24 text-center text-muted-foreground"
                             >
-                                Nenhuma rota de saída encontrada
+                                {companySelected
+                                    ? "Nenhuma rota de saída encontrada"
+                                    : "Selecione uma empresa para listar"}
                             </TableCell>
                         </TableRow>
                     ) : (

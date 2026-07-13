@@ -30,9 +30,11 @@ export default function UsersPage() {
 
     const [companyFilter, setCompanyFilter] = useCompanyFilter()
 
+    // sem filtro selecionado = todas as empresas (não vazio); consistente com as outras
+    // listagens (extensions, queues, etc.), onde ausência de companyId busca tudo
     const filteredUsers = companyFilter
         ? users.filter((u) => u.companies.some((c) => c.id === companyFilter))
-        : []
+        : users
 
     const { paginated, page, setPage, totalPages, total } = usePagination(
         filteredUsers,
@@ -79,6 +81,7 @@ export default function UsersPage() {
                     companies={companies}
                     value={companyFilter}
                     onValueChange={setCompanyFilter}
+                    showAllOption
                 />
             </div>
 

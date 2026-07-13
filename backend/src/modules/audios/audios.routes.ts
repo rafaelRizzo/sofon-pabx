@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import * as AudiosController from './audios.controller'
 import { protectedRoute } from '../../middleware/scope.middleware'
+import { requirePermission } from '../../middleware/permission.middleware'
 import {
     updateAudioSchema, idParamSchema, companyQuerySchema,
     ListAudiosResponse, GetAudioResponse, CreateAudioResponse, UpdateAudioResponse,
@@ -12,7 +13,7 @@ export const audiosRoutes = async (app: FastifyInstance) => {
     const router = app.withTypeProvider<ZodTypeProvider>()
 
     router.get('/audios', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('audios', 'view')],
         schema: {
             tags: ['Audios'],
             summary: 'Listar áudios por empresa',
@@ -27,7 +28,7 @@ export const audiosRoutes = async (app: FastifyInstance) => {
     }, AudiosController.getAudios as any)
 
     router.get('/audios/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('audios', 'view')],
         schema: {
             tags: ['Audios'],
             summary: 'Buscar áudio',
@@ -43,7 +44,7 @@ export const audiosRoutes = async (app: FastifyInstance) => {
     }, AudiosController.getAudioById as any)
 
     router.post('/audios', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('audios', 'manage')],
         schema: {
             tags: ['Audios'],
             summary: 'Enviar novo áudio',
@@ -68,7 +69,7 @@ export const audiosRoutes = async (app: FastifyInstance) => {
     }, AudiosController.createAudio as any)
 
     router.patch('/audios/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('audios', 'manage')],
         schema: {
             tags: ['Audios'],
             summary: 'Renomear áudio',
@@ -86,7 +87,7 @@ export const audiosRoutes = async (app: FastifyInstance) => {
     }, AudiosController.updateAudio as any)
 
     router.delete('/audios/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('audios', 'manage')],
         schema: {
             tags: ['Audios'],
             summary: 'Remover áudio',

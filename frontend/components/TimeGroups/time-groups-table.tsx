@@ -85,6 +85,7 @@ type Props = {
     timeGroups: TimeGroup[]
     companies: Company[]
     loading: boolean
+    companySelected: boolean
     onEdit: (timeGroup: TimeGroup) => void
     onDelete: (timeGroup: TimeGroup) => void
 }
@@ -93,6 +94,7 @@ export function TimeGroupsTable({
     timeGroups,
     companies,
     loading,
+    companySelected,
     onEdit,
     onDelete,
 }: Props) {
@@ -127,7 +129,7 @@ export function TimeGroupsTable({
                                 colSpan={4}
                                 className="h-24 text-center text-muted-foreground"
                             >
-                                Nenhum grupo de horário encontrado
+                                {companySelected ? "Nenhum grupo de horário encontrado" : "Selecione uma empresa para listar"}
                             </TableCell>
                         </TableRow>
                     ) : (

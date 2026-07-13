@@ -15,6 +15,7 @@ let accessToken: string
 let userId: string
 let resellerToken: string
 let resellerId: string
+let companyId: string
 
 beforeAll(async () => {
     app = await buildApp()
@@ -52,9 +53,17 @@ beforeAll(async () => {
         body: { username: `${PREFIX}reseller@test.com`, password: PASSWORD },
     })
     resellerToken = resellerLogin.json().token
+
+    // usuário sempre precisa de >=1 empresa (ver createUserSchema): cria uma e vincula
+    // o reseller a ela também, senão o próprio reseller não teria escopo pra atribuir a ninguém
+    const company = await prisma.company.create({ data: { name: `${PREFIX}company` } })
+    companyId = company.id
+    await prisma.userCompany.create({ data: { userId: resellerId, companyId } })
 })
 
 afterAll(async () => {
+    await prisma.userCompany.deleteMany({ where: { companyId } })
+    await prisma.company.delete({ where: { id: companyId } })
     await prisma.user.deleteMany({ where: { username: { startsWith: PREFIX } } })
     await prisma.$disconnect()
     await app.close()
@@ -78,7 +87,7 @@ describe('GET /users', () => {
             method: 'POST',
             url: '/users',
             headers: resellerAuth(),
-            body: { name: 'Reseller Child', username: `${PREFIX}reschild@test.com`, password: PASSWORD },
+            body: { name: 'Reseller Child', username: `${PREFIX}reschild@test.com`, password: PASSWORD, companyIds: [companyId] },
         })
 
         const res = await app.inject({ method: 'GET', url: '/users', headers: resellerAuth() })
@@ -124,7 +133,7 @@ describe('POST /users', () => {
             method: 'POST',
             url: '/users',
             headers: auth(),
-            body: { name: 'Created Via Route', username: `${PREFIX}created@test.com`, password: PASSWORD },
+            body: { name: 'Created Via Route', username: `${PREFIX}created@test.com`, password: PASSWORD, companyIds: [companyId] },
         })
 
         expect(res.statusCode).toBe(201)
@@ -138,7 +147,7 @@ describe('POST /users', () => {
             method: 'POST',
             url: '/users',
             headers: resellerAuth(),
-            body: { name: 'Reseller Created', username: `${PREFIX}rescreated@test.com`, password: PASSWORD },
+            body: { name: 'Reseller Created', username: `${PREFIX}rescreated@test.com`, password: PASSWORD, companyIds: [companyId] },
         })
 
         expect(res.statusCode).toBe(201)
@@ -155,6 +164,7 @@ describe('POST /users', () => {
                 username: `${PREFIX}attemptadmin@test.com`,
                 password: PASSWORD,
                 role: 'admin',
+                companyIds: [companyId],
             },
         })
         expect(res.statusCode).toBe(403)
@@ -170,6 +180,7 @@ describe('POST /users', () => {
                 username: `${PREFIX}attemptreseller@test.com`,
                 password: PASSWORD,
                 role: 'reseller',
+                companyIds: [companyId],
             },
         })
         expect(res.statusCode).toBe(403)
@@ -190,7 +201,7 @@ describe('POST /users', () => {
             method: 'POST',
             url: '/users',
             headers: auth(),
-            body: { name: 'Dup', username: EMAIL, password: PASSWORD },
+            body: { name: 'Dup', username: EMAIL, password: PASSWORD, companyIds: [companyId] },
         })
         expect(res.statusCode).toBe(409)
     })
@@ -271,7 +282,7 @@ describe('DELETE /users/:id', () => {
             method: 'POST',
             url: '/users',
             headers: auth(),
-            body: { name: 'To Delete', username: `${PREFIX}todelete@test.com`, password: PASSWORD },
+            body: { name: 'To Delete', username: `${PREFIX}todelete@test.com`, password: PASSWORD, companyIds: [companyId] },
         })
         const idToDelete = created.json().userId
 

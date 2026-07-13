@@ -143,11 +143,14 @@ export function useQueues(companyId?: string) {
     const [filter, setFilter] = useState("")
 
     const fetchQueues = useCallback(async () => {
+        if (!companyId) {
+            setQueues([])
+            setLoading(false)
+            return
+        }
         setLoading(true)
         try {
-            const { data } = await api.get("/queues", {
-                params: companyId ? { companyId } : undefined,
-            })
+            const { data } = await api.get("/queues", { params: { companyId } })
             setQueues(data.queues ?? [])
         } catch (err) {
             toast.error(apiError(err, "Erro ao buscar filas"))
@@ -204,12 +207,6 @@ export function useQueues(companyId?: string) {
     const fetchStateRef = useRef<{ key?: string; fetched: boolean }>({ fetched: false })
 
     useEffect(() => {
-        if (!companyId) {
-            setQueues([])
-            setLoading(false)
-            fetchStateRef.current = { fetched: false }
-            return
-        }
         if (fetchStateRef.current.fetched && fetchStateRef.current.key === companyId) return
         fetchStateRef.current = { key: companyId, fetched: true }
         fetchQueues()

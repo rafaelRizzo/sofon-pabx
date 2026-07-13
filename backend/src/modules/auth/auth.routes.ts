@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import * as AuthController from './auth.controller'
 import { authMiddleware } from '../../middleware/auth.middleware'
-import { loginSchema, TokenResponse, LogoutResponse } from './schemas/auth.schema'
+import { loginSchema, TokenResponse, LogoutResponse, MeResponse } from './schemas/auth.schema'
 import { createUserSchema } from '../users/schemas/user.schema'
 import { errors } from '../../schemas/responses'
 
@@ -53,6 +53,21 @@ export const authRoutes = async (app: FastifyInstance) => {
             },
         },
     }, AuthController.refresh as any)
+
+    router.get('/auth/me', {
+        onRequest: authMiddleware,
+        schema: {
+            tags: ['Auth'],
+            summary: 'Usuário logado',
+            description: 'Dados do usuário do token atual, incluindo role e permissions.',
+            security: [{ bearerAuth: [] }],
+            response: {
+                200: MeResponse,
+                401: errors[401],
+                404: errors[404],
+            },
+        },
+    }, AuthController.me as any)
 
     router.post('/auth/logout', {
         onRequest: authMiddleware,

@@ -16,7 +16,6 @@ import {
     type CompanyForm,
 } from "@/hooks/use-companies"
 import { usePagination } from "@/hooks/use-pagination"
-import { useUsers } from "@/hooks/use-users"
 
 export default function CompaniesPage() {
     const {
@@ -28,8 +27,6 @@ export default function CompaniesPage() {
         updateCompany,
         deleteCompany,
     } = useCompanies()
-
-    const { users } = useUsers()
 
     const { paginated, page, setPage, totalPages, total } = usePagination(
         companies,
@@ -90,7 +87,6 @@ export default function CompaniesPage() {
                 open={formOpen}
                 onOpenChange={setFormOpen}
                 company={editing}
-                users={users}
                 onSave={handleSave}
             />
 

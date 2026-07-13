@@ -377,7 +377,7 @@ export function OutboundRouteFormDialog({
                                     <FieldDescription>
                                         Não achou o padrão do seu caso (ex: um
                                         código especial de 4 ou 5 dígitos)?
-                                        Digite o número exato na linha abaixo —
+                                        Digite o número exato na linha abaixo:
                                         ex: <code>_1404</code> corresponde só a
                                         esse número.
                                     </FieldDescription>

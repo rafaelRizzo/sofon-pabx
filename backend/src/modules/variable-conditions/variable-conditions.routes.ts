@@ -3,6 +3,7 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import * as VariableConditionsController from './variable-conditions.controller'
 import { protectedRoute } from '../../middleware/scope.middleware'
+import { requirePermission } from '../../middleware/permission.middleware'
 import {
     createVariableConditionSchema, updateVariableConditionSchema, idParamSchema,
     ListVariableConditionsResponse, GetVariableConditionResponse, CreateVariableConditionResponse, UpdateVariableConditionResponse,
@@ -15,7 +16,7 @@ export const variableConditionsRoutes = async (app: FastifyInstance) => {
     const router = app.withTypeProvider<ZodTypeProvider>()
 
     router.get('/variable-conditions', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('variable-conditions', 'view')],
         schema: {
             tags: ['Variable Conditions'],
             summary: 'Listar condições de variável',
@@ -32,7 +33,7 @@ export const variableConditionsRoutes = async (app: FastifyInstance) => {
     }, VariableConditionsController.getVariableConditionsByCompanyId as any)
 
     router.get('/variable-conditions/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('variable-conditions', 'view')],
         schema: {
             tags: ['Variable Conditions'],
             summary: 'Buscar condição de variável',
@@ -48,7 +49,7 @@ export const variableConditionsRoutes = async (app: FastifyInstance) => {
     }, VariableConditionsController.getVariableConditionById as any)
 
     router.post('/variable-conditions', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('variable-conditions', 'manage')],
         schema: {
             tags: ['Variable Conditions'],
             summary: 'Criar condição de variável',
@@ -66,7 +67,7 @@ export const variableConditionsRoutes = async (app: FastifyInstance) => {
     }, VariableConditionsController.createVariableCondition as any)
 
     router.put('/variable-conditions/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('variable-conditions', 'manage')],
         schema: {
             tags: ['Variable Conditions'],
             summary: 'Atualizar condição de variável',
@@ -84,7 +85,7 @@ export const variableConditionsRoutes = async (app: FastifyInstance) => {
     }, VariableConditionsController.updateVariableCondition as any)
 
     router.delete('/variable-conditions/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('variable-conditions', 'manage')],
         schema: {
             tags: ['Variable Conditions'],
             summary: 'Remover condição de variável',

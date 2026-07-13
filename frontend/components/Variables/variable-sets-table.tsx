@@ -30,6 +30,7 @@ import { type VariableSet } from "@/hooks/use-variables"
 type Props = {
     variableSets: VariableSet[]
     loading: boolean
+    companySelected: boolean
     onEdit: (variableSet: VariableSet) => void
     onDelete: (variableSet: VariableSet) => void
 }
@@ -76,7 +77,7 @@ function useDestinationLabels(variableSets: VariableSet[]) {
     return { labels, loadedTypes }
 }
 
-export function VariableSetsTable({ variableSets, loading, onEdit, onDelete }: Props) {
+export function VariableSetsTable({ variableSets, loading, companySelected, onEdit, onDelete }: Props) {
     const { labels, loadedTypes } = useDestinationLabels(variableSets)
 
     return (
@@ -104,7 +105,7 @@ export function VariableSetsTable({ variableSets, loading, onEdit, onDelete }: P
                     ) : variableSets.length === 0 ? (
                         <TableRow>
                             <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
-                                Nenhuma variável encontrada
+                                {companySelected ? "Nenhuma variável encontrada" : "Selecione uma empresa para listar"}
                             </TableCell>
                         </TableRow>
                     ) : (

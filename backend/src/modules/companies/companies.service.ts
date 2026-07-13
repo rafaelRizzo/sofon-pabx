@@ -80,12 +80,7 @@ export const getCompanyById = async (id: string): Promise<CompanyDto> => {
     return company
 }
 
-export const createCompany = async ({ userId, ...data }: Omit<CreateCompanyInput, 'userId'> & { userId: string }) => {
-    const user = await prisma.user.findUnique({ where: { id: userId } })
-    if (!user) {
-        throw new AppError('User not found', 404)
-    }
-
+export const createCompany = async (data: CreateCompanyInput, userId: string) => {
     if (data.doc) {
         const existing = await prisma.company.findUnique({ where: { name_doc: { name: data.name, doc: data.doc } } })
         if (existing) throw new AppError('Company with this name and document already exists', 409)
@@ -113,20 +108,13 @@ export const createCompany = async ({ userId, ...data }: Omit<CreateCompanyInput
     return company
 }
 
-export const updateCompany = async (id: string, { userId, ...data }: UpdateCompanyInput) => {
+export const updateCompany = async (id: string, data: UpdateCompanyInput) => {
     const existing = await prisma.company.findUnique({
         where: { id },
         include: { users: { select: { userId: true } } },
     })
     if (!existing) {
         throw new AppError('Company not found', 404)
-    }
-
-    if (userId) {
-        const user = await prisma.user.findUnique({ where: { id: userId } })
-        if (!user) {
-            throw new AppError('User not found', 404)
-        }
     }
 
     const name = data.name ?? existing.name
@@ -136,36 +124,18 @@ export const updateCompany = async (id: string, { userId, ...data }: UpdateCompa
         if (conflict && conflict.id !== id) throw new AppError('Company with this name and document already exists', 409)
     }
 
-    const company = await prisma.$transaction(async (tx) => {
-        const updated = await tx.company.update({
-            where: { id },
-            data,
-            select: companySelect,
-        })
-
-        // vínculo N:N aditivo — não desvincula os usuários existentes
-        if (userId) {
-            await tx.userCompany.upsert({
-                where: { userId_companyId: { userId, companyId: id } },
-                create: { userId, companyId: id },
-                update: {},
-            })
-        }
-
-        return updated
+    const company = await prisma.company.update({
+        where: { id },
+        data,
+        select: companySelect,
     })
 
     await CompaniesCache.invalidateCompany(id)
     await CompaniesCache.invalidateAllCompanies()
-    const affectedUsers = new Set(existing.users.map((u) => u.userId))
-    if (userId) affectedUsers.add(userId)
-    await Promise.all([...affectedUsers].map((uid) => CompaniesCache.invalidateCompaniesByUser(uid)))
-    await Promise.all([...affectedUsers].map((uid) => CompaniesCache.invalidateCompaniesForScope(uid)))
-    await Promise.all([...affectedUsers].map((uid) => invalidateUserCompanyIds(uid)))
-    if (userId) {
-        await Promise.all([...affectedUsers].map((uid) => UsersCache.invalidateUser(uid)))
-        await UsersCache.invalidateAllUsers()
-    }
+    const affectedUsers = existing.users.map((u) => u.userId)
+    await Promise.all(affectedUsers.map((uid) => CompaniesCache.invalidateCompaniesByUser(uid)))
+    await Promise.all(affectedUsers.map((uid) => CompaniesCache.invalidateCompaniesForScope(uid)))
+    await Promise.all(affectedUsers.map((uid) => invalidateUserCompanyIds(uid)))
     return company
 }
 

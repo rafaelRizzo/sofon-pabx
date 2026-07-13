@@ -3,6 +3,7 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import * as TimeConditionsController from './time-conditions.controller'
 import { protectedRoute } from '../../middleware/scope.middleware'
+import { requirePermission } from '../../middleware/permission.middleware'
 import {
     createTimeConditionSchema, updateTimeConditionSchema, idParamSchema, companyQuerySchema,
     ListTimeConditionsResponse, GetTimeConditionResponse, CreateTimeConditionResponse, UpdateTimeConditionResponse,
@@ -15,7 +16,7 @@ export const timeConditionsRoutes = async (app: FastifyInstance) => {
     const router = app.withTypeProvider<ZodTypeProvider>()
 
     router.get('/time-conditions', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('time-conditions', 'view')],
         schema: {
             tags: ['Time Conditions'],
             summary: 'Listar condições de horário',
@@ -32,7 +33,7 @@ export const timeConditionsRoutes = async (app: FastifyInstance) => {
     }, TimeConditionsController.getTimeConditionsByCompanyId as any)
 
     router.get('/time-conditions/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('time-conditions', 'view')],
         schema: {
             tags: ['Time Conditions'],
             summary: 'Buscar condição de horário',
@@ -48,7 +49,7 @@ export const timeConditionsRoutes = async (app: FastifyInstance) => {
     }, TimeConditionsController.getTimeConditionById as any)
 
     router.post('/time-conditions', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('time-conditions', 'manage')],
         schema: {
             tags: ['Time Conditions'],
             summary: 'Criar condição de horário',
@@ -65,7 +66,7 @@ export const timeConditionsRoutes = async (app: FastifyInstance) => {
     }, TimeConditionsController.createTimeCondition as any)
 
     router.put('/time-conditions/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('time-conditions', 'manage')],
         schema: {
             tags: ['Time Conditions'],
             summary: 'Atualizar condição de horário',
@@ -83,7 +84,7 @@ export const timeConditionsRoutes = async (app: FastifyInstance) => {
     }, TimeConditionsController.updateTimeCondition as any)
 
     router.delete('/time-conditions/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('time-conditions', 'manage')],
         schema: {
             tags: ['Time Conditions'],
             summary: 'Remover condição de horário',

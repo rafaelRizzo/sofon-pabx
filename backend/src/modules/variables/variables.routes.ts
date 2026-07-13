@@ -3,6 +3,7 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import * as VariablesController from './variables.controller'
 import { protectedRoute } from '../../middleware/scope.middleware'
+import { requirePermission } from '../../middleware/permission.middleware'
 import {
     createVariableSetSchema, updateVariableSetSchema, idParamSchema,
     ListVariableSetsResponse, GetVariableSetResponse, CreateVariableSetResponse, UpdateVariableSetResponse,
@@ -15,7 +16,7 @@ export const variablesRoutes = async (app: FastifyInstance) => {
     const router = app.withTypeProvider<ZodTypeProvider>()
 
     router.get('/variables', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('variables', 'view')],
         schema: {
             tags: ['Variables'],
             summary: 'Listar variable sets',
@@ -31,7 +32,7 @@ export const variablesRoutes = async (app: FastifyInstance) => {
     }, VariablesController.getVariableSets as any)
 
     router.get('/variables/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('variables', 'view')],
         schema: {
             tags: ['Variables'],
             summary: 'Buscar variable set',
@@ -47,7 +48,7 @@ export const variablesRoutes = async (app: FastifyInstance) => {
     }, VariablesController.getVariableSetById as any)
 
     router.post('/variables', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('variables', 'manage')],
         schema: {
             tags: ['Variables'],
             summary: 'Criar variable set',
@@ -64,7 +65,7 @@ export const variablesRoutes = async (app: FastifyInstance) => {
     }, VariablesController.createVariableSet as any)
 
     router.patch('/variables/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('variables', 'manage')],
         schema: {
             tags: ['Variables'],
             summary: 'Atualizar variable set',
@@ -82,7 +83,7 @@ export const variablesRoutes = async (app: FastifyInstance) => {
     }, VariablesController.updateVariableSet as any)
 
     router.delete('/variables/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('variables', 'manage')],
         schema: {
             tags: ['Variables'],
             summary: 'Remover variable set',

@@ -29,6 +29,7 @@ import { type InboundRoute } from "@/hooks/use-inbound-routes"
 type Props = {
     routes: InboundRoute[]
     loading: boolean
+    companySelected: boolean
     onEdit: (route: InboundRoute) => void
     onDelete: (route: InboundRoute) => void
 }
@@ -80,7 +81,7 @@ function useDestinationLabels(routes: InboundRoute[]) {
     return { labels, loadedTypes }
 }
 
-export function InboundRoutesTable({ routes, loading, onEdit, onDelete }: Props) {
+export function InboundRoutesTable({ routes, loading, companySelected, onEdit, onDelete }: Props) {
     const { labels, loadedTypes } = useDestinationLabels(routes)
 
     return (
@@ -109,7 +110,7 @@ export function InboundRoutesTable({ routes, loading, onEdit, onDelete }: Props)
                     ) : routes.length === 0 ? (
                         <TableRow>
                             <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                                Nenhuma rota de entrada encontrada
+                                {companySelected ? "Nenhuma rota de entrada encontrada" : "Selecione uma empresa para listar"}
                             </TableCell>
                         </TableRow>
                     ) : (

@@ -15,7 +15,7 @@ model Company {
     name             String
     doc              String?
     status           String            @default("active") // active | inactive | blocked
-    // padrão de storage é sempre UTC (Timestamptz) — este campo só define o fuso de exibição na API
+    // padrão de storage é sempre UTC (Timestamptz); este campo só define o fuso de exibição na API
     timezone         String            @default("America/Sao_Paulo") @db.VarChar(64)
     metadata         Json              @default("{}")
     createdAt        DateTime          @default(now()) @db.Timestamptz(3)
@@ -69,6 +69,8 @@ model User {
     token        String?       @unique
     role         String        @default("user")
     status       String        @default("active")
+    // relevante só para role="user"; admin/reseller têm acesso irrestrito (ver requirePermission)
+    permissions  String[]      @default([])
     extensionId  String?       @unique
     createdBy    String?
     creator      User?         @relation("UserCreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)

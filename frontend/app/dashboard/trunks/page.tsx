@@ -73,6 +73,7 @@ export default function TrunksPage() {
             <TrunksTable
                 trunks={paginated}
                 loading={loading}
+                companySelected={!!companyFilter}
                 onEdit={setEditTrunk}
                 onDelete={setDeleteTarget}
             />

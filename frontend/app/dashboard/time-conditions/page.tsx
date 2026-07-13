@@ -70,6 +70,7 @@ export default function TimeConditionsPage() {
             <TimeConditionsTable
                 timeConditions={paginated}
                 loading={loading}
+                companySelected={!!companyFilter}
                 onEdit={setEditTimeCondition}
                 onDelete={setDeleteTarget}
             />

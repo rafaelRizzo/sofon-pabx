@@ -46,12 +46,16 @@ import {
     useSidebar,
 } from "@/components/ui/sidebar"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import { useAuth, type PermissionResourceKey } from "@/hooks/use-auth"
 import { useLogout } from "@/hooks/use-logout"
 
 type NavItem = {
     title: string
     href: string
     icon: LucideIcon
+    // omitido = sempre visível (ex: Dashboard); presente = precisa de "<permission>:view"
+    // (admin/reseller sempre veem tudo, só role "user" é filtrado; ver useAuth().hasPermission)
+    permission?: PermissionResourceKey | "cdr"
 }
 
 type NavGroup = {
@@ -70,7 +74,12 @@ const NAV: NavGroup[] = [
                 href: "/dashboard",
                 icon: LayoutDashboardIcon,
             },
-            { title: "CDR", href: "/dashboard/cdr", icon: FileClockIcon },
+            {
+                title: "CDR",
+                href: "/dashboard/cdr",
+                icon: FileClockIcon,
+                permission: "cdr",
+            },
         ],
     },
     {
@@ -80,82 +89,124 @@ const NAV: NavGroup[] = [
                 title: "Empresas",
                 href: "/dashboard/companies",
                 icon: Building2Icon,
+                permission: "companies",
             },
-            { title: "Usuários", href: "/dashboard/users", icon: UsersIcon },
+            {
+                title: "Usuários",
+                href: "/dashboard/users",
+                icon: UsersIcon,
+                permission: "users",
+            },
         ],
     },
     {
         label: "Atendimento",
         items: [
-            { title: "Ramais", href: "/dashboard/extensions", icon: PhoneIcon },
+            {
+                title: "Ramais",
+                href: "/dashboard/extensions",
+                icon: PhoneIcon,
+                permission: "extensions",
+            },
             {
                 title: "Filas",
                 href: "/dashboard/queues",
                 icon: ListOrderedIcon,
+                permission: "queues",
             },
-            { title: "URA", href: "/dashboard/ivr", icon: WorkflowIcon },
+            {
+                title: "URA",
+                href: "/dashboard/ivr",
+                icon: WorkflowIcon,
+                permission: "ivr",
+            },
             {
                 title: "Anúncios",
                 href: "/dashboard/announcements",
                 icon: MegaphoneIcon,
+                permission: "announcements",
             },
             {
                 title: "Callcenter",
                 href: "/dashboard/callcenter",
                 icon: HeadsetIcon,
+                permission: "callcenter",
             },
         ],
     },
     {
         label: "Rotas",
         items: [
-            { title: "DIDs", href: "/dashboard/dids", icon: HashIcon },
+            {
+                title: "DIDs",
+                href: "/dashboard/dids",
+                icon: HashIcon,
+                permission: "dids",
+            },
             {
                 title: "Rotas de entrada",
                 href: "/dashboard/inbound-routes",
                 icon: PhoneIncomingIcon,
+                permission: "inbound-routes",
             },
             {
                 title: "Rotas de saída",
                 href: "/dashboard/outbound-routes",
                 icon: PhoneOutgoingIcon,
+                permission: "outbound-routes",
             },
-            { title: "Troncos", href: "/dashboard/trunks", icon: NetworkIcon },
+            {
+                title: "Troncos",
+                href: "/dashboard/trunks",
+                icon: NetworkIcon,
+                permission: "trunks",
+            },
         ],
     },
     {
         label: "Recursos",
         items: [
-            { title: "Áudios", href: "/dashboard/audios", icon: FileAudioIcon },
+            {
+                title: "Áudios",
+                href: "/dashboard/audios",
+                icon: FileAudioIcon,
+                permission: "audios",
+            },
             {
                 title: "Grupos de horário",
                 href: "/dashboard/time-groups",
                 icon: ClockIcon,
+                permission: "time-groups",
             },
             {
                 title: "Condições de horário",
                 href: "/dashboard/time-conditions",
                 icon: CalendarClockIcon,
+                permission: "time-conditions",
             },
             {
                 title: "Feriados",
                 href: "/dashboard/holiday-groups",
                 icon: CalendarDaysIcon,
+                permission: "holiday-groups",
             },
             {
                 title: "Templates de requisição",
                 href: "/dashboard/request-templates",
                 icon: WebhookIcon,
+                permission: "request-templates",
             },
             {
                 title: "Variáveis",
                 href: "/dashboard/variables",
                 icon: BracesIcon,
+                permission: "variables",
             },
             {
                 title: "Condições de variável",
                 href: "/dashboard/variable-conditions",
                 icon: FilterIcon,
+                permission: "variable-conditions",
             },
         ],
     },
@@ -166,9 +217,17 @@ export function AppSidebar() {
     const { isMobile, setOpenMobile } = useSidebar()
     const { resolvedTheme, setTheme } = useTheme()
     const { logout } = useLogout()
+    const { hasPermission } = useAuth()
 
     const isActive = (href: string) =>
         href === "/dashboard" ? pathname === href : pathname.startsWith(href)
+
+    const visibleNav = NAV.map((group) => ({
+        ...group,
+        items: group.items.filter(
+            (item) => !item.permission || hasPermission(item.permission)
+        ),
+    })).filter((group) => group.items.length > 0)
 
     return (
         <TooltipProvider delay={100}>
@@ -182,7 +241,7 @@ export function AppSidebar() {
                     </div>
                 </SidebarHeader>
                 <SidebarContent>
-                    {NAV.map((group) => (
+                    {visibleNav.map((group) => (
                         <SidebarGroup key={group.label}>
                             <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
                             <SidebarGroupContent>

@@ -23,3 +23,20 @@ export const getUserCompanyIds = async (userId: string): Promise<string[]> => {
 export const invalidateUserCompanyIds = async (userId: string) => {
     await cacheManager.invalidateByKey(`${SCOPE_NAMESPACE}:${userId}`)
 }
+
+const PERMISSIONS_NAMESPACE = 'scope:permissions'
+
+// Mesma lógica de cache de getUserCompanyIds; checado em toda rota gateada por requirePermission
+export const getUserPermissions = async (userId: string): Promise<string[]> => {
+    const cached = await cacheManager.get<string[]>(PERMISSIONS_NAMESPACE, userId)
+    if (cached) return cached
+
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { permissions: true } })
+    const permissions = user?.permissions ?? []
+    await cacheManager.set(PERMISSIONS_NAMESPACE, userId, permissions)
+    return permissions
+}
+
+export const invalidateUserPermissions = async (userId: string) => {
+    await cacheManager.invalidateByKey(`${PERMISSIONS_NAMESPACE}:${userId}`)
+}

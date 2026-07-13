@@ -3,6 +3,7 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import * as Controller from './outbound-routes.controller'
 import { protectedRoute } from '../../middleware/scope.middleware'
+import { requirePermission } from '../../middleware/permission.middleware'
 import {
     createOutboundRouteSchema, updateOutboundRouteSchema, addPatternSchema, updatePatternSchema,
     setTrunksSchema, addExtensionSchema, routeIdParamSchema, patternIdParamSchema,
@@ -19,7 +20,7 @@ export const outboundRoutesRoutes = async (app: FastifyInstance) => {
     const router = app.withTypeProvider<ZodTypeProvider>()
 
     router.get('/outbound-routes', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('outbound-routes', 'view')],
         schema: {
             tags: ['Outbound Routes'],
             summary: 'Listar rotas de saída',
@@ -35,7 +36,7 @@ export const outboundRoutesRoutes = async (app: FastifyInstance) => {
     }, Controller.getRoutes as any)
 
     router.get('/outbound-routes/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('outbound-routes', 'view')],
         schema: {
             tags: ['Outbound Routes'],
             summary: 'Buscar rota',
@@ -51,7 +52,7 @@ export const outboundRoutesRoutes = async (app: FastifyInstance) => {
     }, Controller.getRouteById as any)
 
     router.post('/outbound-routes', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('outbound-routes', 'manage')],
         schema: {
             tags: ['Outbound Routes'],
             summary: 'Criar rota de saída',
@@ -69,7 +70,7 @@ export const outboundRoutesRoutes = async (app: FastifyInstance) => {
     }, Controller.createRoute as any)
 
     router.put('/outbound-routes/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('outbound-routes', 'manage')],
         schema: {
             tags: ['Outbound Routes'],
             summary: 'Atualizar rota',
@@ -86,7 +87,7 @@ export const outboundRoutesRoutes = async (app: FastifyInstance) => {
     }, Controller.updateRoute as any)
 
     router.delete('/outbound-routes/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('outbound-routes', 'manage')],
         schema: {
             tags: ['Outbound Routes'],
             summary: 'Remover rota',
@@ -103,7 +104,7 @@ export const outboundRoutesRoutes = async (app: FastifyInstance) => {
     }, Controller.deleteRoute as any)
 
     router.post('/outbound-routes/:id/patterns', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('outbound-routes', 'manage')],
         schema: {
             tags: ['Outbound Routes'],
             summary: 'Adicionar dial pattern',
@@ -120,7 +121,7 @@ export const outboundRoutesRoutes = async (app: FastifyInstance) => {
     }, Controller.addPattern as any)
 
     router.put('/outbound-routes/:id/patterns/:patternId', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('outbound-routes', 'manage')],
         schema: {
             tags: ['Outbound Routes'],
             summary: 'Atualizar dial pattern',
@@ -137,7 +138,7 @@ export const outboundRoutesRoutes = async (app: FastifyInstance) => {
     }, Controller.updatePattern as any)
 
     router.delete('/outbound-routes/:id/patterns/:patternId', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('outbound-routes', 'manage')],
         schema: {
             tags: ['Outbound Routes'],
             summary: 'Remover dial pattern',
@@ -153,7 +154,7 @@ export const outboundRoutesRoutes = async (app: FastifyInstance) => {
     }, Controller.deletePattern as any)
 
     router.put('/outbound-routes/:id/trunks', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('outbound-routes', 'manage')],
         schema: {
             tags: ['Outbound Routes'],
             summary: 'Definir trunks da rota',
@@ -171,7 +172,7 @@ export const outboundRoutesRoutes = async (app: FastifyInstance) => {
     }, Controller.setTrunks as any)
 
     router.post('/outbound-routes/:id/extensions', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('outbound-routes', 'manage')],
         schema: {
             tags: ['Outbound Routes'],
             summary: 'Restringir rota a ramal',
@@ -188,7 +189,7 @@ export const outboundRoutesRoutes = async (app: FastifyInstance) => {
     }, Controller.addExtension as any)
 
     router.delete('/outbound-routes/:id/extensions/:extensionId', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('outbound-routes', 'manage')],
         schema: {
             tags: ['Outbound Routes'],
             summary: 'Remover restrição de ramal',

@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { PencilIcon, Trash2Icon } from "lucide-react"
 
 import { StatusBadge } from "@/components/status-badge"
@@ -20,6 +21,38 @@ const ROLE_LABELS: Record<UserRole, string> = {
     admin: "Administrador",
     reseller: "Revenda",
     user: "Usuário",
+}
+
+const MAX_VISIBLE_COMPANIES = 3
+
+// Colapsa a lista em N badges + "+X" clicável, evita empresas em massa quebrando a
+// linha da tabela em várias linhas; expande/recolhe ao clicar
+function CompanyBadges({ companies }: { companies: User["companies"] }) {
+    const [expanded, setExpanded] = useState(false)
+    const hiddenCount = companies.length - MAX_VISIBLE_COMPANIES
+    const visible =
+        expanded || hiddenCount <= 0
+            ? companies
+            : companies.slice(0, MAX_VISIBLE_COMPANIES)
+
+    return (
+        <div className="flex flex-wrap items-center gap-1">
+            {visible.map((c) => (
+                <Badge key={c.id} variant="outline">
+                    {c.name}
+                </Badge>
+            ))}
+            {hiddenCount > 0 && (
+                <Badge
+                    variant="secondary"
+                    className="cursor-pointer select-none"
+                    onClick={() => setExpanded((v) => !v)}
+                >
+                    {expanded ? "Mostrar menos" : `+${hiddenCount}`}
+                </Badge>
+            )}
+        </div>
+    )
 }
 
 type UsersTableProps = {
@@ -89,16 +122,10 @@ export function UsersTable({
                                 <TableCell>
                                     {user.companies.length === 0 ? (
                                         <span className="text-sm text-muted-foreground">
-                                            {user.role === "admin" ? "Todas" : "—"}
+                                            {user.role === "admin" ? "Todas" : "-"}
                                         </span>
                                     ) : (
-                                        <div className="flex flex-wrap gap-1">
-                                            {user.companies.map((c) => (
-                                                <Badge key={c.id} variant="outline">
-                                                    {c.name}
-                                                </Badge>
-                                            ))}
-                                        </div>
+                                        <CompanyBadges companies={user.companies} />
                                     )}
                                 </TableCell>
                                 <TableCell>

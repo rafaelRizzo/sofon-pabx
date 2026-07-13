@@ -24,11 +24,18 @@ import { type Trunk } from "@/hooks/use-trunks"
 type Props = {
     trunks: Trunk[]
     loading: boolean
+    companySelected: boolean
     onEdit: (trunk: Trunk) => void
     onDelete: (trunk: Trunk) => void
 }
 
-export function TrunksTable({ trunks, loading, onEdit, onDelete }: Props) {
+export function TrunksTable({
+    trunks,
+    loading,
+    companySelected,
+    onEdit,
+    onDelete,
+}: Props) {
     return (
         <div className="rounded-md border">
             <Table>
@@ -61,7 +68,9 @@ export function TrunksTable({ trunks, loading, onEdit, onDelete }: Props) {
                                 colSpan={6}
                                 className="h-24 text-center text-muted-foreground"
                             >
-                                Nenhum tronco encontrado
+                                {companySelected
+                                    ? "Nenhum tronco encontrado"
+                                    : "Selecione uma empresa para listar"}
                             </TableCell>
                         </TableRow>
                     ) : (
@@ -86,7 +95,7 @@ export function TrunksTable({ trunks, loading, onEdit, onDelete }: Props) {
                                 <TableCell className="font-mono text-sm">
                                     {trunk.host
                                         ? `${trunk.host}${trunk.port ? `:${trunk.port}` : ""}`
-                                        : "—"}
+                                        : "-"}
                                 </TableCell>
                                 <TableCell className="text-sm text-muted-foreground">
                                     {trunk.codecs}

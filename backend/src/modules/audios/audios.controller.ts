@@ -1,3 +1,4 @@
+import { extname } from 'path'
 import type { FastifyRequest, FastifyReply } from 'fastify'
 import * as AudiosService from './audios.service'
 import { createAudioFieldsSchema, updateAudioSchema, idParamSchema, companyQuerySchema } from './schemas/audio.schema'
@@ -5,7 +6,32 @@ import { handleError } from '../../utils/errors/handler.error'
 import { AppError } from '../../utils/errors/app.error'
 import { prisma } from '../../lib/prisma'
 
-const AUDIO_MIME_PREFIX = 'audio/'
+// extensão e mimetype vêm do cliente e são facilmente forjáveis: a extensão só decide o
+// que TENTAMOS validar, quem decide se o upload é aceito é isValidAudioContent() abaixo,
+// lendo os bytes reais do arquivo
+const ALLOWED_AUDIO_EXTENSIONS = new Set(['.wav', '.mp3', '.gsm'])
+
+// GSM 06.10 é um bitstream cru sem header (frames de 33 bytes), não dá pra checar magic
+// bytes, então validamos que o tamanho é múltiplo do frame size, mesma checagem que o
+// Asterisk/ferramentas de conversão usam pra rejeitar arquivo gsm corrompido/inválido
+function isValidAudioContent(ext: string, buffer: Buffer): boolean {
+    if (ext === '.wav') {
+        return (
+            buffer.length >= 12 &&
+            buffer.toString('ascii', 0, 4) === 'RIFF' &&
+            buffer.toString('ascii', 8, 12) === 'WAVE'
+        )
+    }
+    if (ext === '.mp3') {
+        if (buffer.length >= 3 && buffer.toString('ascii', 0, 3) === 'ID3') return true
+        const [b0, b1] = buffer
+        return buffer.length >= 2 && b0 === 0xff && ((b1 ?? 0) & 0xe0) === 0xe0
+    }
+    if (ext === '.gsm') {
+        return buffer.length > 0 && buffer.length % 33 === 0
+    }
+    return false
+}
 
 export const getAudios = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
@@ -37,7 +63,11 @@ export const createAudio = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
         const file = await req.file()
         if (!file) throw new AppError('No audio file sent', 400)
-        if (!file.mimetype.startsWith(AUDIO_MIME_PREFIX)) throw new AppError('File must be an audio file', 400)
+
+        const ext = extname(file.filename).toLowerCase()
+        if (!ALLOWED_AUDIO_EXTENSIONS.has(ext)) {
+            throw new AppError('File must be .wav, .mp3 or .gsm', 400)
+        }
 
         const { name, companyId } = createAudioFieldsSchema.parse({
             name: file.fields.name && 'value' in file.fields.name ? file.fields.name.value : undefined,
@@ -47,6 +77,9 @@ export const createAudio = async (req: FastifyRequest, reply: FastifyReply) => {
 
         const buffer = await file.toBuffer()
         if (buffer.length === 0) throw new AppError('Empty audio file', 400)
+        if (!isValidAudioContent(ext, buffer)) {
+            throw new AppError('File content does not match a valid .wav/.mp3/.gsm file', 422)
+        }
 
         const audio = await AudiosService.createAudio(companyId, name, buffer, file.filename)
         return reply.status(201).send({ success: true, message: 'Audio created successfully', audioId: audio.id })

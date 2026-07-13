@@ -45,11 +45,14 @@ export function useTimeConditions(companyId?: string) {
     const [filter, setFilter] = useState("")
 
     const fetchTimeConditions = useCallback(async () => {
+        if (!companyId) {
+            setTimeConditions([])
+            setLoading(false)
+            return
+        }
         setLoading(true)
         try {
-            const { data } = await api.get("/time-conditions", {
-                params: companyId ? { companyId } : undefined,
-            })
+            const { data } = await api.get("/time-conditions", { params: { companyId } })
             setTimeConditions(data.timeConditions ?? [])
         } catch (err) {
             toast.error(apiError(err, "Erro ao buscar condições de horário"))
@@ -106,12 +109,6 @@ export function useTimeConditions(companyId?: string) {
     const fetchStateRef = useRef<{ key?: string; fetched: boolean }>({ fetched: false })
 
     useEffect(() => {
-        if (!companyId) {
-            setTimeConditions([])
-            setLoading(false)
-            fetchStateRef.current = { fetched: false }
-            return
-        }
         if (fetchStateRef.current.fetched && fetchStateRef.current.key === companyId) return
         fetchStateRef.current = { key: companyId, fetched: true }
         fetchTimeConditions()

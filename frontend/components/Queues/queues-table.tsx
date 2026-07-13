@@ -32,6 +32,7 @@ type Props = {
     queues: Queue[]
     companies: Company[]
     loading: boolean
+    companySelected: boolean
     onEdit: (queue: Queue) => void
     onManageMembers: (queue: Queue) => void
     onDelete: (queue: Queue) => void
@@ -80,7 +81,15 @@ function useDestinationLabels(queues: Queue[]) {
     return { labels, loadedTypes }
 }
 
-export function QueuesTable({ queues, companies, loading, onEdit, onManageMembers, onDelete }: Props) {
+export function QueuesTable({
+    queues,
+    companies,
+    loading,
+    companySelected,
+    onEdit,
+    onManageMembers,
+    onDelete,
+}: Props) {
     const { labels, loadedTypes } = useDestinationLabels(queues)
     const companyName = (companyId: string) =>
         companies.find((c) => c.id === companyId)?.name ?? companyId
@@ -114,7 +123,7 @@ export function QueuesTable({ queues, companies, loading, onEdit, onManageMember
                     ) : queues.length === 0 ? (
                         <TableRow>
                             <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
-                                Nenhuma fila encontrada
+                                {companySelected ? "Nenhuma fila encontrada" : "Selecione uma empresa para listar"}
                             </TableCell>
                         </TableRow>
                     ) : (
@@ -140,7 +149,7 @@ export function QueuesTable({ queues, companies, loading, onEdit, onManageMember
                                             Ativa
                                         </Badge>
                                     ) : (
-                                        <span className="text-muted-foreground">—</span>
+                                        <span className="text-muted-foreground">-</span>
                                     )}
                                 </TableCell>
                                 <TableCell>
@@ -150,7 +159,7 @@ export function QueuesTable({ queues, companies, loading, onEdit, onManageMember
                                             Ativo
                                         </Badge>
                                     ) : (
-                                        <span className="text-muted-foreground">—</span>
+                                        <span className="text-muted-foreground">-</span>
                                     )}
                                 </TableCell>
                                 <TableCell>

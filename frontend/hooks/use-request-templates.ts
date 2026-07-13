@@ -107,11 +107,14 @@ export function useRequestTemplates(companyId?: string) {
     const [filter, setFilter] = useState("")
 
     const fetchRequestTemplates = useCallback(async () => {
+        if (!companyId) {
+            setRequestTemplates([])
+            setLoading(false)
+            return
+        }
         setLoading(true)
         try {
-            const { data } = await api.get("/request-templates", {
-                params: companyId ? { companyId } : undefined,
-            })
+            const { data } = await api.get("/request-templates", { params: { companyId } })
             setRequestTemplates(data.requestTemplates ?? [])
         } catch (err) {
             toast.error(apiError(err, "Erro ao buscar templates de requisição"))
@@ -170,12 +173,6 @@ export function useRequestTemplates(companyId?: string) {
     const fetchStateRef = useRef<{ key?: string; fetched: boolean }>({ fetched: false })
 
     useEffect(() => {
-        if (!companyId) {
-            setRequestTemplates([])
-            setLoading(false)
-            fetchStateRef.current = { fetched: false }
-            return
-        }
         if (fetchStateRef.current.fetched && fetchStateRef.current.key === companyId) return
         fetchStateRef.current = { key: companyId, fetched: true }
         fetchRequestTemplates()

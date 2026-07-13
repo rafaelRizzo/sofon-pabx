@@ -20,7 +20,6 @@ export const createCompanySchema = z.object({
     status: companyStatusSchema.optional(),
     timezone: timezoneSchema.optional(),
     metadata: z.record(z.string(), z.string()).optional().default({}),
-    userId: z.cuid2().optional(),
 })
 
 export const updateCompanySchema = z.object({
@@ -29,7 +28,6 @@ export const updateCompanySchema = z.object({
     status: companyStatusSchema.optional(),
     timezone: timezoneSchema.optional(),
     metadata: z.record(z.string(), z.string()).optional(),
-    userId: z.cuid2().optional(),
 })
 
 export type IdParam = z.infer<typeof idParamSchema>

@@ -82,6 +82,7 @@ export default function InboundRoutesPage() {
             <InboundRoutesTable
                 routes={paginated}
                 loading={loading}
+                companySelected={!!companyFilter}
                 onEdit={setEditRoute}
                 onDelete={setDeleteTarget}
             />

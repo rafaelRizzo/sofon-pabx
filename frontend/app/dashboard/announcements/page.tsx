@@ -74,6 +74,7 @@ export default function AnnouncementsPage() {
             <AnnouncementsTable
                 announcements={paginated}
                 loading={loading}
+                companySelected={!!companyFilter}
                 onEdit={setEditAnnouncement}
                 onDelete={setDeleteTarget}
             />

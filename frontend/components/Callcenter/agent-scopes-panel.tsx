@@ -38,7 +38,7 @@ export function AgentScopesPanel({ companyId }: Props) {
 
     const extensionLabel = (extensionId: string) => {
         const ext = extensions.find((e) => e.id === extensionId)
-        return ext ? `${ext.alias} — ${ext.name}` : extensionId
+        return ext ? `${ext.alias} - ${ext.name}` : extensionId
     }
 
     const availableExtensions = extensions.filter(
@@ -65,7 +65,7 @@ export function AgentScopesPanel({ companyId }: Props) {
                 <Combobox<Extension>
                     items={availableExtensions}
                     value={selectedExtension}
-                    itemToStringLabel={(e) => `${e.alias} — ${e.name}`}
+                    itemToStringLabel={(e) => `${e.alias} - ${e.name}`}
                     isItemEqualToValue={(a, b) => a.id === b.id}
                     onValueChange={(e) => setSelectedExtensionId(e?.id ?? "")}
                 >
@@ -79,7 +79,7 @@ export function AgentScopesPanel({ companyId }: Props) {
                         <ComboboxList>
                             {(e: Extension) => (
                                 <ComboboxItem key={e.id} value={e}>
-                                    {e.alias} — {e.name}
+                                    {e.alias} - {e.name}
                                 </ComboboxItem>
                             )}
                         </ComboboxList>
@@ -114,7 +114,7 @@ export function AgentScopesPanel({ companyId }: Props) {
                         ) : scopes.length === 0 ? (
                             <TableRow>
                                 <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">
-                                    Nenhum ramal vinculado — todos os membros das filas são elegíveis
+                                    Nenhum ramal vinculado: todos os membros das filas são elegíveis
                                 </TableCell>
                             </TableRow>
                         ) : (

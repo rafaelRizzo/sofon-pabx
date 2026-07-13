@@ -3,6 +3,7 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import * as TimeGroupsController from './time-groups.controller'
 import { protectedRoute } from '../../middleware/scope.middleware'
+import { requirePermission } from '../../middleware/permission.middleware'
 import {
     createTimeGroupSchema, updateTimeGroupSchema, idParamSchema, companyQuerySchema,
     ListTimeGroupsResponse, GetTimeGroupResponse, CreateTimeGroupResponse, UpdateTimeGroupResponse,
@@ -15,7 +16,7 @@ export const timeGroupsRoutes = async (app: FastifyInstance) => {
     const router = app.withTypeProvider<ZodTypeProvider>()
 
     router.get('/time-groups', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('time-groups', 'view')],
         schema: {
             tags: ['Time Groups'],
             summary: 'Listar grupos de horário',
@@ -32,7 +33,7 @@ export const timeGroupsRoutes = async (app: FastifyInstance) => {
     }, TimeGroupsController.getTimeGroupsByCompanyId as any)
 
     router.get('/time-groups/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('time-groups', 'view')],
         schema: {
             tags: ['Time Groups'],
             summary: 'Buscar grupo de horário',
@@ -48,7 +49,7 @@ export const timeGroupsRoutes = async (app: FastifyInstance) => {
     }, TimeGroupsController.getTimeGroupById as any)
 
     router.post('/time-groups', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('time-groups', 'manage')],
         schema: {
             tags: ['Time Groups'],
             summary: 'Criar grupo de horário',
@@ -65,7 +66,7 @@ export const timeGroupsRoutes = async (app: FastifyInstance) => {
     }, TimeGroupsController.createTimeGroup as any)
 
     router.put('/time-groups/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('time-groups', 'manage')],
         schema: {
             tags: ['Time Groups'],
             summary: 'Atualizar grupo de horário',
@@ -83,7 +84,7 @@ export const timeGroupsRoutes = async (app: FastifyInstance) => {
     }, TimeGroupsController.updateTimeGroup as any)
 
     router.delete('/time-groups/:id', {
-        onRequest: protectedRoute,
+        onRequest: [...protectedRoute, requirePermission('time-groups', 'manage')],
         schema: {
             tags: ['Time Groups'],
             summary: 'Remover grupo de horário',
