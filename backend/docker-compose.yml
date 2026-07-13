@@ -1,0 +1,55 @@
+services:
+  postgres:
+    image: postgres:18.3-alpine3.23
+    container_name: postgres_sofon
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: asterisk
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: senha_forte
+      TZ: America/Sao_Paulo
+    command: >
+      postgres
+      -c timezone=America/Sao_Paulo
+      -c log_timezone=America/Sao_Paulo
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_sofon_data:/var/lib/postgresql
+    networks:
+      - proxy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sofon_backend
+    restart: unless-stopped
+    network_mode: host
+    env_file:
+      - .env
+    environment:
+      # Override do .env: com network_mode host, "127.0.0.1" já é o host real — não dá pra usar o
+      # nome do service "postgres" (network_mode host não entra na rede proxy), então aponta pra
+      # porta publicada do container postgres (5433:5432 abaixo). AGI_HOST/AMI_HOST ficam no default
+      # (127.0.0.1) do .env — funcionam direto, já que o container compartilha a rede do host.
+      DATABASE_URL: postgresql://postgres:senha_forte@127.0.0.1:5433/asterisk
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - /etc/asterisk/dialplan-extra:/etc/asterisk/dialplan-extra
+      - /var/lib/asterisk/sounds:/var/lib/asterisk/sounds
+
+networks:
+  proxy:
+    external: true
+
+volumes:
+  postgres_sofon_data:
+    name: postgres_sofon_data

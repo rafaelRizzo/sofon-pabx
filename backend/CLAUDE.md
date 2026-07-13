@@ -155,7 +155,22 @@ import { buildApp } from 'src/test/build-app'
 ---
 
 ## Config (`src/config/env.ts`)
-Vars: `DATABASE_URL`, `JWT_SECRET`, `REFRESH_SECRET`, `JWT_EXPIRES_IN` (15m), `REFRESH_TOKEN_EXPIRES_IN` (7d), `REDIS_URL`, `CORS_ORIGIN`, `RATE_LIMIT_MAX` (1000), `RATE_LIMIT_WINDOW` ("1 second"), `PORT` (3333), `HOST`, `LOG_LEVEL`, `LOG_ENABLED`, `TZ` (America/Sao_Paulo — fallback de exibição, ver seção Timezone)
+Vars: `DATABASE_URL`, `JWT_SECRET`, `REFRESH_SECRET`, `JWT_EXPIRES_IN` (15m), `REFRESH_TOKEN_EXPIRES_IN` (7d), `REDIS_URL`, `CORS_ORIGIN`, `RATE_LIMIT_MAX` (1000), `RATE_LIMIT_WINDOW` ("1 second"), `PORT` (3333), `HOST`, `LOG_LEVEL`, `LOG_ENABLED`, `TZ` (America/Sao_Paulo — fallback de exibição, ver seção Timezone), `DATABASE_POOL_SIZE` (10)
+- `AGI_HOST`/`AGI_PORT` (127.0.0.1:4573) — FastAGI server (`src/asterisk/agi-server.ts`); Asterisk conecta via `agi://AGI_HOST:AGI_PORT/<script>,<args>`
+- `AMI_HOST`/`AMI_PORT`/`AMI_USER`/`AMI_SECRET` (127.0.0.1:5038/admin/—) — AMI (`src/asterisk/ami-client.ts`), usado só pra `dialplan reload` sem depender do binário CLI. `AMI_SECRET` é gerado pelo `install-asterisk.sh` (exibido no resumo final) e precisa ser copiado manualmente pro `.env` — indefinido = reload via AMI é pulado (só loga warning, nunca derruba a request)
+- `DIALPLAN_EXTRA_DIR` (`/etc/asterisk/dialplan-extra`) — onde `dialplan-file.repository.ts` materializa os contextos estáticos; testes de integração sobrescrevem via `.env.test`
+- `ASTERISK_VERSION`/`SIP_LEGACY_ENABLED`/`SIP_PORT`/`PJSIP_PORT` — espelham a escolha feita em `install-asterisk.sh` (passo 13 do script grava esses valores direto no `.env` do backend); expostos via `GET /system/sip-config` pro frontend exibir a configuração correta de provisionamento
+
+---
+
+## Deploy (Docker)
+
+Modelo: Asterisk roda **nativo** na VPS (`setups/install-asterisk.sh` + `setups/odbc-realtime.sh`, fora do Docker); backend + Postgres rodam em container via `docker-compose.yml`/`Dockerfile`/`entrypoint.sh` na raiz do backend. Processo completo (Nginx Proxy Manager, ordem dos passos, firewall) documentado no [README.md raiz](../README.md), seção "Deploy (VPS)" — não duplicar aqui, só a mecânica específica destes 3 arquivos:
+
+- **`Dockerfile`** — multi-stage (`deps` → `builder` → `prod-deps` → `runner`). `builder` roda `bunx prisma generate` com um `DATABASE_URL` placeholder (só pro Prisma Client conseguir gerar; a URL real de runtime vem do `docker-compose.yml`) e `bun run build`. `runner` instala `sox` via apt (conversão de áudio, ver `audio-convert.ts`) — não instala o binário CLI do Asterisk, reload de dialplan é via AMI (`ami-client.ts`), não `asterisk -rx`. Expõe `3333` (API) e `4573` (FastAGI).
+- **`docker-compose.yml`** — 2 services: `postgres` (porta `5433:5432` publicada no host) e `backend` (`network_mode: host`, obrigatório porque o backend precisa falar com o Asterisk nativo e o AMI em `127.0.0.1`, e `network_mode: host` não permite resolver o service `postgres` pelo nome — por isso a URL de runtime na env aponta pra `127.0.0.1:5433`, não `postgres:5432`). Monta `/etc/asterisk/dialplan-extra` e `/var/lib/asterisk/sounds` do host como volume (paths criados pelo `install-asterisk.sh`).
+- **`entrypoint.sh`** — roda `bunx prisma migrate deploy` automaticamente antes de subir o server (`bun dist/server.js`) — não precisa rodar migration manual em produção. `odbc-realtime.sh` (que dá os grants Postgres pro usuário `asterisk` usado pelo Realtime/ODBC) deve rodar **depois** do primeiro `docker compose up`, pra que as tabelas já existam.
+- Como o backend está em `network_mode: host`, ele não participa da rede Docker `proxy` (usada por frontend + Nginx Proxy Manager) — pra expor a API por domínio, o Proxy Host no NPM aponta pro gateway da rede `proxy` (IP privado, ex. `172.18.0.1`), não pelo nome do service. O `nftables` gerado por `install-asterisk.sh` já libera essa faixa privada (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`) pra porta `3333` — nunca exposta direto à internet.
 
 ---
 

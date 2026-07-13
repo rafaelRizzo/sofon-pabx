@@ -1,8 +1,7 @@
 import type { FastifyRequest, FastifyReply } from 'fastify'
 import jwt from 'jsonwebtoken'
 import * as AuthService from './auth.service'
-import { loginSchema } from './schemas/auth.schema'
-import { createUserSchema } from '../users/schemas/user.schema'
+import { loginSchema, registerSchema } from './schemas/auth.schema'
 import { handleError } from '../../utils/errors/handler.error'
 import { jtiManager } from '../../lib/jti'
 import { prisma } from '../../lib/prisma'
@@ -112,7 +111,7 @@ export const me = async (req: FastifyRequest, reply: FastifyReply) => {
 
 export const register = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
-        const data = createUserSchema.parse(req.body)
+        const data = registerSchema.parse(req.body)
         const tokens = await AuthService.register(data)
 
         reply.setCookie('refreshToken', tokens.refreshToken, {

@@ -32,6 +32,19 @@ const trunkSelect = {
     techPrefix: true,
     maxInChannels: true,
     maxOutChannels: true,
+    transport: true,
+    dtmfMode: true,
+    directMedia: true,
+    qualifyFrequency: true,
+    qualifyTimeout: true,
+    outboundProxy: true,
+    iceSupport: true,
+    rel: true,
+    timers: true,
+    timersMinSe: true,
+    timersSessExpires: true,
+    sendDiversion: true,
+    customHeaders: true,
     metadata: true,
     createdAt: true,
     updatedAt: true,
@@ -88,6 +101,16 @@ export const createTrunk = async (data: CreateTrunkInput) => {
     })
     if (existing) throw new AppError('Trunk already exists for this company', 409)
 
+    if (data.registrationMode === 'custom') {
+        const created = await prisma.trunk.create({
+            data: { name: data.name, companyId: data.companyId, registrationMode: 'custom', context: data.context },
+        })
+        const trunk = await prisma.trunk.findUnique({ where: { id: created.id }, select: trunkSelect })
+        await TrunksCache.invalidateAllTrunks()
+        await TrunksCache.setTrunk(created.id, trunk!)
+        return trunk!
+    }
+
     const astId = toAsteriskId(company.asteriskId, data.name)
     const identifyBy = data.registrationMode === 'inbound' ? (data.username ? 'username' : 'ip') : null
     const hasAuth = data.registrationMode === 'outbound' || identifyBy === 'username'
@@ -109,6 +132,19 @@ export const createTrunk = async (data: CreateTrunkInput) => {
                 techPrefix: data.techPrefix ?? null,
                 maxInChannels: data.maxInChannels ?? null,
                 maxOutChannels: data.maxOutChannels ?? null,
+                transport: data.transport ?? null,
+                dtmfMode: data.dtmfMode ?? null,
+                directMedia: data.directMedia ?? null,
+                qualifyFrequency: data.qualifyFrequency ?? null,
+                qualifyTimeout: data.qualifyTimeout ?? null,
+                outboundProxy: data.outboundProxy ?? null,
+                iceSupport: data.iceSupport ?? null,
+                rel: data.rel ?? null,
+                timers: data.timers ?? null,
+                timersMinSe: data.timersMinSe ?? null,
+                timersSessExpires: data.timersSessExpires ?? null,
+                sendDiversion: data.sendDiversion ?? null,
+                customHeaders: data.customHeaders ?? [],
             },
         })
 
@@ -126,6 +162,18 @@ export const createTrunk = async (data: CreateTrunkInput) => {
             port: data.port,
             setvar: `TRUNKID=${created.id}`,
             accountcode: company.asteriskId,
+            transport: data.transport,
+            dtmfMode: data.dtmfMode,
+            directMedia: data.directMedia,
+            qualifyFrequency: data.qualifyFrequency,
+            qualifyTimeout: data.qualifyTimeout,
+            outboundProxy: data.outboundProxy,
+            iceSupport: data.iceSupport,
+            rel: data.rel,
+            timers: data.timers,
+            timersMinSe: data.timersMinSe,
+            timersSessExpires: data.timersSessExpires,
+            sendDiversion: data.sendDiversion,
         })
     })
 
@@ -144,6 +192,28 @@ export const updateTrunk = async (id: string, data: UpdateTrunkInput) => {
         include: { company: { select: { asteriskId: true } } },
     })
     if (!existing) throw new AppError('Trunk not found', 404)
+
+    if (data.context !== undefined && existing.registrationMode !== 'custom')
+        throw new AppError('context só pode ser alterado em trunks custom', 400)
+
+    if (existing.registrationMode === 'custom') {
+        const contextChanged = data.context !== undefined && data.context !== existing.context
+        await prisma.$transaction(async (tx) => {
+            if (data.context !== undefined) await tx.trunk.update({ where: { id }, data: { context: data.context } })
+            if (contextChanged) {
+                const affectedRouteIds = (
+                    await tx.outboundRouteTrunk.findMany({ where: { trunkId: id }, select: { routeId: true } })
+                ).map((rt) => rt.routeId)
+                for (const routeId of affectedRouteIds) {
+                    await resyncAllPatterns(tx, routeId)
+                }
+            }
+        })
+        await TrunksCache.invalidateTrunk(id)
+        await TrunksCache.invalidateByCompany(existing.companyId)
+        await TrunksCache.invalidateAllTrunks()
+        return getTrunkById(id)
+    }
 
     if (existing.registrationMode === 'outbound' && data.username === null)
         throw new AppError('Tronco outbound exige username', 400)
@@ -168,6 +238,7 @@ export const updateTrunk = async (id: string, data: UpdateTrunkInput) => {
 
     const maxInChanged = 'maxInChannels' in data && data.maxInChannels !== existing.maxInChannels
     const maxOutChanged = 'maxOutChannels' in data && data.maxOutChannels !== existing.maxOutChannels
+    const customHeadersChanged = 'customHeaders' in data
 
     await prisma.$transaction(async (tx) => {
         await PjsipRepository.updateTrunk(tx, astId, {
@@ -194,7 +265,7 @@ export const updateTrunk = async (id: string, data: UpdateTrunkInput) => {
             }
         }
 
-        if (maxOutChanged) {
+        if (maxOutChanged || customHeadersChanged) {
             const affectedRouteIds = (
                 await tx.outboundRouteTrunk.findMany({ where: { trunkId: id }, select: { routeId: true } })
             ).map((rt) => rt.routeId)
@@ -232,7 +303,9 @@ export const deleteTrunk = async (id: string) => {
         for (const ir of inboundRoutes) {
             await InboundRouteRepository.delete(tx, id, ir.did.number)
         }
-        await PjsipRepository.deleteTrunk(tx, astId, existing.registrationMode, endpointId)
+        if (existing.registrationMode !== 'custom') {
+            await PjsipRepository.deleteTrunk(tx, astId, existing.registrationMode, endpointId)
+        }
         await tx.trunk.delete({ where: { id } })
         for (const routeId of affectedOutboundRouteIds) {
             await resyncAllPatterns(tx, routeId)

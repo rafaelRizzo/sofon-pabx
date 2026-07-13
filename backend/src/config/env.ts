@@ -23,6 +23,15 @@ const envSchema = z.object({
     // AGI(agi://AGI_HOST:AGI_PORT/run,<requestTemplateId>) ao executar um RouteDestination type: "request"
     AGI_HOST: z.string().default('127.0.0.1'),
     AGI_PORT: z.coerce.number().default(4573),
+    // AMI (Asterisk Manager Interface, src/asterisk/ami-client.ts) — usado pra mandar comandos tipo
+    // "dialplan reload" sem depender do binário CLI do Asterisk instalado no host/container do backend.
+    // setups/install-asterisk.sh já habilita manager.conf com esse host/porta/usuário por padrão; o
+    // secret é gerado por instalação e precisa ser copiado manualmente pro .env (AMI_SECRET indefinido
+    // = reload via AMI é pulado, só loga warning, nunca derruba a request).
+    AMI_HOST: z.string().default('127.0.0.1'),
+    AMI_PORT: z.coerce.number().default(5038),
+    AMI_USER: z.string().default('admin'),
+    AMI_SECRET: z.string().optional(),
     // Diretório onde dialplan-file.repository.ts materializa os contextos estáticos (timeconditions,
     // announcements, ivrs, holidays, queues-app, request-templates). Default é o caminho real do
     // Asterisk — testes de integração sobrescrevem via .env.test pra um dir gravável sem Asterisk instalado.

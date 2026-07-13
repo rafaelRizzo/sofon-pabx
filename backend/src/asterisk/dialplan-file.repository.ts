@@ -3,6 +3,7 @@ import { dirname } from 'path'
 import { prisma } from '../lib/prisma'
 import { logger } from '../utils/logger'
 import { validateEnv } from '../config/env'
+import { runAmiCommand } from './ami-client'
 
 // Materializa o dialplan de contextos compartilhados de baixa escrita (holidays, timeconditions,
 // announcements, ivrs, queues-app, request-templates) em arquivo estático por empresa, em vez de
@@ -71,9 +72,9 @@ export async function writeContextFile(context: string, asteriskId: string, entr
     await rename(tmpPath, path)
 }
 
-// Backend e Asterisk rodam no mesmo host (mesmo padrão de AGI_HOST=127.0.0.1) — sem AMI configurado
-// nesse projeto, só spawn direto (mesma abordagem já usada pra `sox` em audio-convert.ts). Falha aqui
-// não derruba a request: o arquivo já está correto, o próximo reload (manual ou próximo CRUD) resolve.
+// Via AMI (src/asterisk/ami-client.ts) em vez de spawnar o binário `asterisk` — dispensa ter o CLI
+// do Asterisk instalado no mesmo host/container do backend. Falha aqui não derruba a request: o
+// arquivo já está correto, o próximo reload (manual ou próximo CRUD) resolve.
 //
 // Chamadores NÃO devem dar await nisso — o arquivo já está correto no disco quando a request
 // responde; o reload só precisa acontecer em algum momento depois, sem segurar a request pra isso.
@@ -88,9 +89,7 @@ export function reloadDialplan(): Promise<void> {
     pendingReload = new Promise((resolve) => {
         setTimeout(async () => {
             try {
-                const proc = Bun.spawn(['asterisk', '-rx', 'dialplan reload'], { stdout: 'pipe', stderr: 'pipe' })
-                const [exitCode, stderr] = await Promise.all([proc.exited, new Response(proc.stderr).text()])
-                if (exitCode !== 0) logger.warn({ event: 'dialplan.reload.failed', exitCode, stderr: stderr.trim() })
+                await runAmiCommand('dialplan reload')
             } catch (error) {
                 logger.warn({ event: 'dialplan.reload.failed', error: error instanceof Error ? error.message : String(error) })
             } finally {

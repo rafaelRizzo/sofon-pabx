@@ -16,7 +16,22 @@ type ExtensionCreateOpts = {
     extras: Record<string, any>
 }
 
-type TrunkCreateOpts = {
+type TrunkAdvancedOpts = {
+    transport?: string | null
+    dtmfMode?: string | null
+    directMedia?: boolean | null
+    qualifyFrequency?: number | null
+    qualifyTimeout?: number | null
+    outboundProxy?: string | null
+    iceSupport?: boolean | null
+    rel?: string | null
+    timers?: string | null
+    timersMinSe?: number | null
+    timersSessExpires?: number | null
+    sendDiversion?: boolean | null
+}
+
+type TrunkCreateOpts = TrunkAdvancedOpts & {
     username?: string
     password?: string
     context: string
@@ -29,7 +44,7 @@ type TrunkCreateOpts = {
     accountcode: string
 }
 
-type TrunkUpdateOpts = {
+type TrunkUpdateOpts = TrunkAdvancedOpts & {
     username?: string | null
     password?: string | null
     host?: string
@@ -42,6 +57,28 @@ type TrunkUpdateOpts = {
     existingHost?: string | null
     existingPort?: number | null
     existingUsername?: string | null
+}
+
+const endpointExtrasOf = (opts: TrunkAdvancedOpts) => {
+    const extras: Record<string, any> = {}
+    if (opts.transport !== undefined) extras.transport = opts.transport
+    if (opts.dtmfMode !== undefined) extras.dtmf_mode = opts.dtmfMode
+    if (opts.directMedia !== undefined) extras.direct_media = opts.directMedia
+    if (opts.outboundProxy !== undefined) extras.outbound_proxy = opts.outboundProxy
+    if (opts.iceSupport !== undefined) extras.ice_support = opts.iceSupport
+    if (opts.rel !== undefined) extras.rel = opts.rel
+    if (opts.timers !== undefined) extras.timers = opts.timers
+    if (opts.timersMinSe !== undefined) extras.timers_min_se = opts.timersMinSe
+    if (opts.timersSessExpires !== undefined) extras.timers_sess_expires = opts.timersSessExpires
+    if (opts.sendDiversion !== undefined) extras.send_diversion = opts.sendDiversion
+    return extras
+}
+
+const aorExtrasOf = (opts: TrunkAdvancedOpts) => {
+    const extras: Record<string, any> = {}
+    if (opts.qualifyFrequency !== undefined) extras.qualify_frequency = opts.qualifyFrequency
+    if (opts.qualifyTimeout !== undefined) extras.qualify_timeout = opts.qualifyTimeout
+    return extras
 }
 
 export const PjsipRepository = {
@@ -74,10 +111,13 @@ export const PjsipRepository = {
             })
         }
 
+        const endpointExtras = endpointExtrasOf(opts)
+        const aorExtras = aorExtrasOf(opts)
+
         if (opts.registrationMode === 'outbound') {
             const uri = hostUri(opts.host, opts.port)
             await tx.ps_aors.create({
-                data: { id, contact: `sip:${uri}`, qualify_frequency: 60 },
+                data: { id, contact: `sip:${uri}`, ...aorExtras },
             })
             await tx.ps_endpoints.create({
                 data: {
@@ -91,10 +131,10 @@ export const PjsipRepository = {
                     allow: opts.codecs,
                     setvar: opts.setvar,
                     accountcode: opts.accountcode,
-                    direct_media: false,
                     force_rport: true,
                     rtp_symmetric: true,
                     rewrite_contact: true,
+                    ...endpointExtras,
                 } as any,
             })
             await tx.ps_registrations.create({
@@ -115,16 +155,18 @@ export const PjsipRepository = {
         } else {
             const endpointId = opts.identifyBy === 'username' ? opts.username! : id
             try {
-                await tx.ps_aors.create({ data: { id: endpointId, max_contacts: 5, remove_existing: false } })
+                await tx.ps_aors.create({
+                    data: { id: endpointId, max_contacts: 5, remove_existing: false, ...aorExtras },
+                })
                 await tx.ps_endpoints.create({
                     data: {
                         id: endpointId, aors: endpointId, ...(hasAuth ? { auth: id } : {}), context: opts.context,
                         disallow: 'all', allow: opts.codecs, setvar: opts.setvar,
                         accountcode: opts.accountcode,
-                        direct_media: false,
                         force_rport: true,
                         rtp_symmetric: true,
                         rewrite_contact: true,
+                        ...endpointExtras,
                     } as any,
                 })
             } catch (err) {
@@ -183,7 +225,7 @@ export const PjsipRepository = {
         const newHost = opts.host ?? opts.existingHost
         const newPort = opts.port !== undefined ? opts.port : opts.existingPort
 
-        const endpointUpdate: Record<string, any> = {}
+        const endpointUpdate: Record<string, any> = { ...endpointExtrasOf(opts) }
         if (opts.context !== undefined) endpointUpdate.context = opts.context
         if (opts.codecs !== undefined) endpointUpdate.allow = opts.codecs
         if (opts.username !== undefined && opts.registrationMode === 'outbound') endpointUpdate.from_user = opts.username
@@ -220,7 +262,7 @@ export const PjsipRepository = {
         }
 
         if (opts.registrationMode === 'outbound') {
-            const aorUpdate: Record<string, any> = {}
+            const aorUpdate: Record<string, any> = { ...aorExtrasOf(opts) }
             if (hostChanged) aorUpdate.contact = `sip:${hostUri(newHost, newPort)}`
             if (Object.keys(aorUpdate).length > 0)
                 await tx.ps_aors.update({ where: { id }, data: aorUpdate })
@@ -233,6 +275,10 @@ export const PjsipRepository = {
             if (opts.username !== undefined) regUpdate.contact_user = opts.username
             if (Object.keys(regUpdate).length > 0)
                 await tx.ps_registrations.update({ where: { id }, data: regUpdate })
+        } else {
+            const aorUpdate = aorExtrasOf(opts)
+            if (Object.keys(aorUpdate).length > 0)
+                await tx.ps_aors.update({ where: { id: newEndpointId }, data: aorUpdate })
         }
     },
 

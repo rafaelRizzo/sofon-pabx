@@ -217,6 +217,21 @@ model Trunk {
     techPrefix       String?              @db.VarChar(20)
     maxInChannels    Int?
     maxOutChannels   Int?
+    transport        String?              @db.VarChar(40) // "transport-udp" | "transport-tcp"
+    dtmfMode         String?              @db.VarChar(40) // rfc4733 | inband | info | auto
+    directMedia      Boolean?
+    qualifyFrequency Int?
+    qualifyTimeout   Float?
+    outboundProxy    String?              @db.VarChar(40)
+    iceSupport       Boolean?
+    rel              String?              @db.VarChar(40) // 100rel: no | yes | required
+    timers           String?              @db.VarChar(40) // no | yes | always
+    timersMinSe      Int?
+    timersSessExpires Int?
+    sendDiversion    Boolean?
+    // [{name, value}] — headers SIP customizados injetados via Set(PJSIP_HEADER(add,name)=value)
+    // antes de cada Dial() de saída (ver outbound-routes.service.ts); só se aplica a chamadas outbound
+    customHeaders    Json                 @default("[]")
     metadata         Json                 @default("{}")
     createdAt        DateTime             @default(now()) @db.Timestamptz(3)
     updatedAt        DateTime             @updatedAt @db.Timestamptz(3)

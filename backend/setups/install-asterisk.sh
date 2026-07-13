@@ -606,6 +606,9 @@ fi
     echo ''
     echo '        tcp dport { 22, 21122 } accept'
     echo ''
+    echo '        # Nginx Proxy Manager (host) — 80/443 público (HTTP/HTTPS + ACME), 81 painel admin'
+    echo '        tcp dport { 80, 443, 81 } accept'
+    echo ''
     if [[ "$USE_LEGACY_SIP" == true ]]; then
         echo "        ip saddr @whitelist tcp dport { ${SIP_PORT}, 5061, ${PJSIP_PORT} } accept"
         echo "        ip saddr @whitelist udp dport { ${SIP_PORT}, 5061, ${PJSIP_PORT} } accept"
@@ -617,6 +620,9 @@ fi
     echo '        ip saddr @whitelist udp dport 10000-20000 accept'
     echo ''
     echo '        ip saddr 127.0.0.1 tcp dport 5038 accept'
+    echo ''
+    echo '        # Backend (3333, network_mode host) — só redes privadas/Docker, nunca exposto à internet'
+    echo '        ip saddr { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } tcp dport 3333 accept'
     echo '    }'
     echo ''
     echo '    chain forward {'
@@ -999,6 +1005,7 @@ else
     echo -e "  PJSIP      : ${CYAN}${PJSIP_PORT}${NC} (UDP/TCP)"
 fi
 echo -e "  RTP        : ${CYAN}10000-20000${NC} (UDP)"
+echo -e "  Proxy Web  : ${CYAN}80, 443${NC} (HTTP/HTTPS) + ${CYAN}81${NC} (painel Nginx Proxy Manager)"
 echo -e "  AMI Secret : ${YELLOW}${AMI_SECRET}${NC}"
 echo -e "  Fail2Ban   : ${GREEN}ativo${NC}"
 echo -e "  manage-fw  : ${GREEN}/usr/local/sbin/manage-fw${NC}"

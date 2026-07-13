@@ -3,8 +3,7 @@ import { generateTokens, verifyRefreshToken } from '../../lib/jwt'
 import { jtiManager } from '../../lib/jti'
 import { AppError } from '../../utils/errors/app.error'
 import argon2 from 'argon2'
-import type { LoginInput } from './schemas/auth.schema'
-import type { CreateUserInput } from '../users/schemas/user.schema'
+import type { LoginInput, RegisterInput } from './schemas/auth.schema'
 
 // Hash descartável usado quando o usuário não existe — roda argon2.verify mesmo assim pra igualar o
 // tempo de resposta e não vazar existência de username por timing. Calculado sob demanda uma vez.
@@ -63,7 +62,7 @@ export const refreshAccessToken = async (refreshToken: string) => {
     }
 }
 
-export const register = async (data: CreateUserInput) => {
+export const register = async (data: RegisterInput) => {
     // count + create numa transação serializável — sem isso, duas requisições concorrentes no bootstrap
     // (0 usuários) passariam ambas no check e criariam dois admins.
     const user = await prisma.$transaction(

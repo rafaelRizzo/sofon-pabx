@@ -73,13 +73,18 @@ export const createInboundRoute = async (data: CreateInboundRouteInput) => {
     const [, did, trunk] = await Promise.all([
         getCompanyById(data.companyId),
         prisma.did.findUnique({ where: { id: data.didId }, select: { id: true, number: true, companyId: true } }),
-        prisma.trunk.findUnique({ where: { id: data.trunkId }, select: { id: true, companyId: true, maxInChannels: true } }),
+        prisma.trunk.findUnique({
+            where: { id: data.trunkId },
+            select: { id: true, companyId: true, maxInChannels: true, registrationMode: true },
+        }),
     ])
 
     if (!did) throw new AppError('DID not found', 404)
     if (!trunk) throw new AppError('Trunk not found', 404)
     if (did.companyId !== data.companyId) throw new AppError('DID belongs to different company', 403)
     if (trunk.companyId !== data.companyId) throw new AppError('Trunk belongs to different company', 403)
+    if (trunk.registrationMode === 'custom')
+        throw new AppError('Trunk custom não recebe chamadas, não pode ter Inbound Route', 400)
 
     const existing = await prisma.inboundRoute.findUnique({
         where: { trunkId_didId: { trunkId: data.trunkId, didId: data.didId } },

@@ -33,10 +33,17 @@ type Props = {
 
 // Ordem da lista = ordem de failover enviada em trunkIds (posição 0 é o tronco primário).
 // Selecionados ficam no topo, em ordem, e podem ser arrastados para reordenar a prioridade.
-export function TrunkOrderSelect({ trunks, value, onChange, className }: Props) {
+export function TrunkOrderSelect({
+    trunks,
+    value,
+    onChange,
+    className,
+}: Props) {
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
-        useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+        useSensor(KeyboardSensor, {
+            coordinateGetter: sortableKeyboardCoordinates,
+        })
     )
 
     function toggle(trunkId: string, checked: boolean) {
@@ -73,7 +80,10 @@ export function TrunkOrderSelect({ trunks, value, onChange, className }: Props) 
                 collisionDetection={closestCenter}
                 onDragEnd={handleDragEnd}
             >
-                <SortableContext items={value} strategy={verticalListSortingStrategy}>
+                <SortableContext
+                    items={value}
+                    strategy={verticalListSortingStrategy}
+                >
                     {selectedTrunks.map((trunk, index) => (
                         <SortableTrunkRow
                             key={trunk.id}
@@ -86,7 +96,10 @@ export function TrunkOrderSelect({ trunks, value, onChange, className }: Props) 
             </DndContext>
 
             {unselectedTrunks.map((trunk) => (
-                <div key={trunk.id} className="flex items-center gap-2 py-1 pl-6">
+                <div
+                    key={trunk.id}
+                    className="flex items-center gap-2 py-1 pl-6"
+                >
                     <label className="flex flex-1 items-center gap-2 text-sm font-normal">
                         <Checkbox
                             checked={false}
@@ -96,7 +109,9 @@ export function TrunkOrderSelect({ trunks, value, onChange, className }: Props) 
                         />
                         {trunk.name}
                         <span className="text-xs text-muted-foreground">
-                            {trunk.host ?? ""}
+                            {trunk.registrationMode === "custom"
+                                ? `custom → ${trunk.context}`
+                                : (trunk.host ?? "")}
                         </span>
                     </label>
                 </div>
@@ -112,8 +127,14 @@ type SortableTrunkRowProps = {
 }
 
 function SortableTrunkRow({ trunk, index, onRemove }: SortableTrunkRowProps) {
-    const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-        useSortable({ id: trunk.id })
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({ id: trunk.id })
 
     const style = {
         transform: CSS.Transform.toString(transform),
@@ -142,7 +163,9 @@ function SortableTrunkRow({ trunk, index, onRemove }: SortableTrunkRowProps) {
                 <Checkbox checked onCheckedChange={onRemove} />
                 <span className="font-medium">{trunk.name}</span>
                 <span className="text-xs text-muted-foreground">
-                    {trunk.host ?? ""}
+                    {trunk.registrationMode === "custom"
+                        ? `custom → ${trunk.context}`
+                        : (trunk.host ?? "")}
                 </span>
             </label>
             <Badge variant="secondary">{index + 1}º</Badge>

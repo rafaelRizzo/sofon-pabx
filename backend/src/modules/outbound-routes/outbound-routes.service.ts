@@ -17,18 +17,29 @@ function trunkAsteriskId(asteriskId: string, trunkName: string): string {
     return `${asteriskId}-trunk-${trunkName}`
 }
 
-type TrunkOpt = { astId: string; maxOut?: number | null; techPrefix?: string | null }
+type CustomHeader = { name: string; value: string }
+
+type TrunkOpt = {
+    astId: string
+    registrationMode: string
+    context: string
+    maxOut?: number | null
+    techPrefix?: string | null
+    customHeaders?: CustomHeader[]
+}
 
 // Priority count per trunk block (used to pre-compute offsets for forward references):
+// custom (sem endpoint PJSIP)   = 1 (Goto pro contexto custom, sem failover/headers)
 // with limit + not last = 5 (GotoIf count, Set GROUP, Dial, GotoIf DIALSTATUS, Set GROUP=)
 // with limit + last    = 3 (GotoIf count, Set GROUP, Dial)
 // no limit + not last  = 2 (Dial, GotoIf DIALSTATUS)
 // no limit + last      = 1 (Dial)
-function trunkBlockSize(hasLimit: boolean, isLast: boolean): number {
-    if (hasLimit && !isLast) return 5
-    if (hasLimit && isLast) return 3
-    if (!hasLimit && !isLast) return 2
-    return 1
+// + 1 Set(PJSIP_HEADER(add,...)) por header customizado da trunk, sempre antes do Dial
+function trunkBlockSize(trunk: TrunkOpt, isLast: boolean): number {
+    if (trunk.registrationMode === 'custom') return 1
+    const hasLimit = trunk.maxOut != null
+    const base = hasLimit ? (isLast ? 3 : 5) : isLast ? 1 : 2
+    return base + (trunk.customHeaders?.length ?? 0)
 }
 
 function buildDialplanEntries(
@@ -51,7 +62,7 @@ function buildDialplanEntries(
     let cursor = baseOffset
     for (let i = 0; i < trunks.length; i++) {
         blockStarts.push(cursor)
-        cursor += trunkBlockSize(trunks[i].maxOut != null, i === trunks.length - 1)
+        cursor += trunkBlockSize(trunks[i], i === trunks.length - 1)
     }
     const hangupPriority = cursor
 
@@ -72,10 +83,22 @@ function buildDialplanEntries(
     })
 
     for (let i = 0; i < trunks.length; i++) {
-        const { astId, maxOut, techPrefix } = trunks[i]
+        const { astId, registrationMode, context: customContext, maxOut, techPrefix, customHeaders } = trunks[i]
         const isLast = i === trunks.length - 1
         const nextTrunkStart = isLast ? hangupPriority : blockStarts[i + 1]
         const dialTarget = `PJSIP/${techPrefix ?? ''}${destVar}@${astId},60`
+
+        if (registrationMode === 'custom') {
+            entries.push({ context, exten, priority: p++, app: 'Goto', appdata: `${customContext},${destVar},1` })
+            continue
+        }
+
+        for (const h of customHeaders ?? []) {
+            entries.push({
+                context, exten, priority: p++, app: 'Set',
+                appdata: `PJSIP_HEADER(add,${h.name})=${h.value}`,
+            })
+        }
 
         if (maxOut != null) {
             entries.push({
@@ -172,7 +195,15 @@ async function getRouteContext(tx: Tx, routeId: string) {
     // trunk is many-to-one → JOIN within findMany — single query
     const trunks = await tx.outboundRouteTrunk.findMany({
         where: { routeId },
-        select: { position: true, trunk: { select: { name: true, maxOutChannels: true, techPrefix: true } } },
+        select: {
+            position: true,
+            trunk: {
+                select: {
+                    name: true, maxOutChannels: true, techPrefix: true, customHeaders: true,
+                    registrationMode: true, context: true,
+                },
+            },
+        },
         orderBy: { position: 'asc' },
     })
 
@@ -185,8 +216,11 @@ export async function resyncAllPatterns(tx: Tx, routeId: string) {
 
     const trunkOpts: TrunkOpt[] = ctx.trunks.map((rt) => ({
         astId: trunkAsteriskId(ctx.company.asteriskId, rt.trunk.name),
+        registrationMode: rt.trunk.registrationMode,
+        context: rt.trunk.context,
         maxOut: rt.trunk.maxOutChannels,
         techPrefix: rt.trunk.techPrefix,
+        customHeaders: rt.trunk.customHeaders as CustomHeader[],
     }))
     for (const p of ctx.patterns) {
         await syncPatternDialplan(tx, 'ramais', p.pattern, trunkOpts, p.prefix, p.prepend, ctx.company.asteriskId)
@@ -337,18 +371,28 @@ export const createOutboundRoute = async (data: CreateOutboundRouteInput) => {
 
     const trunks = await prisma.trunk.findMany({
         where: { id: { in: data.trunkIds }, companyId: data.companyId },
-        select: { id: true, name: true, maxOutChannels: true, techPrefix: true },
+        select: {
+            id: true, name: true, maxOutChannels: true, techPrefix: true, customHeaders: true,
+            registrationMode: true, context: true,
+        },
     })
     if (trunks.length !== data.trunkIds.length) throw new AppError('One or more trunks not found', 404)
 
     const orderedTrunks = data.trunkIds.map((tid, i) => {
         const t = trunks.find((t) => t.id === tid)!
-        return { id: t.id, name: t.name, maxOutChannels: t.maxOutChannels, techPrefix: t.techPrefix, position: i }
+        return {
+            id: t.id, name: t.name, maxOutChannels: t.maxOutChannels, techPrefix: t.techPrefix,
+            customHeaders: t.customHeaders as CustomHeader[], registrationMode: t.registrationMode,
+            context: t.context, position: i,
+        }
     })
     const trunkOpts: TrunkOpt[] = orderedTrunks.map((t) => ({
         astId: trunkAsteriskId(company.asteriskId, t.name),
+        registrationMode: t.registrationMode,
+        context: t.context,
         maxOut: t.maxOutChannels,
         techPrefix: t.techPrefix,
+        customHeaders: t.customHeaders,
     }))
 
     if (data.extensionIds?.length) {

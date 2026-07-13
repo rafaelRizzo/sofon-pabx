@@ -2,8 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import * as AuthController from './auth.controller'
 import { authMiddleware } from '../../middleware/auth.middleware'
-import { loginSchema, TokenResponse, LogoutResponse, MeResponse } from './schemas/auth.schema'
-import { createUserSchema } from '../users/schemas/user.schema'
+import { loginSchema, registerSchema, TokenResponse, LogoutResponse, MeResponse } from './schemas/auth.schema'
 import { errors } from '../../schemas/responses'
 
 // Throttle agressivo em auth: barra brute-force/credential-stuffing (o rate limit global de 1000/s
@@ -19,7 +18,7 @@ export const authRoutes = async (app: FastifyInstance) => {
             tags: ['Auth'],
             summary: 'Registrar primeiro usuário',
             description: 'Só funciona quando não existe nenhum usuário cadastrado. Cria automaticamente como admin.',
-            body: createUserSchema,
+            body: registerSchema,
             response: {
                 201: TokenResponse,
                 409: errors[409],

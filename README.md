@@ -41,7 +41,7 @@ sofon-pabx/
 │   │   ├── modules/      # auth, users, companies, dids, extensions,
 │   │   │                 # queues, queue-members, trunks,
 │   │   │                 # outbound-routes, inbound-routes,
-│   │   │                 # time-groups, time-conditions
+│   │   │                 # time-groups, time-conditions, callcenter, ...
 │   │   ├── asterisk/      # repositórios que escrevem nas tabelas
 │   │   │                  # realtime do Asterisk (sip_peers, ps_endpoints,
 │   │   │                  # queues, extensions/dialplan, etc.)
@@ -49,8 +49,12 @@ sofon-pabx/
 │   │   ├── config/        # env, redis, cache
 │   │   └── schemas/       # respostas/erros padronizados
 │   ├── prisma/            # schema e migrations
-│   └── setups/            # docker-compose, scripts de instalação do Asterisk (VPS)
-└── (frontend, quando existir)
+│   ├── Dockerfile, docker-compose.yml, entrypoint.sh  # imagem de produção (backend + Postgres)
+│   └── setups/            # docker-compose (Postgres p/ dev), scripts de instalação do
+│                           # Asterisk e do Realtime/ODBC (VPS)
+└── frontend/         # Next.js (App Router) — dashboard
+    ├── app/, components/, hooks/, lib/
+    └── Dockerfile, docker-compose.yml  # imagem de produção
 ```
 
 Cada módulo do backend segue o padrão `routes → controller → service`, com schemas Zod dedicados. Ver [backend/CLAUDE.md](backend/CLAUDE.md) para detalhes de convenções, regras de negócio e schemas de API.
@@ -82,7 +86,131 @@ bun run test:integration # só *.routes.test.ts (sobe app + Redis)
 
 ## Deploy (VPS)
 
-Scripts de instalação do Asterisk (PJSIP/chan_sip + ODBC realtime) estão em `backend/setups/`. Ver `install-asterisk.sh` e `odbc-realtime.sh`.
+Modelo: **uma VPS por instância** (ver "Escopo"). Nela convivem 3 mundos diferentes — Asterisk nativo (compilado do fonte, fora do Docker), backend/frontend/Postgres em containers, e um reverse proxy (Nginx Proxy Manager) que termina TLS e expõe tudo por domínio.
+
+### Pré-requisitos
+
+- VPS Debian 11+/Ubuntu 24.04+, acesso root, IP público
+- Docker + Docker Compose plugin instalados
+- Portas liberadas no firewall do provedor (cloud/security group) — o firewall interno (`nftables`) já é configurado pelo instalador do Asterisk (passo 2):
+  - `22`, `21122` — SSH
+  - `80`, `443` — HTTP/HTTPS (proxy + emissão de certificado ACME)
+  - `81` — painel do Nginx Proxy Manager
+  - `5060`-`5062` — SIP/PJSIP (liberado só por IP via whitelist, ver `manage-fw` no fim desta seção)
+  - `10000-20000/udp` — RTP (mesma whitelist)
+
+### 1. Rede Docker compartilhada
+
+```bash
+docker network create proxy
+```
+
+Backend, frontend e Nginx Proxy Manager referenciam essa rede `proxy` como `external: true` nos respectivos `docker-compose.yml`. O backend roda em `network_mode: host` (precisa falar com Asterisk/Postgres em `127.0.0.1`), então não entra nessa rede — ver nota no passo 7.
+
+### 2. Asterisk (nativo, fora do Docker)
+
+```bash
+cd backend/setups
+sudo ./install-asterisk.sh
+```
+
+Compila e instala o Asterisk, configura PJSIP (+ `chan_sip` legado se você escolher), aplica o firewall (`nftables`) e o Fail2Ban, gera as credenciais do AMI (**anote o `AMI_SECRET`** exibido no resumo final) e cria os diretórios que o backend vai montar como volume (`/etc/asterisk/dialplan-extra`, `/var/lib/asterisk/sounds`).
+
+### 3. Nginx Proxy Manager
+
+```yaml
+# ~/nginx-proxy/docker-compose.yml
+services:
+  nginx-proxy-manager:
+    image: jc21/nginx-proxy-manager:latest
+    container_name: npm
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "81:81"
+    environment:
+      - DB_SQLITE_FILE=/data/database.sqlite
+    volumes:
+      - ./data:/data
+      - ./letsencrypt:/etc/letsencrypt
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    external: true
+```
+
+```bash
+docker compose up -d
+```
+
+Painel em `http://<ip-da-vps>:81` — trocar o login/senha padrão no primeiro acesso.
+
+### 4. Backend + Postgres
+
+```bash
+cd backend
+cp .env.example .env
+# editar .env: JWT_SECRET/REFRESH_SECRET (>=32 chars, distintos entre si), AMI_SECRET (passo 2),
+# CORS_ORIGIN (domínio do frontend) — demais defaults servem
+docker compose up -d --build
+```
+
+- Sobe `postgres` (porta `5433` publicada no host) e `backend` (`network_mode: host`).
+- `entrypoint.sh` roda `prisma migrate deploy` automaticamente antes de subir o server — não precisa migration manual.
+- Monta os volumes criados no passo 2 (`dialplan-extra`, `sounds`) — é assim que o backend materializa dialplan estático (timeconditions/ivrs/announcements/filas/etc., ver `backend/CLAUDE.md`).
+
+### 5. Conectar Asterisk ↔ Postgres (Realtime/ODBC)
+
+```bash
+cd backend/setups
+sudo ./odbc-realtime.sh
+```
+
+Rodar **depois** do passo 4 (as tabelas já existem via `prisma migrate deploy`). Cria o usuário `asterisk` no Postgres com os grants necessários, configura o DSN ODBC e `extconfig.conf`/`sorcery.conf`/`cdr_adaptive_odbc.conf`, e reinicia o Asterisk. Ao final, validar:
+
+```bash
+asterisk -rx 'odbc show all'
+asterisk -rx 'pjsip show endpoints'
+```
+
+### 6. Frontend
+
+```bash
+cd frontend
+echo "NEXT_PUBLIC_API_URL=https://api.seudominio.com" > .env
+docker compose up -d --build
+```
+
+Sobe na rede `proxy`, porta `3000` interna (não publicada no host — só alcançável via a rede Docker).
+
+### 7. Nginx Proxy Manager — Proxy Hosts
+
+No painel (`:81`), criar 2 Proxy Hosts com SSL (Let's Encrypt):
+
+| Domínio | Forward Hostname/IP | Porta | Observação |
+|---|---|---|---|
+| `app.seudominio.com` | `frontend` | `3000` | mesma rede Docker `proxy`, resolve pelo nome do service |
+| `api.seudominio.com` | gateway da rede `proxy` (`docker network inspect proxy --format '{{(index .IPAM.Config 0).Gateway}}'`, tipicamente `172.18.0.1`) | `3333` | backend está em `network_mode: host`, sem nome de service — o `nftables` do passo 2 já libera essa faixa privada pra porta `3333` |
+
+### 8. Primeiro acesso
+
+```bash
+curl -X POST https://api.seudominio.com/auth/register \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Admin","username":"admin@empresa.com","password":"senha-forte"}'
+```
+
+Só funciona uma vez (enquanto `COUNT(users) === 0`) e sempre cria o primeiro usuário como `admin`. A partir daí, login pelo frontend (`app.seudominio.com`) e provisionar na ordem: Company → Extensions/Trunks/DIDs → Inbound/Outbound Routes → Queues. Docs interativas da API em `https://api.seudominio.com/docs`.
+
+### Liberar IPs de troncos/ramais remotos
+
+```bash
+sudo manage-fw add 1.2.3.4     # libera IP nas portas SIP/PJSIP/RTP (nftables + Fail2Ban)
+sudo manage-fw list            # whitelist atual + banidos
+```
 
 ## Licença
 
