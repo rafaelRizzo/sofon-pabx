@@ -4,6 +4,8 @@ import { getCompanyById } from '../companies/companies.service'
 import { RequestTemplatesCache } from './cache/request-templates.cache'
 import { RequestTemplateRepository } from '../../asterisk/request-template.repository'
 import { validateRouteDestination } from '../../schemas/route-destination.validate'
+import { resolveDestinationLabels, withDestinationLabel } from '../../schemas/route-destination-label'
+import type { RouteDestination } from '../../schemas/route-destination.schema'
 import type { CreateRequestTemplateInput, UpdateRequestTemplateInput } from './schemas/request-template.schema'
 import { AppError } from '../../utils/errors/app.error'
 
@@ -26,6 +28,30 @@ const select = {
 const validateDest = (dest: any, companyId: string, label: string) =>
     validateRouteDestination(dest ?? null, companyId, label)
 
+// Anexa o nome legível de onSuccess/onError (resolvido no backend, cache-first — ver
+// route-destination-label.ts). Agrupa por companyId — getAllRequestTemplates pode misturar
+// empresas diferentes na mesma lista (visão admin).
+async function withDestinationLabels<T extends { onSuccess: unknown; onError: unknown; companyId: string }>(templates: T[]): Promise<T[]> {
+    if (templates.length === 0) return templates
+    const byCompany = new Map<string, RouteDestination[]>()
+    for (const t of templates) {
+        const arr = byCompany.get(t.companyId) ?? []
+        arr.push(t.onSuccess as RouteDestination, t.onError as RouteDestination)
+        byCompany.set(t.companyId, arr)
+    }
+    const labelMaps = new Map(
+        await Promise.all([...byCompany.entries()].map(async ([companyId, dests]) => [companyId, await resolveDestinationLabels(dests, companyId)] as const)),
+    )
+    return templates.map((t) => {
+        const labelMap = labelMaps.get(t.companyId)!
+        return {
+            ...t,
+            onSuccess: withDestinationLabel(t.onSuccess as RouteDestination, labelMap),
+            onError: withDestinationLabel(t.onError as RouteDestination, labelMap),
+        }
+    })
+}
+
 export const getAllRequestTemplates = async (companyIds?: string[]) => {
     if (companyIds && companyIds.length === 0) return []
 
@@ -34,10 +60,12 @@ export const getAllRequestTemplates = async (companyIds?: string[]) => {
         if (cached) return cached
     }
 
-    const templates = await prisma.requestTemplate.findMany({
-        where: companyIds ? { companyId: { in: companyIds } } : undefined,
-        select,
-    })
+    const templates = await withDestinationLabels(
+        await prisma.requestTemplate.findMany({
+            where: companyIds ? { companyId: { in: companyIds } } : undefined,
+            select,
+        }),
+    )
 
     if (!companyIds) await RequestTemplatesCache.setAll(templates)
     return templates
@@ -49,7 +77,7 @@ export const getRequestTemplatesByCompany = async (companyId: string) => {
 
     await getCompanyById(companyId)
 
-    const templates = await prisma.requestTemplate.findMany({ where: { companyId }, select })
+    const templates = await withDestinationLabels(await prisma.requestTemplate.findMany({ where: { companyId }, select }))
     await RequestTemplatesCache.setByCompany(companyId, templates)
     return templates
 }
@@ -58,9 +86,10 @@ export const getRequestTemplateById = async (id: string) => {
     const cached = await RequestTemplatesCache.getTemplate(id)
     if (cached) return cached
 
-    const template = await prisma.requestTemplate.findUnique({ where: { id }, select })
-    if (!template) throw new AppError('Request template not found', 404)
+    const found = await prisma.requestTemplate.findUnique({ where: { id }, select })
+    if (!found) throw new AppError('Request template not found', 404)
 
+    const template = (await withDestinationLabels([found]))[0]!
     await RequestTemplatesCache.setTemplate(id, template)
     return template
 }

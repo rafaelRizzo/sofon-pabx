@@ -1,6 +1,5 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import { PencilIcon, Trash2Icon } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -20,10 +19,6 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from "@/components/ui/tooltip"
-import {
-    fetchDestinationOptions,
-    type FetchableDestinationType,
-} from "@/components/RouteDestination/route-destination-field"
 import { RouteDestinationBadge } from "@/components/RouteDestination/route-destination-badge"
 import { type VariableSet } from "@/hooks/use-variables"
 
@@ -35,51 +30,7 @@ type Props = {
     onDelete: (variableSet: VariableSet) => void
 }
 
-// Mesmo padrão de InboundRoutesTable: resolve o nome do destino buscando a lista de cada tipo
-// presente uma única vez (não por linha) — agrupa por (tipo, empresa da própria variável),
-// já que a listagem pode mostrar registros de "Todas as empresas" ao mesmo tempo
-function useDestinationLabels(variableSets: VariableSet[]) {
-    const [labels, setLabels] = useState<Record<string, string>>({})
-    const [loadedTypes, setLoadedTypes] = useState<Set<FetchableDestinationType>>(new Set())
-
-    useEffect(() => {
-        const pairs = new Map<string, { type: FetchableDestinationType; companyId: string }>()
-        for (const v of variableSets) {
-            const t = v.destination?.type
-            if (t && t !== "hangup") pairs.set(`${t}:${v.companyId}`, { type: t, companyId: v.companyId })
-        }
-        if (pairs.size === 0) return
-
-        let cancelled = false
-        Promise.all(
-            [...pairs.values()].map(({ type, companyId }) =>
-                fetchDestinationOptions(type, companyId).then((opts) => [type, opts] as const)
-            )
-        )
-            .then((results) => {
-                if (cancelled) return
-                setLabels((prev) => {
-                    const next = { ...prev }
-                    for (const [t, opts] of results) {
-                        for (const o of opts) next[`${t}:${o.id}`] = o.label
-                    }
-                    return next
-                })
-                setLoadedTypes((prev) => new Set([...prev, ...results.map(([t]) => t)]))
-            })
-            .catch(() => {})
-
-        return () => {
-            cancelled = true
-        }
-    }, [variableSets])
-
-    return { labels, loadedTypes }
-}
-
 export function VariableSetsTable({ variableSets, loading, companySelected, onEdit, onDelete }: Props) {
-    const { labels, loadedTypes } = useDestinationLabels(variableSets)
-
     return (
         <div className="rounded-md border">
             <Table>
@@ -122,11 +73,7 @@ export function VariableSetsTable({ variableSets, loading, companySelected, onEd
                                     </div>
                                 </TableCell>
                                 <TableCell>
-                                    <RouteDestinationBadge
-                                        destination={v.destination}
-                                        labels={labels}
-                                        loadedTypes={loadedTypes}
-                                    />
+                                    <RouteDestinationBadge destination={v.destination} />
                                 </TableCell>
                                 <TableCell>
                                     <TooltipProvider delay={100}>

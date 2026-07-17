@@ -4,6 +4,8 @@ import { getCompanyById } from '../companies/companies.service'
 import { VariablesCache } from './cache/variables.cache'
 import { VariableRepository } from '../../asterisk/variable.repository'
 import { validateRouteDestination } from '../../schemas/route-destination.validate'
+import { resolveDestinationLabels, withDestinationLabel } from '../../schemas/route-destination-label'
+import type { RouteDestination } from '../../schemas/route-destination.schema'
 import type { CreateVariableSetInput, UpdateVariableSetInput } from './schemas/variable.schema'
 import { AppError } from '../../utils/errors/app.error'
 
@@ -17,13 +19,30 @@ const select = {
     updatedAt: true,
 } as const
 
+// Anexa o nome legível do destino (resolvido no backend, cache-first — ver route-destination-label.ts)
+// pra a badge do frontend não precisar buscar/mapear id->nome ela mesma. Agrupa por companyId —
+// getAllVariableSets pode misturar empresas diferentes na mesma lista (visão admin).
+async function withDestinationLabels<T extends { destination: unknown; companyId: string }>(sets: T[]): Promise<T[]> {
+    if (sets.length === 0) return sets
+    const byCompany = new Map<string, RouteDestination[]>()
+    for (const s of sets) {
+        const arr = byCompany.get(s.companyId) ?? []
+        arr.push(s.destination as RouteDestination)
+        byCompany.set(s.companyId, arr)
+    }
+    const labelMaps = new Map(
+        await Promise.all([...byCompany.entries()].map(async ([companyId, dests]) => [companyId, await resolveDestinationLabels(dests, companyId)] as const)),
+    )
+    return sets.map((s) => ({ ...s, destination: withDestinationLabel(s.destination as RouteDestination, labelMaps.get(s.companyId)!) }))
+}
+
 export const getVariableSetsByCompany = async (companyId: string) => {
     const cached = await VariablesCache.getByCompany(companyId)
     if (cached) return cached
 
     await getCompanyById(companyId)
 
-    const variableSets = await prisma.variableSet.findMany({ where: { companyId }, select })
+    const variableSets = await withDestinationLabels(await prisma.variableSet.findMany({ where: { companyId }, select }))
     await VariablesCache.setByCompany(companyId, variableSets)
     return variableSets
 }
@@ -36,10 +55,12 @@ export const getAllVariableSets = async (companyIds?: string[]) => {
         if (cached) return cached
     }
 
-    const variableSets = await prisma.variableSet.findMany({
-        where: companyIds ? { companyId: { in: companyIds } } : undefined,
-        select,
-    })
+    const variableSets = await withDestinationLabels(
+        await prisma.variableSet.findMany({
+            where: companyIds ? { companyId: { in: companyIds } } : undefined,
+            select,
+        }),
+    )
 
     if (!companyIds) await VariablesCache.setAll(variableSets)
     return variableSets
@@ -49,9 +70,10 @@ export const getVariableSetById = async (id: string) => {
     const cached = await VariablesCache.getVariableSet(id)
     if (cached) return cached
 
-    const variableSet = await prisma.variableSet.findUnique({ where: { id }, select })
-    if (!variableSet) throw new AppError('Variable set not found', 404)
+    const found = await prisma.variableSet.findUnique({ where: { id }, select })
+    if (!found) throw new AppError('Variable set not found', 404)
 
+    const variableSet = (await withDestinationLabels([found]))[0]!
     await VariablesCache.setVariableSet(id, variableSet)
     return variableSet
 }

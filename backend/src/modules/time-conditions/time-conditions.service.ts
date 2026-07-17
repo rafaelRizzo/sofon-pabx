@@ -5,6 +5,7 @@ import { TimeConditionsCache } from './cache/time-conditions.cache'
 import type { CreateTimeConditionInput, UpdateTimeConditionInput, RouteDest } from './schemas/time-condition.schema'
 import { TimeConditionRepository } from '../../asterisk/timecondition.repository'
 import { validateRouteDestination } from '../../schemas/route-destination.validate'
+import { resolveDestinationLabels, withDestinationLabel } from '../../schemas/route-destination-label'
 import { AppError } from '../../utils/errors/app.error'
 
 const timeConditionSelect = {
@@ -28,13 +29,39 @@ export type TimeConditionDto = NonNullable<Awaited<ReturnType<typeof _byId>>>
 const validateRoute = (route: RouteDest | undefined | null, companyId: string, label: string) =>
     validateRouteDestination(route ?? null, companyId, label)
 
+// Anexa o nome legível de trueRoute/falseRoute (resolvido no backend, cache-first — ver
+// route-destination-label.ts). Agrupa por companyId — getAllTimeConditions pode misturar
+// empresas diferentes na mesma lista (visão admin).
+async function withDestinationLabels<T extends { trueRoute: unknown; falseRoute: unknown; companyId: string }>(
+    conditions: T[],
+): Promise<T[]> {
+    if (conditions.length === 0) return conditions
+    const byCompany = new Map<string, RouteDest[]>()
+    for (const c of conditions) {
+        const arr = byCompany.get(c.companyId) ?? []
+        arr.push(c.trueRoute as RouteDest, c.falseRoute as RouteDest)
+        byCompany.set(c.companyId, arr)
+    }
+    const labelMaps = new Map(
+        await Promise.all([...byCompany.entries()].map(async ([companyId, dests]) => [companyId, await resolveDestinationLabels(dests, companyId)] as const)),
+    )
+    return conditions.map((c) => {
+        const labelMap = labelMaps.get(c.companyId)!
+        return {
+            ...c,
+            trueRoute: withDestinationLabel(c.trueRoute as RouteDest, labelMap),
+            falseRoute: withDestinationLabel(c.falseRoute as RouteDest, labelMap),
+        }
+    })
+}
+
 export const getTimeConditionsByCompany = async (companyId: string) => {
     const cached = await TimeConditionsCache.getByCompany(companyId)
     if (cached) return cached
 
     await getCompanyById(companyId)
 
-    const conditions = await prisma.timeCondition.findMany({ where: { companyId }, select: timeConditionSelect })
+    const conditions = await withDestinationLabels(await prisma.timeCondition.findMany({ where: { companyId }, select: timeConditionSelect }))
     await TimeConditionsCache.setByCompany(companyId, conditions)
     return conditions
 }
@@ -47,10 +74,12 @@ export const getAllTimeConditions = async (companyIds?: string[]) => {
         if (cached) return cached
     }
 
-    const conditions = await prisma.timeCondition.findMany({
-        where: companyIds ? { companyId: { in: companyIds } } : undefined,
-        select: timeConditionSelect,
-    })
+    const conditions = await withDestinationLabels(
+        await prisma.timeCondition.findMany({
+            where: companyIds ? { companyId: { in: companyIds } } : undefined,
+            select: timeConditionSelect,
+        }),
+    )
 
     if (!companyIds) await TimeConditionsCache.setAll(conditions)
     return conditions
@@ -60,9 +89,10 @@ export const getTimeConditionById = async (id: string): Promise<TimeConditionDto
     const cached = await TimeConditionsCache.getTimeCondition(id)
     if (cached) return cached as TimeConditionDto
 
-    const tc = await prisma.timeCondition.findUnique({ where: { id }, select: timeConditionSelect })
-    if (!tc) throw new AppError('Time condition not found', 404)
+    const found = await prisma.timeCondition.findUnique({ where: { id }, select: timeConditionSelect })
+    if (!found) throw new AppError('Time condition not found', 404)
 
+    const tc = (await withDestinationLabels([found]))[0]!
     await TimeConditionsCache.setTimeCondition(id, tc)
     return tc
 }

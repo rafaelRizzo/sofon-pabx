@@ -451,6 +451,12 @@ model IvrMenu {
     name               String      @db.VarChar(80)
     companyId          String
     company            Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+    // "menu" = opções de 1 dígito (options); "collect" = coleta uma sequência fixa de dígitos
+    // (ex: CPF/CNPJ) sem opções, expondo o valor em variableName pra outros módulos (Request
+    // Template, Validar Variável): ver IvrRepository e ivr.service.ts:assertTypeConsistency
+    type               String      @default("menu")
+    // nome da variável de canal que recebe os dígitos coletados, só usado quando type="collect"
+    variableName       String?     @db.VarChar(80)
     // null até vincular um Audio — mesmo padrão de Announcement.audioId (ver IvrRepository)
     audioId            String?
     audio              Audio?      @relation(fields: [audioId], references: [id], onDelete: SetNull)

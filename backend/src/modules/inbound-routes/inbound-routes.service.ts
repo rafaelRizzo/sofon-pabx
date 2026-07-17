@@ -4,6 +4,8 @@ import { getCompanyById } from '../companies/companies.service'
 import { InboundRoutesCache } from './cache/inbound-routes.cache'
 import { InboundRouteRepository } from '../../asterisk/inboundroute.repository'
 import { validateRouteDestination } from '../../schemas/route-destination.validate'
+import { resolveDestinationLabels, withDestinationLabel } from '../../schemas/route-destination-label'
+import type { RouteDestination } from '../../schemas/route-destination.schema'
 import type { CreateInboundRouteInput, UpdateInboundRouteInput, InboundDest } from './schemas/inbound-route.schema'
 import { AppError } from '../../utils/errors/app.error'
 
@@ -26,13 +28,30 @@ export type InboundRouteDto = NonNullable<Awaited<ReturnType<typeof _byId>>>
 const validateDestination = (dest: InboundDest | undefined | null, companyId: string) =>
     validateRouteDestination(dest ?? null, companyId)
 
+// Anexa o nome legível de destination (resolvido no backend, cache-first — ver
+// route-destination-label.ts). Agrupa por companyId — getAllInboundRoutes pode misturar
+// empresas diferentes na mesma lista (visão admin).
+async function withDestinationLabels<T extends { destination: unknown; companyId: string }>(routes: T[]): Promise<T[]> {
+    if (routes.length === 0) return routes
+    const byCompany = new Map<string, RouteDestination[]>()
+    for (const r of routes) {
+        const arr = byCompany.get(r.companyId) ?? []
+        arr.push(r.destination as RouteDestination)
+        byCompany.set(r.companyId, arr)
+    }
+    const labelMaps = new Map(
+        await Promise.all([...byCompany.entries()].map(async ([companyId, dests]) => [companyId, await resolveDestinationLabels(dests, companyId)] as const)),
+    )
+    return routes.map((r) => ({ ...r, destination: withDestinationLabel(r.destination as RouteDestination, labelMaps.get(r.companyId)!) }))
+}
+
 export const getInboundRoutesByCompany = async (companyId: string) => {
     const cached = await InboundRoutesCache.getByCompany(companyId)
     if (cached) return cached
 
     await getCompanyById(companyId)
 
-    const routes = await prisma.inboundRoute.findMany({ where: { companyId }, select: inboundRouteSelect })
+    const routes = await withDestinationLabels(await prisma.inboundRoute.findMany({ where: { companyId }, select: inboundRouteSelect }))
     await InboundRoutesCache.setByCompany(companyId, routes)
     return routes
 }
@@ -48,10 +67,12 @@ export const getAllInboundRoutes = async (companyIds?: string[], userId?: string
         if (cached) return cached
     }
 
-    const routes = await prisma.inboundRoute.findMany({
-        where: companyIds ? { companyId: { in: companyIds } } : undefined,
-        select: inboundRouteSelect,
-    })
+    const routes = await withDestinationLabels(
+        await prisma.inboundRoute.findMany({
+            where: companyIds ? { companyId: { in: companyIds } } : undefined,
+            select: inboundRouteSelect,
+        }),
+    )
 
     if (!companyIds) await InboundRoutesCache.setAll(routes)
     else if (userId) await InboundRoutesCache.setForScope(userId, routes)
@@ -62,9 +83,10 @@ export const getInboundRouteById = async (id: string): Promise<InboundRouteDto> 
     const cached = await InboundRoutesCache.getRoute(id)
     if (cached) return cached as InboundRouteDto
 
-    const route = await prisma.inboundRoute.findUnique({ where: { id }, select: inboundRouteSelect })
-    if (!route) throw new AppError('Inbound route not found', 404)
+    const found = await prisma.inboundRoute.findUnique({ where: { id }, select: inboundRouteSelect })
+    if (!found) throw new AppError('Inbound route not found', 404)
 
+    const route = (await withDestinationLabels([found]))[0]!
     await InboundRoutesCache.setRoute(id, route)
     return route
 }

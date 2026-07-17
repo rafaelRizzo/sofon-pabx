@@ -35,6 +35,7 @@ const COMPANY = { id: 'c1', name: 'ACME' }
 const EXT = { id: 'e1', companyId: 'c1', context: 'ramais', number: '1001' }
 const MENU = {
     id: 'ivr1', name: 'menu-principal', companyId: 'c1',
+    type: 'menu' as 'menu' | 'collect', variableName: null as string | null,
     audioId: null as string | null,
     maxDigits: 1, digitTimeout: 5,
     invalidRetries: 3, invalidDestination: null,
@@ -42,6 +43,7 @@ const MENU = {
     longDestination: null,
     company: { asteriskId: 'ast1' },
     options: [] as { digit: string; destination: any }[],
+    _count: { options: 0 },
     createdAt: new Date(), updatedAt: new Date(),
 }
 
@@ -91,7 +93,7 @@ describe('IvrService.createIvrMenu', () => {
         db.ivrMenu.create.mockResolvedValue({ id: 'ivr1' })
         db.ivrMenu.findUniqueOrThrow.mockResolvedValue(MENU)
         const menu = await IvrService.createIvrMenu({
-            name: 'menu-principal', companyId: 'c1',
+            name: 'menu-principal', companyId: 'c1', type: 'menu',
             maxDigits: 1, digitTimeout: 5, invalidRetries: 3, timeoutRetries: 3, options: [],
         }) as any
         expect(menu.id).toBe('ivr1')
@@ -105,7 +107,7 @@ describe('IvrService.createIvrMenu', () => {
         db.ivrMenu.create.mockResolvedValue({ id: 'ivr1' })
         db.ivrMenu.findUniqueOrThrow.mockResolvedValue({ ...MENU, audioId: 'audio1' })
         const menu = await IvrService.createIvrMenu({
-            name: 'menu-principal', companyId: 'c1', audioId: 'audio1',
+            name: 'menu-principal', companyId: 'c1', type: 'menu', audioId: 'audio1',
             maxDigits: 1, digitTimeout: 5, invalidRetries: 3, timeoutRetries: 3, options: [],
         }) as any
         expect(menu.hasAudio).toBe(true)
@@ -117,7 +119,7 @@ describe('IvrService.createIvrMenu', () => {
         db.ivrMenu.findUnique.mockResolvedValueOnce(null)
         db.audio.findUnique.mockResolvedValue(null)
         await expect(IvrService.createIvrMenu({
-            name: 'menu-principal', companyId: 'c1', audioId: 'bad',
+            name: 'menu-principal', companyId: 'c1', type: 'menu', audioId: 'bad',
             maxDigits: 1, digitTimeout: 5, invalidRetries: 3, timeoutRetries: 3, options: [],
         })).rejects.toMatchObject({ statusCode: 404 })
     })
@@ -129,7 +131,7 @@ describe('IvrService.createIvrMenu', () => {
         db.ivrMenu.create.mockResolvedValue({ id: 'ivr1' })
         db.ivrMenu.findUniqueOrThrow.mockResolvedValue({ ...MENU, invalidDestination: { type: 'extension', id: 'e1' } })
         const menu = await IvrService.createIvrMenu({
-            name: 'menu-principal', companyId: 'c1',
+            name: 'menu-principal', companyId: 'c1', type: 'menu',
             maxDigits: 1, digitTimeout: 5, invalidRetries: 3, timeoutRetries: 3, options: [],
             invalidDestination: { type: 'extension', id: 'e1' },
         }) as any
@@ -145,7 +147,7 @@ describe('IvrService.createIvrMenu', () => {
             ...MENU, options: [{ id: 'o1', digit: '1', destination: { type: 'extension', id: 'e1' } }],
         })
         const menu = await IvrService.createIvrMenu({
-            name: 'menu-principal', companyId: 'c1',
+            name: 'menu-principal', companyId: 'c1', type: 'menu',
             maxDigits: 1, digitTimeout: 5, invalidRetries: 3, timeoutRetries: 3,
             options: [{ digit: '1', destination: { type: 'extension', id: 'e1' } }],
         }) as any
@@ -158,7 +160,7 @@ describe('IvrService.createIvrMenu', () => {
         db.ivrMenu.findUnique.mockResolvedValue(null)
         db.extension.findUnique.mockResolvedValue(null)
         await expect(IvrService.createIvrMenu({
-            name: 'x', companyId: 'c1', maxDigits: 1, digitTimeout: 5, invalidRetries: 3, timeoutRetries: 3,
+            name: 'x', companyId: 'c1', type: 'menu', maxDigits: 1, digitTimeout: 5, invalidRetries: 3, timeoutRetries: 3,
             options: [{ digit: '1', destination: { type: 'extension', id: 'clxxxxxxxxxxxxxxxxxxxxxxxxx' } }],
         })).rejects.toMatchObject({ statusCode: 404 })
     })
@@ -168,7 +170,7 @@ describe('IvrService.createIvrMenu', () => {
         db.ivrMenu.findUnique.mockResolvedValue(null)
         db.extension.findUnique.mockResolvedValue(null)
         await expect(IvrService.createIvrMenu({
-            name: 'x', companyId: 'c1', maxDigits: 1, digitTimeout: 5, invalidRetries: 3, timeoutRetries: 3, options: [],
+            name: 'x', companyId: 'c1', type: 'menu', maxDigits: 1, digitTimeout: 5, invalidRetries: 3, timeoutRetries: 3, options: [],
             invalidDestination: { type: 'extension', id: 'clxxxxxxxxxxxxxxxxxxxxxxxxx' },
         })).rejects.toMatchObject({ statusCode: 404 })
     })
@@ -178,7 +180,7 @@ describe('IvrService.createIvrMenu', () => {
         db.ivrMenu.findUnique.mockResolvedValue(null)
         db.extension.findUnique.mockResolvedValue({ ...EXT, companyId: 'other' })
         await expect(IvrService.createIvrMenu({
-            name: 'x', companyId: 'c1', maxDigits: 1, digitTimeout: 5, invalidRetries: 3, timeoutRetries: 3, options: [],
+            name: 'x', companyId: 'c1', type: 'menu', maxDigits: 1, digitTimeout: 5, invalidRetries: 3, timeoutRetries: 3, options: [],
             timeoutDestination: { type: 'extension', id: 'e1' },
         })).rejects.toMatchObject({ statusCode: 403 })
     })
@@ -187,15 +189,65 @@ describe('IvrService.createIvrMenu', () => {
         db.company.findUnique.mockResolvedValue(COMPANY)
         db.ivrMenu.findUnique.mockResolvedValue(MENU)
         await expect(IvrService.createIvrMenu({
-            name: 'menu-principal', companyId: 'c1', maxDigits: 1, digitTimeout: 5, invalidRetries: 3, timeoutRetries: 3, options: [],
+            name: 'menu-principal', companyId: 'c1', type: 'menu', maxDigits: 1, digitTimeout: 5, invalidRetries: 3, timeoutRetries: 3, options: [],
         })).rejects.toMatchObject({ statusCode: 409 })
     })
 
     it('throws 404 with non-existent companyId', async () => {
         db.company.findUnique.mockResolvedValue(null)
         await expect(IvrService.createIvrMenu({
-            name: 'x', companyId: 'clxxxxxxxxxxxxxxxxxxxxxxxxx', maxDigits: 1, digitTimeout: 5, invalidRetries: 3, timeoutRetries: 3, options: [],
+            name: 'x', companyId: 'clxxxxxxxxxxxxxxxxxxxxxxxxx', type: 'menu', maxDigits: 1, digitTimeout: 5, invalidRetries: 3, timeoutRetries: 3, options: [],
         })).rejects.toMatchObject({ statusCode: 404 })
+    })
+
+    it('throws 400 when type=collect without variableName', async () => {
+        db.company.findUnique.mockResolvedValue(COMPANY)
+        db.ivrMenu.findUnique.mockResolvedValue(null)
+        await expect(IvrService.createIvrMenu({
+            name: 'coleta-cpf', companyId: 'c1', type: 'collect',
+            maxDigits: 11, digitTimeout: 10, invalidRetries: 2, timeoutRetries: 2, options: [],
+        })).rejects.toMatchObject({ statusCode: 400 })
+    })
+
+    it('throws 400 when type=collect has digit options', async () => {
+        db.company.findUnique.mockResolvedValue(COMPANY)
+        db.ivrMenu.findUnique.mockResolvedValue(null)
+        await expect(IvrService.createIvrMenu({
+            name: 'coleta-cpf', companyId: 'c1', type: 'collect', variableName: 'CPF_CLIENTE',
+            maxDigits: 11, digitTimeout: 10, invalidRetries: 2, timeoutRetries: 2,
+            options: [{ digit: '1', destination: { type: 'hangup' } }],
+        })).rejects.toMatchObject({ statusCode: 400 })
+    })
+
+    it('throws 400 when type=collect has maxDigits < 2', async () => {
+        db.company.findUnique.mockResolvedValue(COMPANY)
+        db.ivrMenu.findUnique.mockResolvedValue(null)
+        await expect(IvrService.createIvrMenu({
+            name: 'coleta-cpf', companyId: 'c1', type: 'collect', variableName: 'CPF_CLIENTE',
+            maxDigits: 1, digitTimeout: 10, invalidRetries: 2, timeoutRetries: 2, options: [],
+        })).rejects.toMatchObject({ statusCode: 400 })
+    })
+
+    it('throws 400 when type=menu has variableName set', async () => {
+        db.company.findUnique.mockResolvedValue(COMPANY)
+        db.ivrMenu.findUnique.mockResolvedValue(null)
+        await expect(IvrService.createIvrMenu({
+            name: 'menu-principal', companyId: 'c1', type: 'menu', variableName: 'CPF_CLIENTE',
+            maxDigits: 1, digitTimeout: 5, invalidRetries: 3, timeoutRetries: 3, options: [],
+        })).rejects.toMatchObject({ statusCode: 400 })
+    })
+
+    it('creates a collect-type menu with variableName and no options', async () => {
+        db.company.findUnique.mockResolvedValue(COMPANY)
+        db.ivrMenu.findUnique.mockResolvedValue(null)
+        db.ivrMenu.create.mockResolvedValue({ id: 'ivr1' })
+        db.ivrMenu.findUniqueOrThrow.mockResolvedValue({ ...MENU, type: 'collect', variableName: 'CPF_CLIENTE', maxDigits: 11 })
+        const menu = await IvrService.createIvrMenu({
+            name: 'coleta-cpf', companyId: 'c1', type: 'collect', variableName: 'CPF_CLIENTE',
+            maxDigits: 11, digitTimeout: 10, invalidRetries: 2, timeoutRetries: 2, options: [],
+        }) as any
+        expect(menu.type).toBe('collect')
+        expect(menu.variableName).toBe('CPF_CLIENTE')
     })
 })
 
@@ -278,6 +330,37 @@ describe('IvrService.updateIvrMenu', () => {
         await expect(IvrService.updateIvrMenu('ivr1', {
             options: [{ digit: '1', destination: { type: 'extension', id: 'clxxxxxxxxxxxxxxxxxxxxxxxxx' } }],
         })).rejects.toMatchObject({ statusCode: 404 })
+    })
+
+    it('throws 400 when switching to type=collect without sending variableName', async () => {
+        db.ivrMenu.findUnique.mockResolvedValueOnce(MENU)
+        await expect(IvrService.updateIvrMenu('ivr1', { type: 'collect' }))
+            .rejects.toMatchObject({ statusCode: 400 })
+    })
+
+    it('throws 400 when switching to type=collect while existing digit options are kept (not cleared in the same PUT)', async () => {
+        const withOptions = { ...MENU, _count: { options: 2 } }
+        db.ivrMenu.findUnique.mockResolvedValueOnce(withOptions)
+        await expect(IvrService.updateIvrMenu('ivr1', { type: 'collect', variableName: 'CPF_CLIENTE' }))
+            .rejects.toMatchObject({ statusCode: 400 })
+    })
+
+    it('throws 400 when switching back to type=menu without clearing variableName in the same PUT', async () => {
+        const collectMenu = { ...MENU, type: 'collect' as const, variableName: 'CPF_CLIENTE', maxDigits: 11 }
+        db.ivrMenu.findUnique.mockResolvedValueOnce(collectMenu)
+        await expect(IvrService.updateIvrMenu('ivr1', { type: 'menu' }))
+            .rejects.toMatchObject({ statusCode: 400 })
+    })
+
+    it('switches an existing menu to type=collect with variableName and empty options', async () => {
+        db.ivrMenu.findUnique.mockResolvedValueOnce(MENU)
+        db.ivrMenu.update.mockResolvedValue({ ...MENU, type: 'collect', variableName: 'CPF_CLIENTE', maxDigits: 11 })
+        db.ivrMenu.findUniqueOrThrow.mockResolvedValue({ ...MENU, type: 'collect', variableName: 'CPF_CLIENTE', maxDigits: 11 })
+        const menu = await IvrService.updateIvrMenu('ivr1', {
+            type: 'collect', variableName: 'CPF_CLIENTE', maxDigits: 11, options: [],
+        }) as any
+        expect(menu.type).toBe('collect')
+        expect(menu.variableName).toBe('CPF_CLIENTE')
     })
 })
 

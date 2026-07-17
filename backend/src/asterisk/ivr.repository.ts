@@ -54,6 +54,10 @@ type MenuConfig = {
     digitTimeout: number
     invalidRetries: number
     timeoutRetries: number
+    // type="collect" (ver ivr.schema.ts): nome da variável de canal que recebe os dígitos
+    // coletados antes do Goto pro longDestination, pra outros módulos (Request Template,
+    // Validar Variável) lerem por nome. null quando type="menu" (não expõe nada)
+    variableName: string | null
 }
 
 // Máquina de estados construída só com prioridades numéricas dentro do MESMO exten (Goto/GotoIf
@@ -63,9 +67,13 @@ type MenuConfig = {
 //
 // Read() lê até maxDigits, parando antes se o chamador pausar entre dígitos: 0 dígitos == timeout
 // (READSTATUS=TIMEOUT), 1+ dígitos == segue pro match (LEN==1 checa as opções; LEN>1 vai pro
-// longDestination — ex: CPF). "attempts" do Read fica fixo em 1: quem controla o retry (inválido
-// e timeout, com contadores/limites independentes) é a própria state machine, via __IVR_INV/__IVR_TMO.
-function buildDialplan(
+// longDestination, ex: CPF/CNPJ em type="collect", que não tem opções). Antes desse Goto, se
+// variableName estiver configurado, os dígitos são copiados pra essa variável (Set): é o único
+// jeito de outros módulos (Request Template, Validar Variável) lerem o valor coletado depois do
+// Goto, já que IVR_DIGITS é interna e compartilhada por todo Read() deste contexto. "attempts" do
+// Read fica fixo em 1: quem controla o retry (inválido e timeout, com contadores/limites
+// independentes) é a própria state machine, via __IVR_INV/__IVR_TMO.
+export function buildDialplan(
     id: string,
     cfg: MenuConfig,
     options: { digit: string; target: string | null }[],
@@ -85,12 +93,15 @@ function buildDialplan(
     const INVALID_CHECK = INVALID_INCR + 1
     const INVALID_RETRY = INVALID_INCR + 2
     const INVALID_DEST = INVALID_INCR + 3
-    const MULTI = INVALID_INCR + 4
-    const TIMEOUT_INCR = INVALID_INCR + 5
-    const TIMEOUT_CHECK2 = INVALID_INCR + 6
-    const TIMEOUT_RETRY = INVALID_INCR + 7
-    const TIMEOUT_DEST = INVALID_INCR + 8
-    const HANGUP = INVALID_INCR + 9
+    // MULTI_SET sempre existe (Set quando variableName configurado, NoOp caso contrário): mantém
+    // a numeração do resto da state machine fixa independente de type="menu"/"collect"
+    const MULTI_SET = INVALID_INCR + 4
+    const MULTI_GOTO = INVALID_INCR + 5
+    const TIMEOUT_INCR = INVALID_INCR + 6
+    const TIMEOUT_CHECK2 = INVALID_INCR + 7
+    const TIMEOUT_RETRY = INVALID_INCR + 8
+    const TIMEOUT_DEST = INVALID_INCR + 9
+    const HANGUP = INVALID_INCR + 10
 
     const rows: DialplanRow[] = []
     const push = (priority: number, app: string, appdata: string | null) => rows.push({ context, exten, priority, app, appdata })
@@ -100,7 +111,7 @@ function buildDialplan(
     push(3, 'Set', '__IVR_TMO=0')
     push(READ, 'Read', `IVR_DIGITS,${cfg.soundPath},${cfg.maxDigits},,1,${cfg.digitTimeout}`)
     push(TIMEOUT_CHECK, 'GotoIf', `$["\${READSTATUS}"="TIMEOUT"]?${TIMEOUT_INCR}`)
-    push(LEN_CHECK, 'GotoIf', `$[\${LEN(\${IVR_DIGITS})} > 1]?${MULTI}`)
+    push(LEN_CHECK, 'GotoIf', `$[\${LEN(\${IVR_DIGITS})} > 1]?${MULTI_SET}`)
 
     options.forEach((opt, i) => {
         push(DIGITS_START + i, 'GotoIf', `$["\${IVR_DIGITS}"="${opt.digit}"]?${opt.target ?? HANGUP}`)
@@ -111,7 +122,8 @@ function buildDialplan(
     push(INVALID_RETRY, 'Goto', `${READ}`)
     push(INVALID_DEST, invalidTarget ? 'Goto' : 'Hangup', invalidTarget)
 
-    push(MULTI, 'Goto', longTarget ?? `${INVALID_INCR}`)
+    push(MULTI_SET, cfg.variableName ? 'Set' : 'NoOp', cfg.variableName ? `${cfg.variableName}=\${IVR_DIGITS}` : null)
+    push(MULTI_GOTO, 'Goto', longTarget ?? `${INVALID_INCR}`)
 
     push(TIMEOUT_INCR, 'Set', '__IVR_TMO=$[${__IVR_TMO}+1]')
     push(TIMEOUT_CHECK2, 'GotoIf', `$[\${__IVR_TMO} > ${cfg.timeoutRetries}]?${TIMEOUT_DEST}`)
@@ -156,6 +168,7 @@ export const IvrRepository = {
                         digitTimeout: m.digitTimeout,
                         invalidRetries: m.invalidRetries,
                         timeoutRetries: m.timeoutRetries,
+                        variableName: m.variableName,
                     },
                     resolvedOptions, invalidTarget, timeoutTarget, longTarget,
                 ))

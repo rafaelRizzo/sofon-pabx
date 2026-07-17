@@ -5,6 +5,7 @@ import { IvrCache } from './cache/ivr.cache'
 import { IvrRepository } from '../../asterisk/ivr.repository'
 import { assertAudioBelongsToCompany } from '../audios/audios.service'
 import { validateRouteDestination } from '../../schemas/route-destination.validate'
+import { resolveDestinationLabels, withDestinationLabel } from '../../schemas/route-destination-label'
 import type { CreateIvrMenuInput, UpdateIvrMenuInput, IvrDest } from './schemas/ivr.schema'
 import { AppError } from '../../utils/errors/app.error'
 
@@ -12,6 +13,8 @@ const ivrMenuSelect = {
     id: true,
     name: true,
     companyId: true,
+    type: true,
+    variableName: true,
     audioId: true,
     maxDigits: true,
     digitTimeout: true,
@@ -33,16 +36,62 @@ const toDto = <T extends { audioId: string | null }>(m: T) => ({ ...m, hasAudio:
 const validateDest = (dest: IvrDest | undefined | null, companyId: string, label: string) =>
     validateRouteDestination(dest ?? null, companyId, label)
 
+// Regras de consistência entre type/variableName/options/maxDigits (ver ivr.schema.ts:
+// mesmas 4 regras já aplicadas via superRefine no create; aqui repetidas porque o update é
+// parcial e só dá pra checar depois de mesclar com o registro existente, ver updateIvrMenu)
+const assertTypeConsistency = (
+    type: 'menu' | 'collect',
+    variableName: string | null | undefined,
+    optionsCount: number,
+    maxDigits: number,
+) => {
+    if (type === 'collect') {
+        if (!variableName) throw new AppError('variableName is required when type is collect', 400)
+        if (optionsCount > 0) throw new AppError('collect type cannot have digit options', 400)
+        if (maxDigits < 2) throw new AppError('collect type requires maxDigits >= 2', 400)
+    } else if (variableName) {
+        throw new AppError('variableName only applies to collect type', 400)
+    }
+}
+
+// Anexa o nome legível de invalidDestination/timeoutDestination/longDestination/options[].destination
+// (resolvido no backend, cache-first — ver route-destination-label.ts). Todas as chamadas aqui são
+// de uma única empresa por vez — sem visão cross-empresa nesse módulo (sem getAllIvrMenus).
+type IvrDestFields = {
+    invalidDestination: unknown
+    timeoutDestination: unknown
+    longDestination: unknown
+    options: { destination: unknown }[]
+}
+async function withDestinationLabels<T extends IvrDestFields>(menus: T[], companyId: string): Promise<T[]> {
+    if (menus.length === 0) return menus
+    const labelMap = await resolveDestinationLabels(
+        menus.flatMap((m) => [
+            m.invalidDestination as IvrDest,
+            m.timeoutDestination as IvrDest,
+            m.longDestination as IvrDest,
+            ...m.options.map((o) => o.destination as IvrDest),
+        ]),
+        companyId,
+    )
+    return menus.map((m) => ({
+        ...m,
+        invalidDestination: withDestinationLabel(m.invalidDestination as IvrDest, labelMap),
+        timeoutDestination: withDestinationLabel(m.timeoutDestination as IvrDest, labelMap),
+        longDestination: withDestinationLabel(m.longDestination as IvrDest, labelMap),
+        options: m.options.map((o) => ({ ...o, destination: withDestinationLabel(o.destination as IvrDest, labelMap) })),
+    }))
+}
+
 export const getIvrMenusByCompany = async (companyId: string) => {
     const cached = await IvrCache.getByCompany(companyId)
     if (cached) return cached
 
     await getCompanyById(companyId)
 
-    const menus = await prisma.ivrMenu.findMany({ where: { companyId }, select: ivrMenuSelect })
-    const dtos = menus.map(toDto)
-    await IvrCache.setByCompany(companyId, dtos)
-    return dtos
+    const menus = await withDestinationLabels((await prisma.ivrMenu.findMany({ where: { companyId }, select: ivrMenuSelect })).map(toDto), companyId)
+    await IvrCache.setByCompany(companyId, menus)
+    return menus
 }
 
 export const getIvrMenuById = async (id: string) => {
@@ -52,7 +101,7 @@ export const getIvrMenuById = async (id: string) => {
     const menu = await prisma.ivrMenu.findUnique({ where: { id }, select: ivrMenuSelect })
     if (!menu) throw new AppError('IVR menu not found', 404)
 
-    const dto = toDto(menu)
+    const dto = (await withDestinationLabels([toDto(menu)], menu.companyId))[0]!
     await IvrCache.setMenu(id, dto)
     return dto
 }
@@ -66,6 +115,7 @@ export const createIvrMenu = async (data: CreateIvrMenuInput) => {
     if (existing) throw new AppError('IVR menu already exists for this company', 409)
 
     const options = data.options ?? []
+    assertTypeConsistency(data.type, data.variableName, options.length, data.maxDigits)
 
     await assertAudioBelongsToCompany(data.audioId, data.companyId)
     await validateDest(data.invalidDestination, data.companyId, 'invalidDestination')
@@ -80,6 +130,8 @@ export const createIvrMenu = async (data: CreateIvrMenuInput) => {
             data: {
                 name: data.name,
                 companyId: data.companyId,
+                type: data.type,
+                variableName: data.variableName ?? null,
                 audioId: data.audioId,
                 maxDigits: data.maxDigits,
                 digitTimeout: data.digitTimeout,
@@ -107,7 +159,7 @@ export const createIvrMenu = async (data: CreateIvrMenuInput) => {
 }
 
 export const updateIvrMenu = async (id: string, data: UpdateIvrMenuInput) => {
-    const existing = await prisma.ivrMenu.findUnique({ where: { id } })
+    const existing = await prisma.ivrMenu.findUnique({ where: { id }, include: { _count: { select: { options: true } } } })
     if (!existing) throw new AppError('IVR menu not found', 404)
 
     if (data.name && data.name !== existing.name) {
@@ -116,6 +168,13 @@ export const updateIvrMenu = async (id: string, data: UpdateIvrMenuInput) => {
         })
         if (dup) throw new AppError('IVR menu name already in use for this company', 409)
     }
+
+    assertTypeConsistency(
+        (data.type ?? existing.type) as 'menu' | 'collect',
+        data.variableName !== undefined ? data.variableName : existing.variableName,
+        data.options !== undefined ? data.options.length : existing._count.options,
+        data.maxDigits ?? existing.maxDigits,
+    )
 
     if (data.audioId !== undefined) await assertAudioBelongsToCompany(data.audioId, existing.companyId)
     if (data.invalidDestination !== undefined) await validateDest(data.invalidDestination, existing.companyId, 'invalidDestination')
@@ -132,6 +191,8 @@ export const updateIvrMenu = async (id: string, data: UpdateIvrMenuInput) => {
             where: { id },
             data: {
                 name: data.name,
+                type: data.type,
+                variableName: data.variableName,
                 audioId: data.audioId,
                 maxDigits: data.maxDigits,
                 digitTimeout: data.digitTimeout,

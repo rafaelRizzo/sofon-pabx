@@ -84,17 +84,21 @@ export const ROUTE_DEST_ICONS: Record<RouteDestinationType, LucideIcon> = {
 
 const idSchema = z.string().min(1, "Campo obrigatório")
 
+// label é preenchido só pelo backend (nome legível resolvido no GET, ver
+// route-destination-label.ts) — nunca setado pelo form; ignorado (strip) se vier no submit.
+const labelSchema = z.string().nullable().optional()
+
 export const routeDestinationSchema = z
     .discriminatedUnion("type", [
-        z.object({ type: z.literal("extension"), id: idSchema }),
-        z.object({ type: z.literal("queue"), id: idSchema }),
-        z.object({ type: z.literal("timecondition"), id: idSchema }),
-        z.object({ type: z.literal("holiday"), id: idSchema }),
-        z.object({ type: z.literal("announcement"), id: idSchema }),
-        z.object({ type: z.literal("ivr"), id: idSchema }),
-        z.object({ type: z.literal("request"), id: idSchema }),
-        z.object({ type: z.literal("variable-set"), id: idSchema }),
-        z.object({ type: z.literal("variable-condition"), id: idSchema }),
+        z.object({ type: z.literal("extension"), id: idSchema, label: labelSchema }),
+        z.object({ type: z.literal("queue"), id: idSchema, label: labelSchema }),
+        z.object({ type: z.literal("timecondition"), id: idSchema, label: labelSchema }),
+        z.object({ type: z.literal("holiday"), id: idSchema, label: labelSchema }),
+        z.object({ type: z.literal("announcement"), id: idSchema, label: labelSchema }),
+        z.object({ type: z.literal("ivr"), id: idSchema, label: labelSchema }),
+        z.object({ type: z.literal("request"), id: idSchema, label: labelSchema }),
+        z.object({ type: z.literal("variable-set"), id: idSchema, label: labelSchema }),
+        z.object({ type: z.literal("variable-condition"), id: idSchema, label: labelSchema }),
         z.object({ type: z.literal("hangup") }),
     ])
     .nullable()

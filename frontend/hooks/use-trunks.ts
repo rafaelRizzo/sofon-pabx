@@ -55,6 +55,13 @@ const optPort = z.preprocess(
     z.number().int().min(1, "Mínimo 1").max(65535, "Máximo 65535").optional()
 )
 
+// Só no create: campo vazio deve virar 5060, não ficar sem porta. No update, campo vazio
+// continua significando "sem alteração" (usa optPort, sem default).
+const optPortWithDefault = z.preprocess(
+    (v) => (v === "" || v === undefined || v === null ? undefined : Number(v)),
+    z.number().int().min(1, "Mínimo 1").max(65535, "Máximo 65535").optional().default(5060)
+)
+
 const optQualifyFrequency = z.preprocess(
     (v) => (v === "" || v === undefined || v === null ? undefined : Number(v)),
     z.number().int().min(0, "Mínimo 0").max(3600, "Máximo 3600").optional()
@@ -172,7 +179,7 @@ const baseTrunkFields = {
     codecs: z.string().max(200).default("ulaw,alaw"),
     maxInChannels: optChannels,
     maxOutChannels: optChannels,
-    port: optPort,
+    port: optPortWithDefault,
     ...advancedTrunkFields,
 }
 

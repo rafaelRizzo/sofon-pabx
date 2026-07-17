@@ -5,6 +5,7 @@ import { HolidayGroupsCache } from './cache/holiday-groups.cache'
 import type { CreateHolidayGroupInput, UpdateHolidayGroupInput, RouteDest } from './schemas/holiday-group.schema'
 import { HolidayGroupRepository } from '../../asterisk/holidaygroup.repository'
 import { validateRouteDestination } from '../../schemas/route-destination.validate'
+import { resolveDestinationLabels, withDestinationLabel } from '../../schemas/route-destination-label'
 import { fetchHolidaysFromUrl } from './providers/http.provider'
 import { AppError } from '../../utils/errors/app.error'
 import { logger } from '../../utils/logger'
@@ -70,13 +71,32 @@ export async function resyncAllHolidayGroupsFromUrl(year: number) {
     return groups.length
 }
 
+// Anexa o nome legível de trueRoute/falseRoute (resolvido no backend, cache-first — ver
+// route-destination-label.ts). Todas as chamadas aqui são de uma única empresa por vez —
+// sem visão cross-empresa nesse módulo (sem getAllHolidayGroups).
+async function withDestinationLabels<T extends { trueRoute: unknown; falseRoute: unknown }>(
+    groups: T[],
+    companyId: string,
+): Promise<T[]> {
+    if (groups.length === 0) return groups
+    const labelMap = await resolveDestinationLabels(
+        groups.flatMap((g) => [g.trueRoute as RouteDest, g.falseRoute as RouteDest]),
+        companyId,
+    )
+    return groups.map((g) => ({
+        ...g,
+        trueRoute: withDestinationLabel(g.trueRoute as RouteDest, labelMap),
+        falseRoute: withDestinationLabel(g.falseRoute as RouteDest, labelMap),
+    }))
+}
+
 export const getHolidayGroupsByCompany = async (companyId: string) => {
     const cached = await HolidayGroupsCache.getByCompany(companyId)
     if (cached) return cached
 
     await getCompanyById(companyId)
 
-    const groups = await prisma.holidayGroup.findMany({ where: { companyId }, select: holidayGroupSelect })
+    const groups = await withDestinationLabels(await prisma.holidayGroup.findMany({ where: { companyId }, select: holidayGroupSelect }), companyId)
     await HolidayGroupsCache.setByCompany(companyId, groups)
     return groups
 }
@@ -85,9 +105,10 @@ export const getHolidayGroupById = async (id: string): Promise<HolidayGroupDto> 
     const cached = await HolidayGroupsCache.getHolidayGroup(id)
     if (cached) return cached as HolidayGroupDto
 
-    const hg = await prisma.holidayGroup.findUnique({ where: { id }, select: holidayGroupSelect })
-    if (!hg) throw new AppError('Holiday group not found', 404)
+    const found = await prisma.holidayGroup.findUnique({ where: { id }, select: holidayGroupSelect })
+    if (!found) throw new AppError('Holiday group not found', 404)
 
+    const hg = (await withDestinationLabels([found], found.companyId))[0]!
     await HolidayGroupsCache.setHolidayGroup(id, hg)
     return hg
 }

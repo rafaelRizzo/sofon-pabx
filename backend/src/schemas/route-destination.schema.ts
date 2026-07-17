@@ -37,34 +37,44 @@ export const ROUTE_DEST_TYPES = [
     'variable-set', 'variable-condition', 'hangup',
 ] as const
 
-const variants = <T extends z.ZodTypeAny>(idSchema: T) => [
+// extraShape entra só na resposta (routeDestinationResponseSchema) — carrega o `label` resolvido
+// no backend (ver src/schemas/route-destination-label.ts). Input (routeDestinationSchema) nunca
+// recebe/aceita label, só type+id.
+const variants = <T extends z.ZodTypeAny>(idSchema: T, extraShape: z.ZodRawShape = {}) => [
     z.object({
         type: z.literal('extension').describe('Direciona a chamada para um ramal (Extension)'),
         id: idSchema,
+        ...extraShape,
     }),
     z.object({
         type: z.literal('queue').describe('Direciona a chamada para uma fila (Queue)'),
         id: idSchema,
+        ...extraShape,
     }),
     z.object({
         type: z.literal('voicemail').describe('Direciona a chamada para uma caixa de correio de voz'),
         id: idSchema,
+        ...extraShape,
     }),
     z.object({
         type: z.literal('timecondition').describe('Encadeia outra Time Condition (permite montar árvores de horário)'),
         id: idSchema,
+        ...extraShape,
     }),
     z.object({
         type: z.literal('holiday').describe('Encadeia um Holiday Group (lista de datas manual ou auto-atualizada por URL)'),
         id: idSchema,
+        ...extraShape,
     }),
     z.object({
         type: z.literal('announcement').describe('Toca um anúncio de áudio (Playback) e encerra a chamada — requer áudio já enviado'),
         id: idSchema,
+        ...extraShape,
     }),
     z.object({
         type: z.literal('ivr').describe('Direciona a chamada para um menu de URA (IVR) — requer áudio já enviado'),
         id: idSchema,
+        ...extraShape,
     }),
     z.object({
         type: z.literal('request').describe(
@@ -72,12 +82,14 @@ const variants = <T extends z.ZodTypeAny>(idSchema: T) => [
             'variáveis extraídas do response ficam disponíveis no canal; roteamento continua por onSuccess/onError do template',
         ),
         id: idSchema,
+        ...extraShape,
     }),
     z.object({
         type: z.literal('variable-set').describe(
             'Seta uma ou mais variáveis de canal (Set) e segue pro destino configurado no VariableSet',
         ),
         id: idSchema,
+        ...extraShape,
     }),
     z.object({
         type: z.literal('variable-condition').describe(
@@ -85,6 +97,7 @@ const variants = <T extends z.ZodTypeAny>(idSchema: T) => [
             'por trueRoute/falseRoute do VariableCondition',
         ),
         id: idSchema,
+        ...extraShape,
     }),
     z.object({
         type: z.literal('hangup').describe('Encerra a chamada'),
@@ -100,7 +113,7 @@ export const routeDestinationSchema = z
     )
 
 export const routeDestinationResponseSchema = z
-    .union(variants(z.string()))
+    .union(variants(z.string(), { label: z.string().nullable().optional().describe('nome legível do registro apontado, resolvido no backend') }))
     .nullable()
     .describe('Destino de roteamento resolvido')
 

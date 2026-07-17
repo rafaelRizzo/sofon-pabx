@@ -270,7 +270,9 @@ export function TrunkFormDialog({
                 sendDiversion: trunk.sendDiversion ?? undefined,
                 customHeaders: trunk.customHeaders ?? [],
                 context:
-                    trunk.registrationMode === "custom" ? trunk.context : "",
+                    trunk.registrationMode === "custom"
+                        ? trunk.context
+                        : undefined,
             } as any)
         } else {
             createForm.reset({

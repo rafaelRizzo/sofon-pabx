@@ -5,7 +5,6 @@ import { cn } from "@/lib/utils"
 import {
     ROUTE_DEST_ICONS,
     ROUTE_DEST_LABELS,
-    type FetchableDestinationType,
     type RouteDestination,
     type RouteDestinationType,
 } from "@/components/RouteDestination/route-destination-field"
@@ -20,27 +19,15 @@ const TONE_CLASSES: Record<DestinationTone, string> = {
 
 interface RouteDestinationBadgeProps {
     destination: RouteDestination
-    labels: Record<string, string>
-    loadedTypes: Set<FetchableDestinationType>
     tone?: DestinationTone
 }
 
-export function RouteDestinationBadge({
-    destination,
-    labels,
-    loadedTypes,
-    tone = "neutral",
-}: RouteDestinationBadgeProps) {
+// O nome legível (label) já vem resolvido do backend (ver route-destination-label.ts) — sem
+// fetch client-side, sem estado de "carregando"/"registro não encontrado" pra gerenciar aqui.
+export function RouteDestinationBadge({ destination, tone = "neutral" }: RouteDestinationBadgeProps) {
     const type: RouteDestinationType = destination?.type ?? "hangup"
     const Icon = ROUTE_DEST_ICONS[type]
-
-    let detail: string | null = null
-    if (destination && "id" in destination) {
-        const key = `${type}:${destination.id}`
-        if (labels[key]) detail = labels[key]
-        else if (loadedTypes.has(type as FetchableDestinationType)) detail = "registro não encontrado"
-        else detail = "…"
-    }
+    const detail = destination && "label" in destination ? destination.label : null
 
     return (
         <Badge variant="outline" className={cn("gap-1.5", TONE_CLASSES[tone])}>

@@ -36,6 +36,65 @@ describe('buildExpr', () => {
     it('supports function-call variables like CALLERID(num)', () => {
         expect(buildExpr({ variable: 'CALLERID(num)', operator: 'filled' })).toBe('"${CALLERID(num)}" != ""')
     })
+
+    it('cpf: guards LEN/REGEX, excludes the 10 repeated-digit sequences, checks both verifier digits', () => {
+        const expr = buildExpr({ variable: 'CPF', operator: 'cpf' })
+        expect(expr).toContain('${LEN(${CPF})} = 11')
+        expect(expr).toContain('${REGEX("^[0-9]{11}$",${CPF})} = 1')
+        expect(expr).toContain('"${CPF}" != "00000000000"')
+        expect(expr).toContain('"${CPF}" != "99999999999"')
+        expect(expr).toContain('${CPF:0:1}*10')
+        expect(expr).toContain('${CPF:8:1}*2')
+        expect(expr).toContain('${CPF:9:1} =')
+        expect(expr).toContain('${CPF:10:1} =')
+        // 1 LEN + 1 REGEX + 10 repeated-digit exclusions + 2 verifier-digit checks
+        expect(expr.split(' & ')).toHaveLength(14)
+    })
+
+    it('cnpj: guards LEN/REGEX, does NOT exclude repeated-digit sequences, checks both verifier digits', () => {
+        const expr = buildExpr({ variable: 'CNPJ', operator: 'cnpj' })
+        expect(expr).toContain('${LEN(${CNPJ})} = 14')
+        expect(expr).toContain('${REGEX("^[0-9]{14}$",${CNPJ})} = 1')
+        expect(expr).not.toContain('00000000000000')
+        expect(expr).toContain('${CNPJ:0:1}*5')
+        expect(expr).toContain('${CNPJ:11:1}*2')
+        expect(expr).toContain('${CNPJ:12:1} =')
+        expect(expr).toContain('${CNPJ:13:1} =')
+        // 1 LEN + 1 REGEX + 2 verifier-digit checks (sem exclusão de repetidos)
+        expect(expr.split(' & ')).toHaveLength(4)
+    })
+
+    it('cpf/cnpj checksum formula ((soma*10)%11)%10 matches the official rem<2?0:11-rem rule for every possible remainder', () => {
+        const officialRule = (rem: number) => (rem < 2 ? 0 : 11 - rem)
+        const trickFormula = (rem: number) => ((rem * 10) % 11) % 10
+        for (let rem = 0; rem <= 10; rem++) {
+            expect(trickFormula(rem)).toBe(officialRule(rem))
+        }
+    })
+
+    it('cpf/cnpj checksum formula validates known-good documents and rejects a tampered digit', () => {
+        const verifierDigit = (base: number[], weights: number[]) => {
+            const sum = base.reduce((acc, d, i) => acc + d * weights[i], 0)
+            return ((sum * 10) % 11) % 10
+        }
+        const isValidCpf = (cpf: string) => {
+            const d = cpf.split('').map(Number)
+            const dv1 = verifierDigit(d.slice(0, 9), [10, 9, 8, 7, 6, 5, 4, 3, 2])
+            const dv2 = verifierDigit([...d.slice(0, 9), dv1], [11, 10, 9, 8, 7, 6, 5, 4, 3, 2])
+            return d[9] === dv1 && d[10] === dv2
+        }
+        const isValidCnpj = (cnpj: string) => {
+            const d = cnpj.split('').map(Number)
+            const dv1 = verifierDigit(d.slice(0, 12), [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2])
+            const dv2 = verifierDigit([...d.slice(0, 12), dv1], [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2])
+            return d[12] === dv1 && d[13] === dv2
+        }
+
+        expect(isValidCpf('52998224725')).toBe(true)
+        expect(isValidCpf('52998224726')).toBe(false) // último dígito alterado
+        expect(isValidCnpj('11222333000181')).toBe(true)
+        expect(isValidCnpj('11222333000182')).toBe(false) // último dígito alterado
+    })
 })
 
 describe('buildDialplan', () => {

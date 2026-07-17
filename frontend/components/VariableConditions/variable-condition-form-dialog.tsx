@@ -243,6 +243,12 @@ export function VariableConditionFormDialog({
                                             Adicionar
                                         </Button>
                                     </div>
+                                    <FieldDescription>
+                                        Os operadores &quot;CPF válido&quot;/&quot;CNPJ válido&quot; conferem
+                                        o dígito verificador de verdade (não só o tamanho). Pra aceitar
+                                        qualquer um dos dois na mesma variável, use combinador &quot;OU&quot;
+                                        com uma regra de cada.
+                                    </FieldDescription>
                                     {errors.rules?.root && <FieldError>{errors.rules.root.message}</FieldError>}
                                     {ruleFields.fields.length === 0 ? (
                                         <FieldDescription>Nenhuma regra configurada.</FieldDescription>

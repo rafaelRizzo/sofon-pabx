@@ -66,7 +66,7 @@ const baseTrunkShape = {
     ...advancedTrunkShape,
 }
 
-const portShape = { port: z.number().int().min(1).max(65535).optional() }
+const portShape = { port: z.number().int().min(1).max(65535).optional().default(5060) }
 
 export const createTrunkSchema = z.discriminatedUnion('registrationMode', [
     z.object({

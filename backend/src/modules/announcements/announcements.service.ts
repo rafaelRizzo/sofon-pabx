@@ -5,6 +5,8 @@ import { AnnouncementsCache } from './cache/announcements.cache'
 import { AnnouncementRepository } from '../../asterisk/announcement.repository'
 import { assertAudioBelongsToCompany } from '../audios/audios.service'
 import { validateRouteDestination } from '../../schemas/route-destination.validate'
+import { resolveDestinationLabels, withDestinationLabel } from '../../schemas/route-destination-label'
+import type { RouteDestination } from '../../schemas/route-destination.schema'
 import type { CreateAnnouncementInput, UpdateAnnouncementInput } from './schemas/announcement.schema'
 import { AppError } from '../../utils/errors/app.error'
 
@@ -20,14 +22,21 @@ const select = {
 
 const toDto = <T extends { audioId: string | null }>(a: T) => ({ ...a, hasAudio: a.audioId !== null })
 
+// Anexa o nome legível de destination (resolvido no backend, cache-first — ver
+// route-destination-label.ts). Todas as chamadas aqui são de uma única empresa por vez.
+async function withDestinationLabels<T extends { destination: unknown }>(announcements: T[], companyId: string): Promise<T[]> {
+    if (announcements.length === 0) return announcements
+    const labelMap = await resolveDestinationLabels(announcements.map((a) => a.destination as RouteDestination), companyId)
+    return announcements.map((a) => ({ ...a, destination: withDestinationLabel(a.destination as RouteDestination, labelMap) }))
+}
+
 export const getAnnouncementsByCompany = async (companyId: string) => {
     const cached = await AnnouncementsCache.getByCompany(companyId)
     if (cached) return cached
 
     await getCompanyById(companyId)
 
-    const announcements = await prisma.announcement.findMany({ where: { companyId }, select })
-    const dtos = announcements.map(toDto)
+    const dtos = await withDestinationLabels((await prisma.announcement.findMany({ where: { companyId }, select })).map(toDto), companyId)
     await AnnouncementsCache.setByCompany(companyId, dtos)
     return dtos
 }
@@ -39,7 +48,7 @@ export const getAnnouncementById = async (id: string) => {
     const announcement = await prisma.announcement.findUnique({ where: { id }, select })
     if (!announcement) throw new AppError('Announcement not found', 404)
 
-    const dto = toDto(announcement)
+    const dto = (await withDestinationLabels([toDto(announcement)], announcement.companyId))[0]!
     await AnnouncementsCache.setAnnouncement(id, dto)
     return dto
 }

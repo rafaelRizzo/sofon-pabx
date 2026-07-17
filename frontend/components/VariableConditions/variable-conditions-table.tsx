@@ -1,6 +1,5 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import { PencilIcon, Trash2Icon } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -20,10 +19,6 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from "@/components/ui/tooltip"
-import {
-    fetchDestinationOptions,
-    type FetchableDestinationType,
-} from "@/components/RouteDestination/route-destination-field"
 import { RouteDestinationBadge } from "@/components/RouteDestination/route-destination-badge"
 import { VARIABLE_RULE_OPERATOR_LABELS, type VariableCondition } from "@/hooks/use-variable-conditions"
 
@@ -35,54 +30,7 @@ type Props = {
     onDelete: (variableCondition: VariableCondition) => void
 }
 
-// Mesmo padrão de TimeConditionsTable: resolve o nome de cada destino buscando a lista de cada
-// tipo presente uma única vez (não por linha) — aqui olhando trueRoute e falseRoute. Agrupa por
-// (tipo, empresa da própria condição), já que a listagem pode mostrar condições de "Todas as
-// empresas" ao mesmo tempo
-function useDestinationLabels(variableConditions: VariableCondition[]) {
-    const [labels, setLabels] = useState<Record<string, string>>({})
-    const [loadedTypes, setLoadedTypes] = useState<Set<FetchableDestinationType>>(new Set())
-
-    useEffect(() => {
-        const pairs = new Map<string, { type: FetchableDestinationType; companyId: string }>()
-        for (const vc of variableConditions) {
-            for (const dest of [vc.trueRoute, vc.falseRoute]) {
-                const t = dest?.type
-                if (t && t !== "hangup") pairs.set(`${t}:${vc.companyId}`, { type: t, companyId: vc.companyId })
-            }
-        }
-        if (pairs.size === 0) return
-
-        let cancelled = false
-        Promise.all(
-            [...pairs.values()].map(({ type, companyId }) =>
-                fetchDestinationOptions(type, companyId).then((opts) => [type, opts] as const)
-            )
-        )
-            .then((results) => {
-                if (cancelled) return
-                setLabels((prev) => {
-                    const next = { ...prev }
-                    for (const [t, opts] of results) {
-                        for (const o of opts) next[`${t}:${o.id}`] = o.label
-                    }
-                    return next
-                })
-                setLoadedTypes((prev) => new Set([...prev, ...results.map(([t]) => t)]))
-            })
-            .catch(() => {})
-
-        return () => {
-            cancelled = true
-        }
-    }, [variableConditions])
-
-    return { labels, loadedTypes }
-}
-
 export function VariableConditionsTable({ variableConditions, loading, companySelected, onEdit, onDelete }: Props) {
-    const { labels, loadedTypes } = useDestinationLabels(variableConditions)
-
     return (
         <div className="rounded-md border">
             <Table>
@@ -130,20 +78,10 @@ export function VariableConditionsTable({ variableConditions, loading, companySe
                                     </span>
                                 </TableCell>
                                 <TableCell>
-                                    <RouteDestinationBadge
-                                        destination={vc.trueRoute}
-                                        labels={labels}
-                                        loadedTypes={loadedTypes}
-                                        tone="true"
-                                    />
+                                    <RouteDestinationBadge destination={vc.trueRoute} tone="true" />
                                 </TableCell>
                                 <TableCell>
-                                    <RouteDestinationBadge
-                                        destination={vc.falseRoute}
-                                        labels={labels}
-                                        loadedTypes={loadedTypes}
-                                        tone="false"
-                                    />
+                                    <RouteDestinationBadge destination={vc.falseRoute} tone="false" />
                                 </TableCell>
                                 <TableCell>
                                     <TooltipProvider delay={100}>

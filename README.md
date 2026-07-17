@@ -67,14 +67,67 @@ Isolamento entre empresas é feito por sufixo (`asteriskId`) nos identificadores
 
 ## Desenvolvimento
 
+### Pré-requisitos
+
+- [Bun](https://bun.com) >= 1.x
+- Docker (Postgres local)
+- Redis (local ou container)
+
+### 1. Infra local (Postgres + Redis)
+
+```bash
+cd backend/setups
+docker compose up -d                          # Postgres em localhost:5433
+docker run -d --name redis_sofon -p 6379:6379 redis:alpine
+```
+
+### 2. Backend
+
 ```bash
 cd backend
 bun install
-cp .env.example .env   # configurar DATABASE_URL, JWT_SECRET, REDIS_URL etc.
+cp .env.example .env
+# editar .env: DATABASE_URL="postgresql://postgres:senha_forte@localhost:5433/asterisk",
+# REDIS_URL=redis://localhost:6379, JWT_SECRET/REFRESH_SECRET (dev pode manter os defaults)
+bunx prisma migrate dev
 bun run dev             # http://localhost:3333 (docs em /docs)
 ```
 
-Infra local (Postgres) via `backend/setups/docker-compose.yml`.
+### 3. Frontend
+
+```bash
+cd frontend
+pnpm install
+cp .env.example .env   # NEXT_PUBLIC_API_URL=http://localhost:3333
+pnpm dev                # http://localhost:3000
+```
+
+### 4. Nginx Proxy Manager (opcional — testar por domínio localmente)
+
+Backend e frontend rodam nativos (`bun dev`/`pnpm dev`), fora de qualquer rede Docker. Pra expor por domínio local em vez de `localhost:3333`/`localhost:3000`, o NPM (em container) precisa alcançar o host via `host.docker.internal` (Docker Desktop no Mac/Windows resolve automaticamente):
+
+```bash
+docker network create proxy   # se ainda não existir
+docker run -d --name npm_dev --network proxy \
+  -p 80:80 -p 443:443 -p 81:81 \
+  -v npm_dev_data:/data -v npm_dev_letsencrypt:/etc/letsencrypt \
+  jc21/nginx-proxy-manager:latest
+```
+
+Adicionar em `/etc/hosts`:
+
+```
+127.0.0.1  app.local.test api.local.test
+```
+
+Painel em `http://localhost:81` (trocar login/senha padrão). Criar 2 Proxy Hosts sem SSL (dev, sem ACME):
+
+| Domínio | Forward Hostname/IP | Porta |
+|---|---|---|
+| `app.local.test` | `host.docker.internal` | `3000` |
+| `api.local.test` | `host.docker.internal` | `3333` |
+
+Ajustar `CORS_ORIGIN` (backend) e `NEXT_PUBLIC_API_URL` (frontend) pros novos domínios se for testar o fluxo completo assim.
 
 ### Testes
 

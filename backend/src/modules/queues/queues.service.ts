@@ -6,6 +6,8 @@ import type { CreateQueueInput, UpdateQueueInput } from './schemas/queue.schema'
 import { AsteriskQueueRepository, toAsteriskQueueName } from '../../asterisk/queue.repository'
 import { CallcenterSurveyRepository } from '../../asterisk/callcenter-survey.repository'
 import { validateRouteDestination } from '../../schemas/route-destination.validate'
+import { resolveDestinationLabels, withDestinationLabel } from '../../schemas/route-destination-label'
+import type { RouteDestination } from '../../schemas/route-destination.schema'
 import { assertAudioBelongsToCompany } from '../audios/audios.service'
 import { audioSoundPath } from '../../asterisk/audio.repository'
 import { AppError } from '../../utils/errors/app.error'
@@ -55,6 +57,23 @@ const queueSelect = {
 
 const toDto = <T extends { surveyAudioId: string | null }>(q: T) => ({ ...q, hasSurveyAudio: q.surveyAudioId !== null })
 
+// Anexa o nome legível de postQueueDestination (resolvido no backend, cache-first — ver
+// route-destination-label.ts). Agrupa por companyId — getAllQueues pode misturar empresas
+// diferentes na mesma lista (visão admin).
+async function withDestinationLabels<T extends { postQueueDestination: unknown; companyId: string }>(queues: T[]): Promise<T[]> {
+    if (queues.length === 0) return queues
+    const byCompany = new Map<string, RouteDestination[]>()
+    for (const q of queues) {
+        const arr = byCompany.get(q.companyId) ?? []
+        arr.push(q.postQueueDestination as RouteDestination)
+        byCompany.set(q.companyId, arr)
+    }
+    const labelMaps = new Map(
+        await Promise.all([...byCompany.entries()].map(async ([companyId, dests]) => [companyId, await resolveDestinationLabels(dests, companyId)] as const)),
+    )
+    return queues.map((q) => ({ ...q, postQueueDestination: withDestinationLabel(q.postQueueDestination as RouteDestination, labelMaps.get(q.companyId)!) }))
+}
+
 export const getAllQueues = async (companyIds?: string[], userId?: string) => {
     if (companyIds && companyIds.length === 0) return []
 
@@ -66,10 +85,10 @@ export const getAllQueues = async (companyIds?: string[], userId?: string) => {
         if (cached) return cached
     }
 
-    const queues = (await prisma.queue.findMany({
+    const queues = await withDestinationLabels((await prisma.queue.findMany({
         where: companyIds ? { companyId: { in: companyIds } } : undefined,
         select: queueSelect,
-    })).map(toDto)
+    })).map(toDto))
 
     if (!companyIds) await QueuesCache.setAll(queues)
     else if (userId) await QueuesCache.setForScope(userId, queues)
@@ -82,7 +101,7 @@ export const getQueuesByCompany = async (companyId: string) => {
 
     await getCompanyById(companyId)
 
-    const queues = (await prisma.queue.findMany({ where: { companyId }, select: queueSelect })).map(toDto)
+    const queues = await withDestinationLabels((await prisma.queue.findMany({ where: { companyId }, select: queueSelect })).map(toDto))
     await QueuesCache.setByCompany(companyId, queues)
     return queues
 }
@@ -97,7 +116,7 @@ export const getQueueById = async (id: string): Promise<QueueDto> => {
     const queue = await prisma.queue.findUnique({ where: { id }, select: queueSelect })
     if (!queue) throw new AppError('Queue not found', 404)
 
-    const dto = toDto(queue)
+    const dto = (await withDestinationLabels([toDto(queue)]))[0]!
     await QueuesCache.setQueue(id, dto)
     return dto
 }

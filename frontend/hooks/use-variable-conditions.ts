@@ -12,6 +12,7 @@ export const VARIABLE_RULE_OPERATORS = [
     "length_eq", "length_neq", "length_gt", "length_gte", "length_lt", "length_lte",
     "eq", "neq", "contains", "regex",
     "gt", "gte", "lt", "lte",
+    "cpf", "cnpj",
 ] as const
 
 export type VariableRuleOperator = (typeof VARIABLE_RULE_OPERATORS)[number]
@@ -33,10 +34,14 @@ export const VARIABLE_RULE_OPERATOR_LABELS: Record<VariableRuleOperator, string>
     gte: "Maior ou igual a",
     lt: "Menor que",
     lte: "Menor ou igual a",
+    cpf: "CPF válido",
+    cnpj: "CNPJ válido",
 }
 
-// Operadores que não usam o campo "value" — a UI esconde/desabilita o input pra esses
-const NO_VALUE_OPERATORS: readonly VariableRuleOperator[] = ["filled", "empty"]
+// Operadores que não usam o campo "value": a UI esconde/desabilita o input pra esses.
+// cpf/cnpj validam o dígito verificador do próprio valor da variável (ver checksumExpr em
+// backend/src/asterisk/variablecondition.repository.ts), sem parâmetro, como filled/empty
+const NO_VALUE_OPERATORS: readonly VariableRuleOperator[] = ["filled", "empty", "cpf", "cnpj"]
 const NUMERIC_VALUE_OPERATORS: readonly VariableRuleOperator[] = [
     "length_eq", "length_neq", "length_gt", "length_gte", "length_lt", "length_lte", "gt", "gte", "lt", "lte",
 ]

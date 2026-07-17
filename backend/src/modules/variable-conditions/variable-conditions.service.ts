@@ -4,6 +4,8 @@ import { getCompanyById } from '../companies/companies.service'
 import { VariableConditionsCache } from './cache/variable-conditions.cache'
 import { VariableConditionRepository } from '../../asterisk/variablecondition.repository'
 import { validateRouteDestination } from '../../schemas/route-destination.validate'
+import { resolveDestinationLabels, withDestinationLabel } from '../../schemas/route-destination-label'
+import type { RouteDestination } from '../../schemas/route-destination.schema'
 import type { CreateVariableConditionInput, UpdateVariableConditionInput } from './schemas/variable-condition.schema'
 import { AppError } from '../../utils/errors/app.error'
 
@@ -19,13 +21,39 @@ const select = {
     updatedAt: true,
 } as const
 
+// Anexa o nome legível de trueRoute/falseRoute (resolvido no backend, cache-first — ver
+// route-destination-label.ts). Agrupa por companyId — getAllVariableConditions pode misturar
+// empresas diferentes na mesma lista (visão admin).
+async function withDestinationLabels<T extends { trueRoute: unknown; falseRoute: unknown; companyId: string }>(
+    conditions: T[],
+): Promise<T[]> {
+    if (conditions.length === 0) return conditions
+    const byCompany = new Map<string, RouteDestination[]>()
+    for (const c of conditions) {
+        const arr = byCompany.get(c.companyId) ?? []
+        arr.push(c.trueRoute as RouteDestination, c.falseRoute as RouteDestination)
+        byCompany.set(c.companyId, arr)
+    }
+    const labelMaps = new Map(
+        await Promise.all([...byCompany.entries()].map(async ([companyId, dests]) => [companyId, await resolveDestinationLabels(dests, companyId)] as const)),
+    )
+    return conditions.map((c) => {
+        const labelMap = labelMaps.get(c.companyId)!
+        return {
+            ...c,
+            trueRoute: withDestinationLabel(c.trueRoute as RouteDestination, labelMap),
+            falseRoute: withDestinationLabel(c.falseRoute as RouteDestination, labelMap),
+        }
+    })
+}
+
 export const getVariableConditionsByCompany = async (companyId: string) => {
     const cached = await VariableConditionsCache.getByCompany(companyId)
     if (cached) return cached
 
     await getCompanyById(companyId)
 
-    const variableConditions = await prisma.variableCondition.findMany({ where: { companyId }, select })
+    const variableConditions = await withDestinationLabels(await prisma.variableCondition.findMany({ where: { companyId }, select }))
     await VariableConditionsCache.setByCompany(companyId, variableConditions)
     return variableConditions
 }
@@ -38,10 +66,12 @@ export const getAllVariableConditions = async (companyIds?: string[]) => {
         if (cached) return cached
     }
 
-    const variableConditions = await prisma.variableCondition.findMany({
-        where: companyIds ? { companyId: { in: companyIds } } : undefined,
-        select,
-    })
+    const variableConditions = await withDestinationLabels(
+        await prisma.variableCondition.findMany({
+            where: companyIds ? { companyId: { in: companyIds } } : undefined,
+            select,
+        }),
+    )
 
     if (!companyIds) await VariableConditionsCache.setAll(variableConditions)
     return variableConditions
@@ -51,9 +81,10 @@ export const getVariableConditionById = async (id: string) => {
     const cached = await VariableConditionsCache.getVariableCondition(id)
     if (cached) return cached
 
-    const variableCondition = await prisma.variableCondition.findUnique({ where: { id }, select })
-    if (!variableCondition) throw new AppError('Variable condition not found', 404)
+    const found = await prisma.variableCondition.findUnique({ where: { id }, select })
+    if (!found) throw new AppError('Variable condition not found', 404)
 
+    const variableCondition = (await withDestinationLabels([found]))[0]!
     await VariableConditionsCache.setVariableCondition(id, variableCondition)
     return variableCondition
 }

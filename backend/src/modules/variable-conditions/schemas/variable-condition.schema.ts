@@ -10,10 +10,13 @@ export const VARIABLE_RULE_OPERATORS = [
     'length_eq', 'length_neq', 'length_gt', 'length_gte', 'length_lt', 'length_lte',
     'eq', 'neq', 'contains', 'regex',
     'gt', 'gte', 'lt', 'lte',
+    'cpf', 'cnpj',
 ] as const
 
 const NUMERIC_VALUE_OPS: readonly string[] = ['length_eq', 'length_neq', 'length_gt', 'length_gte', 'length_lt', 'length_lte', 'gt', 'gte', 'lt', 'lte']
-const NO_VALUE_OPS: readonly string[] = ['filled', 'empty']
+// cpf/cnpj validam o dígito verificador do valor da própria variável, sem parâmetro, mesmo
+// grupo de filled/empty (ver checksumExpr em asterisk/variablecondition.repository.ts)
+const NO_VALUE_OPS: readonly string[] = ['filled', 'empty', 'cpf', 'cnpj']
 
 // nome simples (MYVAR) ou chamada de função Asterisk (CALLERID(num), DB(family/key))
 const VARIABLE_REGEX = /^[A-Za-z_][A-Za-z0-9_]*(\([A-Za-z0-9_:,.\- ]*\))?$/

@@ -1,6 +1,5 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import { HeadsetIcon, PencilIcon, StarIcon, Trash2Icon, UsersIcon } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -20,10 +19,6 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from "@/components/ui/tooltip"
-import {
-    fetchDestinationOptions,
-    type FetchableDestinationType,
-} from "@/components/RouteDestination/route-destination-field"
 import { RouteDestinationBadge } from "@/components/RouteDestination/route-destination-badge"
 import { type Company } from "@/hooks/use-companies"
 import { QUEUE_STRATEGY_LABELS, type Queue } from "@/hooks/use-queues"
@@ -38,49 +33,6 @@ type Props = {
     onDelete: (queue: Queue) => void
 }
 
-// Mesmo padrão de InboundRoutesTable/TimeConditionsTable: resolve o nome do destino buscando a
-// lista de cada tipo presente uma única vez (não por linha) — evita N requests repetidos.
-// Agrupa por (tipo, empresa da própria fila) em vez de receber uma empresa fixa, já que a
-// listagem pode mostrar filas de "Todas as empresas" ao mesmo tempo
-function useDestinationLabels(queues: Queue[]) {
-    const [labels, setLabels] = useState<Record<string, string>>({})
-    const [loadedTypes, setLoadedTypes] = useState<Set<FetchableDestinationType>>(new Set())
-
-    useEffect(() => {
-        const pairs = new Map<string, { type: FetchableDestinationType; companyId: string }>()
-        for (const q of queues) {
-            const t = q.postQueueDestination?.type
-            if (t && t !== "hangup") pairs.set(`${t}:${q.companyId}`, { type: t, companyId: q.companyId })
-        }
-        if (pairs.size === 0) return
-
-        let cancelled = false
-        Promise.all(
-            [...pairs.values()].map(({ type, companyId }) =>
-                fetchDestinationOptions(type, companyId).then((opts) => [type, opts] as const)
-            )
-        )
-            .then((results) => {
-                if (cancelled) return
-                setLabels((prev) => {
-                    const next = { ...prev }
-                    for (const [t, opts] of results) {
-                        for (const o of opts) next[`${t}:${o.id}`] = o.label
-                    }
-                    return next
-                })
-                setLoadedTypes((prev) => new Set([...prev, ...results.map(([t]) => t)]))
-            })
-            .catch(() => {})
-
-        return () => {
-            cancelled = true
-        }
-    }, [queues])
-
-    return { labels, loadedTypes }
-}
-
 export function QueuesTable({
     queues,
     companies,
@@ -90,7 +42,6 @@ export function QueuesTable({
     onManageMembers,
     onDelete,
 }: Props) {
-    const { labels, loadedTypes } = useDestinationLabels(queues)
     const companyName = (companyId: string) =>
         companies.find((c) => c.id === companyId)?.name ?? companyId
 
@@ -136,11 +87,7 @@ export function QueuesTable({
                                 </TableCell>
                                 <TableCell>{QUEUE_STRATEGY_LABELS[queue.strategy]}</TableCell>
                                 <TableCell>
-                                    <RouteDestinationBadge
-                                        destination={queue.postQueueDestination}
-                                        labels={labels}
-                                        loadedTypes={loadedTypes}
-                                    />
+                                    <RouteDestinationBadge destination={queue.postQueueDestination} />
                                 </TableCell>
                                 <TableCell>
                                     {queue.hasSurveyAudio ? (

@@ -1,6 +1,5 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import { PencilIcon, Trash2Icon } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -20,10 +19,6 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from "@/components/ui/tooltip"
-import {
-    fetchDestinationOptions,
-    type FetchableDestinationType,
-} from "@/components/RouteDestination/route-destination-field"
 import { RouteDestinationBadge } from "@/components/RouteDestination/route-destination-badge"
 import { type HttpMethod, type RequestTemplate } from "@/hooks/use-request-templates"
 
@@ -35,49 +30,6 @@ const METHOD_BADGE_CLASS: Record<HttpMethod, string> = {
     DELETE: "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-400",
 }
 
-// Mesmo padrão de TimeConditionsTable: resolve o nome de cada destino buscando a lista de cada
-// tipo presente uma única vez (não por linha/campo), olhando onSuccess e onError
-function useDestinationLabels(requestTemplates: RequestTemplate[]) {
-    const [labels, setLabels] = useState<Record<string, string>>({})
-    const [loadedTypes, setLoadedTypes] = useState<Set<FetchableDestinationType>>(new Set())
-
-    useEffect(() => {
-        const pairs = new Map<string, { type: FetchableDestinationType; companyId: string }>()
-        for (const rt of requestTemplates) {
-            for (const dest of [rt.onSuccess, rt.onError]) {
-                const t = dest?.type
-                if (t && t !== "hangup") pairs.set(`${t}:${rt.companyId}`, { type: t, companyId: rt.companyId })
-            }
-        }
-        if (pairs.size === 0) return
-
-        let cancelled = false
-        Promise.all(
-            [...pairs.values()].map(({ type, companyId }) =>
-                fetchDestinationOptions(type, companyId).then((opts) => [type, opts] as const)
-            )
-        )
-            .then((results) => {
-                if (cancelled) return
-                setLabels((prev) => {
-                    const next = { ...prev }
-                    for (const [t, opts] of results) {
-                        for (const o of opts) next[`${t}:${o.id}`] = o.label
-                    }
-                    return next
-                })
-                setLoadedTypes((prev) => new Set([...prev, ...results.map(([t]) => t)]))
-            })
-            .catch(() => {})
-
-        return () => {
-            cancelled = true
-        }
-    }, [requestTemplates])
-
-    return { labels, loadedTypes }
-}
-
 type Props = {
     requestTemplates: RequestTemplate[]
     loading: boolean
@@ -87,8 +39,6 @@ type Props = {
 }
 
 export function RequestTemplatesTable({ requestTemplates, loading, companySelected, onEdit, onDelete }: Props) {
-    const { labels, loadedTypes } = useDestinationLabels(requestTemplates)
-
     return (
         <div className="rounded-md border">
             <Table>
@@ -141,20 +91,10 @@ export function RequestTemplatesTable({ requestTemplates, loading, companySelect
                                     )}
                                 </TableCell>
                                 <TableCell>
-                                    <RouteDestinationBadge
-                                        destination={rt.onSuccess}
-                                        labels={labels}
-                                        loadedTypes={loadedTypes}
-                                        tone="true"
-                                    />
+                                    <RouteDestinationBadge destination={rt.onSuccess} tone="true" />
                                 </TableCell>
                                 <TableCell>
-                                    <RouteDestinationBadge
-                                        destination={rt.onError}
-                                        labels={labels}
-                                        loadedTypes={loadedTypes}
-                                        tone="false"
-                                    />
+                                    <RouteDestinationBadge destination={rt.onError} tone="false" />
                                 </TableCell>
                                 <TableCell>
                                     <TooltipProvider delay={100}>
