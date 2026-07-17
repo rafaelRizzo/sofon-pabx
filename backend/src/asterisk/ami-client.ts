@@ -49,7 +49,12 @@ export async function runAmiCommand(command: string): Promise<void> {
                         logger.warn({ event: 'ami.login.failed', command })
                     }
                     sock.write(`Action: Command${CRLF}Command: ${command}${CRLF}${CRLF}Action: Logoff${CRLF}${CRLF}`)
-                    setTimeout(finish, 200)
+                    setTimeout(() => {
+                        // warn (não info) de propósito: nível 'info' é descartado em produção
+                        // (ver logger.ts) e essa é a única confirmação de que o reload rodou
+                        logger.warn({ event: 'ami.command.executed', command })
+                        finish()
+                    }, 200)
                 },
                 error(_sock, error) {
                     logger.warn({ event: 'ami.command.failed', command, error: error.message })
