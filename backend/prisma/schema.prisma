@@ -206,6 +206,7 @@ model Trunk {
     name             String               @db.VarChar(20)
     companyId        String
     company          Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+    type             String               @default("pjsip") @db.VarChar(10) // "pjsip" | "iax"
     registrationMode String               @db.VarChar(10)
     identifyBy       String?              @db.VarChar(10) // "ip" | "username" — só p/ registrationMode inbound
     host             String?              @db.VarChar(255)
@@ -229,8 +230,15 @@ model Trunk {
     timersMinSe      Int?
     timersSessExpires Int?
     sendDiversion    Boolean?
+    // Campos abaixo só se aplicam a type="iax" — sem equivalente em PJSIP (SIP headers, 100rel,
+    // session timers etc. não existem no IAX2; ver iax.repository.ts)
+    qualify          String?              @db.VarChar(10) // yes | no
+    trunkMode        Boolean? // "trunk" do iax.conf — otimização de meta-frame p/ alto volume ponto-a-ponto
+    encryption       Boolean? // AES128 nativo do IAX2 usando o secret
+    transfer         String?              @db.VarChar(10) // yes | no | mediaonly
+    jitterbuffer     Boolean?
     // [{name, value}] — headers SIP customizados injetados via Set(PJSIP_HEADER(add,name)=value)
-    // antes de cada Dial() de saída (ver outbound-routes.service.ts); só se aplica a chamadas outbound
+    // antes de cada Dial() de saída (ver outbound-routes.service.ts); só se aplica a chamadas outbound e type="pjsip"
     customHeaders    Json                 @default("[]")
     metadata         Json                 @default("{}")
     createdAt        DateTime             @default(now()) @db.Timestamptz(3)
@@ -852,6 +860,35 @@ model sip_peers {
     vmexten           String? @db.VarChar(40)
     autoframing       String? @db.VarChar(10)
     rtpkeepalive      Int?
+}
+
+// chan_iax2 realtime (family iaxpeers/iaxusers, ambas apontando pra essa mesma tabela — ver
+// setups/odbc-realtime.sh) — só usado por Trunk.type="iax" (iax.repository.ts). Estrutura plana
+// como sip_peers (chan_iax2 é pré-sorcery, não tem o esquema multi-tabela do pjsip).
+// regseconds/ipaddr/port são só estado de registro que o próprio Asterisk grava de volta.
+model iax_friends {
+    id               Int     @id @default(autoincrement())
+    name             String  @unique @db.VarChar(40)
+    type             String? @default("friend") @db.VarChar(10)
+    host             String? @default("dynamic") @db.VarChar(40)
+    secret           String? @db.VarChar(80)
+    context          String? @default("ramais") @db.VarChar(40)
+    permit           String? @db.VarChar(95)
+    deny             String? @db.VarChar(95)
+    disallow         String? @default("all") @db.VarChar(200)
+    allow            String? @default("ulaw,alaw") @db.VarChar(200)
+    callerid         String? @db.VarChar(40)
+    accountcode      String? @db.VarChar(40)
+    qualify          String? @default("yes") @db.VarChar(10)
+    trunk            String? @default("no") @db.VarChar(10)
+    encryption       String? @default("no") @db.VarChar(10)
+    transfer         String? @default("mediaonly") @db.VarChar(10)
+    jitterbuffer     String? @default("no") @db.VarChar(10)
+    requirecalltoken String? @default("yes") @db.VarChar(10)
+    setvar           String? @db.VarChar(200)
+    regseconds       BigInt? @default(0)
+    ipaddr           String? @db.VarChar(45)
+    port             String? @db.VarChar(6)
 }
 
 // name é a PK — Asterisk identifica filas por nome, não por UUID

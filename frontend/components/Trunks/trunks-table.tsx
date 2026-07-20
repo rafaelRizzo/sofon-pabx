@@ -42,6 +42,7 @@ export function TrunksTable({
                 <TableHeader>
                     <TableRow>
                         <TableHead>Nome</TableHead>
+                        <TableHead>Tipo</TableHead>
                         <TableHead>Modo</TableHead>
                         <TableHead>Host</TableHead>
                         <TableHead>Codecs</TableHead>
@@ -55,7 +56,7 @@ export function TrunksTable({
                     {loading ? (
                         Array.from({ length: 3 }).map((_, i) => (
                             <TableRow key={i}>
-                                {Array.from({ length: 6 }).map((_, j) => (
+                                {Array.from({ length: 7 }).map((_, j) => (
                                     <TableCell key={j}>
                                         <Skeleton className="h-4 w-full" />
                                     </TableCell>
@@ -65,7 +66,7 @@ export function TrunksTable({
                     ) : trunks.length === 0 ? (
                         <TableRow>
                             <TableCell
-                                colSpan={6}
+                                colSpan={7}
                                 className="h-24 text-center text-muted-foreground"
                             >
                                 {companySelected
@@ -78,6 +79,17 @@ export function TrunksTable({
                             <TableRow key={trunk.id}>
                                 <TableCell className="font-medium">
                                     {trunk.name}
+                                </TableCell>
+                                <TableCell>
+                                    <Badge
+                                        variant={
+                                            (trunk.type ?? "pjsip") === "pjsip"
+                                                ? "secondary"
+                                                : "outline"
+                                        }
+                                    >
+                                        {(trunk.type ?? "pjsip").toUpperCase()}
+                                    </Badge>
                                 </TableCell>
                                 <TableCell>
                                     <Badge

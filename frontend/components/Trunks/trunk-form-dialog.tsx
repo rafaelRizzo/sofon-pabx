@@ -53,6 +53,7 @@ import {
     type RegistrationMode,
     type Trunk,
     type TrunkCreateForm,
+    type TrunkType,
     type TrunkUpdateForm,
 } from "@/hooks/use-trunks"
 
@@ -60,6 +61,11 @@ const REGISTRATION_MODES = [
     { value: "outbound", label: "Outbound (registra no provedor)" },
     { value: "inbound", label: "Inbound (recebe registro)" },
     { value: "custom", label: "Custom (Goto pro seu contexto)" },
+]
+
+const TRUNK_TYPES = [
+    { value: "pjsip", label: "PJSIP" },
+    { value: "iax", label: "IAX2" },
 ]
 
 // Sentinela pra representar "não definido" em selects opcionais — base-ui não aceita value=""
@@ -91,6 +97,19 @@ const TIMERS_OPTIONS = [
     { value: "no", label: "No" },
     { value: "yes", label: "Yes" },
     { value: "always", label: "Always" },
+]
+
+const IAX_QUALIFY_OPTIONS = [
+    { value: UNSET, label: "Padrão (yes)" },
+    { value: "yes", label: "Yes" },
+    { value: "no", label: "No" },
+]
+
+const IAX_TRANSFER_OPTIONS = [
+    { value: UNSET, label: "Padrão (mediaonly)" },
+    { value: "yes", label: "Yes" },
+    { value: "no", label: "No" },
+    { value: "mediaonly", label: "Mediaonly" },
 ]
 
 function AdvancedSelect({
@@ -196,6 +215,7 @@ export function TrunkFormDialog({
     const createForm = useForm<TrunkCreateForm>({
         resolver: zodResolver(createTrunkSchema) as any,
         defaultValues: {
+            type: "pjsip",
             registrationMode: "outbound",
             name: "",
             companyId: "",
@@ -217,6 +237,11 @@ export function TrunkFormDialog({
             timersSessExpires: undefined,
             sendDiversion: undefined,
             customHeaders: [],
+            qualify: undefined,
+            trunkMode: undefined,
+            encryption: undefined,
+            transfer: undefined,
+            jitterbuffer: undefined,
             context: "",
         } as any,
     })
@@ -230,6 +255,13 @@ export function TrunkFormDialog({
         : createRegistrationMode
     const isInboundMode = registrationMode === "inbound"
     const isCustomMode = registrationMode === "custom"
+
+    const createType = useWatch({
+        control: createForm.control,
+        name: "type",
+    }) as TrunkType
+    const trunkType = isEdit ? trunk.type : createType
+    const isIaxType = trunkType === "iax"
 
     const updateForm = useForm<TrunkUpdateForm>({
         resolver: zodResolver(updateTrunkSchema) as any,
@@ -269,6 +301,11 @@ export function TrunkFormDialog({
                 timersSessExpires: trunk.timersSessExpires ?? undefined,
                 sendDiversion: trunk.sendDiversion ?? undefined,
                 customHeaders: trunk.customHeaders ?? [],
+                qualify: trunk.qualify ?? undefined,
+                trunkMode: trunk.trunkMode ?? undefined,
+                encryption: trunk.encryption ?? undefined,
+                transfer: trunk.transfer ?? undefined,
+                jitterbuffer: trunk.jitterbuffer ?? undefined,
                 context:
                     trunk.registrationMode === "custom"
                         ? trunk.context
@@ -276,6 +313,7 @@ export function TrunkFormDialog({
             } as any)
         } else {
             createForm.reset({
+                type: "pjsip",
                 registrationMode: "outbound",
                 name: "",
                 companyId: "",
@@ -297,6 +335,11 @@ export function TrunkFormDialog({
                 timersSessExpires: undefined,
                 sendDiversion: undefined,
                 customHeaders: [],
+                qualify: undefined,
+                trunkMode: undefined,
+                encryption: undefined,
+                transfer: undefined,
+                jitterbuffer: undefined,
                 context: "",
             } as any)
         }
@@ -352,6 +395,37 @@ export function TrunkFormDialog({
                 >
                     <div className="flex-1 overflow-x-hidden overflow-y-auto">
                         <FieldGroup>
+                            {!isEdit && (
+                                <Field>
+                                    <FieldLabel>Tipo</FieldLabel>
+                                    <Controller
+                                        control={createForm.control}
+                                        name="type"
+                                        render={({ field }) => (
+                                            <Select
+                                                items={TRUNK_TYPES}
+                                                value={field.value}
+                                                onValueChange={field.onChange}
+                                            >
+                                                <SelectTrigger className="w-full">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {TRUNK_TYPES.map((t) => (
+                                                        <SelectItem
+                                                            key={t.value}
+                                                            value={t.value}
+                                                        >
+                                                            {t.label}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        )}
+                                    />
+                                </Field>
+                            )}
+
                             {!isEdit && (
                                 <Field>
                                     <FieldLabel>Modo de registro</FieldLabel>
@@ -528,6 +602,21 @@ export function TrunkFormDialog({
                                                     por usuário/senha.
                                                 </FieldDescription>
                                             )}
+                                            {!isInboundMode && isIaxType && (
+                                                <FieldDescription>
+                                                    IAX2 outbound não envia
+                                                    REGISTER pro provedor
+                                                    (limitação do Asterisk, sem
+                                                    tabela realtime de
+                                                    registro pra IAX2). Esse
+                                                    tronco funciona como peer
+                                                    estático autenticado por
+                                                    IP + secret, não como
+                                                    registro dinâmico. Use
+                                                    apenas com provedores de
+                                                    IP fixo.
+                                                </FieldDescription>
+                                            )}
                                         </Field>
                                         <Field>
                                             <FieldLabel>Porta</FieldLabel>
@@ -654,6 +743,7 @@ export function TrunkFormDialog({
                                     </div>
 
                                     <Accordion multiple>
+                                        {!isIaxType && (
                                         <AccordionItem value="advanced">
                                             <AccordionTrigger>
                                                 Avançado (PJSIP)
@@ -821,7 +911,68 @@ export function TrunkFormDialog({
                                                 </div>
                                             </AccordionContent>
                                         </AccordionItem>
+                                        )}
 
+                                        {isIaxType && (
+                                        <AccordionItem value="advanced-iax">
+                                            <AccordionTrigger>
+                                                Avançado (IAX2)
+                                            </AccordionTrigger>
+                                            <AccordionContent>
+                                                <div className="space-y-3">
+                                                    <div className="grid grid-cols-2 gap-3">
+                                                        <AdvancedSelect
+                                                            label="Qualify"
+                                                            name="qualify"
+                                                            control={control}
+                                                            items={
+                                                                IAX_QUALIFY_OPTIONS
+                                                            }
+                                                        />
+                                                        <AdvancedSelect
+                                                            label="Transfer"
+                                                            name="transfer"
+                                                            control={control}
+                                                            items={
+                                                                IAX_TRANSFER_OPTIONS
+                                                            }
+                                                        />
+                                                    </div>
+                                                    <div className="grid grid-cols-3 gap-3">
+                                                        <AdvancedSwitch
+                                                            label="Trunk mode"
+                                                            name="trunkMode"
+                                                            control={control}
+                                                        />
+                                                        <AdvancedSwitch
+                                                            label="Encryption"
+                                                            name="encryption"
+                                                            control={control}
+                                                        />
+                                                        <AdvancedSwitch
+                                                            label="Jitterbuffer"
+                                                            name="jitterbuffer"
+                                                            control={control}
+                                                        />
+                                                    </div>
+                                                    <FieldDescription>
+                                                        Trunk mode otimiza o
+                                                        transporte pra alto
+                                                        volume de chamadas
+                                                        ponto a ponto
+                                                        (meta-frame). Encryption
+                                                        usa AES128 nativo do
+                                                        IAX2 com o secret
+                                                        configurado acima, só
+                                                        funciona se o outro
+                                                        lado também suportar.
+                                                    </FieldDescription>
+                                                </div>
+                                            </AccordionContent>
+                                        </AccordionItem>
+                                        )}
+
+                                        {!isIaxType && (
                                         <AccordionItem value="headers">
                                             <AccordionTrigger>
                                                 Headers SIP customizados
@@ -968,6 +1119,7 @@ export function TrunkFormDialog({
                                                 </div>
                                             </AccordionContent>
                                         </AccordionItem>
+                                        )}
                                     </Accordion>
                                 </>
                             )}

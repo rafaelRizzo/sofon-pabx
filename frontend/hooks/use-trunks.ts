@@ -8,6 +8,8 @@ import { api, apiError } from "@/lib/api"
 
 export type RegistrationMode = "outbound" | "inbound" | "custom"
 
+export type TrunkType = "pjsip" | "iax"
+
 export type IdentifyBy = "ip" | "username"
 
 export type CustomHeader = { name: string; value: string }
@@ -16,6 +18,7 @@ export type Trunk = {
     id: string
     name: string
     companyId: string
+    type: TrunkType
     registrationMode: RegistrationMode
     // Derivado pelo backend a partir de username (inbound: "username" se informado, senão "ip"; outbound: sempre null)
     // — não é enviado no create/update; no PUT inbound, enviar username muda para "username", enviar username: null volta para "ip"
@@ -41,6 +44,11 @@ export type Trunk = {
     timersSessExpires: number | null
     sendDiversion: boolean | null
     customHeaders: CustomHeader[]
+    qualify: string | null
+    trunkMode: boolean | null
+    encryption: boolean | null
+    transfer: string | null
+    jitterbuffer: boolean | null
     createdAt: string
     updatedAt: string
 }
@@ -173,14 +181,25 @@ const advancedTrunkFields = {
         .optional(),
 }
 
+// Espelha iaxAdvancedShape de backend/src/modules/trunks/schemas/trunk.schema.ts
+const iaxTrunkFields = {
+    qualify: z.enum(["yes", "no"]).optional(),
+    trunkMode: z.boolean().optional(),
+    encryption: z.boolean().optional(),
+    transfer: z.enum(["yes", "no", "mediaonly"]).optional(),
+    jitterbuffer: z.boolean().optional(),
+}
+
 // Espelha baseTrunkShape de backend/src/modules/trunks/schemas/trunk.schema.ts
 const baseTrunkFields = {
     ...minimalTrunkFields,
+    type: z.enum(["pjsip", "iax"]).default("pjsip"),
     codecs: z.string().max(200).default("ulaw,alaw"),
     maxInChannels: optChannels,
     maxOutChannels: optChannels,
     port: optPortWithDefault,
     ...advancedTrunkFields,
+    ...iaxTrunkFields,
 }
 
 export const createTrunkSchema = z.discriminatedUnion("registrationMode", [
@@ -215,6 +234,7 @@ export const updateTrunkSchema = z.object({
     maxInChannels: optChannels,
     maxOutChannels: optChannels,
     ...advancedTrunkFields,
+    ...iaxTrunkFields,
     // Só aceito pelo backend quando o trunk existente é registrationMode="custom"
     context: customTrunkContextFieldSchema.optional(),
 })

@@ -4,6 +4,7 @@ import { getCompanyById } from '../companies/companies.service'
 import { TrunksCache } from './cache/trunks.cache'
 import type { CreateTrunkInput, UpdateTrunkInput } from './schemas/trunk.schema'
 import { PjsipRepository } from '../../asterisk/pjsip.repository'
+import { IaxRepository } from '../../asterisk/iax.repository'
 import { InboundRouteRepository, TRUNK_ENTRY_CONTEXT } from '../../asterisk/inboundroute.repository'
 import { resyncAllPatterns } from '../outbound-routes/outbound-routes.service'
 import { OutboundRoutesCache } from '../outbound-routes/cache/outbound-routes.cache'
@@ -21,6 +22,7 @@ const trunkSelect = {
     id: true,
     name: true,
     companyId: true,
+    type: true,
     registrationMode: true,
     identifyBy: true,
     host: true,
@@ -45,6 +47,11 @@ const trunkSelect = {
     timersSessExpires: true,
     sendDiversion: true,
     customHeaders: true,
+    qualify: true,
+    trunkMode: true,
+    encryption: true,
+    transfer: true,
+    jitterbuffer: true,
     metadata: true,
     createdAt: true,
     updatedAt: true,
@@ -82,8 +89,11 @@ export const getAllTrunks = async (companyIds?: string[], userId?: string) => {
     return trunks
 }
 
-export const getTrunkById = async (id: string) => {
-    const cached = await TrunksCache.getTrunk(id)
+const _byId = () => prisma.trunk.findUnique({ where: { id: '' }, select: trunkSelect })
+export type TrunkDto = NonNullable<Awaited<ReturnType<typeof _byId>>>
+
+export const getTrunkById = async (id: string): Promise<TrunkDto> => {
+    const cached = await TrunksCache.getTrunk<TrunkDto>(id)
     if (cached) return cached
 
     const trunk = await prisma.trunk.findUnique({ where: { id }, select: trunkSelect })
@@ -122,6 +132,7 @@ export const createTrunk = async (data: CreateTrunkInput) => {
             data: {
                 name: data.name,
                 companyId: data.companyId,
+                type: data.type,
                 registrationMode: data.registrationMode,
                 identifyBy,
                 host: data.registrationMode === 'outbound' ? data.host : (data.host ?? null),
@@ -144,37 +155,61 @@ export const createTrunk = async (data: CreateTrunkInput) => {
                 timersMinSe: data.timersMinSe ?? null,
                 timersSessExpires: data.timersSessExpires ?? null,
                 sendDiversion: data.sendDiversion ?? null,
-                customHeaders: data.customHeaders ?? [],
+                customHeaders: data.type === 'pjsip' ? (data.customHeaders ?? []) : [],
+                qualify: data.qualify ?? null,
+                trunkMode: data.trunkMode ?? null,
+                encryption: data.encryption ?? null,
+                transfer: data.transfer ?? null,
+                jitterbuffer: data.jitterbuffer ?? null,
             },
         })
 
         // contexto único (from-trunk) — TRUNKID via setvar isola o dialplan por trunk no from-trunk-routed
         await tx.trunk.update({ where: { id: created.id }, data: { context: TRUNK_ENTRY_CONTEXT } })
 
-        await PjsipRepository.createTrunk(tx, astId, {
-            username: username ?? undefined,
-            password: password ?? undefined,
-            context: TRUNK_ENTRY_CONTEXT,
-            codecs: data.codecs,
-            registrationMode: data.registrationMode,
-            identifyBy,
-            host: data.host,
-            port: data.port,
-            setvar: `TRUNKID=${created.id}`,
-            accountcode: company.asteriskId,
-            transport: data.transport,
-            dtmfMode: data.dtmfMode,
-            directMedia: data.directMedia,
-            qualifyFrequency: data.qualifyFrequency,
-            qualifyTimeout: data.qualifyTimeout,
-            outboundProxy: data.outboundProxy,
-            iceSupport: data.iceSupport,
-            rel: data.rel,
-            timers: data.timers,
-            timersMinSe: data.timersMinSe,
-            timersSessExpires: data.timersSessExpires,
-            sendDiversion: data.sendDiversion,
-        })
+        if (data.type === 'iax') {
+            await IaxRepository.createTrunk(tx, astId, {
+                username: username ?? undefined,
+                password: password ?? undefined,
+                context: TRUNK_ENTRY_CONTEXT,
+                codecs: data.codecs,
+                registrationMode: data.registrationMode,
+                identifyBy,
+                host: data.host,
+                setvar: `TRUNKID=${created.id}`,
+                accountcode: company.asteriskId,
+                qualify: data.qualify,
+                trunkMode: data.trunkMode,
+                encryption: data.encryption,
+                transfer: data.transfer,
+                jitterbuffer: data.jitterbuffer,
+            })
+        } else {
+            await PjsipRepository.createTrunk(tx, astId, {
+                username: username ?? undefined,
+                password: password ?? undefined,
+                context: TRUNK_ENTRY_CONTEXT,
+                codecs: data.codecs,
+                registrationMode: data.registrationMode,
+                identifyBy,
+                host: data.host,
+                port: data.port,
+                setvar: `TRUNKID=${created.id}`,
+                accountcode: company.asteriskId,
+                transport: data.transport,
+                dtmfMode: data.dtmfMode,
+                directMedia: data.directMedia,
+                qualifyFrequency: data.qualifyFrequency,
+                qualifyTimeout: data.qualifyTimeout,
+                outboundProxy: data.outboundProxy,
+                iceSupport: data.iceSupport,
+                rel: data.rel,
+                timers: data.timers,
+                timersMinSe: data.timersMinSe,
+                timersSessExpires: data.timersSessExpires,
+                sendDiversion: data.sendDiversion,
+            })
+        }
     })
 
     const created = await prisma.trunk.findUnique({
@@ -241,17 +276,29 @@ export const updateTrunk = async (id: string, data: UpdateTrunkInput) => {
     const customHeadersChanged = 'customHeaders' in data
 
     await prisma.$transaction(async (tx) => {
-        await PjsipRepository.updateTrunk(tx, astId, {
-            ...data,
-            username: trunkUpdate.username,
-            password: trunkUpdate.password,
-            registrationMode: existing.registrationMode,
-            identifyBy,
-            existingIdentifyBy,
-            existingHost: existing.host,
-            existingPort: existing.port,
-            existingUsername: existing.username,
-        })
+        if (existing.type === 'iax') {
+            await IaxRepository.updateTrunk(tx, astId, {
+                ...data,
+                username: trunkUpdate.username,
+                password: trunkUpdate.password,
+                registrationMode: existing.registrationMode,
+                identifyBy,
+                existingIdentifyBy,
+                existingUsername: existing.username,
+            })
+        } else {
+            await PjsipRepository.updateTrunk(tx, astId, {
+                ...data,
+                username: trunkUpdate.username,
+                password: trunkUpdate.password,
+                registrationMode: existing.registrationMode,
+                identifyBy,
+                existingIdentifyBy,
+                existingHost: existing.host,
+                existingPort: existing.port,
+                existingUsername: existing.username,
+            })
+        }
         await tx.trunk.update({ where: { id }, data: trunkUpdate })
 
         if (maxInChanged) {
@@ -304,7 +351,8 @@ export const deleteTrunk = async (id: string) => {
             await InboundRouteRepository.delete(tx, id, ir.did.number)
         }
         if (existing.registrationMode !== 'custom') {
-            await PjsipRepository.deleteTrunk(tx, astId, existing.registrationMode, endpointId)
+            if (existing.type === 'iax') await IaxRepository.deleteTrunk(tx, endpointId)
+            else await PjsipRepository.deleteTrunk(tx, astId, existing.registrationMode, endpointId)
         }
         await tx.trunk.delete({ where: { id } })
         for (const routeId of affectedOutboundRouteIds) {

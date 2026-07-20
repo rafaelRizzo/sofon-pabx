@@ -74,7 +74,7 @@ describe('buildExpr', () => {
 
     it('cpf/cnpj checksum formula validates known-good documents and rejects a tampered digit', () => {
         const verifierDigit = (base: number[], weights: number[]) => {
-            const sum = base.reduce((acc, d, i) => acc + d * weights[i], 0)
+            const sum = base.reduce((acc, d, i) => acc + d * weights[i]!, 0)
             return ((sum * 10) % 11) % 10
         }
         const isValidCpf = (cpf: string) => {

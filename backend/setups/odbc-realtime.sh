@@ -1,7 +1,7 @@
 #!/bin/bash
 # ============================================================
 # SOFON PBX - PostgreSQL Realtime Setup
-# Configura ODBC + Realtime para PJSIP e SIP legado
+# Configura ODBC + Realtime para PJSIP, SIP legado e IAX2
 # ============================================================
 
 set -uo pipefail
@@ -54,17 +54,16 @@ pg_admin_db() { docker exec "$DOCKER_CONTAINER" psql -U "$PG_ADMIN" -d "$PG_DB" 
 # ============================================================
 # COLETA DE DADOS
 # ============================================================
+# Senha gerada automaticamente — só usada internamente (role do Postgres + odbc.ini/res_odbc.conf,
+# ambos lidos só pelo Asterisk); ninguém precisa digitar nem guardar esse valor.
+PG_PASS="$(openssl rand -base64 24)"
+
 echo -e "${BOLD}Configuração do PostgreSQL:${NC}"
 echo ""
 echo -e "  Host      : ${CYAN}${PG_HOST}:${PG_PORT}${NC}"
 echo -e "  Container : ${CYAN}${DOCKER_CONTAINER}${NC}"
 echo -e "  Database  : ${CYAN}${PG_DB}${NC}"
-echo -e "  Usuário   : ${CYAN}${PG_USER}${NC}"
-echo ""
-echo -ne "  Senha para o usuário '${PG_USER}': "
-read -rs PG_PASS; echo ""
-[[ -z "$PG_PASS" ]] && err "Senha não pode ser vazia"
-
+echo -e "  Usuário   : ${CYAN}${PG_USER}${NC} (senha gerada automaticamente)"
 echo ""
 echo -ne "  Confirma? [s/N]: "
 read -r REPLY
@@ -205,6 +204,8 @@ ps_endpoint_id_ips => odbc,asterisk,ps_identifies
 ps_registrations   => odbc,asterisk,ps_registrations
 sippeers           => odbc,asterisk,sip_peers
 sipregs            => odbc,asterisk,sip_peers
+iaxpeers           => odbc,asterisk,iax_friends
+iaxusers           => odbc,asterisk,iax_friends
 voicemail          => odbc,asterisk,voicemail_users
 extensions         => odbc,asterisk,extensions
 queues             => odbc,asterisk,queues
@@ -330,6 +331,7 @@ ALTER TABLE IF EXISTS ps_auths        OWNER TO ${PG_USER};
 ALTER TABLE IF EXISTS ps_contacts     OWNER TO ${PG_USER};
 ALTER TABLE IF EXISTS ps_endpoints    OWNER TO ${PG_USER};
 ALTER TABLE IF EXISTS sip_peers       OWNER TO ${PG_USER};
+ALTER TABLE IF EXISTS iax_friends     OWNER TO ${PG_USER};
 ALTER TABLE IF EXISTS voicemail_users OWNER TO ${PG_USER};
 ALTER TABLE IF EXISTS queues          OWNER TO ${PG_USER};
 ALTER TABLE IF EXISTS queue_members   OWNER TO ${PG_USER};
@@ -396,6 +398,7 @@ echo -e "    ${YELLOW}ALTER TABLE ps_auths        OWNER TO ${PG_USER};${NC}"
 echo -e "    ${YELLOW}ALTER TABLE ps_contacts     OWNER TO ${PG_USER};${NC}"
 echo -e "    ${YELLOW}ALTER TABLE ps_endpoints    OWNER TO ${PG_USER};${NC}"
 echo -e "    ${YELLOW}ALTER TABLE sip_peers       OWNER TO ${PG_USER};${NC}"
+echo -e "    ${YELLOW}ALTER TABLE iax_friends     OWNER TO ${PG_USER};${NC}"
 echo -e "    ${YELLOW}ALTER TABLE voicemail_users OWNER TO ${PG_USER};${NC}"
 echo -e "    ${YELLOW}ALTER TABLE queues          OWNER TO ${PG_USER};${NC}"
 echo -e "    ${YELLOW}ALTER TABLE queue_members   OWNER TO ${PG_USER};${NC}"

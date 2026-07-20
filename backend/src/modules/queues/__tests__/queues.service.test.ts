@@ -62,6 +62,7 @@ describe('QueuesService.createQueue', () => {
             strategy: 'ringall', musicOnHold: 'default', timeout: 15, retry: 5,
             maxLen: 0, wrapupTime: 0, announceFrequency: 0, announcePosition: false,
             periodicAnnounceFrequency: 60, joinEmpty: true, leaveWhenEmpty: false, weight: 0,
+            callcenterEnabled: false,
         }))
             .rejects.toMatchObject({ statusCode: 404 })
     })
@@ -74,6 +75,7 @@ describe('QueuesService.createQueue', () => {
             strategy: 'ringall', musicOnHold: 'default', timeout: 15, retry: 5,
             maxLen: 0, wrapupTime: 0, announceFrequency: 0, announcePosition: false,
             periodicAnnounceFrequency: 60, joinEmpty: true, leaveWhenEmpty: false, weight: 0,
+            callcenterEnabled: false,
         }))
             .rejects.toMatchObject({ statusCode: 409 })
     })

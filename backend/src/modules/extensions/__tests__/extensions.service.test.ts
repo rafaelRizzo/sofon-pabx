@@ -44,9 +44,14 @@ mock.module('../../../asterisk/queue.repository', () => ({
 }))
 
 import * as ExtensionsService from '../extensions.service'
+import type { CreateExtensionInput } from '../schemas/extension.schema'
 
 const COMPANY = { id: 'c1', asteriskId: 'ast1' }
 const EXT_DB = { id: 'e1', alias: '2001', number: '2001_ast1', type: 'pjsip', name: 'Test', context: 'ramais', allowOutbound: true, companyId: 'c1', createdAt: new Date(), updatedAt: new Date() }
+
+// campos pjsip com default no schema Zod (transport/disallow/allow/...) só existem no output pós-parse —
+// os testes chamam o service direto, sem passar pelo validatorCompiler, por isso o cast
+const pjsip = (data: object) => data as CreateExtensionInput
 
 beforeEach(() => clearPrismaMock(db))
 
@@ -54,14 +59,14 @@ beforeEach(() => clearPrismaMock(db))
 describe('ExtensionsService.createExtension', () => {
     it('throws 409 when alias already exists in company', async () => {
         db.extension.findUnique.mockResolvedValue(EXT_DB)
-        await expect(ExtensionsService.createExtension({ alias: '2001', type: 'pjsip', name: 'Test', companyId: 'c1', context: 'ramais', allowOutbound: true }))
+        await expect(ExtensionsService.createExtension(pjsip({ alias: '2001', type: 'pjsip', name: 'Test', companyId: 'c1', context: 'ramais', allowOutbound: true })))
             .rejects.toMatchObject({ statusCode: 409 })
     })
 
     it('throws 404 when company not found', async () => {
         db.extension.findUnique.mockResolvedValue(null)
         db.company.findUnique.mockResolvedValue(null)
-        await expect(ExtensionsService.createExtension({ alias: '2002', type: 'pjsip', name: 'Test', companyId: 'clxxxxxxxxxxxxxxxxxxxxxxxxx', context: 'ramais', allowOutbound: true }))
+        await expect(ExtensionsService.createExtension(pjsip({ alias: '2002', type: 'pjsip', name: 'Test', companyId: 'clxxxxxxxxxxxxxxxxxxxxxxxxx', context: 'ramais', allowOutbound: true })))
             .rejects.toMatchObject({ statusCode: 404 })
     })
 
@@ -76,7 +81,7 @@ describe('ExtensionsService.createExtension', () => {
             .mockResolvedValueOnce({ id: '2001_ast1' }) // checkAsteriskSync
         db.extension.create.mockResolvedValue(EXT_DB)
 
-        const ext = await ExtensionsService.createExtension({ alias: '2001', type: 'pjsip', name: 'Test', companyId: 'c1', context: 'ramais', allowOutbound: true }) as any
+        const ext = await ExtensionsService.createExtension(pjsip({ alias: '2001', type: 'pjsip', name: 'Test', companyId: 'c1', context: 'ramais', allowOutbound: true })) as any
         expect(ext).toHaveProperty('password')
         expect(typeof ext.password).toBe('string')
     })

@@ -21,6 +21,7 @@ type CustomHeader = { name: string; value: string }
 
 type TrunkOpt = {
     astId: string
+    type: string
     registrationMode: string
     context: string
     maxOut?: number | null
@@ -39,7 +40,7 @@ function trunkBlockSize(trunk: TrunkOpt, isLast: boolean): number {
     if (trunk.registrationMode === 'custom') return 1
     const hasLimit = trunk.maxOut != null
     const base = hasLimit ? (isLast ? 3 : 5) : isLast ? 1 : 2
-    return base + (trunk.customHeaders?.length ?? 0)
+    return base + (trunk.type === 'pjsip' ? (trunk.customHeaders?.length ?? 0) : 0)
 }
 
 function buildDialplanEntries(
@@ -62,7 +63,7 @@ function buildDialplanEntries(
     let cursor = baseOffset
     for (let i = 0; i < trunks.length; i++) {
         blockStarts.push(cursor)
-        cursor += trunkBlockSize(trunks[i], i === trunks.length - 1)
+        cursor += trunkBlockSize(trunks[i]!, i === trunks.length - 1)
     }
     const hangupPriority = cursor
 
@@ -83,21 +84,25 @@ function buildDialplanEntries(
     })
 
     for (let i = 0; i < trunks.length; i++) {
-        const { astId, registrationMode, context: customContext, maxOut, techPrefix, customHeaders } = trunks[i]
+        const { astId, type, registrationMode, context: customContext, maxOut, techPrefix, customHeaders } = trunks[i]!
         const isLast = i === trunks.length - 1
         const nextTrunkStart = isLast ? hangupPriority : blockStarts[i + 1]
-        const dialTarget = `PJSIP/${techPrefix ?? ''}${destVar}@${astId},60`
+        const tech = type === 'iax' ? 'IAX2' : 'PJSIP'
+        const dialTarget = `${tech}/${techPrefix ?? ''}${destVar}@${astId},60`
 
         if (registrationMode === 'custom') {
             entries.push({ context, exten, priority: p++, app: 'Goto', appdata: `${customContext},${destVar},1` })
             continue
         }
 
-        for (const h of customHeaders ?? []) {
-            entries.push({
-                context, exten, priority: p++, app: 'Set',
-                appdata: `PJSIP_HEADER(add,${h.name})=${h.value}`,
-            })
+        // PJSIP_HEADER não existe em IAX2 — sem headers SIP customizados nesse tech
+        if (type === 'pjsip') {
+            for (const h of customHeaders ?? []) {
+                entries.push({
+                    context, exten, priority: p++, app: 'Set',
+                    appdata: `PJSIP_HEADER(add,${h.name})=${h.value}`,
+                })
+            }
         }
 
         if (maxOut != null) {
@@ -199,7 +204,7 @@ async function getRouteContext(tx: Tx, routeId: string) {
             position: true,
             trunk: {
                 select: {
-                    name: true, maxOutChannels: true, techPrefix: true, customHeaders: true,
+                    name: true, type: true, maxOutChannels: true, techPrefix: true, customHeaders: true,
                     registrationMode: true, context: true,
                 },
             },
@@ -216,6 +221,7 @@ export async function resyncAllPatterns(tx: Tx, routeId: string) {
 
     const trunkOpts: TrunkOpt[] = ctx.trunks.map((rt) => ({
         astId: trunkAsteriskId(ctx.company.asteriskId, rt.trunk.name),
+        type: rt.trunk.type,
         registrationMode: rt.trunk.registrationMode,
         context: rt.trunk.context,
         maxOut: rt.trunk.maxOutChannels,
@@ -372,7 +378,7 @@ export const createOutboundRoute = async (data: CreateOutboundRouteInput) => {
     const trunks = await prisma.trunk.findMany({
         where: { id: { in: data.trunkIds }, companyId: data.companyId },
         select: {
-            id: true, name: true, maxOutChannels: true, techPrefix: true, customHeaders: true,
+            id: true, name: true, type: true, maxOutChannels: true, techPrefix: true, customHeaders: true,
             registrationMode: true, context: true,
         },
     })
@@ -381,13 +387,14 @@ export const createOutboundRoute = async (data: CreateOutboundRouteInput) => {
     const orderedTrunks = data.trunkIds.map((tid, i) => {
         const t = trunks.find((t) => t.id === tid)!
         return {
-            id: t.id, name: t.name, maxOutChannels: t.maxOutChannels, techPrefix: t.techPrefix,
+            id: t.id, name: t.name, type: t.type, maxOutChannels: t.maxOutChannels, techPrefix: t.techPrefix,
             customHeaders: t.customHeaders as CustomHeader[], registrationMode: t.registrationMode,
             context: t.context, position: i,
         }
     })
     const trunkOpts: TrunkOpt[] = orderedTrunks.map((t) => ({
         astId: trunkAsteriskId(company.asteriskId, t.name),
+        type: t.type,
         registrationMode: t.registrationMode,
         context: t.context,
         maxOut: t.maxOutChannels,

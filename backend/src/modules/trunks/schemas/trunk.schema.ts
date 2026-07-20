@@ -41,6 +41,7 @@ const minimalTrunkShape = {
     companyId: z.cuid2(),
 }
 
+// Só se aplica a type="pjsip" — sem equivalente em IAX2 (SIP headers, 100rel, session timers etc.)
 const advancedTrunkShape = {
     transport: z.enum(['transport-udp', 'transport-tcp']).optional(),
     dtmfMode: z.enum(['rfc4733', 'inband', 'info', 'auto']).optional(),
@@ -57,13 +58,24 @@ const advancedTrunkShape = {
     customHeaders: z.array(customHeaderSchema).max(10).optional(),
 }
 
+// Só se aplica a type="iax" — espelha as diretivas do iax.conf (ver iax.repository.ts)
+const iaxAdvancedShape = {
+    qualify: z.enum(['yes', 'no']).optional(),
+    trunkMode: z.boolean().optional(),
+    encryption: z.boolean().optional(),
+    transfer: z.enum(['yes', 'no', 'mediaonly']).optional(),
+    jitterbuffer: z.boolean().optional(),
+}
+
 const baseTrunkShape = {
     ...minimalTrunkShape,
+    type: z.enum(['pjsip', 'iax']).default('pjsip'),
     codecs: z.string().max(200).default('ulaw,alaw'),
     techPrefix: z.string().max(20).optional(),
     maxInChannels: z.number().int().min(1).optional(),
     maxOutChannels: z.number().int().min(1).optional(),
     ...advancedTrunkShape,
+    ...iaxAdvancedShape,
 }
 
 const portShape = { port: z.number().int().min(1).max(65535).optional().default(5060) }
@@ -117,6 +129,11 @@ export const updateTrunkSchema = z.object({
     timersSessExpires: z.number().int().min(90).max(100000).nullable().optional(),
     sendDiversion: z.boolean().nullable().optional(),
     customHeaders: z.array(customHeaderSchema).max(10).optional(),
+    qualify: z.enum(['yes', 'no']).nullable().optional(),
+    trunkMode: z.boolean().nullable().optional(),
+    encryption: z.boolean().nullable().optional(),
+    transfer: z.enum(['yes', 'no', 'mediaonly']).nullable().optional(),
+    jitterbuffer: z.boolean().nullable().optional(),
     // Só aceito pelo service quando o trunk existente é registrationMode='custom'
     context: customTrunkContextSchema.optional(),
 })
@@ -131,6 +148,7 @@ export const TrunkSchema = z.object({
     id: z.string(),
     name: z.string(),
     companyId: z.string(),
+    type: z.enum(['pjsip', 'iax']),
     registrationMode: z.enum(['outbound', 'inbound', 'custom']),
     identifyBy: z.enum(['ip', 'username']).nullable(),
     host: z.string().nullable(),
@@ -155,6 +173,11 @@ export const TrunkSchema = z.object({
     timersSessExpires: z.number().nullable(),
     sendDiversion: z.boolean().nullable(),
     customHeaders: z.array(z.object({ name: z.string(), value: z.string() })),
+    qualify: z.string().nullable(),
+    trunkMode: z.boolean().nullable(),
+    encryption: z.boolean().nullable(),
+    transfer: z.string().nullable(),
+    jitterbuffer: z.boolean().nullable(),
     createdAt: timestamp,
     updatedAt: timestamp,
 })

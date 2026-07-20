@@ -3,6 +3,8 @@ packages: []
 # força zod 4 em todo o grafo (o CLI shadcn embute zod 3, que conflita com @hookform/resolvers)
 overrides:
   zod: ^4.4.3
+  # TS 7 (tsgo, reescrita nativa em Go) ainda quebra o type-check builtin do Next.js
+  typescript: ~6.0.3
 
 allowBuilds:
   sharp: true
