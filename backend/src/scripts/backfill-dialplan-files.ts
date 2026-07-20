@@ -1,7 +1,9 @@
 // One-off: gera os arquivos estáticos de dialplan (/etc/asterisk/dialplan-extra/**) pra todas as
 // empresas já existentes no banco — necessário depois do deploy que trocou holidays/timeconditions/
-// announcements/ivrs/queues-app/request-templates de Realtime pra arquivo, já que `regenerate()` só
-// roda automaticamente em create/update/delete daqui pra frente. Rodar uma vez no VPS:
+// announcements/ivrs/queues-app/request-templates/variables/variable-conditions/callcenter-surveys
+// de Realtime pra arquivo, já que `regenerate()` só roda automaticamente em create/update/delete
+// daqui pra frente (também útil depois de reinstalação do Asterisk que apagou dialplan-extra/
+// mas manteve o banco intacto). Rodar uma vez no VPS:
 //   bun run src/scripts/backfill-dialplan-files.ts
 import { prisma } from '../lib/prisma'
 import { HolidayGroupRepository } from '../asterisk/holidaygroup.repository'
@@ -10,6 +12,9 @@ import { AnnouncementRepository } from '../asterisk/announcement.repository'
 import { IvrRepository } from '../asterisk/ivr.repository'
 import { AsteriskQueueRepository } from '../asterisk/queue.repository'
 import { RequestTemplateRepository } from '../asterisk/request-template.repository'
+import { VariableRepository } from '../asterisk/variable.repository'
+import { VariableConditionRepository } from '../asterisk/variablecondition.repository'
+import { CallcenterSurveyRepository } from '../asterisk/callcenter-survey.repository'
 
 async function main() {
     const companies = await prisma.company.findMany({ select: { id: true, name: true } })
@@ -23,6 +28,9 @@ async function main() {
         await IvrRepository.regenerate(company.id)
         await AsteriskQueueRepository.regenerate(company.id)
         await RequestTemplateRepository.regenerate(company.id)
+        await VariableRepository.regenerate(company.id)
+        await VariableConditionRepository.regenerate(company.id)
+        await CallcenterSurveyRepository.regenerate(company.id)
     }
 
     console.log('Backfill concluído.')

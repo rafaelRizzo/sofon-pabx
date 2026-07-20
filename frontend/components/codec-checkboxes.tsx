@@ -12,6 +12,7 @@ export const CODEC_OPTIONS = [
     "opus",
     "speex",
     "ilbc",
+    "h264",
 ] as const
 
 function parseCodecs(value: string): string[] {

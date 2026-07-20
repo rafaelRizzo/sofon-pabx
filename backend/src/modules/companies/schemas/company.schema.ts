@@ -49,3 +49,4 @@ export const ListCompaniesResponse = ok({ message: z.string(), companies: z.arra
 export const GetCompanyResponse = ok({ message: z.string(), company: CompanySchema })
 export const CreateCompanyResponse = ok({ message: z.string(), companyId: z.string() })
 export const UpdateCompanyResponse = ok({ message: z.string() })
+export const ResyncDialplanResponse = ok({ message: z.string() })

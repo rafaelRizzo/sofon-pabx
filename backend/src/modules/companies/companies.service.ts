@@ -12,6 +12,14 @@ import { AsteriskQueueRepository, QUEUE_APP_CONTEXT } from '../../asterisk/queue
 import { InboundRouteRepository } from '../../asterisk/inboundroute.repository'
 import { audioSoundDir } from '../../asterisk/audio.repository'
 import { removeCompanyDialplanFiles } from '../../asterisk/dialplan-file.repository'
+import { HolidayGroupRepository } from '../../asterisk/holidaygroup.repository'
+import { TimeConditionRepository } from '../../asterisk/timecondition.repository'
+import { AnnouncementRepository } from '../../asterisk/announcement.repository'
+import { IvrRepository } from '../../asterisk/ivr.repository'
+import { RequestTemplateRepository } from '../../asterisk/request-template.repository'
+import { VariableRepository } from '../../asterisk/variable.repository'
+import { VariableConditionRepository } from '../../asterisk/variablecondition.repository'
+import { CallcenterSurveyRepository } from '../../asterisk/callcenter-survey.repository'
 import { TC_CONTEXT, HOL_CONTEXT, ANNOUNCEMENT_CONTEXT, IVR_CONTEXT, REQUEST_TEMPLATE_CONTEXT, VAR_CONTEXT, VARCOND_CONTEXT, SURVEY_CONTEXT } from '../../asterisk/dialplan-names'
 import { RequestTemplatesCache } from '../request-templates/cache/request-templates.cache'
 import { HolidayGroupsCache } from '../holiday-groups/cache/holiday-groups.cache'
@@ -137,6 +145,22 @@ export const updateCompany = async (id: string, data: UpdateCompanyInput) => {
     await Promise.all(affectedUsers.map((uid) => CompaniesCache.invalidateCompaniesForScope(uid)))
     await Promise.all(affectedUsers.map((uid) => invalidateUserCompanyIds(uid)))
     return company
+}
+
+// regenera todo dialplan estático (/etc/asterisk/dialplan-extra/**) da empresa a partir do banco —
+// mesma lista de contextos de DIALPLAN_FILE_CONTEXTS acima, usado quando os arquivos em disco somem
+// (ex: reinstalação do Asterisk que manteve o banco intacto) sem precisar salvar módulo por módulo
+export const resyncDialplan = async (id: string) => {
+    const company = await getCompanyById(id)
+    await HolidayGroupRepository.regenerate(company.id)
+    await TimeConditionRepository.regenerate(company.id)
+    await AnnouncementRepository.regenerate(company.id)
+    await IvrRepository.regenerate(company.id)
+    await AsteriskQueueRepository.regenerate(company.id)
+    await RequestTemplateRepository.regenerate(company.id)
+    await VariableRepository.regenerate(company.id)
+    await VariableConditionRepository.regenerate(company.id)
+    await CallcenterSurveyRepository.regenerate(company.id)
 }
 
 export const deleteCompany = async (id: string) => {

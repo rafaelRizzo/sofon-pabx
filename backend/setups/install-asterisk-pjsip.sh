@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-# INSTALADOR SOFON PBX v6.1 - PJSIP + IAX2 (sem Docker, sem chan_sip)
+# INSTALADOR SOFON PBX v6.2 - PJSIP + IAX2 (sem Docker, sem chan_sip)
 # Debian 11+ | Ubuntu 24.04+ | Asterisk 22.7.0 LTS
 # ============================================================
 
@@ -230,6 +230,9 @@ menuselect/menuselect \
     --enable format_mp3 \
     --enable codec_opus \
     --enable codec_speex \
+    --enable codec_gsm \
+    --enable codec_g722 \
+    --enable codec_ilbc \
     --enable res_srtp \
     --enable res_pjsip \
     --enable res_pjsip_session \
@@ -237,6 +240,8 @@ menuselect/menuselect \
     --enable chan_iax2 \
     --disable chan_sip \
     menuselect.makeopts >> "$LOG_FILE" 2>&1 || true
+# G.729 NÃO entra aqui: codec proprietário (Digium), sem build open-source.
+# Precisa comprar o módulo binário e instalar manualmente em /usr/lib/asterisk/modules.
 
 log "Configuração concluída"
 sleep 1

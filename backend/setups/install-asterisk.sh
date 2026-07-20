@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-# INSTALADOR SOFON PBX v6.0 - NATIVO (sem Docker)
+# INSTALADOR SOFON PBX v6.1 - NATIVO (sem Docker)
 # Debian 11+ | Ubuntu 24.04+
 # ============================================================
 
@@ -258,8 +258,13 @@ menuselect/menuselect \
     --enable format_mp3 \
     --enable codec_opus \
     --enable codec_speex \
+    --enable codec_gsm \
+    --enable codec_g722 \
+    --enable codec_ilbc \
     --enable res_srtp \
     menuselect.makeopts >> "$LOG_FILE" 2>&1 || true
+# G.729 NÃO entra aqui: codec proprietário (Digium), sem build open-source.
+# Precisa comprar o módulo binário e instalar manualmente em /usr/lib/asterisk/modules.
 
 if [[ "$USE_LEGACY_SIP" == true ]]; then
     menuselect/menuselect \
