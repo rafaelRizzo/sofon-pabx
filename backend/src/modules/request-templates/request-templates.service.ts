@@ -27,6 +27,7 @@ const select = {
 
 const _byId = () => prisma.requestTemplate.findUnique({ where: { id: '' }, select })
 export type RequestTemplateDto = NonNullable<Awaited<ReturnType<typeof _byId>>> & { onSuccess: RouteDestination; onError: RouteDestination; usedBy: UsedByRef[] }
+type RequestTemplateRow = NonNullable<Awaited<ReturnType<typeof _byId>>> & { onSuccess: RouteDestination; onError: RouteDestination }
 
 const validateDest = (dest: RouteDestination | undefined | null, companyId: string, label: string) =>
     validateRouteDestination(dest ?? null, companyId, label)
@@ -76,62 +77,53 @@ async function withUsedBy<T extends { id: string; companyId: string }>(templates
 export const getAllRequestTemplates = async (companyIds?: string[]) => {
     if (companyIds && companyIds.length === 0) return []
 
-    if (!companyIds) {
-        const cached = await RequestTemplatesCache.getAll()
-        if (cached) return cached
+    let rows = !companyIds ? ((await RequestTemplatesCache.getAll()) as RequestTemplateRow[] | null) : null
+    if (!rows) {
+        const rtRows = await prisma.requestTemplate.findMany({
+            where: companyIds ? { companyId: { in: companyIds } } : undefined,
+            select,
+        })
+        const edges = await FlowEdgeRepository.getBySourceIds('requesttemplate', rtRows.map((t) => t.id))
+        rows = rtRows.map((t) => ({ ...t, onSuccess: edges.get(t.id)?.success ?? null, onError: edges.get(t.id)?.error ?? null }))
+        if (!companyIds) await RequestTemplatesCache.setAll(rows)
     }
 
-    const rows = await prisma.requestTemplate.findMany({
-        where: companyIds ? { companyId: { in: companyIds } } : undefined,
-        select,
-    })
-    const edges = await FlowEdgeRepository.getBySourceIds('requesttemplate', rows.map((t) => t.id))
-    const templates = await withUsedBy(await withDestinationLabels(rows.map((t) => ({
-        ...t,
-        onSuccess: edges.get(t.id)?.success ?? null,
-        onError: edges.get(t.id)?.error ?? null,
-    }))))
-
-    if (!companyIds) await RequestTemplatesCache.setAll(templates)
-    return templates
+    return withUsedBy(await withDestinationLabels(rows))
 }
 
 export const getRequestTemplatesByCompany = async (companyId: string) => {
-    const cached = await RequestTemplatesCache.getByCompany(companyId)
-    if (cached) return cached
+    let rows = (await RequestTemplatesCache.getByCompany(companyId)) as RequestTemplateRow[] | null
+    if (!rows) {
+        await getCompanyById(companyId)
 
-    await getCompanyById(companyId)
+        const [rtRows, edges] = await Promise.all([
+            prisma.requestTemplate.findMany({ where: { companyId }, select }),
+            FlowEdgeRepository.getBySource(companyId, 'requesttemplate'),
+        ])
+        rows = rtRows.map((t) => ({ ...t, onSuccess: edges.get(t.id)?.success ?? null, onError: edges.get(t.id)?.error ?? null }))
+        await RequestTemplatesCache.setByCompany(companyId, rows)
+    }
 
-    const [rows, edges] = await Promise.all([
-        prisma.requestTemplate.findMany({ where: { companyId }, select }),
-        FlowEdgeRepository.getBySource(companyId, 'requesttemplate'),
-    ])
     const usedByMap = await resolveUsedByLabels('request', rows.map((t) => t.id), companyId)
-    const templates = await withDestinationLabels(rows.map((t) => ({
-        ...t,
-        onSuccess: edges.get(t.id)?.success ?? null,
-        onError: edges.get(t.id)?.error ?? null,
-        usedBy: usedByMap.get(t.id) ?? [],
-    })))
-    await RequestTemplatesCache.setByCompany(companyId, templates)
-    return templates
+    return withDestinationLabels(rows.map((t) => ({ ...t, usedBy: usedByMap.get(t.id) ?? [] })))
 }
 
 export const getRequestTemplateById = async (id: string) => {
-    const cached = await RequestTemplatesCache.getTemplate(id)
-    if (cached) return cached
+    let row = (await RequestTemplatesCache.getTemplate(id)) as RequestTemplateRow | null
+    if (!row) {
+        const found = await prisma.requestTemplate.findUnique({ where: { id }, select })
+        if (!found) throw new AppError('Request template not found', 404)
 
-    const found = await prisma.requestTemplate.findUnique({ where: { id }, select })
-    if (!found) throw new AppError('Request template not found', 404)
+        const [onSuccess, onError] = await Promise.all([
+            FlowEdgeRepository.getOne('requesttemplate', id, 'success'),
+            FlowEdgeRepository.getOne('requesttemplate', id, 'error'),
+        ])
+        row = { ...found, onSuccess, onError }
+        await RequestTemplatesCache.setTemplate(id, row)
+    }
 
-    const [onSuccess, onError, usedByMap] = await Promise.all([
-        FlowEdgeRepository.getOne('requesttemplate', id, 'success'),
-        FlowEdgeRepository.getOne('requesttemplate', id, 'error'),
-        resolveUsedByLabels('request', [id], found.companyId),
-    ])
-    const template = (await withDestinationLabels([{ ...found, onSuccess, onError, usedBy: usedByMap.get(id) ?? [] }]))[0]!
-    await RequestTemplatesCache.setTemplate(id, template)
-    return template
+    const usedByMap = await resolveUsedByLabels('request', [id], row.companyId)
+    return (await withDestinationLabels([{ ...row, usedBy: usedByMap.get(id) ?? [] }]))[0]!
 }
 
 export const createRequestTemplate = async (data: CreateRequestTemplateInput) => {

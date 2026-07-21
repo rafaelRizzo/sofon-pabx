@@ -21,6 +21,8 @@ const select = {
 
 const toDto = <T extends { entryDestination: RouteDestination; usedBy: UsedByRef[] }>(f: T) => f
 
+type FlowRow = { id: string; name: string; companyId: string; layout: unknown; createdAt: Date; updatedAt: Date; entryDestination: RouteDestination }
+
 // Anexa o nome legível de entryDestination (resolvido no backend, cache-first — ver
 // route-destination-label.ts). Todas as chamadas aqui são de uma única empresa por vez.
 async function withDestinationLabels<T extends { entryDestination: unknown }>(flows: T[], companyId: string): Promise<T[]> {
@@ -29,39 +31,44 @@ async function withDestinationLabels<T extends { entryDestination: unknown }>(fl
     return flows.map((f) => ({ ...f, entryDestination: withDestinationLabel(f.entryDestination as RouteDestination, labelMap) }))
 }
 
+// FlowsCache guarda só o dado bruto (sem label/usedBy) — labels vêm de entidades de outros
+// módulos (Extension/Queue/TimeCondition/...) e usedBy é referência reversa; nenhum dos dois é
+// invalidado por quem os altera (ex: renomear uma Extension não invalida FlowsCache). Resolver os
+// dois fora do cache, sempre fresh, evita servir nome desatualizado indefinidamente (TTL do
+// node-cache é infinito, só expira por invalidação explícita).
 export const getFlowsByCompany = async (companyId: string) => {
-    const cached = await FlowsCache.getByCompany(companyId)
-    if (cached) return cached
+    let rows = (await FlowsCache.getByCompany(companyId)) as FlowRow[] | null
+    if (!rows) {
+        await getCompanyById(companyId)
 
-    await getCompanyById(companyId)
+        const [flowRows, edges] = await Promise.all([
+            prisma.flow.findMany({ where: { companyId }, select }),
+            FlowEdgeRepository.getBySource(companyId, 'flow'),
+        ])
+        rows = flowRows.map((f) => ({ ...f, entryDestination: edges.get(f.id)?.entry ?? null }))
+        await FlowsCache.setByCompany(companyId, rows)
+    }
 
-    const [rows, edges] = await Promise.all([
-        prisma.flow.findMany({ where: { companyId }, select }),
-        FlowEdgeRepository.getBySource(companyId, 'flow'),
-    ])
     const usedByMap = await resolveUsedByLabels('flow', rows.map((f) => f.id), companyId)
-    const flows = await withDestinationLabels(
-        rows.map((f) => toDto({ ...f, entryDestination: edges.get(f.id)?.entry ?? null, usedBy: usedByMap.get(f.id) ?? [] })),
+    return withDestinationLabels(
+        rows.map((f) => toDto({ ...f, usedBy: usedByMap.get(f.id) ?? [] })),
         companyId,
     )
-    await FlowsCache.setByCompany(companyId, flows)
-    return flows
 }
 
 export const getFlowById = async (id: string) => {
-    const cached = await FlowsCache.getFlow(id)
-    if (cached) return cached
+    let row = (await FlowsCache.getFlow(id)) as FlowRow | null
+    if (!row) {
+        const flow = await prisma.flow.findUnique({ where: { id }, select })
+        if (!flow) throw new AppError('Flow not found', 404)
 
-    const flow = await prisma.flow.findUnique({ where: { id }, select })
-    if (!flow) throw new AppError('Flow not found', 404)
+        const entryDestination = await FlowEdgeRepository.getOne('flow', id, 'entry')
+        row = { ...flow, entryDestination }
+        await FlowsCache.setFlow(id, row)
+    }
 
-    const [entryDestination, usedByMap] = await Promise.all([
-        FlowEdgeRepository.getOne('flow', id, 'entry'),
-        resolveUsedByLabels('flow', [id], flow.companyId),
-    ])
-    const dto = (await withDestinationLabels([toDto({ ...flow, entryDestination, usedBy: usedByMap.get(id) ?? [] })], flow.companyId))[0]!
-    await FlowsCache.setFlow(id, dto)
-    return dto
+    const usedByMap = await resolveUsedByLabels('flow', [id], row.companyId)
+    return (await withDestinationLabels([toDto({ ...row, usedBy: usedByMap.get(id) ?? [] })], row.companyId))[0]!
 }
 
 export const createFlow = async (data: CreateFlowInput) => {

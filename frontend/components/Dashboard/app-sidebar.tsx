@@ -33,7 +33,6 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
     SidebarRail,
-    SidebarSeparator,
     useSidebar,
 } from "@/components/ui/sidebar"
 import { TooltipProvider } from "@/components/ui/tooltip"
@@ -178,7 +177,10 @@ export function AppSidebar() {
                 </SidebarHeader>
                 <SidebarContent>
                     {visibleNav.map((group) => (
-                        <SidebarGroup key={group.label}>
+                        <SidebarGroup
+                            key={group.label}
+                            className="group-data-[collapsible=icon]:py-0"
+                        >
                             <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
                             <SidebarGroupContent>
                                 <SidebarMenu>
@@ -209,7 +211,6 @@ export function AppSidebar() {
                         </SidebarGroup>
                     ))}
                 </SidebarContent>
-                <SidebarSeparator />
                 <SidebarFooter>
                     <SidebarMenu>
                         <SidebarMenuItem>

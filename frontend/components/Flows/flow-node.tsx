@@ -99,8 +99,8 @@ function SlotChip({
         align === "start"
             ? "justify-start"
             : align === "end"
-              ? "justify-end"
-              : "justify-center"
+                ? "justify-end"
+                : "justify-center"
 
     if (target) {
         const Icon = ROUTE_DEST_ICONS[target.type as RouteDestinationType]
@@ -117,7 +117,7 @@ function SlotChip({
                     trigger={
                         <button
                             type="button"
-                            className={`nodrag flex min-w-0 flex-1 items-center gap-1.5 py-1 text-[0.6875rem] font-semibold ${justify}`}
+                            className="nodrag flex min-w-0 flex-1 items-center justify-center gap-1.5 py-1 text-[0.6875rem] font-semibold"
                         >
                             {Icon && <Icon className="size-3.5 shrink-0" />}
                             <span className="truncate">{target.name}</span>
@@ -191,11 +191,11 @@ export function FlowNode({
             <Handle
                 type="target"
                 position={Position.Top}
-                className="size-3.5! border-2! border-card! bg-primary! shadow-sm transition-transform hover:scale-125!"
+                className="size-3.5! border-2! border-card! shadow-sm dark:border-neutral-700!"
             />
 
             <div className="flex items-start gap-2.5 px-3 pt-3 pb-2.5">
-                <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 dark:bg-primary/50 text-primary dark:text-indigo-400">
                     <Icon className="size-4" />
                 </div>
                 <div className="flex min-w-0 flex-col">
@@ -262,7 +262,6 @@ export function FlowNode({
                     {branchSlots && (
                         <div className="grid grid-cols-2 gap-2">
                             {branchSlots.map((slot) => {
-                                const color = SLOT_COLORS[slot]
                                 const isLeft =
                                     slot === "false" || slot === "error"
                                 return (
@@ -270,10 +269,7 @@ export function FlowNode({
                                         key={slot}
                                         slot={slot}
                                         label={SLOT_LABELS[slot] ?? slot}
-                                        colorText={
-                                            color?.text ??
-                                            "text-muted-foreground"
-                                        }
+                                        colorText="text-muted-foreground"
                                         target={data.slotTargets?.[slot]}
                                         companyId={data.companyId}
                                         align={isLeft ? "start" : "end"}
@@ -333,7 +329,7 @@ export function FlowNode({
                         position={Position.Bottom}
                         id={slot}
                         style={{ left: sourceLeft(index, outputSlots.length) }}
-                        className={`flow-node-output-handle h-2.5! w-6! rounded-full! border-2! border-card! shadow-sm transition-transform hover:scale-110! ${color?.handle ?? "bg-primary!"}`}
+                        className={`size-3.5! border-2! border-card! shadow-sm dark:border-neutral-700! ${color?.handle ?? ""}`}
                     />
                 )
             })}
@@ -367,7 +363,7 @@ export function StartNode() {
                 type="source"
                 position={Position.Bottom}
                 id="entry"
-                className="flow-node-output-handle h-2.5! w-6! rounded-full! border-2! border-card! bg-emerald-500! shadow-sm transition-transform hover:scale-110!"
+                className="size-3.5! border-2! border-card! bg-emerald-500! shadow-sm dark:border-neutral-700!"
             />
         </div>
     )

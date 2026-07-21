@@ -7,11 +7,6 @@
     --xy-background-color: var(--color-background);
     --xy-background-pattern-color: var(--color-border);
 
-    --xy-edge-stroke: var(--color-border);
-    --xy-edge-stroke-selected: var(--color-primary);
-    --xy-edge-stroke-width: 1.5;
-    --xy-connectionline-stroke: var(--color-primary);
-    --xy-connectionline-stroke-width: 1.5;
     --xy-edge-label-background-color: var(--color-card);
     --xy-edge-label-color: var(--color-foreground);
 
@@ -22,8 +17,7 @@
         color-mix(in oklch, var(--color-foreground) 8%, transparent);
     --xy-node-boxshadow-selected: 0 0 0 2px var(--color-primary);
 
-    --xy-handle-background-color: var(--color-primary);
-    --xy-handle-border-color: var(--color-background);
+    --xy-handle-background-color: oklch(0.556 0 0);
 
     --xy-selection-background-color: color-mix(
         in oklch,
@@ -55,6 +49,13 @@
     --flow-branch-negative: oklch(0.645 0.222 16.439);
 }
 
+.dark .react-flow {
+    --xy-background-color: oklch(20.5% 0 none);
+    --xy-handle-background-color: oklch(0.205 0 0);
+    --xy-edge-stroke: oklch(0.371 0 0);
+    --xy-connectionline-stroke: oklch(0.371 0 0);
+}
+
 .react-flow__node-flowNode,
 .react-flow__node-startNode {
     cursor: grab;
@@ -67,13 +68,31 @@
 
 .react-flow__handle {
     cursor: crosshair;
+    transition: transform 150ms ease;
 }
 
-.react-flow__handle.flow-node-output-handle {
-    bottom: -6px;
-    box-shadow:
-        0 0 0 1px color-mix(in oklch, var(--color-foreground) 12%, transparent),
-        0 2px 4px color-mix(in oklch, var(--color-foreground) 16%, transparent);
+/* Área de clique/drag maior que o círculo visível, sem crescer o handle na tela — ::before é
+ * parte do mesmo elemento pra efeito de hit-test, não precisa de outro nó/handler. */
+.react-flow__handle::before {
+    content: "";
+    position: absolute;
+    inset: -8px;
+}
+
+/* scale no :hover precisa ficar dentro do mesmo `transform` do translate de centralização da lib
+ * (translate(-50%, ±50%)) — combinar via propriedade `scale` separada (utility do Tailwind v4)
+ * amplifica esse translate junto e o handle parece "pular" pro lado em vez de só crescer. */
+.react-flow__handle-top {
+    transform: translate(-50%, -50%) scale(1);
+}
+.react-flow__handle-top:hover {
+    transform: translate(-50%, -50%) scale(1.25);
+}
+.react-flow__handle-bottom {
+    transform: translate(-50%, 50%) scale(1);
+}
+.react-flow__handle-bottom:hover {
+    transform: translate(-50%, 50%) scale(1.25);
 }
 
 .react-flow__edge-path {

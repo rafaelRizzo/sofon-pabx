@@ -19,6 +19,9 @@ const select = {
     updatedAt: true,
 } as const
 
+const _byId = () => prisma.variableSet.findUnique({ where: { id: '' }, select })
+type VariableSetRow = NonNullable<Awaited<ReturnType<typeof _byId>>> & { destination: RouteDestination }
+
 // Anexa o nome legível do destino (resolvido no backend, cache-first — ver route-destination-label.ts)
 // pra a badge do frontend não precisar buscar/mapear id->nome ela mesma. Agrupa por companyId —
 // getAllVariableSets pode misturar empresas diferentes na mesma lista (visão admin).
@@ -56,59 +59,53 @@ async function withUsedBy<T extends { id: string; companyId: string }>(sets: T[]
 }
 
 export const getVariableSetsByCompany = async (companyId: string) => {
-    const cached = await VariablesCache.getByCompany(companyId)
-    if (cached) return cached
+    let rows = (await VariablesCache.getByCompany(companyId)) as VariableSetRow[] | null
+    if (!rows) {
+        await getCompanyById(companyId)
 
-    await getCompanyById(companyId)
+        const [vsRows, edges] = await Promise.all([
+            prisma.variableSet.findMany({ where: { companyId }, select }),
+            FlowEdgeRepository.getBySource(companyId, 'variableset'),
+        ])
+        rows = vsRows.map((s) => ({ ...s, destination: edges.get(s.id)?.default ?? null }))
+        await VariablesCache.setByCompany(companyId, rows)
+    }
 
-    const [rows, edges] = await Promise.all([
-        prisma.variableSet.findMany({ where: { companyId }, select }),
-        FlowEdgeRepository.getBySource(companyId, 'variableset'),
-    ])
     const usedByMap = await resolveUsedByLabels('variable-set', rows.map((s) => s.id), companyId)
-    const variableSets = await withDestinationLabels(
-        rows.map((s) => ({ ...s, destination: edges.get(s.id)?.default ?? null, usedBy: usedByMap.get(s.id) ?? [] })),
-    )
-    await VariablesCache.setByCompany(companyId, variableSets)
-    return variableSets
+    return withDestinationLabels(rows.map((s) => ({ ...s, usedBy: usedByMap.get(s.id) ?? [] })))
 }
 
 export const getAllVariableSets = async (companyIds?: string[]) => {
     if (companyIds && companyIds.length === 0) return []
 
-    if (!companyIds) {
-        const cached = await VariablesCache.getAll()
-        if (cached) return cached
+    let rows = !companyIds ? ((await VariablesCache.getAll()) as VariableSetRow[] | null) : null
+    if (!rows) {
+        const vsRows = await prisma.variableSet.findMany({
+            where: companyIds ? { companyId: { in: companyIds } } : undefined,
+            select,
+        })
+        const edges = await FlowEdgeRepository.getBySourceIds('variableset', vsRows.map((s) => s.id))
+        rows = vsRows.map((s) => ({ ...s, destination: edges.get(s.id)?.default ?? null }))
+        if (!companyIds) await VariablesCache.setAll(rows)
     }
 
-    const rows = await prisma.variableSet.findMany({
-        where: companyIds ? { companyId: { in: companyIds } } : undefined,
-        select,
-    })
-    const edges = await FlowEdgeRepository.getBySourceIds('variableset', rows.map((s) => s.id))
     const usedByMap = await withUsedBy(rows)
-    const variableSets = await withDestinationLabels(
-        rows.map((s) => ({ ...s, destination: edges.get(s.id)?.default ?? null, usedBy: usedByMap.get(s.id) ?? [] })),
-    )
-
-    if (!companyIds) await VariablesCache.setAll(variableSets)
-    return variableSets
+    return withDestinationLabels(rows.map((s) => ({ ...s, usedBy: usedByMap.get(s.id) ?? [] })))
 }
 
 export const getVariableSetById = async (id: string) => {
-    const cached = await VariablesCache.getVariableSet(id)
-    if (cached) return cached
+    let row = (await VariablesCache.getVariableSet(id)) as VariableSetRow | null
+    if (!row) {
+        const found = await prisma.variableSet.findUnique({ where: { id }, select })
+        if (!found) throw new AppError('Variable set not found', 404)
 
-    const found = await prisma.variableSet.findUnique({ where: { id }, select })
-    if (!found) throw new AppError('Variable set not found', 404)
+        const destination = await FlowEdgeRepository.getOne('variableset', id, 'default')
+        row = { ...found, destination }
+        await VariablesCache.setVariableSet(id, row)
+    }
 
-    const [destination, usedByMap] = await Promise.all([
-        FlowEdgeRepository.getOne('variableset', id, 'default'),
-        resolveUsedByLabels('variable-set', [id], found.companyId),
-    ])
-    const variableSet = (await withDestinationLabels([{ ...found, destination, usedBy: usedByMap.get(id) ?? [] }]))[0]!
-    await VariablesCache.setVariableSet(id, variableSet)
-    return variableSet
+    const usedByMap = await resolveUsedByLabels('variable-set', [id], row.companyId)
+    return (await withDestinationLabels([{ ...row, usedBy: usedByMap.get(id) ?? [] }]))[0]!
 }
 
 export const createVariableSet = async (data: CreateVariableSetInput) => {

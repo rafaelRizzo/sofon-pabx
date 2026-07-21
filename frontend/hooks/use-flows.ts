@@ -301,8 +301,11 @@ export function useFlowNodes(flowId?: string) {
 
     return {
         nodes,
+        setNodes,
         edges,
+        setEdges,
         entryNodeId,
+        setEntryNodeId,
         loading,
         refreshing,
         refetchNodes: fetchNodes,

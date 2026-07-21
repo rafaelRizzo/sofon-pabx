@@ -198,8 +198,8 @@ export const SLOT_COLORS: Record<string, { text: string; handle: string }> = {
         text: "text-emerald-600 dark:text-emerald-400",
         handle: "bg-emerald-500!",
     },
-    false: { text: "text-rose-600 dark:text-rose-400", handle: "bg-rose-500!" },
-    error: { text: "text-rose-600 dark:text-rose-400", handle: "bg-rose-500!" },
+    false: { text: "text-red-600 dark:text-red-500", handle: "bg-red-500!" },
+    error: { text: "text-red-600 dark:text-red-500", handle: "bg-red-500!" },
 }
 
 // chave composta type:id — única no canvas independente do tipo, usada como id de nó do React Flow.

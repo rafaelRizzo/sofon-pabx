@@ -25,6 +25,7 @@ mock.module('../providers/http.provider', () => ({
 
 import * as HolidayGroupsService from '../holiday-groups.service'
 import { fetchHolidaysFromUrl } from '../providers/http.provider'
+import { createHolidayGroupSchema } from '../schemas/holiday-group.schema'
 
 const COMPANY = { id: 'c1', name: 'ACME' }
 const EXT = { id: 'e1', companyId: 'c1', context: 'ramais', number: '1001' }
@@ -76,6 +77,14 @@ describe('HolidayGroupsService.getHolidayGroupById', () => {
 
 // ─── createHolidayGroup ─────────────────────────────────────────────────────────
 describe('HolidayGroupsService.createHolidayGroup', () => {
+    it('accepts null url for a manual group', () => {
+        const result = createHolidayGroupSchema.safeParse({
+            name: 'Feriados Nacionais', companyId: 'cmrntbdpc000001qcnlvt01cb', url: null,
+            dates: [{ name: 'Ano Novo', month: 1, day: 1 }],
+        })
+        expect(result.success).toBe(true)
+    })
+
     it('creates group with manual dates', async () => {
         db.company.findUnique.mockResolvedValue(COMPANY)
         db.holidayGroup.findUnique.mockResolvedValue(null)

@@ -24,6 +24,7 @@ const timeConditionSelect = {
 
 const _byId = () => prisma.timeCondition.findUnique({ where: { id: '' }, select: timeConditionSelect })
 export type TimeConditionDto = NonNullable<Awaited<ReturnType<typeof _byId>>> & { trueRoute: RouteDest; falseRoute: RouteDest; usedBy: UsedByRef[] }
+type TimeConditionRow = NonNullable<Awaited<ReturnType<typeof _byId>>> & { trueRoute: RouteDest; falseRoute: RouteDest }
 
 const validateRoute = (route: RouteDest | undefined | null, companyId: string, label: string) =>
     validateRouteDestination(route ?? null, companyId, label)
@@ -74,68 +75,56 @@ async function resolveUsedByMap<T extends { id: string; companyId: string }>(row
 }
 
 export const getTimeConditionsByCompany = async (companyId: string) => {
-    const cached = await TimeConditionsCache.getByCompany(companyId)
-    if (cached) return cached
+    let rows = (await TimeConditionsCache.getByCompany(companyId)) as TimeConditionRow[] | null
+    if (!rows) {
+        await getCompanyById(companyId)
 
-    await getCompanyById(companyId)
+        const [tcRows, edges] = await Promise.all([
+            prisma.timeCondition.findMany({ where: { companyId }, select: timeConditionSelect }),
+            FlowEdgeRepository.getBySource(companyId, 'timecondition'),
+        ])
+        rows = tcRows.map((tc) => ({ ...tc, trueRoute: edges.get(tc.id)?.true ?? null, falseRoute: edges.get(tc.id)?.false ?? null }))
+        await TimeConditionsCache.setByCompany(companyId, rows)
+    }
 
-    const [rows, edges] = await Promise.all([
-        prisma.timeCondition.findMany({ where: { companyId }, select: timeConditionSelect }),
-        FlowEdgeRepository.getBySource(companyId, 'timecondition'),
-    ])
     const usedByMap = await resolveUsedByLabels('timecondition', rows.map((tc) => tc.id), companyId)
-    const conditions = await withDestinationLabels(rows.map((tc) => ({
-        ...tc,
-        trueRoute: edges.get(tc.id)?.true ?? null,
-        falseRoute: edges.get(tc.id)?.false ?? null,
-        usedBy: usedByMap.get(tc.id) ?? [],
-    })))
-    await TimeConditionsCache.setByCompany(companyId, conditions)
-    return conditions
+    return withDestinationLabels(rows.map((tc) => ({ ...tc, usedBy: usedByMap.get(tc.id) ?? [] })))
 }
 
 export const getAllTimeConditions = async (companyIds?: string[]) => {
     if (companyIds && companyIds.length === 0) return []
 
-    if (!companyIds) {
-        const cached = await TimeConditionsCache.getAll()
-        if (cached) return cached
+    let rows = !companyIds ? ((await TimeConditionsCache.getAll()) as TimeConditionRow[] | null) : null
+    if (!rows) {
+        const tcRows = await prisma.timeCondition.findMany({
+            where: companyIds ? { companyId: { in: companyIds } } : undefined,
+            select: timeConditionSelect,
+        })
+        const edges = await FlowEdgeRepository.getBySourceIds('timecondition', tcRows.map((tc) => tc.id))
+        rows = tcRows.map((tc) => ({ ...tc, trueRoute: edges.get(tc.id)?.true ?? null, falseRoute: edges.get(tc.id)?.false ?? null }))
+        if (!companyIds) await TimeConditionsCache.setAll(rows)
     }
 
-    const rows = await prisma.timeCondition.findMany({
-        where: companyIds ? { companyId: { in: companyIds } } : undefined,
-        select: timeConditionSelect,
-    })
-    const [edges, usedByMap] = await Promise.all([
-        FlowEdgeRepository.getBySourceIds('timecondition', rows.map((tc) => tc.id)),
-        resolveUsedByMap(rows),
-    ])
-    const conditions = await withDestinationLabels(rows.map((tc) => ({
-        ...tc,
-        trueRoute: edges.get(tc.id)?.true ?? null,
-        falseRoute: edges.get(tc.id)?.false ?? null,
-        usedBy: usedByMap.get(tc.id) ?? [],
-    })))
-
-    if (!companyIds) await TimeConditionsCache.setAll(conditions)
-    return conditions
+    const usedByMap = await resolveUsedByMap(rows)
+    return withDestinationLabels(rows.map((tc) => ({ ...tc, usedBy: usedByMap.get(tc.id) ?? [] })))
 }
 
 export const getTimeConditionById = async (id: string): Promise<TimeConditionDto> => {
-    const cached = await TimeConditionsCache.getTimeCondition(id)
-    if (cached) return cached as TimeConditionDto
+    let row = (await TimeConditionsCache.getTimeCondition(id)) as TimeConditionRow | null
+    if (!row) {
+        const found = await prisma.timeCondition.findUnique({ where: { id }, select: timeConditionSelect })
+        if (!found) throw new AppError('Time condition not found', 404)
 
-    const found = await prisma.timeCondition.findUnique({ where: { id }, select: timeConditionSelect })
-    if (!found) throw new AppError('Time condition not found', 404)
+        const [trueRoute, falseRoute] = await Promise.all([
+            FlowEdgeRepository.getOne('timecondition', id, 'true'),
+            FlowEdgeRepository.getOne('timecondition', id, 'false'),
+        ])
+        row = { ...found, trueRoute, falseRoute }
+        await TimeConditionsCache.setTimeCondition(id, row)
+    }
 
-    const [trueRoute, falseRoute, usedByMap] = await Promise.all([
-        FlowEdgeRepository.getOne('timecondition', id, 'true'),
-        FlowEdgeRepository.getOne('timecondition', id, 'false'),
-        resolveUsedByLabels('timecondition', [id], found.companyId),
-    ])
-    const tc = (await withDestinationLabels([{ ...found, trueRoute, falseRoute, usedBy: usedByMap.get(id) ?? [] }]))[0]!
-    await TimeConditionsCache.setTimeCondition(id, tc)
-    return tc
+    const usedByMap = await resolveUsedByLabels('timecondition', [id], row.companyId)
+    return (await withDestinationLabels([{ ...row, usedBy: usedByMap.get(id) ?? [] }]))[0]!
 }
 
 export const createTimeCondition = async (data: CreateTimeConditionInput) => {

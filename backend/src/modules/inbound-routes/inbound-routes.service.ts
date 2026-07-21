@@ -23,6 +23,7 @@ const inboundRouteSelect = {
 
 const _byId = () => prisma.inboundRoute.findUnique({ where: { id: '' }, select: inboundRouteSelect })
 export type InboundRouteDto = NonNullable<Awaited<ReturnType<typeof _byId>>> & { destination: RouteDestination }
+type InboundRouteRow = InboundRouteDto
 
 const validateDestination = (dest: InboundDest | undefined | null, companyId: string) =>
     validateRouteDestination(dest ?? null, companyId)
@@ -45,54 +46,54 @@ async function withDestinationLabels<T extends { destination: unknown; companyId
 }
 
 export const getInboundRoutesByCompany = async (companyId: string) => {
-    const cached = await InboundRoutesCache.getByCompany(companyId)
-    if (cached) return cached
+    let rows = (await InboundRoutesCache.getByCompany(companyId)) as InboundRouteRow[] | null
+    if (!rows) {
+        await getCompanyById(companyId)
 
-    await getCompanyById(companyId)
+        const [irRows, edges] = await Promise.all([
+            prisma.inboundRoute.findMany({ where: { companyId }, select: inboundRouteSelect }),
+            FlowEdgeRepository.getBySource(companyId, 'inboundroute'),
+        ])
+        rows = irRows.map((r) => ({ ...r, destination: edges.get(r.id)?.default ?? null }))
+        await InboundRoutesCache.setByCompany(companyId, rows)
+    }
 
-    const [rows, edges] = await Promise.all([
-        prisma.inboundRoute.findMany({ where: { companyId }, select: inboundRouteSelect }),
-        FlowEdgeRepository.getBySource(companyId, 'inboundroute'),
-    ])
-    const routes = await withDestinationLabels(rows.map((r) => ({ ...r, destination: edges.get(r.id)?.default ?? null })))
-    await InboundRoutesCache.setByCompany(companyId, routes)
-    return routes
+    return withDestinationLabels(rows)
 }
 
 export const getAllInboundRoutes = async (companyIds?: string[], userId?: string) => {
     if (companyIds && companyIds.length === 0) return []
 
-    if (!companyIds) {
-        const cached = await InboundRoutesCache.getAll()
-        if (cached) return cached
-    } else if (userId) {
-        const cached = await InboundRoutesCache.getForScope(userId)
-        if (cached) return cached
+    let rows: InboundRouteRow[] | null = null
+    if (!companyIds) rows = (await InboundRoutesCache.getAll()) as InboundRouteRow[] | null
+    else if (userId) rows = (await InboundRoutesCache.getForScope(userId)) as InboundRouteRow[] | null
+
+    if (!rows) {
+        const irRows = await prisma.inboundRoute.findMany({
+            where: companyIds ? { companyId: { in: companyIds } } : undefined,
+            select: inboundRouteSelect,
+        })
+        const edges = await FlowEdgeRepository.getBySourceIds('inboundroute', irRows.map((r) => r.id))
+        rows = irRows.map((r) => ({ ...r, destination: edges.get(r.id)?.default ?? null }))
+        if (!companyIds) await InboundRoutesCache.setAll(rows)
+        else if (userId) await InboundRoutesCache.setForScope(userId, rows)
     }
 
-    const rows = await prisma.inboundRoute.findMany({
-        where: companyIds ? { companyId: { in: companyIds } } : undefined,
-        select: inboundRouteSelect,
-    })
-    const edges = await FlowEdgeRepository.getBySourceIds('inboundroute', rows.map((r) => r.id))
-    const routes = await withDestinationLabels(rows.map((r) => ({ ...r, destination: edges.get(r.id)?.default ?? null })))
-
-    if (!companyIds) await InboundRoutesCache.setAll(routes)
-    else if (userId) await InboundRoutesCache.setForScope(userId, routes)
-    return routes
+    return withDestinationLabels(rows)
 }
 
 export const getInboundRouteById = async (id: string): Promise<InboundRouteDto> => {
-    const cached = await InboundRoutesCache.getRoute(id)
-    if (cached) return cached as InboundRouteDto
+    let row = (await InboundRoutesCache.getRoute(id)) as InboundRouteRow | null
+    if (!row) {
+        const found = await prisma.inboundRoute.findUnique({ where: { id }, select: inboundRouteSelect })
+        if (!found) throw new AppError('Inbound route not found', 404)
 
-    const found = await prisma.inboundRoute.findUnique({ where: { id }, select: inboundRouteSelect })
-    if (!found) throw new AppError('Inbound route not found', 404)
+        const destination = await FlowEdgeRepository.getOne('inboundroute', id, 'default')
+        row = { ...found, destination }
+        await InboundRoutesCache.setRoute(id, row)
+    }
 
-    const destination = await FlowEdgeRepository.getOne('inboundroute', id, 'default')
-    const route = (await withDestinationLabels([{ ...found, destination }]))[0]!
-    await InboundRoutesCache.setRoute(id, route)
-    return route
+    return (await withDestinationLabels([row]))[0]!
 }
 
 export const createInboundRoute = async (data: CreateInboundRouteInput) => {

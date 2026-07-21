@@ -22,6 +22,7 @@ const select = {
 
 const _byId = () => prisma.variableCondition.findUnique({ where: { id: '' }, select })
 export type VariableConditionDto = NonNullable<Awaited<ReturnType<typeof _byId>>> & { trueRoute: RouteDest; falseRoute: RouteDest; usedBy: UsedByRef[] }
+type VariableConditionRow = NonNullable<Awaited<ReturnType<typeof _byId>>> & { trueRoute: RouteDest; falseRoute: RouteDest }
 
 const validateRoute = (route: RouteDest | undefined | null, companyId: string, label: string) =>
     validateRouteDestination(route ?? null, companyId, label)
@@ -69,66 +70,56 @@ async function resolveUsedByLabelsBatched(rows: { id: string; companyId: string 
 }
 
 export const getVariableConditionsByCompany = async (companyId: string) => {
-    const cached = await VariableConditionsCache.getByCompany(companyId)
-    if (cached) return cached
+    let rows = (await VariableConditionsCache.getByCompany(companyId)) as VariableConditionRow[] | null
+    if (!rows) {
+        await getCompanyById(companyId)
 
-    await getCompanyById(companyId)
+        const [vcRows, edges] = await Promise.all([
+            prisma.variableCondition.findMany({ where: { companyId }, select }),
+            FlowEdgeRepository.getBySource(companyId, 'variablecondition'),
+        ])
+        rows = vcRows.map((vc) => ({ ...vc, trueRoute: edges.get(vc.id)?.true ?? null, falseRoute: edges.get(vc.id)?.false ?? null }))
+        await VariableConditionsCache.setByCompany(companyId, rows)
+    }
 
-    const [rows, edges] = await Promise.all([
-        prisma.variableCondition.findMany({ where: { companyId }, select }),
-        FlowEdgeRepository.getBySource(companyId, 'variablecondition'),
-    ])
     const usedByMap = await resolveUsedByLabels('variable-condition', rows.map((vc) => vc.id), companyId)
-    const variableConditions = await withDestinationLabels(rows.map((vc) => ({
-        ...vc,
-        trueRoute: edges.get(vc.id)?.true ?? null,
-        falseRoute: edges.get(vc.id)?.false ?? null,
-        usedBy: usedByMap.get(vc.id) ?? [],
-    })))
-    await VariableConditionsCache.setByCompany(companyId, variableConditions)
-    return variableConditions
+    return withDestinationLabels(rows.map((vc) => ({ ...vc, usedBy: usedByMap.get(vc.id) ?? [] })))
 }
 
 export const getAllVariableConditions = async (companyIds?: string[]) => {
     if (companyIds && companyIds.length === 0) return []
 
-    if (!companyIds) {
-        const cached = await VariableConditionsCache.getAll()
-        if (cached) return cached
+    let rows = !companyIds ? ((await VariableConditionsCache.getAll()) as VariableConditionRow[] | null) : null
+    if (!rows) {
+        const vcRows = await prisma.variableCondition.findMany({
+            where: companyIds ? { companyId: { in: companyIds } } : undefined,
+            select,
+        })
+        const edges = await FlowEdgeRepository.getBySourceIds('variablecondition', vcRows.map((vc) => vc.id))
+        rows = vcRows.map((vc) => ({ ...vc, trueRoute: edges.get(vc.id)?.true ?? null, falseRoute: edges.get(vc.id)?.false ?? null }))
+        if (!companyIds) await VariableConditionsCache.setAll(rows)
     }
 
-    const rows = await prisma.variableCondition.findMany({
-        where: companyIds ? { companyId: { in: companyIds } } : undefined,
-        select,
-    })
-    const edges = await FlowEdgeRepository.getBySourceIds('variablecondition', rows.map((vc) => vc.id))
     const usedByMap = await resolveUsedByLabelsBatched(rows)
-    const variableConditions = await withDestinationLabels(rows.map((vc) => ({
-        ...vc,
-        trueRoute: edges.get(vc.id)?.true ?? null,
-        falseRoute: edges.get(vc.id)?.false ?? null,
-        usedBy: usedByMap.get(vc.id) ?? [],
-    })))
-
-    if (!companyIds) await VariableConditionsCache.setAll(variableConditions)
-    return variableConditions
+    return withDestinationLabels(rows.map((vc) => ({ ...vc, usedBy: usedByMap.get(vc.id) ?? [] })))
 }
 
 export const getVariableConditionById = async (id: string): Promise<VariableConditionDto> => {
-    const cached = await VariableConditionsCache.getVariableCondition(id)
-    if (cached) return cached as VariableConditionDto
+    let row = (await VariableConditionsCache.getVariableCondition(id)) as VariableConditionRow | null
+    if (!row) {
+        const found = await prisma.variableCondition.findUnique({ where: { id }, select })
+        if (!found) throw new AppError('Variable condition not found', 404)
 
-    const found = await prisma.variableCondition.findUnique({ where: { id }, select })
-    if (!found) throw new AppError('Variable condition not found', 404)
+        const [trueRoute, falseRoute] = await Promise.all([
+            FlowEdgeRepository.getOne('variablecondition', id, 'true'),
+            FlowEdgeRepository.getOne('variablecondition', id, 'false'),
+        ])
+        row = { ...found, trueRoute, falseRoute }
+        await VariableConditionsCache.setVariableCondition(id, row)
+    }
 
-    const [trueRoute, falseRoute, usedByMap] = await Promise.all([
-        FlowEdgeRepository.getOne('variablecondition', id, 'true'),
-        FlowEdgeRepository.getOne('variablecondition', id, 'false'),
-        resolveUsedByLabels('variable-condition', [id], found.companyId),
-    ])
-    const variableCondition = (await withDestinationLabels([{ ...found, trueRoute, falseRoute, usedBy: usedByMap.get(id) ?? [] }]))[0]!
-    await VariableConditionsCache.setVariableCondition(id, variableCondition)
-    return variableCondition
+    const usedByMap = await resolveUsedByLabels('variable-condition', [id], row.companyId)
+    return (await withDestinationLabels([{ ...row, usedBy: usedByMap.get(id) ?? [] }]))[0]!
 }
 
 export const createVariableCondition = async (data: CreateVariableConditionInput) => {

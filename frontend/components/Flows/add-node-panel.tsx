@@ -24,7 +24,7 @@ export function AddNodePanel({ onAdd }: Props) {
                     </div>
                     <div>
                         <h2 className="text-sm font-semibold">
-                            Adicionar ação
+                            Adicionar ação?
                         </h2>
                         <p className="mt-0.5 text-xs leading-4 text-muted-foreground">
                             Escolha o que a chamada deve fazer. A configuração é

@@ -23,6 +23,7 @@ const holidayGroupSelect = {
 
 const _byId = () => prisma.holidayGroup.findUnique({ where: { id: '' }, select: holidayGroupSelect })
 export type HolidayGroupDto = NonNullable<Awaited<ReturnType<typeof _byId>>> & { trueRoute: RouteDest; falseRoute: RouteDest; usedBy: UsedByRef[] }
+type HolidayGroupRow = NonNullable<Awaited<ReturnType<typeof _byId>>> & { trueRoute: RouteDest; falseRoute: RouteDest }
 
 type DateInput = { name: string; month: number; day: number }
 
@@ -90,41 +91,38 @@ async function withDestinationLabels<T extends { trueRoute: unknown; falseRoute:
 }
 
 export const getHolidayGroupsByCompany = async (companyId: string) => {
-    const cached = await HolidayGroupsCache.getByCompany(companyId)
-    if (cached) return cached
+    let rows = (await HolidayGroupsCache.getByCompany(companyId)) as HolidayGroupRow[] | null
+    if (!rows) {
+        await getCompanyById(companyId)
 
-    await getCompanyById(companyId)
+        const [hgRows, edges] = await Promise.all([
+            prisma.holidayGroup.findMany({ where: { companyId }, select: holidayGroupSelect }),
+            FlowEdgeRepository.getBySource(companyId, 'holidaygroup'),
+        ])
+        rows = hgRows.map((hg) => ({ ...hg, trueRoute: edges.get(hg.id)?.true ?? null, falseRoute: edges.get(hg.id)?.false ?? null }))
+        await HolidayGroupsCache.setByCompany(companyId, rows)
+    }
 
-const [rows, edges] = await Promise.all([
-        prisma.holidayGroup.findMany({ where: { companyId }, select: holidayGroupSelect }),
-        FlowEdgeRepository.getBySource(companyId, 'holidaygroup'),
-    ])
     const usedByMap = await resolveUsedByLabels('holiday', rows.map((h) => h.id), companyId)
-    const groups = await withDestinationLabels(rows.map((hg) => ({
-        ...hg,
-        trueRoute: edges.get(hg.id)?.true ?? null,
-        falseRoute: edges.get(hg.id)?.false ?? null,
-        usedBy: usedByMap.get(hg.id) ?? [],
-    })), companyId)
-    await HolidayGroupsCache.setByCompany(companyId, groups)
-    return groups
+    return withDestinationLabels(rows.map((hg) => ({ ...hg, usedBy: usedByMap.get(hg.id) ?? [] })), companyId)
 }
 
 export const getHolidayGroupById = async (id: string): Promise<HolidayGroupDto> => {
-    const cached = await HolidayGroupsCache.getHolidayGroup(id)
-    if (cached) return cached as HolidayGroupDto
+    let row = (await HolidayGroupsCache.getHolidayGroup(id)) as HolidayGroupRow | null
+    if (!row) {
+        const found = await prisma.holidayGroup.findUnique({ where: { id }, select: holidayGroupSelect })
+        if (!found) throw new AppError('Holiday group not found', 404)
 
-    const found = await prisma.holidayGroup.findUnique({ where: { id }, select: holidayGroupSelect })
-    if (!found) throw new AppError('Holiday group not found', 404)
+        const [trueRoute, falseRoute] = await Promise.all([
+            FlowEdgeRepository.getOne('holidaygroup', id, 'true'),
+            FlowEdgeRepository.getOne('holidaygroup', id, 'false'),
+        ])
+        row = { ...found, trueRoute, falseRoute }
+        await HolidayGroupsCache.setHolidayGroup(id, row)
+    }
 
-    const [trueRoute, falseRoute, usedByMap] = await Promise.all([
-        FlowEdgeRepository.getOne('holidaygroup', id, 'true'),
-        FlowEdgeRepository.getOne('holidaygroup', id, 'false'),
-        resolveUsedByLabels('holiday', [id], found.companyId),
-    ])
-    const hg = (await withDestinationLabels([{ ...found, trueRoute, falseRoute, usedBy: usedByMap.get(id) ?? [] }], found.companyId))[0]!
-    await HolidayGroupsCache.setHolidayGroup(id, hg)
-    return hg
+    const usedByMap = await resolveUsedByLabels('holiday', [id], row.companyId)
+    return (await withDestinationLabels([{ ...row, usedBy: usedByMap.get(id) ?? [] }], row.companyId))[0]!
 }
 
 export const createHolidayGroup = async (data: CreateHolidayGroupInput) => {

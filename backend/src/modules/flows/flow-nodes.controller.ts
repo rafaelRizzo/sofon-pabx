@@ -125,6 +125,25 @@ export const connectNodes = async (
   }
 };
 
+export const batchEdges = async (
+  request: FastifyRequest,
+  reply: FastifyReply,
+) => {
+  try {
+    const { id } = request.params as { id: string };
+    await assertFlowAccess(request, id);
+    const { operations } = request.body as any;
+    const edges = await FlowNodesService.batchFlowNodeEdges(id, operations);
+    return reply.send({
+      success: true,
+      message: "Flow node edges synchronized successfully",
+      edges,
+    });
+  } catch (error) {
+    return handleError(reply, error, request);
+  }
+};
+
 export const deleteEdge = async (
   request: FastifyRequest,
   reply: FastifyReply,

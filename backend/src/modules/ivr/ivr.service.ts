@@ -32,6 +32,14 @@ const ivrMenuSelect = {
 
 const toDto = <T extends { audioId: string | null; usedBy: UsedByRef[] }>(m: T) => ({ ...m, hasAudio: m.audioId !== null })
 
+const _byId = () => prisma.ivrMenu.findUnique({ where: { id: '' }, select: ivrMenuSelect })
+type IvrMenuRow = Omit<NonNullable<Awaited<ReturnType<typeof _byId>>>, 'options'> & {
+    invalidDestination: IvrDest
+    timeoutDestination: IvrDest
+    longDestination: IvrDest
+    options: { id: string; digit: string; destination: IvrDest }[]
+}
+
 const validateDest = (dest: IvrDest | undefined | null, companyId: string, label: string) =>
     validateRouteDestination(dest ?? null, companyId, label)
 
@@ -83,54 +91,54 @@ async function withDestinationLabels<T extends IvrDestFields>(menus: T[], compan
 }
 
 export const getIvrMenusByCompany = async (companyId: string) => {
-    const cached = await IvrCache.getByCompany(companyId)
-    if (cached) return cached
+    let rows = (await IvrCache.getByCompany(companyId)) as IvrMenuRow[] | null
+    if (!rows) {
+        await getCompanyById(companyId)
 
-    await getCompanyById(companyId)
+        const [menuRows, menuEdges, optionEdges] = await Promise.all([
+            prisma.ivrMenu.findMany({ where: { companyId }, select: ivrMenuSelect }),
+            FlowEdgeRepository.getBySource(companyId, 'ivrmenu'),
+            FlowEdgeRepository.getBySource(companyId, 'ivroption'),
+        ])
+        rows = menuRows.map((m) => ({
+            ...m,
+            invalidDestination: menuEdges.get(m.id)?.invalid ?? null,
+            timeoutDestination: menuEdges.get(m.id)?.timeout ?? null,
+            longDestination: menuEdges.get(m.id)?.long ?? null,
+            options: m.options.map((o) => ({ ...o, destination: optionEdges.get(o.id)?.default ?? null })),
+        }))
+        await IvrCache.setByCompany(companyId, rows)
+    }
 
-    const [rows, menuEdges, optionEdges] = await Promise.all([
-        prisma.ivrMenu.findMany({ where: { companyId }, select: ivrMenuSelect }),
-        FlowEdgeRepository.getBySource(companyId, 'ivrmenu'),
-        FlowEdgeRepository.getBySource(companyId, 'ivroption'),
-    ])
     const usedByMap = await resolveUsedByLabels('ivr', rows.map((m) => m.id), companyId)
-    const withDest = rows.map((m) => ({
-        ...m,
-        invalidDestination: menuEdges.get(m.id)?.invalid ?? null,
-        timeoutDestination: menuEdges.get(m.id)?.timeout ?? null,
-        longDestination: menuEdges.get(m.id)?.long ?? null,
-        options: m.options.map((o) => ({ ...o, destination: optionEdges.get(o.id)?.default ?? null })),
-        usedBy: usedByMap.get(m.id) ?? [],
-    }))
-    const menus = await withDestinationLabels(withDest.map(toDto), companyId)
-    await IvrCache.setByCompany(companyId, menus)
-    return menus
+    return withDestinationLabels(
+        rows.map((m) => toDto({ ...m, usedBy: usedByMap.get(m.id) ?? [] })),
+        companyId,
+    )
 }
 
 export const getIvrMenuById = async (id: string) => {
-    const cached = await IvrCache.getMenu(id)
-    if (cached) return cached
+    let row = (await IvrCache.getMenu(id)) as IvrMenuRow | null
+    if (!row) {
+        const menu = await prisma.ivrMenu.findUnique({ where: { id }, select: ivrMenuSelect })
+        if (!menu) throw new AppError('IVR menu not found', 404)
 
-    const menu = await prisma.ivrMenu.findUnique({ where: { id }, select: ivrMenuSelect })
-    if (!menu) throw new AppError('IVR menu not found', 404)
-
-    const [invalidDestination, timeoutDestination, longDestination, optionDests, usedByMap] = await Promise.all([
-        FlowEdgeRepository.getOne('ivrmenu', id, 'invalid'),
-        FlowEdgeRepository.getOne('ivrmenu', id, 'timeout'),
-        FlowEdgeRepository.getOne('ivrmenu', id, 'long'),
-        Promise.all(menu.options.map((o) => FlowEdgeRepository.getOne('ivroption', o.id, 'default'))),
-        resolveUsedByLabels('ivr', [id], menu.companyId),
-    ])
-    const withDest = {
-        ...menu,
-        invalidDestination, timeoutDestination, longDestination,
-        options: menu.options.map((o, i) => ({ ...o, destination: optionDests[i] ?? null })),
-        usedBy: usedByMap.get(id) ?? [],
+        const [invalidDestination, timeoutDestination, longDestination, optionDests] = await Promise.all([
+            FlowEdgeRepository.getOne('ivrmenu', id, 'invalid'),
+            FlowEdgeRepository.getOne('ivrmenu', id, 'timeout'),
+            FlowEdgeRepository.getOne('ivrmenu', id, 'long'),
+            Promise.all(menu.options.map((o) => FlowEdgeRepository.getOne('ivroption', o.id, 'default'))),
+        ])
+        row = {
+            ...menu,
+            invalidDestination, timeoutDestination, longDestination,
+            options: menu.options.map((o, i) => ({ ...o, destination: optionDests[i] ?? null })),
+        }
+        await IvrCache.setMenu(id, row)
     }
 
-    const dto = (await withDestinationLabels([toDto(withDest)], menu.companyId))[0]!
-    await IvrCache.setMenu(id, dto)
-    return dto
+    const usedByMap = await resolveUsedByLabels('ivr', [id], row.companyId)
+    return (await withDestinationLabels([toDto({ ...row, usedBy: usedByMap.get(id) ?? [] })], row.companyId))[0]!
 }
 
 export const createIvrMenu = async (data: CreateIvrMenuInput) => {

@@ -218,6 +218,46 @@ async function assertNoCycle(
   }
 }
 
+function assertNoCycleInEdges(
+  sourceNodeId: string,
+  targetNodeId: string,
+  edges: { sourceNodeId: string; targetNodeId: string }[],
+) {
+  if (sourceNodeId === targetNodeId)
+    throw new AppError("A node cannot connect to itself", 400);
+
+  const queue = [targetNodeId];
+  const visited = new Set<string>();
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    if (current === sourceNodeId)
+      throw new AppError("Cycles are not allowed in a call flow", 409);
+    if (visited.has(current)) continue;
+    visited.add(current);
+    for (const edge of edges)
+      if (edge.sourceNodeId === current) queue.push(edge.targetNodeId);
+  }
+}
+
+const flowEdgeLocks = new Map<string, Promise<unknown>>();
+
+// Mesmo padrão de withDialplanLock (dialplan-file.repository.ts): serializa leitura+validação de
+// ciclo+escrita das arestas de um mesmo flow. Sem isso, duas requisições concorrentes de conexão
+// (2 abas, duplo clique) que fechem um ciclo juntas passariam cada uma no próprio assertNoCycle
+// antes de qualquer commit, já que a leitura e a escrita não estavam na mesma seção crítica.
+function withFlowEdgeLock<T>(flowId: string, fn: () => Promise<T>): Promise<T> {
+  const previous = flowEdgeLocks.get(flowId) ?? Promise.resolve();
+  const run = previous.then(fn, fn);
+  flowEdgeLocks.set(
+    flowId,
+    run.then(
+      () => undefined,
+      () => undefined,
+    ),
+  );
+  return run;
+}
+
 // Best-effort, mesmo motivo do regenerateSafely em queues.service.ts: o FlowNode/FlowNodeEdge já
 // foi commitado, e cada um desses recursos embute um GotoIf($[FLOW_NODE_ID]...) (ver
 // nodeExitCheck em flow-node-runtime.ts) que só existe no .conf dele depois de um regenerate seu —
@@ -239,13 +279,28 @@ async function regenerate(flowId: string, companyId: string) {
   await FlowNodeRepository.regenerate(companyId);
   await FlowRepository.regenerate(companyId);
   await Promise.all([
-    regenerateSafely(() => AsteriskQueueRepository.regenerate(companyId), companyId),
-    regenerateSafely(() => AnnouncementRepository.regenerate(companyId), companyId),
-    regenerateSafely(() => TimeConditionRepository.regenerate(companyId), companyId),
-    regenerateSafely(() => HolidayGroupRepository.regenerate(companyId), companyId),
+    regenerateSafely(
+      () => AsteriskQueueRepository.regenerate(companyId),
+      companyId,
+    ),
+    regenerateSafely(
+      () => AnnouncementRepository.regenerate(companyId),
+      companyId,
+    ),
+    regenerateSafely(
+      () => TimeConditionRepository.regenerate(companyId),
+      companyId,
+    ),
+    regenerateSafely(
+      () => HolidayGroupRepository.regenerate(companyId),
+      companyId,
+    ),
     regenerateSafely(() => IvrRepository.regenerate(companyId), companyId),
     regenerateSafely(() => VariableRepository.regenerate(companyId), companyId),
-    regenerateSafely(() => VariableConditionRepository.regenerate(companyId), companyId),
+    regenerateSafely(
+      () => VariableConditionRepository.regenerate(companyId),
+      companyId,
+    ),
   ]);
   await FlowsCache.invalidateFlow(flowId);
   await FlowsCache.invalidateByCompany(companyId);
@@ -291,12 +346,10 @@ export const createFlowNode = async (
     });
     return created;
   });
-  // Posição/rótulo são puramente visuais; não reescrevem o dialplan a cada pixel arrastado.
+  // Posição/rótulo são puramente visuais; não reescrevem o dialplan a cada pixel arrastado e não
+  // fazem parte do DTO cacheado em FlowsCache (ver `select` em flows.service.ts), então não há
+  // o que invalidar quando só isso muda.
   if (data.resourceId !== undefined) await regenerate(flowId, flow.companyId);
-  else {
-    await FlowsCache.invalidateFlow(flowId);
-    await FlowsCache.invalidateByCompany(flow.companyId);
-  }
   return node;
 };
 
@@ -346,7 +399,13 @@ export const updateFlowNode = async (
       });
     return result;
   });
-  await regenerate(flowId, flow.companyId);
+  // position/label são puramente visuais (mesmo motivo do createFlowNode) — só resourceId/isEntry
+  // afetam o .conf gerado e o DTO cacheado em FlowsCache. Sem esse gate, todo autosave de arraste
+  // (PUT/:nodeId a cada drag-stop) dispararia um regenerate() completo da empresa (Flow + FlowNode
+  // + queue/announcement/timecondition/holiday/ivr/variable/variablecondition, cada um com reload
+  // de dialplan próprio) por nó movido.
+  if (data.resourceId !== undefined || data.isEntry !== undefined)
+    await regenerate(flowId, flow.companyId);
   return updated;
 };
 
@@ -421,36 +480,146 @@ export const connectFlowNodes = async (
   data: { sourceNodeId: string; sourcePort: string; targetNodeId: string },
 ) => {
   const flow = await getFlowOrThrow(flowId);
-  const [source, target] = await Promise.all([
-    prisma.flowNode.findFirst({ where: { id: data.sourceNodeId, flowId } }),
-    prisma.flowNode.findFirst({ where: { id: data.targetNodeId, flowId } }),
-  ]);
-  if (!source || !target)
-    throw new AppError("Both nodes must belong to this Flow", 400);
-  await assertPort(
-    source.type as FlowNodeType,
-    source.resourceId,
-    data.sourcePort,
-  );
-  await assertNoCycle(flowId, source.id, target.id);
-  const edge = await prisma.flowNodeEdge.upsert({
-    where: {
-      sourceNodeId_sourcePort: {
+  const edge = await withFlowEdgeLock(flowId, async () => {
+    const [source, target] = await Promise.all([
+      prisma.flowNode.findFirst({ where: { id: data.sourceNodeId, flowId } }),
+      prisma.flowNode.findFirst({ where: { id: data.targetNodeId, flowId } }),
+    ]);
+    if (!source || !target)
+      throw new AppError("Both nodes must belong to this Flow", 400);
+    await assertPort(
+      source.type as FlowNodeType,
+      source.resourceId,
+      data.sourcePort,
+    );
+    await assertNoCycle(flowId, source.id, target.id);
+    return prisma.flowNodeEdge.upsert({
+      where: {
+        sourceNodeId_sourcePort: {
+          sourceNodeId: source.id,
+          sourcePort: data.sourcePort,
+        },
+      },
+      create: {
+        flowId,
         sourceNodeId: source.id,
         sourcePort: data.sourcePort,
+        targetNodeId: target.id,
       },
-    },
-    create: {
-      flowId,
-      sourceNodeId: source.id,
-      sourcePort: data.sourcePort,
-      targetNodeId: target.id,
-    },
-    update: { targetNodeId: target.id },
+      update: { targetNodeId: target.id },
+    });
   });
   await regenerate(flowId, flow.companyId);
   return edge;
 };
+
+type FlowNodeEdgeOperation =
+  | {
+      type: "connect";
+      sourceNodeId: string;
+      sourcePort: string;
+      targetNodeId: string;
+    }
+  | { type: "disconnect"; sourceNodeId: string; sourcePort: string };
+
+// Aplica o estado final das saídas em uma única transação. O canvas pode agrupar alterações
+// otimistas sem expor estado parcial no banco ou regenerar o dialplan a cada gesto do usuário.
+export const batchFlowNodeEdges = async (
+  flowId: string,
+  operations: FlowNodeEdgeOperation[],
+) => {
+  const flow = await getFlowOrThrow(flowId);
+  const edges = await withFlowEdgeLock(flowId, () =>
+    applyBatchFlowNodeEdges(flowId, operations),
+  );
+  await regenerate(flowId, flow.companyId);
+  return edges;
+};
+
+async function applyBatchFlowNodeEdges(
+  flowId: string,
+  operations: FlowNodeEdgeOperation[],
+) {
+  const [nodes, currentEdges] = await Promise.all([
+    prisma.flowNode.findMany({ where: { flowId } }),
+    prisma.flowNodeEdge.findMany({ where: { flowId } }),
+  ]);
+  const nodesById = new Map(nodes.map((node) => [node.id, node]));
+  const edgesByPort = new Map(
+    currentEdges.map((edge) => [
+      `${edge.sourceNodeId}:${edge.sourcePort}`,
+      edge,
+    ]),
+  );
+
+  for (const operation of operations) {
+    const source = nodesById.get(operation.sourceNodeId);
+    if (!source)
+      throw new AppError("Source node does not belong to this Flow", 400);
+    await assertPort(
+      source.type as FlowNodeType,
+      source.resourceId,
+      operation.sourcePort,
+    );
+
+    const key = `${operation.sourceNodeId}:${operation.sourcePort}`;
+    if (operation.type === "disconnect") {
+      edgesByPort.delete(key);
+      continue;
+    }
+
+    if (!nodesById.has(operation.targetNodeId))
+      throw new AppError("Target node does not belong to this Flow", 400);
+
+    const simulatedEdges = [...edgesByPort.entries()]
+      .filter(([edgeKey]) => edgeKey !== key)
+      .map(([, edge]) => edge);
+    assertNoCycleInEdges(
+      operation.sourceNodeId,
+      operation.targetNodeId,
+      simulatedEdges,
+    );
+    edgesByPort.set(key, {
+      sourceNodeId: operation.sourceNodeId,
+      sourcePort: operation.sourcePort,
+      targetNodeId: operation.targetNodeId,
+    } as (typeof currentEdges)[number]);
+  }
+
+  return prisma.$transaction(async (tx) => {
+    for (const operation of operations) {
+      if (operation.type === "disconnect") {
+        await tx.flowNodeEdge.deleteMany({
+          where: {
+            flowId,
+            sourceNodeId: operation.sourceNodeId,
+            sourcePort: operation.sourcePort,
+          },
+        });
+        continue;
+      }
+      await tx.flowNodeEdge.upsert({
+        where: {
+          sourceNodeId_sourcePort: {
+            sourceNodeId: operation.sourceNodeId,
+            sourcePort: operation.sourcePort,
+          },
+        },
+        create: {
+          flowId,
+          sourceNodeId: operation.sourceNodeId,
+          sourcePort: operation.sourcePort,
+          targetNodeId: operation.targetNodeId,
+        },
+        update: { targetNodeId: operation.targetNodeId },
+      });
+    }
+    return tx.flowNodeEdge.findMany({
+      where: { flowId },
+      orderBy: { createdAt: "asc" },
+    });
+  });
+}
 
 export const deleteFlowNodeEdge = async (flowId: string, edgeId: string) => {
   const [flow, edge] = await Promise.all([

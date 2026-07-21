@@ -15,6 +15,7 @@ import {
   createFlowNodeSchema,
   updateFlowNodeSchema,
   connectFlowNodesSchema,
+  batchFlowNodeEdgesSchema,
   ListFlowsResponse,
   GetFlowResponse,
   CreateFlowResponse,
@@ -23,6 +24,7 @@ import {
   GetFlowNodesResponse,
   CreateFlowNodeResponse,
   ConnectFlowNodesResponse,
+  BatchFlowNodeEdgesResponse,
   CheckResourceDeletionResponse,
 } from "./schemas/flow.schema";
 import { errors, deleted } from "../../schemas/responses";
@@ -240,6 +242,29 @@ export const flowsRoutes = async (app: FastifyInstance) => {
       },
     },
     FlowNodesController.deleteEdge as any,
+  );
+
+  router.put(
+    "/flows/:id/node-edges/batch",
+    {
+      onRequest: [...protectedRoute, requirePermission("flows", "manage")],
+      schema: {
+        tags: ["Flows"],
+        summary: "Sincronizar lote de conexões do canvas",
+        security: [{ bearerAuth: [] }],
+        params: idParamSchema,
+        body: batchFlowNodeEdgesSchema,
+        response: {
+          200: BatchFlowNodeEdgesResponse,
+          400: errors[400],
+          401: errors[401],
+          403: errors[403],
+          404: errors[404],
+          409: errors[409],
+        },
+      },
+    },
+    FlowNodesController.batchEdges as any,
   );
 
   router.post(

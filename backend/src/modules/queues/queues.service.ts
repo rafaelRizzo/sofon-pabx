@@ -76,6 +76,9 @@ const toDto = <T extends { surveyAudioId: string | null; usedBy: UsedByRef[] }>(
     q: T
 ) => ({ ...q, hasSurveyAudio: q.surveyAudioId !== null })
 
+const _byId = () => prisma.queue.findUnique({ where: { id: '' }, select: queueSelect })
+type QueueRow = NonNullable<Awaited<ReturnType<typeof _byId>>> & { postQueueDestination: RouteDestination }
+
 // Anexa o nome legível de postQueueDestination (resolvido no backend, cache-first — ver
 // route-destination-label.ts). Agrupa por companyId — getAllQueues pode misturar empresas
 // diferentes na mesma lista (visão admin).
@@ -134,101 +137,79 @@ async function withUsedBy<T extends { id: string; companyId: string }>(
 export const getAllQueues = async (companyIds?: string[], userId?: string) => {
     if (companyIds && companyIds.length === 0) return []
 
-    if (!companyIds) {
-        const cached = await QueuesCache.getAll()
-        if (cached) return cached
-    } else if (userId) {
-        const cached = await QueuesCache.getForScope(userId)
-        if (cached) return cached
+    let rows: QueueRow[] | null = null
+    if (!companyIds) rows = (await QueuesCache.getAll()) as QueueRow[] | null
+    else if (userId) rows = (await QueuesCache.getForScope(userId)) as QueueRow[] | null
+
+    if (!rows) {
+        const qRows = await prisma.queue.findMany({
+            where: companyIds ? { companyId: { in: companyIds } } : undefined,
+            select: queueSelect
+        })
+        const edges = await FlowEdgeRepository.getBySourceIds(
+            'queue',
+            qRows.map((r) => r.id)
+        )
+        rows = qRows.map((r) => ({
+            ...r,
+            postQueueDestination: edges.get(r.id)?.default ?? null
+        }))
+        if (!companyIds) await QueuesCache.setAll(rows)
+        else if (userId) await QueuesCache.setForScope(userId, rows)
     }
 
-    const rows = await prisma.queue.findMany({
-        where: companyIds ? { companyId: { in: companyIds } } : undefined,
-        select: queueSelect
-    })
-    const edges = await FlowEdgeRepository.getBySourceIds(
-        'queue',
-        rows.map((r) => r.id)
-    )
     const rowsWithUsedBy = await withUsedBy(rows)
-    const queues = await withDestinationLabels(
-        rowsWithUsedBy.map((r) =>
-            toDto({
-                ...r,
-                postQueueDestination: edges.get(r.id)?.default ?? null
-            })
-        )
-    )
-
-    if (!companyIds) await QueuesCache.setAll(queues)
-    else if (userId) await QueuesCache.setForScope(userId, queues)
-    return queues
+    return withDestinationLabels(rowsWithUsedBy.map(toDto))
 }
 
 export const getQueuesByCompany = async (companyId: string) => {
-    const cached = await QueuesCache.getByCompany(companyId)
-    if (cached) return cached
+    let rows = (await QueuesCache.getByCompany(companyId)) as QueueRow[] | null
+    if (!rows) {
+        await getCompanyById(companyId)
 
-    await getCompanyById(companyId)
+        const [qRows, edges] = await Promise.all([
+            prisma.queue.findMany({ where: { companyId }, select: queueSelect }),
+            FlowEdgeRepository.getBySource(companyId, 'queue')
+        ])
+        rows = qRows.map((r) => ({
+            ...r,
+            postQueueDestination: edges.get(r.id)?.default ?? null
+        }))
+        await QueuesCache.setByCompany(companyId, rows)
+    }
 
-    const [rows, edges] = await Promise.all([
-        prisma.queue.findMany({ where: { companyId }, select: queueSelect }),
-        FlowEdgeRepository.getBySource(companyId, 'queue')
-    ])
     const usedByMap = await resolveUsedByLabels(
         'queue',
         rows.map((r) => r.id),
         companyId
     )
-    const queues = await withDestinationLabels(
-        rows.map((r) =>
-            toDto({
-                ...r,
-                postQueueDestination: edges.get(r.id)?.default ?? null,
-                usedBy: usedByMap.get(r.id) ?? []
-            })
-        )
+    return withDestinationLabels(
+        rows.map((r) => toDto({ ...r, usedBy: usedByMap.get(r.id) ?? [] }))
     )
-    await QueuesCache.setByCompany(companyId, queues)
-    return queues
 }
 
-const _queueByIdQuery = () =>
-    prisma.queue.findUnique({ where: { id: '' }, select: queueSelect })
-export type QueueDto = ReturnType<
-    typeof toDto<
-        NonNullable<Awaited<ReturnType<typeof _queueByIdQuery>>> & {
-            postQueueDestination: RouteDestination
-            usedBy: UsedByRef[]
-        }
-    >
->
+export type QueueDto = ReturnType<typeof toDto<QueueRow & { usedBy: UsedByRef[] }>>
 
 export const getQueueById = async (id: string): Promise<QueueDto> => {
-    const cached = await QueuesCache.getQueue(id)
-    if (cached) return cached as QueueDto
+    let row = (await QueuesCache.getQueue(id)) as QueueRow | null
+    if (!row) {
+        const queue = await prisma.queue.findUnique({
+            where: { id },
+            select: queueSelect
+        })
+        if (!queue) throw new AppError('Queue not found', 404)
 
-    const queue = await prisma.queue.findUnique({
-        where: { id },
-        select: queueSelect
-    })
-    if (!queue) throw new AppError('Queue not found', 404)
+        const postQueueDestination = await FlowEdgeRepository.getOne('queue', id, 'default')
+        row = { ...queue, postQueueDestination }
+        await QueuesCache.setQueue(id, row)
+    }
 
-    const [postQueueDestination, usedByMap] = await Promise.all([
-        FlowEdgeRepository.getOne('queue', id, 'default'),
-        resolveUsedByLabels('queue', [id], queue.companyId)
-    ])
-    const dto = (
+    const usedByMap = await resolveUsedByLabels('queue', [id], row.companyId)
+    return (
         await withDestinationLabels([
-            toDto({
-                ...queue,
-                postQueueDestination,
-                usedBy: usedByMap.get(id) ?? []
-            })
+            toDto({ ...row, usedBy: usedByMap.get(id) ?? [] })
         ])
     )[0]!
-    await QueuesCache.setQueue(id, dto)
-    return dto
 }
 
 export const createQueue = async (data: CreateQueueInput) => {
