@@ -29,14 +29,21 @@ function NumberInput({
                 // e.key.length > 1 == tecla especial (Backspace, Delete, Enter, ArrowLeft...).
                 // Nunca bloquear essas: "Backspace"/"Delete"/"Enter"/"Escape" contêm a letra "e"
                 // e batiam no regex, travando o apagar
-                if (e.key.length === 1 && (BLOCKED_CHARS.test(e.key) || (e.key === "-" && !allowMinus))) {
+                if (
+                    e.key.length === 1 &&
+                    (BLOCKED_CHARS.test(e.key) ||
+                        (e.key === "-" && !allowMinus))
+                ) {
                     e.preventDefault()
                 }
                 onKeyDown?.(e)
             }}
             onPaste={(e) => {
                 const text = e.clipboardData.getData("text")
-                if (BLOCKED_CHARS.test(text) || (text.includes("-") && !allowMinus)) {
+                if (
+                    BLOCKED_CHARS.test(text) ||
+                    (text.includes("-") && !allowMinus)
+                ) {
                     e.preventDefault()
                 }
                 onPaste?.(e)
@@ -47,8 +54,16 @@ function NumberInput({
                 // valor nunca ficar fora do intervalo que o backend aceita, sem depender do
                 // usuário perceber o erro só no submit
                 if (e.target.value !== "") {
-                    if (max !== undefined && Number(e.target.value) > Number(max)) e.target.value = String(max)
-                    if (min !== undefined && Number(e.target.value) < Number(min)) e.target.value = String(min)
+                    if (
+                        max !== undefined &&
+                        Number(e.target.value) > Number(max)
+                    )
+                        e.target.value = String(max)
+                    if (
+                        min !== undefined &&
+                        Number(e.target.value) < Number(min)
+                    )
+                        e.target.value = String(min)
                 }
                 onChange?.(e)
             }}

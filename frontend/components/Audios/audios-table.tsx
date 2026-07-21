@@ -28,7 +28,13 @@ type Props = {
     onDelete: (audio: Audio) => void
 }
 
-export function AudiosTable({ audios, loading, companySelected, onEdit, onDelete }: Props) {
+export function AudiosTable({
+    audios,
+    loading,
+    companySelected,
+    onEdit,
+    onDelete,
+}: Props) {
     return (
         <div className="rounded-md border">
             <Table>
@@ -52,19 +58,29 @@ export function AudiosTable({ audios, loading, companySelected, onEdit, onDelete
                         ))
                     ) : audios.length === 0 ? (
                         <TableRow>
-                            <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">
-                                {companySelected ? "Nenhum áudio encontrado" : "Selecione uma empresa para listar"}
+                            <TableCell
+                                colSpan={3}
+                                className="h-24 text-center text-muted-foreground"
+                            >
+                                {companySelected
+                                    ? "Nenhum áudio encontrado"
+                                    : "Selecione uma empresa para listar"}
                             </TableCell>
                         </TableRow>
                     ) : (
                         audios.map((audio) => (
                             <TableRow key={audio.id}>
-                                <TableCell className="font-medium">{audio.name}</TableCell>
+                                <TableCell className="font-medium">
+                                    {audio.name}
+                                </TableCell>
                                 <TableCell>
-                                    {new Date(audio.createdAt).toLocaleString("pt-BR", {
-                                        dateStyle: "short",
-                                        timeStyle: "short",
-                                    })}
+                                    {new Date(audio.createdAt).toLocaleString(
+                                        "pt-BR",
+                                        {
+                                            dateStyle: "short",
+                                            timeStyle: "short",
+                                        }
+                                    )}
                                 </TableCell>
                                 <TableCell>
                                     <TooltipProvider delay={100}>
@@ -75,14 +91,20 @@ export function AudiosTable({ audios, loading, companySelected, onEdit, onDelete
                                                         <Button
                                                             variant="outline"
                                                             size="icon"
-                                                            onClick={() => onEdit(audio)}
+                                                            onClick={() =>
+                                                                onEdit(audio)
+                                                            }
                                                         >
                                                             <PencilIcon />
-                                                            <span className="sr-only">Renomear</span>
+                                                            <span className="sr-only">
+                                                                Renomear
+                                                            </span>
                                                         </Button>
                                                     }
                                                 />
-                                                <TooltipContent>Renomear áudio</TooltipContent>
+                                                <TooltipContent>
+                                                    Renomear áudio
+                                                </TooltipContent>
                                             </Tooltip>
                                             <Tooltip>
                                                 <TooltipTrigger
@@ -90,14 +112,20 @@ export function AudiosTable({ audios, loading, companySelected, onEdit, onDelete
                                                         <Button
                                                             variant="destructive"
                                                             size="icon"
-                                                            onClick={() => onDelete(audio)}
+                                                            onClick={() =>
+                                                                onDelete(audio)
+                                                            }
                                                         >
                                                             <Trash2Icon />
-                                                            <span className="sr-only">Deletar</span>
+                                                            <span className="sr-only">
+                                                                Deletar
+                                                            </span>
                                                         </Button>
                                                     }
                                                 />
-                                                <TooltipContent>Deletar áudio</TooltipContent>
+                                                <TooltipContent>
+                                                    Deletar áudio
+                                                </TooltipContent>
                                             </Tooltip>
                                         </div>
                                     </TooltipProvider>

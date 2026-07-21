@@ -20,8 +20,15 @@ export default function DidsPage() {
     const { companies } = useCompanies()
     const [companyFilter, setCompanyFilter] = useCompanyFilter()
 
-    const { dids, loading, filter, setFilter, createDid, updateDid, deleteDid } =
-        useDids(companyFilter)
+    const {
+        dids,
+        loading,
+        filter,
+        setFilter,
+        createDid,
+        updateDid,
+        deleteDid,
+    } = useDids(companyFilter)
 
     const [createOpen, setCreateOpen] = useState(false)
     const [editDid, setEditDid] = useState<Did | null>(null)

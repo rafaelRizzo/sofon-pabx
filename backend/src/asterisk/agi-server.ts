@@ -1,12 +1,13 @@
 import { prisma } from '../lib/prisma'
 import { logger } from '../utils/logger'
 import { resolveRouteDestinationToDialplan } from './route-destination-resolver'
+import { FlowEdgeRepository } from './flow-edge.repository'
 import { parseMemberInterface } from './queue.repository'
-import { SURVEY_CONTEXT, surveyExten, ROUTING_TRUNK_VAR } from './dialplan-names'
-import { assertSafeUrl } from '../utils/net/safe-url'
+import { FLOW_NODE_CONTEXT, SURVEY_CONTEXT, surveyExten, ROUTING_TRUNK_VAR, flowNodeExitExten } from './dialplan-names'
+import { FLOW_NODE_ID_VAR } from './flow-node-runtime'
+import { safeFetch } from '../utils/net/safe-url'
 import { resolveActiveRule } from '../modules/callcenter/routing-rules/routing-rules.service'
 import { createRating } from '../modules/callcenter/ratings/ratings.service'
-import type { RouteDestination } from '../schemas/route-destination.schema'
 import type { VariableMapping } from '../modules/request-templates/schemas/request-template.schema'
 
 // Servidor FastAGI — Asterisk conecta via AGI(agi://AGI_HOST:AGI_PORT/<script>,<args>) em 4 pontos:
@@ -145,12 +146,11 @@ async function handleRequestTemplate(conn: AgiConn, templateId: string) {
     let parsed: unknown = null
 
     try {
-        // SSRF: só libera http/https pra host externo (bloqueia loopback/privado/link-local/metadata)
-        await assertSafeUrl(url)
+        // SSRF: fixa o IP validado no socket e não segue redirects para hosts internos.
         const controller = new AbortController()
         const timeout = setTimeout(() => controller.abort(), template.timeoutMs)
         try {
-            const res = await fetch(url, {
+            const res = await safeFetch(url, {
                 method: template.method,
                 headers,
                 body: body !== undefined && template.method !== 'GET' ? JSON.stringify(body) : undefined,
@@ -199,7 +199,12 @@ async function handleRequestTemplate(conn: AgiConn, templateId: string) {
     }
 
     logger.info({ event: 'agi.request_template.done', templateId, success, mappings: mappings.length })
-    const dest = (success ? template.onSuccess : template.onError) as RouteDestination
+    const nodeId = await agiGetVariable(conn, FLOW_NODE_ID_VAR)
+    if (nodeId) {
+        await agiExecGoto(conn, { context: FLOW_NODE_CONTEXT, exten: flowNodeExitExten(nodeId, success ? 'success' : 'error'), priority: 1 })
+        return
+    }
+    const dest = await FlowEdgeRepository.getOne('requesttemplate', templateId, success ? 'success' : 'error')
     const target = await resolveRouteDestinationToDialplan(dest)
     if (target) await agiExecGoto(conn, target)
 }

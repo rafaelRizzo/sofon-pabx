@@ -1,50 +1,17 @@
 import { prisma } from '../lib/prisma'
 import type { RouteDestination } from '../schemas/route-destination.schema'
-import { queueAppExten } from './queue.repository'
 import { audioSoundPath } from './audio.repository'
-import {
-    TC_CONTEXT, tcEntry, ANNOUNCEMENT_CONTEXT, announcementExten, IVR_CONTEXT, ivrExten,
-    REQUEST_TEMPLATE_CONTEXT, requestTemplateExten, HOL_CONTEXT, holEntry,
-    VAR_CONTEXT, varEntry, VARCOND_CONTEXT, varCondEntry,
-} from './dialplan-names'
+import { IVR_CONTEXT, ivrExten } from './dialplan-names'
 import { resolveAsteriskId, withDialplanLock, writeContextFile, reloadDialplan, type DialplanRow } from './dialplan-file.repository'
+import { resolveRouteDestinationToDialplan } from './route-destination-resolver'
+import { FlowEdgeRepository } from './flow-edge.repository'
 
 export { IVR_CONTEXT, ivrExten }
 
-// "context,exten,priority" para destinos fora do exten atual, ou null para hangup —
-// mesmo contrato de resolveRoute() em timecondition.repository.ts
+// "context,exten,priority" para destinos fora do exten atual, ou null para hangup
 async function resolveTarget(dest: RouteDestination): Promise<string | null> {
-    if (!dest || dest.type === 'hangup') return null
-
-    switch (dest.type) {
-        case 'extension': {
-            const ext = await prisma.extension.findUnique({ where: { id: dest.id }, select: { context: true, number: true } })
-            return ext ? `${ext.context},${ext.number},1` : null
-        }
-        case 'queue': {
-            const q = await prisma.queue.findUnique({
-                where: { id: dest.id },
-                select: { number: true, company: { select: { asteriskId: true } } },
-            })
-            return q?.number ? `queues-app,${queueAppExten(q.company.asteriskId, q.number)},1` : null
-        }
-        case 'voicemail':
-            return `vm,${dest.id},1`
-        case 'timecondition':
-            return `${TC_CONTEXT},${tcEntry(dest.id)},1`
-        case 'holiday':
-            return `${HOL_CONTEXT},${holEntry(dest.id)},1`
-        case 'announcement':
-            return `${ANNOUNCEMENT_CONTEXT},${announcementExten(dest.id)},1`
-        case 'ivr':
-            return `${IVR_CONTEXT},${ivrExten(dest.id)},1`
-        case 'request':
-            return `${REQUEST_TEMPLATE_CONTEXT},${requestTemplateExten(dest.id)},1`
-        case 'variable-set':
-            return `${VAR_CONTEXT},${varEntry(dest.id)},1`
-        case 'variable-condition':
-            return `${VARCOND_CONTEXT},${varCondEntry(dest.id)},1`
-    }
+    const target = await resolveRouteDestinationToDialplan(dest)
+    return target ? `${target.context},${target.exten},${target.priority}` : null
 }
 
 type MenuConfig = {
@@ -80,9 +47,9 @@ export function buildDialplan(
     invalidTarget: string | null,
     timeoutTarget: string | null,
     longTarget: string | null,
+    location: { context: string; exten: string } = { context: IVR_CONTEXT, exten: ivrExten(id) },
 ): DialplanRow[] {
-    const context = IVR_CONTEXT
-    const exten = ivrExten(id)
+    const { context, exten } = location
     const K = options.length
 
     const READ = 4
@@ -143,10 +110,14 @@ export const IvrRepository = {
     async regenerate(companyId: string) {
         const asteriskId = await resolveAsteriskId(companyId)
         return withDialplanLock(`${IVR_CONTEXT}:${asteriskId}`, async () => {
-            const menus = await prisma.ivrMenu.findMany({
-                where: { companyId },
-                include: { options: { orderBy: { digit: 'asc' } } },
-            })
+            const [menus, menuEdges, optionEdges] = await Promise.all([
+                prisma.ivrMenu.findMany({
+                    where: { companyId },
+                    include: { options: { orderBy: { digit: 'asc' } } },
+                }),
+                FlowEdgeRepository.getBySource(companyId, 'ivrmenu'),
+                FlowEdgeRepository.getBySource(companyId, 'ivroption'),
+            ])
             const entries: DialplanRow[] = []
             for (const m of menus) {
                 if (!m.audioId) {
@@ -154,10 +125,10 @@ export const IvrRepository = {
                     continue
                 }
                 const [resolvedOptions, invalidTarget, timeoutTarget, longTarget] = await Promise.all([
-                    Promise.all(m.options.map(async (o) => ({ digit: o.digit, target: await resolveTarget(o.destination as RouteDestination) }))),
-                    resolveTarget(m.invalidDestination as RouteDestination),
-                    resolveTarget(m.timeoutDestination as RouteDestination),
-                    resolveTarget(m.longDestination as RouteDestination),
+                    Promise.all(m.options.map(async (o) => ({ digit: o.digit, target: await resolveTarget(optionEdges.get(o.id)?.default ?? null) }))),
+                    resolveTarget(menuEdges.get(m.id)?.invalid ?? null),
+                    resolveTarget(menuEdges.get(m.id)?.timeout ?? null),
+                    resolveTarget(menuEdges.get(m.id)?.long ?? null),
                 ])
                 entries.push(...buildDialplan(
                     m.id,
@@ -174,6 +145,10 @@ export const IvrRepository = {
                 ))
             }
             await writeContextFile(IVR_CONTEXT, asteriskId, entries)
+            // URAs usadas em FlowNode são compiladas por instância para que cada saída tenha sua
+            // própria aresta. Regera essas instâncias quando a configuração/opções do menu muda.
+            const { FlowNodeRepository } = await import('./flow-node.repository')
+            await FlowNodeRepository.regenerate(companyId)
             reloadDialplan()
         })
     },

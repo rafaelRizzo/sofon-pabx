@@ -1,6 +1,12 @@
 "use client"
 
-import { HeadsetIcon, PencilIcon, StarIcon, Trash2Icon, UsersIcon } from "lucide-react"
+import {
+    HeadsetIcon,
+    PencilIcon,
+    StarIcon,
+    Trash2Icon,
+    UsersIcon,
+} from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -20,6 +26,7 @@ import {
     TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { RouteDestinationBadge } from "@/components/RouteDestination/route-destination-badge"
+import { UsedByBadge } from "@/components/RouteDestination/used-by-badge"
 import { type Company } from "@/hooks/use-companies"
 import { QUEUE_STRATEGY_LABELS, type Queue } from "@/hooks/use-queues"
 
@@ -55,6 +62,7 @@ export function QueuesTable({
                         <TableHead>Empresa</TableHead>
                         <TableHead>Estratégia</TableHead>
                         <TableHead>Destino pós-fila</TableHead>
+                        <TableHead>Usado por</TableHead>
                         <TableHead>Pesquisa</TableHead>
                         <TableHead>Callcenter</TableHead>
                         <TableHead className="w-38 text-right">Ações</TableHead>
@@ -64,7 +72,7 @@ export function QueuesTable({
                     {loading ? (
                         Array.from({ length: 3 }).map((_, i) => (
                             <TableRow key={i}>
-                                {Array.from({ length: 8 }).map((_, j) => (
+                                {Array.from({ length: 9 }).map((_, j) => (
                                     <TableCell key={j}>
                                         <Skeleton className="h-4 w-full" />
                                     </TableCell>
@@ -73,40 +81,66 @@ export function QueuesTable({
                         ))
                     ) : queues.length === 0 ? (
                         <TableRow>
-                            <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
-                                {companySelected ? "Nenhuma fila encontrada" : "Selecione uma empresa para listar"}
+                            <TableCell
+                                colSpan={9}
+                                className="h-24 text-center text-muted-foreground"
+                            >
+                                {companySelected
+                                    ? "Nenhuma fila encontrada"
+                                    : "Selecione uma empresa para listar"}
                             </TableCell>
                         </TableRow>
                     ) : (
                         queues.map((queue) => (
                             <TableRow key={queue.id}>
-                                <TableCell className="font-medium">{queue.name}</TableCell>
+                                <TableCell className="font-medium">
+                                    {queue.name}
+                                </TableCell>
                                 <TableCell>{queue.number}</TableCell>
                                 <TableCell>
-                                    <Badge variant="outline">{companyName(queue.companyId)}</Badge>
+                                    <Badge variant="outline">
+                                        {companyName(queue.companyId)}
+                                    </Badge>
                                 </TableCell>
-                                <TableCell>{QUEUE_STRATEGY_LABELS[queue.strategy]}</TableCell>
                                 <TableCell>
-                                    <RouteDestinationBadge destination={queue.postQueueDestination} />
+                                    {QUEUE_STRATEGY_LABELS[queue.strategy]}
+                                </TableCell>
+                                <TableCell>
+                                    <RouteDestinationBadge
+                                        destination={queue.postQueueDestination}
+                                    />
+                                </TableCell>
+                                <TableCell>
+                                    <UsedByBadge usedBy={queue.usedBy} />
                                 </TableCell>
                                 <TableCell>
                                     {queue.hasSurveyAudio ? (
-                                        <Badge variant="outline" className="gap-1.5">
+                                        <Badge
+                                            variant="outline"
+                                            className="gap-1.5"
+                                        >
                                             <StarIcon className="size-3" />
                                             Ativa
                                         </Badge>
                                     ) : (
-                                        <span className="text-muted-foreground">-</span>
+                                        <span className="text-muted-foreground">
+                                            -
+                                        </span>
                                     )}
                                 </TableCell>
                                 <TableCell>
                                     {queue.callcenterEnabled ? (
-                                        <Badge variant="outline" className="gap-1.5">
+                                        <Badge
+                                            variant="outline"
+                                            className="gap-1.5"
+                                        >
                                             <HeadsetIcon className="size-3" />
                                             Ativo
                                         </Badge>
                                     ) : (
-                                        <span className="text-muted-foreground">-</span>
+                                        <span className="text-muted-foreground">
+                                            -
+                                        </span>
                                     )}
                                 </TableCell>
                                 <TableCell>
@@ -118,14 +152,22 @@ export function QueuesTable({
                                                         <Button
                                                             variant="outline"
                                                             size="icon"
-                                                            onClick={() => onManageMembers(queue)}
+                                                            onClick={() =>
+                                                                onManageMembers(
+                                                                    queue
+                                                                )
+                                                            }
                                                         >
                                                             <UsersIcon />
-                                                            <span className="sr-only">Membros</span>
+                                                            <span className="sr-only">
+                                                                Membros
+                                                            </span>
                                                         </Button>
                                                     }
                                                 />
-                                                <TooltipContent>Gerenciar membros</TooltipContent>
+                                                <TooltipContent>
+                                                    Gerenciar membros
+                                                </TooltipContent>
                                             </Tooltip>
                                             <Tooltip>
                                                 <TooltipTrigger
@@ -133,14 +175,20 @@ export function QueuesTable({
                                                         <Button
                                                             variant="outline"
                                                             size="icon"
-                                                            onClick={() => onEdit(queue)}
+                                                            onClick={() =>
+                                                                onEdit(queue)
+                                                            }
                                                         >
                                                             <PencilIcon />
-                                                            <span className="sr-only">Editar</span>
+                                                            <span className="sr-only">
+                                                                Editar
+                                                            </span>
                                                         </Button>
                                                     }
                                                 />
-                                                <TooltipContent>Editar fila</TooltipContent>
+                                                <TooltipContent>
+                                                    Editar fila
+                                                </TooltipContent>
                                             </Tooltip>
                                             <Tooltip>
                                                 <TooltipTrigger
@@ -148,14 +196,20 @@ export function QueuesTable({
                                                         <Button
                                                             variant="destructive"
                                                             size="icon"
-                                                            onClick={() => onDelete(queue)}
+                                                            onClick={() =>
+                                                                onDelete(queue)
+                                                            }
                                                         >
                                                             <Trash2Icon />
-                                                            <span className="sr-only">Deletar</span>
+                                                            <span className="sr-only">
+                                                                Deletar
+                                                            </span>
                                                         </Button>
                                                     }
                                                 />
-                                                <TooltipContent>Deletar fila</TooltipContent>
+                                                <TooltipContent>
+                                                    Deletar fila
+                                                </TooltipContent>
                                             </Tooltip>
                                         </div>
                                     </TooltipProvider>

@@ -5,19 +5,36 @@ import { toast } from "sonner"
 import { z } from "zod"
 
 import { api, apiError } from "@/lib/api"
-import { routeDestinationSchema, type RouteDestination } from "@/components/RouteDestination/route-destination-field"
+import { type RouteDestination } from "@/components/RouteDestination/route-destination-field"
+import type { UsedByRef } from "@/components/RouteDestination/used-by-badge"
 
 export const VARIABLE_RULE_OPERATORS = [
-    "filled", "empty",
-    "length_eq", "length_neq", "length_gt", "length_gte", "length_lt", "length_lte",
-    "eq", "neq", "contains", "regex",
-    "gt", "gte", "lt", "lte",
-    "cpf", "cnpj",
+    "filled",
+    "empty",
+    "length_eq",
+    "length_neq",
+    "length_gt",
+    "length_gte",
+    "length_lt",
+    "length_lte",
+    "eq",
+    "neq",
+    "contains",
+    "regex",
+    "gt",
+    "gte",
+    "lt",
+    "lte",
+    "cpf",
+    "cnpj",
 ] as const
 
 export type VariableRuleOperator = (typeof VARIABLE_RULE_OPERATORS)[number]
 
-export const VARIABLE_RULE_OPERATOR_LABELS: Record<VariableRuleOperator, string> = {
+export const VARIABLE_RULE_OPERATOR_LABELS: Record<
+    VariableRuleOperator,
+    string
+> = {
     filled: "Preenchida",
     empty: "Vazia",
     length_eq: "Tamanho =",
@@ -41,16 +58,34 @@ export const VARIABLE_RULE_OPERATOR_LABELS: Record<VariableRuleOperator, string>
 // Operadores que não usam o campo "value": a UI esconde/desabilita o input pra esses.
 // cpf/cnpj validam o dígito verificador do próprio valor da variável (ver checksumExpr em
 // backend/src/asterisk/variablecondition.repository.ts), sem parâmetro, como filled/empty
-const NO_VALUE_OPERATORS: readonly VariableRuleOperator[] = ["filled", "empty", "cpf", "cnpj"]
+const NO_VALUE_OPERATORS: readonly VariableRuleOperator[] = [
+    "filled",
+    "empty",
+    "cpf",
+    "cnpj",
+]
 const NUMERIC_VALUE_OPERATORS: readonly VariableRuleOperator[] = [
-    "length_eq", "length_neq", "length_gt", "length_gte", "length_lt", "length_lte", "gt", "gte", "lt", "lte",
+    "length_eq",
+    "length_neq",
+    "length_gt",
+    "length_gte",
+    "length_lt",
+    "length_lte",
+    "gt",
+    "gte",
+    "lt",
+    "lte",
 ]
 
 export function ruleNeedsValue(operator: VariableRuleOperator) {
     return !NO_VALUE_OPERATORS.includes(operator)
 }
 
-export type VariableRule = { variable: string; operator: VariableRuleOperator; value?: string }
+export type VariableRule = {
+    variable: string
+    operator: VariableRuleOperator
+    value?: string
+}
 export type Combinator = "and" | "or"
 
 export type VariableCondition = {
@@ -59,8 +94,12 @@ export type VariableCondition = {
     companyId: string
     combinator: Combinator
     rules: VariableRule[]
+    // não são mais editáveis por aqui — só via arrastar uma conexão no canvas do Flow (ver
+    // flow-canvas.tsx), que grava direto no FlowEdge por PUT separado. Mantidos no tipo só porque a
+    // API ainda devolve os campos (label resolvido, usado em telas de leitura)
     trueRoute: RouteDestination
     falseRoute: RouteDestination
+    usedBy: UsedByRef[]
     createdAt: string
     updatedAt: string
 }
@@ -80,17 +119,30 @@ const ruleFieldSchema = z
         value: z
             .string()
             .max(200, "Máximo 200 caracteres")
-            .regex(/^[^"\\]*$/, "Não pode conter aspas duplas ou barra invertida")
+            .regex(
+                /^[^"\\]*$/,
+                "Não pode conter aspas duplas ou barra invertida"
+            )
             .optional(),
     })
-    .refine((r) => !ruleNeedsValue(r.operator) || (r.value !== undefined && r.value.length > 0), {
-        message: "Valor obrigatório para este operador",
-        path: ["value"],
-    })
-    .refine((r) => !NUMERIC_VALUE_OPERATORS.includes(r.operator) || /^-?\d+(\.\d+)?$/.test(r.value ?? ""), {
-        message: "Valor deve ser numérico para este operador",
-        path: ["value"],
-    })
+    .refine(
+        (r) =>
+            !ruleNeedsValue(r.operator) ||
+            (r.value !== undefined && r.value.length > 0),
+        {
+            message: "Valor obrigatório para este operador",
+            path: ["value"],
+        }
+    )
+    .refine(
+        (r) =>
+            !NUMERIC_VALUE_OPERATORS.includes(r.operator) ||
+            /^-?\d+(\.\d+)?$/.test(r.value ?? ""),
+        {
+            message: "Valor deve ser numérico para este operador",
+            path: ["value"],
+        }
+    )
 
 // Espelha create/updateVariableConditionSchema de backend/src/modules/variable-conditions/schemas/variable-condition.schema.ts —
 // companyId só existe no create, o PUT do backend não permite trocar empresa
@@ -98,20 +150,28 @@ export const createVariableConditionFormSchema = z.object({
     name: z.string().min(1, "Informe o nome").max(80, "Máximo 80 caracteres"),
     companyId: z.string().min(1, "Selecione uma empresa"),
     combinator: z.enum(["and", "or"]),
-    rules: z.array(ruleFieldSchema).min(1, "Adicione ao menos uma regra").max(20, "Máximo 20 regras"),
-    trueRoute: routeDestinationSchema,
-    falseRoute: routeDestinationSchema,
+    rules: z
+        .array(ruleFieldSchema)
+        .min(1, "Adicione ao menos uma regra")
+        .max(20, "Máximo 20 regras"),
 })
 
-export const updateVariableConditionFormSchema = createVariableConditionFormSchema.omit({ companyId: true })
+export const updateVariableConditionFormSchema =
+    createVariableConditionFormSchema.omit({ companyId: true })
 
-export type VariableConditionForm = z.infer<typeof createVariableConditionFormSchema>
-export type VariableConditionUpdateForm = z.infer<typeof updateVariableConditionFormSchema>
+export type VariableConditionForm = z.infer<
+    typeof createVariableConditionFormSchema
+>
+export type VariableConditionUpdateForm = z.infer<
+    typeof updateVariableConditionFormSchema
+>
 
 // companyId opcional — enquanto não informado, a lista não é buscada (filtro de
 // empresa da página exige seleção antes de consultar o backend)
 export function useVariableConditions(companyId?: string) {
-    const [variableConditions, setVariableConditions] = useState<VariableCondition[]>([])
+    const [variableConditions, setVariableConditions] = useState<
+        VariableCondition[]
+    >([])
     const [loading, setLoading] = useState(true)
     const [filter, setFilter] = useState("")
 
@@ -135,20 +195,35 @@ export function useVariableConditions(companyId?: string) {
     }, [companyId])
 
     // companyId da condição vem do próprio form (campo "Empresa" do dialog), não do filtro da página
-    const createVariableCondition = async (form: VariableConditionForm) => {
+    async function createVariableCondition(
+        form: VariableConditionForm
+    ): Promise<boolean>
+    async function createVariableCondition(
+        form: VariableConditionForm,
+        withResourceId: true
+    ): Promise<string | null>
+    async function createVariableCondition(
+        form: VariableConditionForm,
+        withResourceId = false
+    ) {
         const id = toast.loading("Criando condição de variável...")
         try {
-            await api.post("/variable-conditions", form)
+            const { data } = await api.post("/variable-conditions", form)
             toast.success("Condição de variável criada", { id })
             await fetchVariableConditions()
-            return true
+            return withResourceId ? (data.variableConditionId as string) : true
         } catch (err) {
-            toast.error(apiError(err, "Erro ao criar condição de variável"), { id })
-            return false
+            toast.error(apiError(err, "Erro ao criar condição de variável"), {
+                id,
+            })
+            return withResourceId ? null : false
         }
     }
 
-    const updateVariableCondition = async (variableConditionId: string, form: VariableConditionUpdateForm) => {
+    const updateVariableCondition = async (
+        variableConditionId: string,
+        form: VariableConditionUpdateForm
+    ) => {
         const id = toast.loading("Atualizando condição de variável...")
         try {
             await api.put(`/variable-conditions/${variableConditionId}`, form)
@@ -156,7 +231,10 @@ export function useVariableConditions(companyId?: string) {
             await fetchVariableConditions()
             return true
         } catch (err) {
-            toast.error(apiError(err, "Erro ao atualizar condição de variável"), { id })
+            toast.error(
+                apiError(err, "Erro ao atualizar condição de variável"),
+                { id }
+            )
             return false
         }
     }
@@ -169,7 +247,9 @@ export function useVariableConditions(companyId?: string) {
             await fetchVariableConditions()
             return true
         } catch (err) {
-            toast.error(apiError(err, "Erro ao deletar condição de variável"), { id })
+            toast.error(apiError(err, "Erro ao deletar condição de variável"), {
+                id,
+            })
             return false
         }
     }
@@ -178,10 +258,16 @@ export function useVariableConditions(companyId?: string) {
         v.name.toLowerCase().includes(filter.toLowerCase())
     )
 
-    const fetchStateRef = useRef<{ key?: string; fetched: boolean }>({ fetched: false })
+    const fetchStateRef = useRef<{ key?: string; fetched: boolean }>({
+        fetched: false,
+    })
 
     useEffect(() => {
-        if (fetchStateRef.current.fetched && fetchStateRef.current.key === companyId) return
+        if (
+            fetchStateRef.current.fetched &&
+            fetchStateRef.current.key === companyId
+        )
+            return
         fetchStateRef.current = { key: companyId, fetched: true }
         fetchVariableConditions()
     }, [fetchVariableConditions, companyId])

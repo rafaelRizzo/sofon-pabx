@@ -1,12 +1,10 @@
 import { prisma } from '../lib/prisma'
 import type { RouteDestination } from '../schemas/route-destination.schema'
-import { queueAppExten } from './queue.repository'
-import {
-    TC_CONTEXT, tcEntry, ANNOUNCEMENT_CONTEXT, announcementExten, IVR_CONTEXT, ivrExten,
-    REQUEST_TEMPLATE_CONTEXT, requestTemplateExten, HOL_CONTEXT, holEntry,
-    VAR_CONTEXT, varEntry, VARCOND_CONTEXT, varCondEntry,
-} from './dialplan-names'
+import { VARCOND_CONTEXT, varCondEntry } from './dialplan-names'
 import { resolveAsteriskId, withDialplanLock, writeContextFile, reloadDialplan, type DialplanRow } from './dialplan-file.repository'
+import { resolveRouteDestinationToDialplan } from './route-destination-resolver'
+import { FlowEdgeRepository } from './flow-edge.repository'
+import { nodeExitCheck } from './flow-node-runtime'
 
 export { VARCOND_CONTEXT, varCondEntry }
 
@@ -91,37 +89,8 @@ function checksumExpr(variable: string, spec: ChecksumSpec): string {
 
 // mesmo contrato de resolveRoute() em timecondition.repository.ts — "context,exten,priority" ou null
 async function resolveRoute(route: RouteDestination): Promise<string | null> {
-    if (!route || route.type === 'hangup') return null
-
-    switch (route.type) {
-        case 'extension': {
-            const ext = await prisma.extension.findUnique({ where: { id: route.id }, select: { context: true, number: true } })
-            return ext ? `${ext.context},${ext.number},1` : null
-        }
-        case 'queue': {
-            const q = await prisma.queue.findUnique({
-                where: { id: route.id },
-                select: { number: true, company: { select: { asteriskId: true } } },
-            })
-            return q?.number ? `queues-app,${queueAppExten(q.company.asteriskId, q.number)},1` : null
-        }
-        case 'voicemail':
-            return `vm,${route.id},1`
-        case 'timecondition':
-            return `${TC_CONTEXT},${tcEntry(route.id)},1`
-        case 'holiday':
-            return `${HOL_CONTEXT},${holEntry(route.id)},1`
-        case 'announcement':
-            return `${ANNOUNCEMENT_CONTEXT},${announcementExten(route.id)},1`
-        case 'ivr':
-            return `${IVR_CONTEXT},${ivrExten(route.id)},1`
-        case 'request':
-            return `${REQUEST_TEMPLATE_CONTEXT},${requestTemplateExten(route.id)},1`
-        case 'variable-set':
-            return `${VAR_CONTEXT},${varEntry(route.id)},1`
-        case 'variable-condition':
-            return `${VARCOND_CONTEXT},${varCondEntry(route.id)},1`
-    }
+    const target = await resolveRouteDestinationToDialplan(route)
+    return target ? `${target.context},${target.exten},${target.priority}` : null
 }
 
 // Monta a expressão booleana Asterisk ($[...]) equivalente a uma regra — função pura, sem I/O,
@@ -201,14 +170,30 @@ export const VariableConditionRepository = {
     async regenerate(companyId: string) {
         const asteriskId = await resolveAsteriskId(companyId)
         return withDialplanLock(`${VARCOND_CONTEXT}:${asteriskId}`, async () => {
-            const conditions = await prisma.variableCondition.findMany({ where: { companyId } })
+            const [conditions, edges] = await Promise.all([
+                prisma.variableCondition.findMany({ where: { companyId } }),
+                FlowEdgeRepository.getBySource(companyId, 'variablecondition'),
+            ])
             const entries: DialplanRow[] = []
             for (const c of conditions) {
                 const [trueAsterisk, falseAsterisk] = await Promise.all([
-                    resolveRoute(c.trueRoute as RouteDestination),
-                    resolveRoute(c.falseRoute as RouteDestination),
+                    resolveRoute(edges.get(c.id)?.true ?? null),
+                    resolveRoute(edges.get(c.id)?.false ?? null),
                 ])
-                entries.push(...buildDialplan(c.id, c.name, c.combinator as Combinator, c.rules as VariableRule[], trueAsterisk, falseAsterisk))
+                const rows = buildDialplan(c.id, c.name, c.combinator as Combinator, c.rules as VariableRule[], trueAsterisk, falseAsterisk)
+                const entry = varCondEntry(c.id)
+                const matched = varMatched(entry)
+                const mainPort = c.combinator === 'or' ? 'false' : 'true'
+                const matchedPort = c.combinator === 'or' ? 'true' : 'false'
+                const withNodeExits: DialplanRow[] = []
+                for (const row of rows) {
+                    if ((row.exten === entry || row.exten === matched) && (row.app === 'Goto' || row.app === 'Hangup')) {
+                        const port = row.exten === entry ? mainPort : matchedPort
+                        withNodeExits.push(nodeExitCheck(VARCOND_CONTEXT, row.exten, row.priority, port))
+                        withNodeExits.push({ ...row, priority: row.priority + 1 })
+                    } else withNodeExits.push(row)
+                }
+                entries.push(...withNodeExits)
             }
             await writeContextFile(VARCOND_CONTEXT, asteriskId, entries)
             reloadDialplan()

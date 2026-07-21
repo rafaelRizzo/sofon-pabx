@@ -1,10 +1,11 @@
-import { Prisma } from '../../../generated/prisma/client'
 import { prisma } from '../../lib/prisma'
 import { getCompanyById } from '../companies/companies.service'
 import { VariablesCache } from './cache/variables.cache'
 import { VariableRepository } from '../../asterisk/variable.repository'
-import { validateRouteDestination } from '../../schemas/route-destination.validate'
+import { FlowEdgeRepository } from '../../asterisk/flow-edge.repository'
+import { validateRouteDestination, assertNotReferenced } from '../../schemas/route-destination.validate'
 import { resolveDestinationLabels, withDestinationLabel } from '../../schemas/route-destination-label'
+import { resolveUsedByLabels, type UsedByRef } from '../../schemas/flow-reference-label'
 import type { RouteDestination } from '../../schemas/route-destination.schema'
 import type { CreateVariableSetInput, UpdateVariableSetInput } from './schemas/variable.schema'
 import { AppError } from '../../utils/errors/app.error'
@@ -14,7 +15,6 @@ const select = {
     name: true,
     companyId: true,
     assignments: true,
-    destination: true,
     createdAt: true,
     updatedAt: true,
 } as const
@@ -36,13 +36,39 @@ async function withDestinationLabels<T extends { destination: unknown; companyId
     return sets.map((s) => ({ ...s, destination: withDestinationLabel(s.destination as RouteDestination, labelMaps.get(s.companyId)!) }))
 }
 
+// Resolve o indicador "usado por" em lote, agrupando por companyId — resolveUsedByLabels só aceita
+// uma empresa por chamada (mesma razão de withDestinationLabels acima: getAllVariableSets pode
+// misturar empresas diferentes na mesma lista, visão admin).
+async function withUsedBy<T extends { id: string; companyId: string }>(sets: T[]): Promise<Map<string, UsedByRef[]>> {
+    if (sets.length === 0) return new Map()
+    const byCompany = new Map<string, string[]>()
+    for (const s of sets) {
+        const arr = byCompany.get(s.companyId) ?? []
+        arr.push(s.id)
+        byCompany.set(s.companyId, arr)
+    }
+    const maps = await Promise.all(
+        [...byCompany.entries()].map(([companyId, ids]) => resolveUsedByLabels('variable-set', ids, companyId)),
+    )
+    const merged = new Map<string, UsedByRef[]>()
+    for (const m of maps) for (const [k, v] of m) merged.set(k, v)
+    return merged
+}
+
 export const getVariableSetsByCompany = async (companyId: string) => {
     const cached = await VariablesCache.getByCompany(companyId)
     if (cached) return cached
 
     await getCompanyById(companyId)
 
-    const variableSets = await withDestinationLabels(await prisma.variableSet.findMany({ where: { companyId }, select }))
+    const [rows, edges] = await Promise.all([
+        prisma.variableSet.findMany({ where: { companyId }, select }),
+        FlowEdgeRepository.getBySource(companyId, 'variableset'),
+    ])
+    const usedByMap = await resolveUsedByLabels('variable-set', rows.map((s) => s.id), companyId)
+    const variableSets = await withDestinationLabels(
+        rows.map((s) => ({ ...s, destination: edges.get(s.id)?.default ?? null, usedBy: usedByMap.get(s.id) ?? [] })),
+    )
     await VariablesCache.setByCompany(companyId, variableSets)
     return variableSets
 }
@@ -55,11 +81,14 @@ export const getAllVariableSets = async (companyIds?: string[]) => {
         if (cached) return cached
     }
 
+    const rows = await prisma.variableSet.findMany({
+        where: companyIds ? { companyId: { in: companyIds } } : undefined,
+        select,
+    })
+    const edges = await FlowEdgeRepository.getBySourceIds('variableset', rows.map((s) => s.id))
+    const usedByMap = await withUsedBy(rows)
     const variableSets = await withDestinationLabels(
-        await prisma.variableSet.findMany({
-            where: companyIds ? { companyId: { in: companyIds } } : undefined,
-            select,
-        }),
+        rows.map((s) => ({ ...s, destination: edges.get(s.id)?.default ?? null, usedBy: usedByMap.get(s.id) ?? [] })),
     )
 
     if (!companyIds) await VariablesCache.setAll(variableSets)
@@ -73,7 +102,11 @@ export const getVariableSetById = async (id: string) => {
     const found = await prisma.variableSet.findUnique({ where: { id }, select })
     if (!found) throw new AppError('Variable set not found', 404)
 
-    const variableSet = (await withDestinationLabels([found]))[0]!
+    const [destination, usedByMap] = await Promise.all([
+        FlowEdgeRepository.getOne('variableset', id, 'default'),
+        resolveUsedByLabels('variable-set', [id], found.companyId),
+    ])
+    const variableSet = (await withDestinationLabels([{ ...found, destination, usedBy: usedByMap.get(id) ?? [] }]))[0]!
     await VariablesCache.setVariableSet(id, variableSet)
     return variableSet
 }
@@ -94,10 +127,10 @@ export const createVariableSet = async (data: CreateVariableSetInput) => {
                 name: data.name,
                 companyId: data.companyId,
                 assignments: data.assignments,
-                destination: data.destination ?? undefined,
             },
             select,
         })
+        await FlowEdgeRepository.setSlot(tx, data.companyId, 'variableset', created.id, 'default', data.destination ?? null)
         return created
     })
 
@@ -107,7 +140,7 @@ export const createVariableSet = async (data: CreateVariableSetInput) => {
         await VariablesCache.invalidateByCompany(data.companyId)
         await VariablesCache.invalidateAll()
     }
-    return variableSet
+    return { ...variableSet, destination: data.destination ?? null, usedBy: [] }
 }
 
 export const updateVariableSet = async (id: string, data: UpdateVariableSetInput) => {
@@ -129,10 +162,12 @@ export const updateVariableSet = async (id: string, data: UpdateVariableSetInput
             data: {
                 name: data.name,
                 assignments: data.assignments,
-                destination: data.destination === undefined ? undefined : (data.destination ?? Prisma.JsonNull),
             },
             select,
         })
+        if (data.destination !== undefined) {
+            await FlowEdgeRepository.setSlot(tx, existing.companyId, 'variableset', id, 'default', data.destination)
+        }
         return updated
     })
 
@@ -143,15 +178,22 @@ export const updateVariableSet = async (id: string, data: UpdateVariableSetInput
         await VariablesCache.invalidateByCompany(existing.companyId)
         await VariablesCache.invalidateAll()
     }
-    return variableSet
+    const [destination, usedByMap] = await Promise.all([
+        data.destination !== undefined ? data.destination : FlowEdgeRepository.getOne('variableset', id, 'default'),
+        resolveUsedByLabels('variable-set', [id], existing.companyId),
+    ])
+    return { ...variableSet, destination, usedBy: usedByMap.get(id) ?? [] }
 }
 
 export const deleteVariableSet = async (id: string) => {
     const existing = await prisma.variableSet.findUnique({ where: { id }, select: { companyId: true } })
     if (!existing) throw new AppError('Variable set not found', 404)
 
+    await assertNotReferenced('variable-set', id)
+
     await prisma.$transaction(async (tx) => {
         await tx.variableSet.delete({ where: { id } })
+        await FlowEdgeRepository.deleteAllForSource(tx, 'variableset', id)
     })
 
     try {

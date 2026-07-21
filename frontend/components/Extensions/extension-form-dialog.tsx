@@ -773,21 +773,21 @@ const TYPES = [
 
 type Props =
     | {
-        open: boolean
-        onOpenChange: (open: boolean) => void
-        extension: null
-        companies: Company[]
-        onCreate: (form: ExtensionCreateForm) => Promise<any>
-        onUpdate?: never
-    }
+          open: boolean
+          onOpenChange: (open: boolean) => void
+          extension: null
+          companies: Company[]
+          onCreate: (form: ExtensionCreateForm) => Promise<any>
+          onUpdate?: never
+      }
     | {
-        open: boolean
-        onOpenChange: (open: boolean) => void
-        extension: Extension | string
-        companies: Company[]
-        onCreate?: never
-        onUpdate: (form: ExtensionUpdateForm) => Promise<boolean>
-    }
+          open: boolean
+          onOpenChange: (open: boolean) => void
+          extension: Extension | string
+          companies: Company[]
+          onCreate?: never
+          onUpdate: (form: ExtensionUpdateForm) => Promise<boolean>
+      }
 
 export function ExtensionFormDialog({
     open,
@@ -1216,8 +1216,8 @@ export function ExtensionFormDialog({
                                 ? "Salvando..."
                                 : "Criando..."
                             : isEdit
-                                ? "Salvar"
-                                : "Criar"}
+                              ? "Salvar"
+                              : "Criar"}
                     </Button>
                 </DialogFooter>
             </DialogContent>

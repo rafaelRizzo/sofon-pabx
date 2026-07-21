@@ -20,6 +20,7 @@ import {
     TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { RouteDestinationBadge } from "@/components/RouteDestination/route-destination-badge"
+import { UsedByBadge } from "@/components/RouteDestination/used-by-badge"
 import { type IvrMenu } from "@/hooks/use-ivr"
 
 type Props = {
@@ -30,7 +31,13 @@ type Props = {
     onDelete: (ivrMenu: IvrMenu) => void
 }
 
-export function IvrMenusTable({ ivrMenus, loading, companySelected, onEdit, onDelete }: Props) {
+export function IvrMenusTable({
+    ivrMenus,
+    loading,
+    companySelected,
+    onEdit,
+    onDelete,
+}: Props) {
     return (
         <div className="rounded-md border">
             <Table>
@@ -42,6 +49,7 @@ export function IvrMenusTable({ ivrMenus, loading, companySelected, onEdit, onDe
                         <TableHead>Opções</TableHead>
                         <TableHead>Dígito inválido</TableHead>
                         <TableHead>Timeout</TableHead>
+                        <TableHead>Usado por</TableHead>
                         <TableHead className="w-30 text-right">Ações</TableHead>
                     </TableRow>
                 </TableHeader>
@@ -49,7 +57,7 @@ export function IvrMenusTable({ ivrMenus, loading, companySelected, onEdit, onDe
                     {loading ? (
                         Array.from({ length: 3 }).map((_, i) => (
                             <TableRow key={i}>
-                                {Array.from({ length: 7 }).map((_, j) => (
+                                {Array.from({ length: 8 }).map((_, j) => (
                                     <TableCell key={j}>
                                         <Skeleton className="h-4 w-full" />
                                     </TableCell>
@@ -58,17 +66,26 @@ export function IvrMenusTable({ ivrMenus, loading, companySelected, onEdit, onDe
                         ))
                     ) : ivrMenus.length === 0 ? (
                         <TableRow>
-                            <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
-                                {companySelected ? "Nenhum menu de URA encontrado" : "Selecione uma empresa para listar"}
+                            <TableCell
+                                colSpan={8}
+                                className="h-24 text-center text-muted-foreground"
+                            >
+                                {companySelected
+                                    ? "Nenhum menu de URA encontrado"
+                                    : "Selecione uma empresa para listar"}
                             </TableCell>
                         </TableRow>
                     ) : (
                         ivrMenus.map((menu) => (
                             <TableRow key={menu.id}>
-                                <TableCell className="font-medium">{menu.name}</TableCell>
+                                <TableCell className="font-medium">
+                                    {menu.name}
+                                </TableCell>
                                 <TableCell>
                                     <Badge variant="outline">
-                                        {menu.type === "collect" ? "Coleta" : "Menu"}
+                                        {menu.type === "collect"
+                                            ? "Coleta"
+                                            : "Menu"}
                                     </Badge>
                                 </TableCell>
                                 <TableCell>
@@ -80,38 +97,61 @@ export function IvrMenusTable({ ivrMenus, loading, companySelected, onEdit, onDe
                                                 : "border-transparent bg-red-500/15 text-red-600 dark:bg-red-400/20 dark:text-red-300"
                                         }
                                     >
-                                        {menu.hasAudio ? "Vinculado" : "Sem áudio"}
+                                        {menu.hasAudio
+                                            ? "Vinculado"
+                                            : "Sem áudio"}
                                     </Badge>
                                 </TableCell>
                                 <TableCell>
                                     {menu.type === "collect" ? (
                                         <span className="text-xs">
-                                            {menu.maxDigits} dígitos <span className="text-muted-foreground">→</span>{" "}
-                                            <code className="text-xs">{menu.variableName}</code>
+                                            {menu.maxDigits} dígitos{" "}
+                                            <span className="text-muted-foreground">
+                                                →
+                                            </span>{" "}
+                                            <code className="text-xs">
+                                                {menu.variableName}
+                                            </code>
                                         </span>
                                     ) : (
                                         <TooltipProvider delay={150}>
                                             <div className="flex flex-wrap gap-1">
                                                 {menu.options.length === 0 && (
-                                                    <span className="text-xs text-muted-foreground">Nenhuma</span>
+                                                    <span className="text-xs text-muted-foreground">
+                                                        Nenhuma
+                                                    </span>
                                                 )}
                                                 {menu.options.map((opt) => {
-                                                    const type = opt.destination?.type ?? "hangup"
+                                                    const type =
+                                                        opt.destination?.type ??
+                                                        "hangup"
                                                     const label =
-                                                        opt.destination && "label" in opt.destination
-                                                            ? opt.destination.label
+                                                        opt.destination &&
+                                                        "label" in
+                                                            opt.destination
+                                                            ? opt.destination
+                                                                  .label
                                                             : null
                                                     return (
                                                         <Tooltip key={opt.id}>
                                                             <TooltipTrigger
                                                                 render={
-                                                                    <Badge variant="secondary" className="cursor-default">
-                                                                        {opt.digit}
+                                                                    <Badge
+                                                                        variant="secondary"
+                                                                        className="cursor-default"
+                                                                    >
+                                                                        {
+                                                                            opt.digit
+                                                                        }
                                                                     </Badge>
                                                                 }
                                                             />
                                                             <TooltipContent>
-                                                                {label ?? (type === "hangup" ? "Encerrar chamada" : "registro não encontrado")}
+                                                                {label ??
+                                                                    (type ===
+                                                                    "hangup"
+                                                                        ? "Encerrar chamada"
+                                                                        : "registro não encontrado")}
                                                             </TooltipContent>
                                                         </Tooltip>
                                                     )
@@ -121,10 +161,17 @@ export function IvrMenusTable({ ivrMenus, loading, companySelected, onEdit, onDe
                                     )}
                                 </TableCell>
                                 <TableCell>
-                                    <RouteDestinationBadge destination={menu.invalidDestination} />
+                                    <RouteDestinationBadge
+                                        destination={menu.invalidDestination}
+                                    />
                                 </TableCell>
                                 <TableCell>
-                                    <RouteDestinationBadge destination={menu.timeoutDestination} />
+                                    <RouteDestinationBadge
+                                        destination={menu.timeoutDestination}
+                                    />
+                                </TableCell>
+                                <TableCell>
+                                    <UsedByBadge usedBy={menu.usedBy} />
                                 </TableCell>
                                 <TableCell>
                                     <TooltipProvider delay={100}>
@@ -135,14 +182,20 @@ export function IvrMenusTable({ ivrMenus, loading, companySelected, onEdit, onDe
                                                         <Button
                                                             variant="outline"
                                                             size="icon"
-                                                            onClick={() => onEdit(menu)}
+                                                            onClick={() =>
+                                                                onEdit(menu)
+                                                            }
                                                         >
                                                             <PencilIcon />
-                                                            <span className="sr-only">Editar</span>
+                                                            <span className="sr-only">
+                                                                Editar
+                                                            </span>
                                                         </Button>
                                                     }
                                                 />
-                                                <TooltipContent>Editar menu</TooltipContent>
+                                                <TooltipContent>
+                                                    Editar menu
+                                                </TooltipContent>
                                             </Tooltip>
                                             <Tooltip>
                                                 <TooltipTrigger
@@ -150,14 +203,20 @@ export function IvrMenusTable({ ivrMenus, loading, companySelected, onEdit, onDe
                                                         <Button
                                                             variant="destructive"
                                                             size="icon"
-                                                            onClick={() => onDelete(menu)}
+                                                            onClick={() =>
+                                                                onDelete(menu)
+                                                            }
                                                         >
                                                             <Trash2Icon />
-                                                            <span className="sr-only">Deletar</span>
+                                                            <span className="sr-only">
+                                                                Deletar
+                                                            </span>
                                                         </Button>
                                                     }
                                                 />
-                                                <TooltipContent>Deletar menu</TooltipContent>
+                                                <TooltipContent>
+                                                    Deletar menu
+                                                </TooltipContent>
                                             </Tooltip>
                                         </div>
                                     </TooltipProvider>

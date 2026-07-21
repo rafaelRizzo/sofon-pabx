@@ -50,6 +50,10 @@ export function createPrismaMock() {
         agentAffinity: model(),
         variableSet: model(),
         variableCondition: model(),
+        flowEdge: model(),
+        flow: model(),
+        flowNode: model(),
+        flowNodeEdge: model(),
         // Asterisk realtime
         ps_endpoints: model(),
         ps_auths: model(),

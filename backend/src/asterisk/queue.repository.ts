@@ -1,13 +1,11 @@
 import { prisma } from '../lib/prisma'
 import { validateEnv } from '../config/env'
 import type { RouteDestination } from '../schemas/route-destination.schema'
-import {
-    TC_CONTEXT, tcEntry, ANNOUNCEMENT_CONTEXT, announcementExten, IVR_CONTEXT, ivrExten,
-    REQUEST_TEMPLATE_CONTEXT, requestTemplateExten, HOL_CONTEXT, holEntry,
-    VAR_CONTEXT, varEntry, VARCOND_CONTEXT, varCondEntry,
-} from './dialplan-names'
 import { resolveAsteriskId, withDialplanLock, writeContextFile, reloadDialplan, type DialplanRow } from './dialplan-file.repository'
 import { audioSoundPath } from './audio.repository'
+import { resolveRouteDestinationToDialplan } from './route-destination-resolver'
+import { FlowEdgeRepository } from './flow-edge.repository'
+import { nodeExitCheck } from './flow-node-runtime'
 
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 
@@ -15,7 +13,9 @@ const env = validateEnv()
 
 export const QUEUE_APP_CONTEXT = 'queues-app'
 
-export const toAsteriskQueueName = (asteriskId: string, queueName: string) => `${asteriskId}-${queueName}`
+// `number` é a identidade operacional da fila; `name` é só o rótulo editável exibido na UI.
+// Assim, reutilizar a Fila 600 em vários nós nunca cria nem renomeia uma segunda fila no Asterisk.
+export const toAsteriskQueueName = (asteriskId: string, queueNumber: string) => `${asteriskId}-${queueNumber}`
 export const queueAppExten = (asteriskId: string, number: string) => `${asteriskId}-${number}`
 
 export const toAsteriskInterface = (type: string, number: string) => `${type.toUpperCase()}/${number}`
@@ -39,36 +39,8 @@ const buildQueueSurveyAgiUrl = (queueId: string) => `agi://${env.AGI_HOST}:${env
 // Pra onde o cliente vai quando a fila termina sem ele ter desligado (timeout, sem agente, ou
 // agente desliga primeiro) — mesmo RouteDestination usado por Inbound Routes/Time Conditions
 async function resolvePostQueueDestination(dest: RouteDestination): Promise<{ app: string; appdata: string | null }> {
-    if (!dest || dest.type === 'hangup') return { app: 'Hangup', appdata: null }
-
-    switch (dest.type) {
-        case 'extension': {
-            const ext = await prisma.extension.findUnique({ where: { id: dest.id }, select: { context: true, number: true } })
-            return ext ? { app: 'Goto', appdata: `${ext.context},${ext.number},1` } : { app: 'Hangup', appdata: null }
-        }
-        case 'queue': {
-            const q = await prisma.queue.findUnique({ where: { id: dest.id }, select: { number: true, company: { select: { asteriskId: true } } } })
-            return q?.number
-                ? { app: 'Goto', appdata: `${QUEUE_APP_CONTEXT},${queueAppExten(q.company.asteriskId, q.number)},1` }
-                : { app: 'Hangup', appdata: null }
-        }
-        case 'voicemail':
-            return { app: 'Goto', appdata: `vm,${dest.id},1` }
-        case 'timecondition':
-            return { app: 'Goto', appdata: `${TC_CONTEXT},${tcEntry(dest.id)},1` }
-        case 'holiday':
-            return { app: 'Goto', appdata: `${HOL_CONTEXT},${holEntry(dest.id)},1` }
-        case 'announcement':
-            return { app: 'Goto', appdata: `${ANNOUNCEMENT_CONTEXT},${announcementExten(dest.id)},1` }
-        case 'ivr':
-            return { app: 'Goto', appdata: `${IVR_CONTEXT},${ivrExten(dest.id)},1` }
-        case 'request':
-            return { app: 'Goto', appdata: `${REQUEST_TEMPLATE_CONTEXT},${requestTemplateExten(dest.id)},1` }
-        case 'variable-set':
-            return { app: 'Goto', appdata: `${VAR_CONTEXT},${varEntry(dest.id)},1` }
-        case 'variable-condition':
-            return { app: 'Goto', appdata: `${VARCOND_CONTEXT},${varCondEntry(dest.id)},1` }
-    }
+    const target = await resolveRouteDestinationToDialplan(dest)
+    return target ? { app: 'Goto', appdata: `${target.context},${target.exten},${target.priority}` } : { app: 'Hangup', appdata: null }
 }
 
 type AsteriskQueueData = {
@@ -115,17 +87,26 @@ export const AsteriskQueueRepository = {
         })
     },
 
+    // upsert em vez de update: a linha realtime pode ter sido perdida (drift entre `Queue` e
+    // `queues` — ex: reset manual do banco) sem que o registro do app deixe de existir; recriar
+    // com os campos default do Asterisk (ver schema.prisma) é mais seguro que 500 num PUT normal.
     async updateQueue(tx: Tx, asteriskName: string, update: Record<string, any>) {
         if (Object.keys(update).length > 0)
-            await tx.queues.update({ where: { name: asteriskName }, data: update })
+            await tx.queues.upsert({
+                where: { name: asteriskName },
+                update,
+                create: { name: asteriskName, ...update },
+            })
     },
 
+    // updateMany não lança se `oldName` já não existir (linha ausente por drift) — segue como
+    // no-op, e o updateQueue() logo em seguida recria a linha já com `newAsteriskName`.
     async renameQueue(tx: Tx, oldName: string, newName: string) {
         await tx.queue_members.updateMany({
             where: { queue_name: oldName },
             data: { queue_name: newName },
         })
-        await tx.queues.update({ where: { name: oldName }, data: { name: newName } })
+        await tx.queues.updateMany({ where: { name: oldName }, data: { name: newName } })
     },
 
     async deleteQueue(tx: Tx, asteriskName: string) {
@@ -191,13 +172,16 @@ export const AsteriskQueueRepository = {
     async regenerate(companyId: string) {
         const asteriskId = await resolveAsteriskId(companyId)
         return withDialplanLock(`${QUEUE_APP_CONTEXT}:${asteriskId}`, async () => {
-            const queues = await prisma.queue.findMany({ where: { companyId } })
+            const [queues, edges] = await Promise.all([
+                prisma.queue.findMany({ where: { companyId } }),
+                FlowEdgeRepository.getBySource(companyId, 'queue'),
+            ])
             const entries: DialplanRow[] = []
             for (const q of queues) {
                 if (!q.number) continue
                 const exten = queueAppExten(asteriskId, q.number)
-                const asteriskName = toAsteriskQueueName(asteriskId, q.name)
-                const { app, appdata } = await resolvePostQueueDestination(q.postQueueDestination as RouteDestination)
+                const asteriskName = toAsteriskQueueName(asteriskId, q.number)
+                const { app, appdata } = await resolvePostQueueDestination(edges.get(q.id)?.default ?? null)
 
                 // callcenterEnabled=false: fila roda 100% nativa, sem o AGI de pré-roteamento
                 // (RoutingRule/QUEUE_PRIO) — pesquisa (priority AGI queue-survey) segue independente,
@@ -212,10 +196,15 @@ export const AsteriskQueueRepository = {
                 entries.push(
                     { context: QUEUE_APP_CONTEXT, exten, priority: priority++, app: 'Queue', appdata: asteriskName },
                     { context: QUEUE_APP_CONTEXT, exten, priority: priority++, app: 'AGI', appdata: buildQueueSurveyAgiUrl(q.id) },
+                    nodeExitCheck(QUEUE_APP_CONTEXT, exten, priority++, 'default'),
                     { context: QUEUE_APP_CONTEXT, exten, priority: priority++, app, appdata },
                 )
             }
             await writeContextFile(QUEUE_APP_CONTEXT, asteriskId, entries)
+            // FlowNodes guardam uma entrada por instância e ela contém o número da fila. Recompila
+            // também quando uma fila muda de número, sem nunca recriar o recurso realtime.
+            const { FlowNodeRepository } = await import('./flow-node.repository')
+            await FlowNodeRepository.regenerate(companyId)
             reloadDialplan()
         })
     },

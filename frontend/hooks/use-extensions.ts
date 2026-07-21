@@ -5,6 +5,7 @@ import { toast } from "sonner"
 import { z } from "zod"
 
 import { api, apiError } from "@/lib/api"
+import type { UsedByRef } from "@/components/RouteDestination/used-by-badge"
 
 export type ExtensionType = "sip" | "pjsip"
 
@@ -27,6 +28,7 @@ export type Extension = {
     companyId: string
     context: string
     allowOutbound: boolean
+    usedBy: UsedByRef[]
     createdAt: string
     updatedAt: string
     // SIP optional
@@ -275,15 +277,18 @@ export function useExtensions(companyId?: string) {
         }
     }, [companyId])
 
-    const getExtensionById = useCallback(async (id: string): Promise<Extension | null> => {
-        try {
-            const { data } = await api.get(`/extensions/${id}`)
-            return data.extension || data
-        } catch (err) {
-            toast.error(apiError(err, "Erro ao buscar ramal"))
-            return null
-        }
-    }, [])
+    const getExtensionById = useCallback(
+        async (id: string): Promise<Extension | null> => {
+            try {
+                const { data } = await api.get(`/extensions/${id}`)
+                return data.extension || data
+            } catch (err) {
+                toast.error(apiError(err, "Erro ao buscar ramal"))
+                return null
+            }
+        },
+        []
+    )
 
     const createExtension = async (
         form: ExtensionCreateForm
@@ -297,8 +302,7 @@ export function useExtensions(companyId?: string) {
 
             const payload = Object.fromEntries(
                 Object.entries(form).filter(
-                    ([k, v]) =>
-                        allowedKeys(k) && v !== undefined && v !== ""
+                    ([k, v]) => allowedKeys(k) && v !== undefined && v !== ""
                 )
             )
 
@@ -388,10 +392,16 @@ export function useExtensions(companyId?: string) {
             .includes(filter.toLowerCase())
     )
 
-    const fetchStateRef = useRef<{ key?: string; fetched: boolean }>({ fetched: false })
+    const fetchStateRef = useRef<{ key?: string; fetched: boolean }>({
+        fetched: false,
+    })
 
     useEffect(() => {
-        if (fetchStateRef.current.fetched && fetchStateRef.current.key === companyId) return
+        if (
+            fetchStateRef.current.fetched &&
+            fetchStateRef.current.key === companyId
+        )
+            return
         fetchStateRef.current = { key: companyId, fetched: true }
         fetchExtensions()
     }, [fetchExtensions, companyId])

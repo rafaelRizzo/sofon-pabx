@@ -44,6 +44,7 @@ describe('TimeConditionsService.getTimeConditionsByCompany', () => {
     it('returns list of conditions', async () => {
         db.company.findUnique.mockResolvedValue(COMPANY)
         db.timeCondition.findMany.mockResolvedValue([TC])
+        db.flowEdge.findMany.mockResolvedValue([])
         const conditions = await TimeConditionsService.getTimeConditionsByCompany('c1') as any[]
         expect(conditions[0].id).toBe('tc1')
     })
@@ -59,6 +60,7 @@ describe('TimeConditionsService.getTimeConditionsByCompany', () => {
 describe('TimeConditionsService.getTimeConditionById', () => {
     it('returns condition by id', async () => {
         db.timeCondition.findUnique.mockResolvedValue(TC)
+        db.flowEdge.findMany.mockResolvedValue([])
         const tc = await TimeConditionsService.getTimeConditionById('tc1') as any
         expect(tc.id).toBe('tc1')
     })
@@ -179,6 +181,7 @@ describe('TimeConditionsService.updateTimeCondition', () => {
         db.timeCondition.findUnique.mockResolvedValueOnce(TC).mockResolvedValueOnce(null)
         db.timeCondition.update.mockResolvedValue({ ...TC, name: 'noturno' })
         db.timeConditionTimeGroup.findMany.mockResolvedValue([])
+        db.flowEdge.findMany.mockResolvedValue([])
         const tc = await TimeConditionsService.updateTimeCondition('tc1', { name: 'noturno' }) as any
         expect(tc.name).toBe('noturno')
     })
@@ -188,6 +191,7 @@ describe('TimeConditionsService.updateTimeCondition', () => {
         db.timeCondition.findUnique.mockResolvedValueOnce(TC).mockResolvedValueOnce(OTHER_TC)
         db.timeCondition.update.mockResolvedValue({ ...TC, trueRoute: { type: 'timecondition', id: 'tc2' } })
         db.timeConditionTimeGroup.findMany.mockResolvedValue([])
+        db.flowEdge.findMany.mockResolvedValue([])
         await TimeConditionsService.updateTimeCondition('tc1', { trueRoute: { type: 'timecondition', id: 'tc2' } })
         expect(db.timeCondition.update).toHaveBeenCalled()
     })
@@ -203,9 +207,17 @@ describe('TimeConditionsService.updateTimeCondition', () => {
 describe('TimeConditionsService.deleteTimeCondition', () => {
     it('deletes time condition', async () => {
         db.timeCondition.findUnique.mockResolvedValue(TC)
+        db.flowEdge.findMany.mockResolvedValue([])
         db.timeCondition.delete.mockResolvedValue(TC)
         await TimeConditionsService.deleteTimeCondition('tc1')
         expect(db.timeCondition.delete).toHaveBeenCalled()
+    })
+
+    it('throws 409 when still referenced by another flow', async () => {
+        db.timeCondition.findUnique.mockResolvedValue(TC)
+        db.flowEdge.findMany.mockResolvedValue([{ sourceType: 'announcement', sourceId: 'a1', slot: 'default' }])
+        await expect(TimeConditionsService.deleteTimeCondition('tc1')).rejects.toMatchObject({ statusCode: 409 })
+        expect(db.timeCondition.delete).not.toHaveBeenCalled()
     })
 
     it('throws 404 with non-existent id', async () => {

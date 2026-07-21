@@ -79,6 +79,7 @@ describe('VariableConditionsService.createVariableCondition', () => {
 describe('VariableConditionsService.getVariableConditionById', () => {
     it('returns condition by id', async () => {
         db.variableCondition.findUnique.mockResolvedValue(VARCOND)
+        db.flowEdge.findMany.mockResolvedValue([])
         const found = await VariableConditionsService.getVariableConditionById('vc1') as any
         expect(found.id).toBe('vc1')
     })
@@ -95,6 +96,7 @@ describe('VariableConditionsService.updateVariableCondition', () => {
     it('replaces rules and combinator, regenerates dialplan', async () => {
         db.variableCondition.findUnique.mockResolvedValueOnce(VARCOND) // existing
         db.variableCondition.update.mockResolvedValue({ ...VARCOND, combinator: 'or' })
+        db.flowEdge.findMany.mockResolvedValue([])
         const updated = await VariableConditionsService.updateVariableCondition('vc1', { combinator: 'or' }) as any
         expect(updated.combinator).toBe('or')
         expect(VariableConditionRepository.regenerate).toHaveBeenCalledWith('c1')
@@ -111,6 +113,7 @@ describe('VariableConditionsService.updateVariableCondition', () => {
 describe('VariableConditionsService.deleteVariableCondition', () => {
     it('deletes condition and regenerates dialplan', async () => {
         db.variableCondition.findUnique.mockResolvedValue({ id: 'vc1', companyId: 'c1' })
+        db.flowEdge.findMany.mockResolvedValue([]) // ninguém referencia — assertNotReferenced passa
         db.variableCondition.delete.mockResolvedValue(VARCOND)
         await VariableConditionsService.deleteVariableCondition('vc1')
         expect(VariableConditionRepository.regenerate).toHaveBeenCalledWith('c1')
@@ -121,5 +124,12 @@ describe('VariableConditionsService.deleteVariableCondition', () => {
         db.variableCondition.findUnique.mockResolvedValue(null)
         await expect(VariableConditionsService.deleteVariableCondition('clxxxxxxxxxxxxxxxxxxxxxxxxx'))
             .rejects.toMatchObject({ statusCode: 404 })
+    })
+
+    it('throws 409 when still referenced by another flow', async () => {
+        db.variableCondition.findUnique.mockResolvedValue({ id: 'vc1', companyId: 'c1' })
+        db.flowEdge.findMany.mockResolvedValue([{ sourceType: 'timecondition', sourceId: 'tc1', slot: 'true' }])
+        await expect(VariableConditionsService.deleteVariableCondition('vc1')).rejects.toMatchObject({ statusCode: 409 })
+        expect(db.variableCondition.delete).not.toHaveBeenCalled()
     })
 })

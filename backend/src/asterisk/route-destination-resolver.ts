@@ -4,15 +4,18 @@ import { QUEUE_APP_CONTEXT, queueAppExten } from './queue.repository'
 import {
     TC_CONTEXT, tcEntry, ANNOUNCEMENT_CONTEXT, announcementExten, IVR_CONTEXT, ivrExten,
     REQUEST_TEMPLATE_CONTEXT, requestTemplateExten, HOL_CONTEXT, holEntry,
-    VAR_CONTEXT, varEntry, VARCOND_CONTEXT, varCondEntry,
+    VAR_CONTEXT, varEntry, VARCOND_CONTEXT, varCondEntry, FLOW_CONTEXT, flowExten,
 } from './dialplan-names'
 
 export type DialplanTarget = { context: string; exten: string; priority: number }
 
-// Resolve um RouteDestination pro context/exten/priority Asterisk equivalente via EXEC Goto — usado
-// só pelo AGI server (src/asterisk/agi-server.ts) pra decidir onSuccess/onError de RequestTemplate em
-// tempo de execução. 'request' encadeia outro template normalmente (mesmo Goto estático de sempre) —
-// loop entre templates é erro de configuração do usuário, mesma situação já possível com timecondition.
+// Única implementação do switch RouteDestination → context/exten/priority Asterisk — usada pelo AGI
+// server (src/asterisk/agi-server.ts) pra decidir onSuccess/onError de RequestTemplate em tempo de
+// execução, e por todo repositório que materializa dialplan estático (announcement/ivr/timecondition/
+// holidaygroup/variable/variablecondition/queue/inboundroute), formatando o resultado pro shape local
+// que cada um precisa (string "ctx,exten,prio" ou {app,appdata}). Não duplicar esse switch de novo.
+// 'request' encadeia outro template normalmente (mesmo Goto estático de sempre) — loop entre
+// templates é erro de configuração do usuário, mesma situação já possível com timecondition.
 export async function resolveRouteDestinationToDialplan(dest: RouteDestination): Promise<DialplanTarget | null> {
     if (!dest || dest.type === 'hangup') return null
 
@@ -41,5 +44,7 @@ export async function resolveRouteDestinationToDialplan(dest: RouteDestination):
             return { context: VAR_CONTEXT, exten: varEntry(dest.id), priority: 1 }
         case 'variable-condition':
             return { context: VARCOND_CONTEXT, exten: varCondEntry(dest.id), priority: 1 }
+        case 'flow':
+            return { context: FLOW_CONTEXT, exten: flowExten(dest.id), priority: 1 }
     }
 }

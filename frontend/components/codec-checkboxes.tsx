@@ -42,7 +42,9 @@ export function CodecCheckboxes({
             : selected.filter((c) => c !== codec)
         const ordered = [
             ...CODEC_OPTIONS.filter((c) => next.includes(c)),
-            ...next.filter((c) => !(CODEC_OPTIONS as readonly string[]).includes(c)),
+            ...next.filter(
+                (c) => !(CODEC_OPTIONS as readonly string[]).includes(c)
+            ),
         ]
         onChange(ordered.join(","))
     }
@@ -66,7 +68,7 @@ export function CodecCheckboxes({
                 ))}
             </div>
             {extras.length > 0 && (
-                <p className="text-muted-foreground text-xs">
+                <p className="text-xs text-muted-foreground">
                     Outros: {extras.join(", ")}
                 </p>
             )}

@@ -20,6 +20,7 @@ export const PERMISSION_RESOURCES = [
     'request-templates',
     'variables',
     'variable-conditions',
+    'flows',
 ] as const
 
 export type PermissionResource = (typeof PERMISSION_RESOURCES)[number]

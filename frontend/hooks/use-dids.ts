@@ -93,12 +93,18 @@ export function useDids(companyId?: string) {
         d.number.toLowerCase().includes(filter.toLowerCase())
     )
 
-    const fetchStateRef = useRef<{ key?: string; fetched: boolean }>({ fetched: false })
+    const fetchStateRef = useRef<{ key?: string; fetched: boolean }>({
+        fetched: false,
+    })
 
     // sem companyId ("Todas as empresas") também busca: o backend já retorna tudo dentro
     // do escopo do usuário quando ?companyId é omitido (ver dids.controller.ts)
     useEffect(() => {
-        if (fetchStateRef.current.fetched && fetchStateRef.current.key === companyId) return
+        if (
+            fetchStateRef.current.fetched &&
+            fetchStateRef.current.key === companyId
+        )
+            return
         fetchStateRef.current = { key: companyId, fetched: true }
         fetchDids()
     }, [fetchDids, companyId])

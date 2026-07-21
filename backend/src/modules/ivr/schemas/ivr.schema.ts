@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { timestamp, cuidParam, ok } from '../../../schemas/responses'
 import { routeDestinationSchema, routeDestinationResponseSchema } from '../../../schemas/route-destination.schema'
+import { usedBySchema } from '../../../schemas/flow-reference-label'
 
 export const idParamSchema = z.object({ id: cuidParam })
 export const companyQuerySchema = z.object({ companyId: z.cuid2() })
@@ -94,6 +95,7 @@ export const IvrMenuSchema = z.object({
     timeoutDestination: routeDestinationResponseSchema,
     longDestination:    routeDestinationResponseSchema.describe('destino quando o chamador digita mais de 1 dígito (até maxDigits) sem bater com nenhuma opção — ex: CPF'),
     options:            z.array(IvrOptionSchema),
+    usedBy:             usedBySchema,
     createdAt:          timestamp,
     updatedAt:          timestamp,
 })

@@ -31,10 +31,10 @@ export const PERMISSION_RESOURCES = [
     { key: "request-templates", label: "Templates de requisição" },
     { key: "variables", label: "Variáveis" },
     { key: "variable-conditions", label: "Condições de variável" },
+    { key: "flows", label: "Flows" },
 ] as const
 
-export type PermissionResourceKey =
-    (typeof PERMISSION_RESOURCES)[number]["key"]
+export type PermissionResourceKey = (typeof PERMISSION_RESOURCES)[number]["key"]
 export type PermissionAction = "view" | "manage"
 
 export type AuthUser = {

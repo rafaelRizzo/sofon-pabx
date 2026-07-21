@@ -60,6 +60,7 @@ describe('InboundRoutesService.getInboundRoutesByCompany', () => {
     it('returns list', async () => {
         db.company.findUnique.mockResolvedValue(COMPANY)
         db.inboundRoute.findMany.mockResolvedValue([ROUTE])
+        db.flowEdge.findMany.mockResolvedValue([])
         const routes = await InboundRoutesService.getInboundRoutesByCompany('c1') as any[]
         expect(routes[0].id).toBe('r1')
     })

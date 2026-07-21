@@ -14,7 +14,10 @@ import { Input } from "@/components/ui/input"
 import { useCompanies } from "@/hooks/use-companies"
 import { useCompanyFilter } from "@/hooks/use-company-filter"
 import { usePagination } from "@/hooks/use-pagination"
-import { useRequestTemplates, type RequestTemplate } from "@/hooks/use-request-templates"
+import {
+    useRequestTemplates,
+    type RequestTemplate,
+} from "@/hooks/use-request-templates"
 
 export default function RequestTemplatesPage() {
     const { companies } = useCompanies()
@@ -31,10 +34,16 @@ export default function RequestTemplatesPage() {
     } = useRequestTemplates(companyFilter)
 
     const [createOpen, setCreateOpen] = useState(false)
-    const [editRequestTemplate, setEditRequestTemplate] = useState<RequestTemplate | null>(null)
-    const [deleteTarget, setDeleteTarget] = useState<RequestTemplate | null>(null)
+    const [editRequestTemplate, setEditRequestTemplate] =
+        useState<RequestTemplate | null>(null)
+    const [deleteTarget, setDeleteTarget] = useState<RequestTemplate | null>(
+        null
+    )
 
-    const { paginated, page, setPage, totalPages, total } = usePagination(requestTemplates, 15)
+    const { paginated, page, setPage, totalPages, total } = usePagination(
+        requestTemplates,
+        15
+    )
 
     const handleDelete = async () => {
         if (!deleteTarget) return false
@@ -75,7 +84,12 @@ export default function RequestTemplatesPage() {
                 onDelete={setDeleteTarget}
             />
 
-            <DataPagination page={page} totalPages={totalPages} total={total} onPageChange={setPage} />
+            <DataPagination
+                page={page}
+                totalPages={totalPages}
+                total={total}
+                onPageChange={setPage}
+            />
 
             {createOpen && (
                 <RequestTemplateFormDialog
@@ -83,17 +97,23 @@ export default function RequestTemplatesPage() {
                     onOpenChange={setCreateOpen}
                     requestTemplate={null}
                     companies={companies}
-                    onSave={(form) => createRequestTemplate(form, form.companyId)}
+                    onSave={(form) =>
+                        createRequestTemplate(form, form.companyId)
+                    }
                 />
             )}
 
             {editRequestTemplate && (
                 <RequestTemplateFormDialog
                     open={!!editRequestTemplate}
-                    onOpenChange={(open) => !open && setEditRequestTemplate(null)}
+                    onOpenChange={(open) =>
+                        !open && setEditRequestTemplate(null)
+                    }
                     requestTemplate={editRequestTemplate}
                     companies={companies}
-                    onSave={(form) => updateRequestTemplate(editRequestTemplate.id, form)}
+                    onSave={(form) =>
+                        updateRequestTemplate(editRequestTemplate.id, form)
+                    }
                 />
             )}
 

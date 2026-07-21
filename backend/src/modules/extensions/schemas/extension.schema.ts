@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { timestamp, ok } from '../../../schemas/responses'
+import { usedBySchema } from '../../../schemas/flow-reference-label'
 
 const aliasSchema = z.string().regex(/^\d{2,6}$/, 'Must be 2-6 digits')
 
@@ -363,6 +364,7 @@ export const ExtensionSchema = z.object({
     companyId: z.string(),
     context: z.string(),
     allowOutbound: z.boolean(),
+    usedBy: usedBySchema,
     createdAt: timestamp,
     updatedAt: timestamp,
     ...sipFieldsPublic,

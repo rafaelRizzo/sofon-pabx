@@ -26,7 +26,7 @@ import { RequestTemplateRepository } from '../../../asterisk/request-template.re
 const COMPANY = { id: 'c1', name: 'ACME' }
 const TEMPLATE = {
     id: 't1', name: 'crm-lookup', companyId: 'c1', method: 'GET', url: 'https://crm.example.com/{{EXTEN}}',
-    headers: null, body: null, timeoutMs: 5000, variableMappings: [], onSuccess: null, onError: null,
+    headers: null, body: null, timeoutMs: 5000, variableMappings: [],
     createdAt: new Date(), updatedAt: new Date(),
 }
 
@@ -78,6 +78,7 @@ describe('RequestTemplatesService.createRequestTemplate', () => {
 describe('RequestTemplatesService.getRequestTemplateById', () => {
     it('returns template', async () => {
         db.requestTemplate.findUnique.mockResolvedValue(TEMPLATE)
+        db.flowEdge.findMany.mockResolvedValue([])
         const template = await RequestTemplatesService.getRequestTemplateById('t1') as any
         expect(template.id).toBe('t1')
     })
@@ -92,6 +93,7 @@ describe('RequestTemplatesService.getRequestTemplateById', () => {
 describe('RequestTemplatesService.updateRequestTemplate', () => {
     it('updates template fields', async () => {
         db.requestTemplate.findUnique.mockResolvedValue(TEMPLATE)
+        db.flowEdge.findMany.mockResolvedValue([])
         db.requestTemplate.update.mockResolvedValue({ ...TEMPLATE, url: 'https://crm.example.com/v2/{{EXTEN}}' })
         const template = await RequestTemplatesService.updateRequestTemplate('t1', { url: 'https://crm.example.com/v2/{{EXTEN}}' }) as any
         expect(template.url).toBe('https://crm.example.com/v2/{{EXTEN}}')
@@ -108,6 +110,7 @@ describe('RequestTemplatesService.updateRequestTemplate', () => {
 describe('RequestTemplatesService.deleteRequestTemplate', () => {
     it('deletes template and removes dialplan entry', async () => {
         db.requestTemplate.findUnique.mockResolvedValue(TEMPLATE)
+        db.flowEdge.findMany.mockResolvedValue([]) // ninguém referencia — assertNotReferenced passa
         db.requestTemplate.delete.mockResolvedValue(TEMPLATE)
         await RequestTemplatesService.deleteRequestTemplate('t1')
         expect(RequestTemplateRepository.regenerate).toHaveBeenCalledWith('c1')
@@ -118,5 +121,12 @@ describe('RequestTemplatesService.deleteRequestTemplate', () => {
         db.requestTemplate.findUnique.mockResolvedValue(null)
         await expect(RequestTemplatesService.deleteRequestTemplate('clxxxxxxxxxxxxxxxxxxxxxxxxx'))
             .rejects.toMatchObject({ statusCode: 404 })
+    })
+
+    it('throws 409 when still referenced by another flow', async () => {
+        db.requestTemplate.findUnique.mockResolvedValue(TEMPLATE)
+        db.flowEdge.findMany.mockResolvedValue([{ sourceType: 'timecondition', sourceId: 'tc1', slot: 'true' }])
+        await expect(RequestTemplatesService.deleteRequestTemplate('t1')).rejects.toMatchObject({ statusCode: 409 })
+        expect(db.requestTemplate.delete).not.toHaveBeenCalled()
     })
 })

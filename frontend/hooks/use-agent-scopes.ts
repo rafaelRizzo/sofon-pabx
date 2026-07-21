@@ -38,10 +38,14 @@ export function useAgentScopes(companyId?: string) {
         }
         setLoading(true)
         try {
-            const { data } = await api.get(`/callcenter/agents/company/${companyId}`)
+            const { data } = await api.get(
+                `/callcenter/agents/company/${companyId}`
+            )
             setScopes(data.scopes ?? [])
         } catch (err) {
-            toast.error(apiError(err, "Erro ao buscar elegibilidade de agentes"))
+            toast.error(
+                apiError(err, "Erro ao buscar elegibilidade de agentes")
+            )
         } finally {
             setLoading(false)
         }
@@ -64,7 +68,9 @@ export function useAgentScopes(companyId?: string) {
         const id = toast.loading(active ? "Ativando..." : "Desativando...")
         try {
             await api.patch(`/callcenter/agents/${scopeId}`, { active })
-            toast.success(active ? "Agente ativado" : "Agente desativado", { id })
+            toast.success(active ? "Agente ativado" : "Agente desativado", {
+                id,
+            })
             await fetchScopes()
             return true
         } catch (err) {
@@ -86,10 +92,16 @@ export function useAgentScopes(companyId?: string) {
         }
     }
 
-    const fetchStateRef = useRef<{ key?: string; fetched: boolean }>({ fetched: false })
+    const fetchStateRef = useRef<{ key?: string; fetched: boolean }>({
+        fetched: false,
+    })
 
     useEffect(() => {
-        if (fetchStateRef.current.fetched && fetchStateRef.current.key === companyId) return
+        if (
+            fetchStateRef.current.fetched &&
+            fetchStateRef.current.key === companyId
+        )
+            return
         fetchStateRef.current = { key: companyId, fetched: true }
         fetchScopes()
     }, [fetchScopes, companyId])

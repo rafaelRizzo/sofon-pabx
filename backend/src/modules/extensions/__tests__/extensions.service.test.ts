@@ -80,6 +80,7 @@ describe('ExtensionsService.createExtension', () => {
             .mockResolvedValueOnce(null)            // Asterisk number conflict check
             .mockResolvedValueOnce({ id: '2001_ast1' }) // checkAsteriskSync
         db.extension.create.mockResolvedValue(EXT_DB)
+        db.flowEdge.findMany.mockResolvedValue([]) // ninguém referencia — resolveUsedByLabels em getExtensionById
 
         const ext = await ExtensionsService.createExtension(pjsip({ alias: '2001', type: 'pjsip', name: 'Test', companyId: 'c1', context: 'ramais', allowOutbound: true })) as any
         expect(ext).toHaveProperty('password')
@@ -98,13 +99,16 @@ describe('ExtensionsService.getExtensionById', () => {
     it('returns extension with synced status', async () => {
         db.extension.findUnique.mockResolvedValue(EXT_DB)
         db.ps_endpoints.findUnique.mockResolvedValue({ id: '2001_ast1' })
+        db.flowEdge.findMany.mockResolvedValue([])
         const ext = await ExtensionsService.getExtensionById('e1') as any
         expect(ext.id).toBe('e1')
         expect(typeof ext.synced).toBe('boolean')
+        expect(ext.usedBy).toEqual([])
     })
 
     it('serves live sip/pjsip details from cache on a hit, skipping asterisk tables', async () => {
         db.extension.findUnique.mockResolvedValue(EXT_DB)
+        db.flowEdge.findMany.mockResolvedValue([])
         const { ExtensionsCache } = await import('../cache/extensions.cache')
         ;(ExtensionsCache.getLiveDetails as any).mockResolvedValueOnce({ synced: true, callerid: 'cached' })
 
@@ -112,6 +116,20 @@ describe('ExtensionsService.getExtensionById', () => {
 
         expect(ext).toMatchObject({ id: 'e1', synced: true, callerid: 'cached' })
         expect(db.ps_endpoints.findUnique).not.toHaveBeenCalled()
+    })
+
+    it('resolves usedBy from FlowEdgeRepository reverse references', async () => {
+        db.extension.findUnique.mockResolvedValue(EXT_DB)
+        db.ps_endpoints.findUnique.mockResolvedValue({ id: '2001_ast1' })
+        db.flowEdge.findMany.mockResolvedValue([
+            { sourceType: 'timecondition', sourceId: 'tc1', slot: 'true', targetId: 'e1' },
+        ])
+        db.timeCondition.findMany.mockResolvedValue([{ id: 'tc1', name: 'Horário comercial' }])
+
+        const ext = await ExtensionsService.getExtensionById('e1') as any
+
+        expect(ext.usedBy).toHaveLength(1)
+        expect(ext.usedBy[0]).toMatchObject({ sourceType: 'timecondition', sourceId: 'tc1', slot: 'true' })
     })
 })
 
@@ -139,5 +157,20 @@ describe('ExtensionsService.deleteExtension', () => {
         db.extension.findUnique.mockResolvedValue(null)
         await expect(ExtensionsService.deleteExtension('clxxxxxxxxxxxxxxxxxxxxxxxxx'))
             .rejects.toMatchObject({ statusCode: 404 })
+    })
+
+    it('deletes extension when not referenced by any flow', async () => {
+        db.extension.findUnique.mockResolvedValue(EXT_DB)
+        db.flowEdge.findMany.mockResolvedValue([]) // ninguém referencia — assertNotReferenced passa
+        const result = await ExtensionsService.deleteExtension('e1')
+        expect(result).toEqual({ id: 'e1', alias: '2001', companyId: 'c1' })
+        expect(db.extension.delete).toHaveBeenCalledWith({ where: { id: 'e1' } })
+    })
+
+    it('throws 409 when still referenced by another flow', async () => {
+        db.extension.findUnique.mockResolvedValue(EXT_DB)
+        db.flowEdge.findMany.mockResolvedValue([{ sourceType: 'timecondition', sourceId: 'tc1', slot: 'true' }])
+        await expect(ExtensionsService.deleteExtension('e1')).rejects.toMatchObject({ statusCode: 409 })
+        expect(db.extension.delete).not.toHaveBeenCalled()
     })
 })

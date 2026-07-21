@@ -92,10 +92,17 @@ export function TimeGroupFormDialog({
         formState: { errors, isSubmitting, isDirty },
     } = useForm<TimeGroupForm>({
         resolver: zodResolver(createTimeGroupFormSchema) as any,
-        defaultValues: { name: "", companyId: "", ranges: [{ ...EMPTY_RANGE }] } as any,
+        defaultValues: {
+            name: "",
+            companyId: "",
+            ranges: [{ ...EMPTY_RANGE }],
+        } as any,
     })
 
-    const { fields, append, remove } = useFieldArray({ control, name: "ranges" })
+    const { fields, append, remove } = useFieldArray({
+        control,
+        name: "ranges",
+    })
     const companyId = watch("companyId")
     const selectedCompany = companies.find((c) => c.id === companyId) ?? null
 
@@ -137,7 +144,9 @@ export function TimeGroupFormDialog({
                 <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-2xl">
                     <DialogHeader>
                         <DialogTitle>
-                            {isEdit ? "Editar grupo de horário" : "Novo grupo de horário"}
+                            {isEdit
+                                ? "Editar grupo de horário"
+                                : "Novo grupo de horário"}
                         </DialogTitle>
                         <DialogDescription>
                             {isEdit
@@ -160,7 +169,9 @@ export function TimeGroupFormDialog({
                                         {...register("name")}
                                     />
                                     {errors.name && (
-                                        <FieldError>{errors.name.message}</FieldError>
+                                        <FieldError>
+                                            {errors.name.message}
+                                        </FieldError>
                                     )}
                                 </Field>
 
@@ -171,20 +182,31 @@ export function TimeGroupFormDialog({
                                             items={companies}
                                             value={selectedCompany}
                                             itemToStringLabel={(c) => c.name}
-                                            isItemEqualToValue={(a, b) => a.id === b.id}
+                                            isItemEqualToValue={(a, b) =>
+                                                a.id === b.id
+                                            }
                                             onValueChange={(c) =>
-                                                setValue("companyId", c?.id ?? "", {
-                                                    shouldValidate: true,
-                                                    shouldDirty: true,
-                                                })
+                                                setValue(
+                                                    "companyId",
+                                                    c?.id ?? "",
+                                                    {
+                                                        shouldValidate: true,
+                                                        shouldDirty: true,
+                                                    }
+                                                )
                                             }
                                         >
                                             <ComboboxInput placeholder="Buscar empresa..." />
                                             <ComboboxContent>
-                                                <ComboboxEmpty>Nenhuma empresa</ComboboxEmpty>
+                                                <ComboboxEmpty>
+                                                    Nenhuma empresa
+                                                </ComboboxEmpty>
                                                 <ComboboxList>
                                                     {(c: Company) => (
-                                                        <ComboboxItem key={c.id} value={c}>
+                                                        <ComboboxItem
+                                                            key={c.id}
+                                                            value={c}
+                                                        >
                                                             {c.name}
                                                         </ComboboxItem>
                                                     )}
@@ -192,7 +214,9 @@ export function TimeGroupFormDialog({
                                             </ComboboxContent>
                                         </Combobox>
                                         {errors.companyId && (
-                                            <FieldError>{errors.companyId.message}</FieldError>
+                                            <FieldError>
+                                                {errors.companyId.message}
+                                            </FieldError>
                                         )}
                                     </Field>
                                 )}
@@ -204,22 +228,29 @@ export function TimeGroupFormDialog({
                                             type="button"
                                             variant="outline"
                                             size="sm"
-                                            onClick={() => append({ ...EMPTY_RANGE })}
+                                            onClick={() =>
+                                                append({ ...EMPTY_RANGE })
+                                            }
                                         >
                                             <PlusIcon />
                                             Adicionar período
                                         </Button>
                                     </div>
                                     {errors.ranges?.root && (
-                                        <FieldError>{errors.ranges.root.message}</FieldError>
+                                        <FieldError>
+                                            {errors.ranges.root.message}
+                                        </FieldError>
                                     )}
                                     {errors.ranges?.message && (
-                                        <FieldError>{errors.ranges.message}</FieldError>
+                                        <FieldError>
+                                            {errors.ranges.message}
+                                        </FieldError>
                                     )}
                                     <FieldDescription>
-                                        Um período não pode cruzar a virada do dia. Para
-                                        cobrir das 08:00 até as 08:00 do dia seguinte, crie
-                                        dois períodos: 08:00–23:59 e 00:00–07:59.
+                                        Um período não pode cruzar a virada do
+                                        dia. Para cobrir das 08:00 até as 08:00
+                                        do dia seguinte, crie dois períodos:
+                                        08:00–23:59 e 00:00–07:59.
                                     </FieldDescription>
 
                                     <div className="flex flex-col gap-3">
@@ -234,8 +265,13 @@ export function TimeGroupFormDialog({
                                                             type="button"
                                                             variant="destructive"
                                                             size="icon"
-                                                            disabled={fields.length <= 1}
-                                                            onClick={() => remove(index)}
+                                                            disabled={
+                                                                fields.length <=
+                                                                1
+                                                            }
+                                                            onClick={() =>
+                                                                remove(index)
+                                                            }
                                                         >
                                                             <Trash2Icon className="size-4" />
                                                             <span className="sr-only">
@@ -246,7 +282,9 @@ export function TimeGroupFormDialog({
 
                                                     <div className="grid grid-cols-2 gap-3">
                                                         <Field>
-                                                            <FieldLabel>Início</FieldLabel>
+                                                            <FieldLabel>
+                                                                Início
+                                                            </FieldLabel>
                                                             <InputGroup>
                                                                 <InputGroupAddon>
                                                                     <ClockIcon />
@@ -259,18 +297,25 @@ export function TimeGroupFormDialog({
                                                                     )}
                                                                 />
                                                             </InputGroup>
-                                                            {errors.ranges?.[index]
-                                                                ?.startTime && (
+                                                            {errors.ranges?.[
+                                                                index
+                                                            ]?.startTime && (
                                                                 <FieldError>
                                                                     {
-                                                                        errors.ranges[index]
-                                                                            ?.startTime?.message
+                                                                        errors
+                                                                            .ranges[
+                                                                            index
+                                                                        ]
+                                                                            ?.startTime
+                                                                            ?.message
                                                                     }
                                                                 </FieldError>
                                                             )}
                                                         </Field>
                                                         <Field>
-                                                            <FieldLabel>Fim</FieldLabel>
+                                                            <FieldLabel>
+                                                                Fim
+                                                            </FieldLabel>
                                                             <InputGroup>
                                                                 <InputGroupAddon>
                                                                     <ClockIcon />
@@ -283,12 +328,17 @@ export function TimeGroupFormDialog({
                                                                     )}
                                                                 />
                                                             </InputGroup>
-                                                            {errors.ranges?.[index]
-                                                                ?.endTime && (
+                                                            {errors.ranges?.[
+                                                                index
+                                                            ]?.endTime && (
                                                                 <FieldError>
                                                                     {
-                                                                        errors.ranges[index]
-                                                                            ?.endTime?.message
+                                                                        errors
+                                                                            .ranges[
+                                                                            index
+                                                                        ]
+                                                                            ?.endTime
+                                                                            ?.message
                                                                     }
                                                                 </FieldError>
                                                             )}
@@ -296,14 +346,22 @@ export function TimeGroupFormDialog({
                                                     </div>
 
                                                     <Field>
-                                                        <FieldLabel>Dias da semana</FieldLabel>
+                                                        <FieldLabel>
+                                                            Dias da semana
+                                                        </FieldLabel>
                                                         <Controller
                                                             control={control}
                                                             name={`ranges.${index}.weekdays`}
-                                                            render={({ field: f }) => (
+                                                            render={({
+                                                                field: f,
+                                                            }) => (
                                                                 <WeekdayCheckboxes
-                                                                    value={f.value}
-                                                                    onChange={f.onChange}
+                                                                    value={
+                                                                        f.value
+                                                                    }
+                                                                    onChange={
+                                                                        f.onChange
+                                                                    }
                                                                 />
                                                             )}
                                                         />
@@ -311,8 +369,11 @@ export function TimeGroupFormDialog({
                                                             ?.weekdays && (
                                                             <FieldError>
                                                                 {
-                                                                    errors.ranges[index]
-                                                                        ?.weekdays?.message
+                                                                    errors
+                                                                        .ranges[
+                                                                        index
+                                                                    ]?.weekdays
+                                                                        ?.message
                                                                 }
                                                             </FieldError>
                                                         )}
@@ -324,20 +385,32 @@ export function TimeGroupFormDialog({
                                                                 Dias do mês
                                                             </FieldLabel>
                                                             <Controller
-                                                                control={control}
+                                                                control={
+                                                                    control
+                                                                }
                                                                 name={`ranges.${index}.monthdays`}
-                                                                render={({ field: f }) => (
+                                                                render={({
+                                                                    field: f,
+                                                                }) => (
                                                                     <MonthdaysField
-                                                                        value={f.value}
-                                                                        onChange={f.onChange}
+                                                                        value={
+                                                                            f.value
+                                                                        }
+                                                                        onChange={
+                                                                            f.onChange
+                                                                        }
                                                                     />
                                                                 )}
                                                             />
-                                                            {errors.ranges?.[index]
-                                                                ?.monthdays && (
+                                                            {errors.ranges?.[
+                                                                index
+                                                            ]?.monthdays && (
                                                                 <FieldError>
                                                                     {
-                                                                        errors.ranges[index]
+                                                                        errors
+                                                                            .ranges[
+                                                                            index
+                                                                        ]
                                                                             ?.monthdays
                                                                             ?.message
                                                                     }
@@ -345,23 +418,38 @@ export function TimeGroupFormDialog({
                                                             )}
                                                         </Field>
                                                         <Field>
-                                                            <FieldLabel>Meses</FieldLabel>
+                                                            <FieldLabel>
+                                                                Meses
+                                                            </FieldLabel>
                                                             <Controller
-                                                                control={control}
+                                                                control={
+                                                                    control
+                                                                }
                                                                 name={`ranges.${index}.months`}
-                                                                render={({ field: f }) => (
+                                                                render={({
+                                                                    field: f,
+                                                                }) => (
                                                                     <MonthsField
-                                                                        value={f.value}
-                                                                        onChange={f.onChange}
+                                                                        value={
+                                                                            f.value
+                                                                        }
+                                                                        onChange={
+                                                                            f.onChange
+                                                                        }
                                                                     />
                                                                 )}
                                                             />
-                                                            {errors.ranges?.[index]
-                                                                ?.months && (
+                                                            {errors.ranges?.[
+                                                                index
+                                                            ]?.months && (
                                                                 <FieldError>
                                                                     {
-                                                                        errors.ranges[index]
-                                                                            ?.months?.message
+                                                                        errors
+                                                                            .ranges[
+                                                                            index
+                                                                        ]
+                                                                            ?.months
+                                                                            ?.message
                                                                     }
                                                                 </FieldError>
                                                             )}
@@ -401,18 +489,27 @@ export function TimeGroupFormDialog({
                 </DialogContent>
             </Dialog>
 
-            <AlertDialog open={confirmDiscardOpen} onOpenChange={setConfirmDiscardOpen}>
+            <AlertDialog
+                open={confirmDiscardOpen}
+                onOpenChange={setConfirmDiscardOpen}
+            >
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Descartar alterações?</AlertDialogTitle>
+                        <AlertDialogTitle>
+                            Descartar alterações?
+                        </AlertDialogTitle>
                         <AlertDialogDescription>
                             Você tem alterações não salvas
-                            {isEdit ? ` no grupo "${timeGroup.name}"` : " neste grupo"}. Se
-                            sair agora, elas serão perdidas.
+                            {isEdit
+                                ? ` no grupo "${timeGroup.name}"`
+                                : " neste grupo"}
+                            . Se sair agora, elas serão perdidas.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel>Continuar editando</AlertDialogCancel>
+                        <AlertDialogCancel>
+                            Continuar editando
+                        </AlertDialogCancel>
                         <AlertDialogAction
                             variant="destructive"
                             onClick={() => {

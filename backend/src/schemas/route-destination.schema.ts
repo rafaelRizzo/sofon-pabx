@@ -25,6 +25,8 @@ import { z } from 'zod'
  * |                 |                | segue pro destination configurado no VariableSet                |                                                  |
  * | variable-condition | ✔           | Goto(variable-conditions,varcond-<id>,1) → valida variável(is) | mesma empresa                                   |
  * |                 |                | (preenchida/tamanho/igualdade/regex/numérica), trueRoute/falseRoute |                                             |
+ * | flow            | ✔              | Goto(flows,flow-<id>,1) → resolve recursivamente o             | mesma empresa; guard de ciclo em               |
+ * |                 |                | entryDestination do Flow (mesmo switch, ver resolver)          | resolveRouteDestinationToDialplan               |
  * | hangup          | ✗              | Hangup()                                                       | —                                               |
  *
  * `null` ou campo omitido equivale a `{ type: "hangup" }`.
@@ -34,7 +36,7 @@ import { z } from 'zod'
  */
 export const ROUTE_DEST_TYPES = [
     'extension', 'queue', 'voicemail', 'timecondition', 'holiday', 'announcement', 'ivr', 'request',
-    'variable-set', 'variable-condition', 'hangup',
+    'variable-set', 'variable-condition', 'flow', 'hangup',
 ] as const
 
 // extraShape entra só na resposta (routeDestinationResponseSchema) — carrega o `label` resolvido
@@ -95,6 +97,13 @@ const variants = <T extends z.ZodTypeAny>(idSchema: T, extraShape: z.ZodRawShape
         type: z.literal('variable-condition').describe(
             'Valida variável(is) de canal (preenchida, tamanho, igualdade, regex, numérica) e direciona ' +
             'por trueRoute/falseRoute do VariableCondition',
+        ),
+        id: idSchema,
+        ...extraShape,
+    }),
+    z.object({
+        type: z.literal('flow').describe(
+            'Encadeia um Flow (alias nomeado/reaproveitável pra uma cadeia inteira de nós montada no canvas visual)',
         ),
         id: idSchema,
         ...extraShape,

@@ -68,7 +68,13 @@ function isAudioFile(file: File) {
     return !!ext && AUDIO_EXTENSIONS.includes(ext)
 }
 
-export function AudioFormDialog({ open, onOpenChange, audio, companies, onSave }: Props) {
+export function AudioFormDialog({
+    open,
+    onOpenChange,
+    audio,
+    companies,
+    onSave,
+}: Props) {
     const isEdit = !!audio
 
     const {
@@ -100,7 +106,9 @@ export function AudioFormDialog({ open, onOpenChange, audio, companies, onSave }
     function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
         const selected = e.target.files?.[0] ?? null
         if (selected && !isAudioFile(selected)) {
-            setFileError("Formato não suportado, veja os formatos aceitos abaixo")
+            setFileError(
+                "Formato não suportado, veja os formatos aceitos abaixo"
+            )
             setFile(null)
             return
         }
@@ -134,7 +142,9 @@ export function AudioFormDialog({ open, onOpenChange, audio, companies, onSave }
             <Dialog open={open} onOpenChange={requestClose}>
                 <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-lg">
                     <DialogHeader>
-                        <DialogTitle>{isEdit ? "Renomear áudio" : "Enviar áudio"}</DialogTitle>
+                        <DialogTitle>
+                            {isEdit ? "Renomear áudio" : "Enviar áudio"}
+                        </DialogTitle>
                         <DialogDescription>
                             {isEdit
                                 ? `Áudio ${audio.name}`
@@ -151,8 +161,15 @@ export function AudioFormDialog({ open, onOpenChange, audio, companies, onSave }
                             <FieldGroup>
                                 <Field>
                                     <FieldLabel>Nome</FieldLabel>
-                                    <Input placeholder="Ex: boas-vindas" {...register("name")} />
-                                    {errors.name && <FieldError>{errors.name.message}</FieldError>}
+                                    <Input
+                                        placeholder="Ex: boas-vindas"
+                                        {...register("name")}
+                                    />
+                                    {errors.name && (
+                                        <FieldError>
+                                            {errors.name.message}
+                                        </FieldError>
+                                    )}
                                 </Field>
 
                                 {!isEdit && (
@@ -162,20 +179,31 @@ export function AudioFormDialog({ open, onOpenChange, audio, companies, onSave }
                                             items={companies}
                                             value={selectedCompany}
                                             itemToStringLabel={(c) => c.name}
-                                            isItemEqualToValue={(a, b) => a.id === b.id}
+                                            isItemEqualToValue={(a, b) =>
+                                                a.id === b.id
+                                            }
                                             onValueChange={(c) =>
-                                                setValue("companyId", c?.id ?? "", {
-                                                    shouldValidate: true,
-                                                    shouldDirty: true,
-                                                })
+                                                setValue(
+                                                    "companyId",
+                                                    c?.id ?? "",
+                                                    {
+                                                        shouldValidate: true,
+                                                        shouldDirty: true,
+                                                    }
+                                                )
                                             }
                                         >
                                             <ComboboxInput placeholder="Buscar empresa..." />
                                             <ComboboxContent>
-                                                <ComboboxEmpty>Nenhuma empresa</ComboboxEmpty>
+                                                <ComboboxEmpty>
+                                                    Nenhuma empresa
+                                                </ComboboxEmpty>
                                                 <ComboboxList>
                                                     {(c: Company) => (
-                                                        <ComboboxItem key={c.id} value={c}>
+                                                        <ComboboxItem
+                                                            key={c.id}
+                                                            value={c}
+                                                        >
                                                             {c.name}
                                                         </ComboboxItem>
                                                     )}
@@ -183,7 +211,9 @@ export function AudioFormDialog({ open, onOpenChange, audio, companies, onSave }
                                             </ComboboxContent>
                                         </Combobox>
                                         {errors.companyId && (
-                                            <FieldError>{errors.companyId.message}</FieldError>
+                                            <FieldError>
+                                                {errors.companyId.message}
+                                            </FieldError>
                                         )}
                                     </Field>
                                 )}
@@ -201,35 +231,50 @@ export function AudioFormDialog({ open, onOpenChange, audio, companies, onSave }
                                         {file ? (
                                             <div className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
                                                 <FileAudioIcon className="size-4 shrink-0 text-muted-foreground" />
-                                                <span className="min-w-0 flex-1 truncate">{file.name}</span>
+                                                <span className="min-w-0 flex-1 truncate">
+                                                    {file.name}
+                                                </span>
                                                 <Button
                                                     type="button"
                                                     variant="ghost"
                                                     size="icon-xs"
                                                     onClick={() => {
                                                         setFile(null)
-                                                        if (fileInputRef.current) fileInputRef.current.value = ""
+                                                        if (
+                                                            fileInputRef.current
+                                                        )
+                                                            fileInputRef.current.value =
+                                                                ""
                                                     }}
                                                 >
                                                     <XIcon />
-                                                    <span className="sr-only">Remover arquivo</span>
+                                                    <span className="sr-only">
+                                                        Remover arquivo
+                                                    </span>
                                                 </Button>
                                             </div>
                                         ) : (
                                             <Button
                                                 type="button"
                                                 variant="outline"
-                                                onClick={() => fileInputRef.current?.click()}
+                                                onClick={() =>
+                                                    fileInputRef.current?.click()
+                                                }
                                             >
                                                 <UploadIcon />
                                                 Selecionar arquivo
                                             </Button>
                                         )}
-                                        {fileError && <FieldError>{fileError}</FieldError>}
+                                        {fileError && (
+                                            <FieldError>{fileError}</FieldError>
+                                        )}
                                         <FieldDescription>
-                                            Formatos aceitos: WAV, MP3, GSM. Convertido automaticamente
-                                            para WAV PCM 16-bit mono 8kHz (formato usado pelo Asterisk),
-                                            sem perda de qualidade e sem resample durante a chamada.
+                                            Formatos aceitos: WAV, MP3, GSM.
+                                            Convertido automaticamente para WAV
+                                            PCM 16-bit mono 8kHz (formato usado
+                                            pelo Asterisk), sem perda de
+                                            qualidade e sem resample durante a
+                                            chamada.
                                         </FieldDescription>
                                     </Field>
                                 )}
@@ -238,10 +283,18 @@ export function AudioFormDialog({ open, onOpenChange, audio, companies, onSave }
                     </form>
 
                     <DialogFooter className="pt-4">
-                        <Button type="button" variant="outline" onClick={() => requestClose(false)}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => requestClose(false)}
+                        >
                             Cancelar
                         </Button>
-                        <Button type="submit" form="audio-form" disabled={isSubmitting}>
+                        <Button
+                            type="submit"
+                            form="audio-form"
+                            disabled={isSubmitting}
+                        >
                             {isSubmitting
                                 ? isEdit
                                     ? "Salvando..."
@@ -254,18 +307,27 @@ export function AudioFormDialog({ open, onOpenChange, audio, companies, onSave }
                 </DialogContent>
             </Dialog>
 
-            <AlertDialog open={confirmDiscardOpen} onOpenChange={setConfirmDiscardOpen}>
+            <AlertDialog
+                open={confirmDiscardOpen}
+                onOpenChange={setConfirmDiscardOpen}
+            >
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Descartar alterações?</AlertDialogTitle>
+                        <AlertDialogTitle>
+                            Descartar alterações?
+                        </AlertDialogTitle>
                         <AlertDialogDescription>
                             Você tem alterações não salvas
-                            {isEdit ? ` no áudio "${audio.name}"` : " neste envio"}. Se sair agora, elas
-                            serão perdidas.
+                            {isEdit
+                                ? ` no áudio "${audio.name}"`
+                                : " neste envio"}
+                            . Se sair agora, elas serão perdidas.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel>Continuar editando</AlertDialogCancel>
+                        <AlertDialogCancel>
+                            Continuar editando
+                        </AlertDialogCancel>
                         <AlertDialogAction
                             variant="destructive"
                             onClick={() => {

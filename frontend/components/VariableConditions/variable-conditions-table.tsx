@@ -20,7 +20,11 @@ import {
     TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { RouteDestinationBadge } from "@/components/RouteDestination/route-destination-badge"
-import { VARIABLE_RULE_OPERATOR_LABELS, type VariableCondition } from "@/hooks/use-variable-conditions"
+import { UsedByBadge } from "@/components/RouteDestination/used-by-badge"
+import {
+    VARIABLE_RULE_OPERATOR_LABELS,
+    type VariableCondition,
+} from "@/hooks/use-variable-conditions"
 
 type Props = {
     variableConditions: VariableCondition[]
@@ -30,7 +34,13 @@ type Props = {
     onDelete: (variableCondition: VariableCondition) => void
 }
 
-export function VariableConditionsTable({ variableConditions, loading, companySelected, onEdit, onDelete }: Props) {
+export function VariableConditionsTable({
+    variableConditions,
+    loading,
+    companySelected,
+    onEdit,
+    onDelete,
+}: Props) {
     return (
         <div className="rounded-md border">
             <Table>
@@ -40,6 +50,7 @@ export function VariableConditionsTable({ variableConditions, loading, companySe
                         <TableHead>Regras</TableHead>
                         <TableHead>Se verdadeiro</TableHead>
                         <TableHead>Se falso</TableHead>
+                        <TableHead>Usado por</TableHead>
                         <TableHead className="w-30 text-right">Ações</TableHead>
                     </TableRow>
                 </TableHeader>
@@ -47,7 +58,7 @@ export function VariableConditionsTable({ variableConditions, loading, companySe
                     {loading ? (
                         Array.from({ length: 3 }).map((_, i) => (
                             <TableRow key={i}>
-                                {Array.from({ length: 5 }).map((_, j) => (
+                                {Array.from({ length: 6 }).map((_, j) => (
                                     <TableCell key={j}>
                                         <Skeleton className="h-4 w-full" />
                                     </TableCell>
@@ -56,32 +67,58 @@ export function VariableConditionsTable({ variableConditions, loading, companySe
                         ))
                     ) : variableConditions.length === 0 ? (
                         <TableRow>
-                            <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                                {companySelected ? "Nenhuma condição de variável encontrada" : "Selecione uma empresa para listar"}
+                            <TableCell
+                                colSpan={6}
+                                className="h-24 text-center text-muted-foreground"
+                            >
+                                {companySelected
+                                    ? "Nenhuma condição de variável encontrada"
+                                    : "Selecione uma empresa para listar"}
                             </TableCell>
                         </TableRow>
                     ) : (
                         variableConditions.map((vc) => (
                             <TableRow key={vc.id}>
-                                <TableCell className="font-medium">{vc.name}</TableCell>
+                                <TableCell className="font-medium">
+                                    {vc.name}
+                                </TableCell>
                                 <TableCell>
                                     <div className="flex flex-wrap gap-1">
                                         {vc.rules.map((r, i) => (
-                                            <Badge key={i} variant="secondary" className="font-mono text-xs">
-                                                {r.variable} {VARIABLE_RULE_OPERATOR_LABELS[r.operator]}
+                                            <Badge
+                                                key={i}
+                                                variant="secondary"
+                                                className="font-mono text-xs"
+                                            >
+                                                {r.variable}{" "}
+                                                {
+                                                    VARIABLE_RULE_OPERATOR_LABELS[
+                                                        r.operator
+                                                    ]
+                                                }
                                                 {r.value ? ` ${r.value}` : ""}
                                             </Badge>
                                         ))}
                                     </div>
                                     <span className="mt-1 block text-xs text-muted-foreground">
-                                        Combinador: {vc.combinator === "and" ? "E" : "OU"}
+                                        Combinador:{" "}
+                                        {vc.combinator === "and" ? "E" : "OU"}
                                     </span>
                                 </TableCell>
                                 <TableCell>
-                                    <RouteDestinationBadge destination={vc.trueRoute} tone="true" />
+                                    <RouteDestinationBadge
+                                        destination={vc.trueRoute}
+                                        tone="true"
+                                    />
                                 </TableCell>
                                 <TableCell>
-                                    <RouteDestinationBadge destination={vc.falseRoute} tone="false" />
+                                    <RouteDestinationBadge
+                                        destination={vc.falseRoute}
+                                        tone="false"
+                                    />
+                                </TableCell>
+                                <TableCell>
+                                    <UsedByBadge usedBy={vc.usedBy} />
                                 </TableCell>
                                 <TableCell>
                                     <TooltipProvider delay={100}>
@@ -92,14 +129,20 @@ export function VariableConditionsTable({ variableConditions, loading, companySe
                                                         <Button
                                                             variant="outline"
                                                             size="icon"
-                                                            onClick={() => onEdit(vc)}
+                                                            onClick={() =>
+                                                                onEdit(vc)
+                                                            }
                                                         >
                                                             <PencilIcon />
-                                                            <span className="sr-only">Editar</span>
+                                                            <span className="sr-only">
+                                                                Editar
+                                                            </span>
                                                         </Button>
                                                     }
                                                 />
-                                                <TooltipContent>Editar condição</TooltipContent>
+                                                <TooltipContent>
+                                                    Editar condição
+                                                </TooltipContent>
                                             </Tooltip>
                                             <Tooltip>
                                                 <TooltipTrigger
@@ -107,14 +150,20 @@ export function VariableConditionsTable({ variableConditions, loading, companySe
                                                         <Button
                                                             variant="destructive"
                                                             size="icon"
-                                                            onClick={() => onDelete(vc)}
+                                                            onClick={() =>
+                                                                onDelete(vc)
+                                                            }
                                                         >
                                                             <Trash2Icon />
-                                                            <span className="sr-only">Deletar</span>
+                                                            <span className="sr-only">
+                                                                Deletar
+                                                            </span>
                                                         </Button>
                                                     }
                                                 />
-                                                <TooltipContent>Deletar condição</TooltipContent>
+                                                <TooltipContent>
+                                                    Deletar condição
+                                                </TooltipContent>
                                             </Tooltip>
                                         </div>
                                     </TooltipProvider>

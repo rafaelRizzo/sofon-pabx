@@ -57,6 +57,7 @@ describe('IvrService.getIvrMenusByCompany', () => {
     it('returns list of menus', async () => {
         db.company.findUnique.mockResolvedValue(COMPANY)
         db.ivrMenu.findMany.mockResolvedValue([MENU])
+        db.flowEdge.findMany.mockResolvedValue([])
         const menus = await IvrService.getIvrMenusByCompany('c1') as any[]
         expect(menus[0].id).toBe('ivr1')
         expect(menus[0].hasAudio).toBe(false)
@@ -73,6 +74,7 @@ describe('IvrService.getIvrMenusByCompany', () => {
 describe('IvrService.getIvrMenuById', () => {
     it('returns hasAudio=true when audioId is set', async () => {
         db.ivrMenu.findUnique.mockResolvedValue({ ...MENU, audioId: 'audio1' })
+        db.flowEdge.findMany.mockResolvedValue([])
         const menu = await IvrService.getIvrMenuById('ivr1') as any
         expect(menu.hasAudio).toBe(true)
         expect(menu.audioId).toBe('audio1')
@@ -256,6 +258,7 @@ describe('IvrService.updateIvrMenu', () => {
     it('updates name and regenerates dialplan', async () => {
         db.ivrMenu.findUnique.mockResolvedValueOnce(MENU).mockResolvedValueOnce(null)
         db.ivrMenu.update.mockResolvedValue({ ...MENU, name: 'novo-menu' })
+        db.flowEdge.findMany.mockResolvedValue([])
         const menu = await IvrService.updateIvrMenu('ivr1', { name: 'novo-menu' }) as any
         expect(menu.name).toBe('novo-menu')
         expect(IvrRepository.regenerate).toHaveBeenCalledWith('c1')
@@ -265,6 +268,7 @@ describe('IvrService.updateIvrMenu', () => {
         const withAudio = { ...MENU, audioId: 'audio1' }
         db.ivrMenu.findUnique.mockResolvedValueOnce(withAudio)
         db.ivrMenu.update.mockResolvedValue({ ...withAudio, digitTimeout: 8 })
+        db.flowEdge.findMany.mockResolvedValue([])
         await IvrService.updateIvrMenu('ivr1', { digitTimeout: 8 })
         expect(IvrRepository.regenerate).toHaveBeenCalledWith('c1')
     })
@@ -273,6 +277,7 @@ describe('IvrService.updateIvrMenu', () => {
         db.ivrMenu.findUnique.mockResolvedValueOnce(MENU) // existing
         db.audio.findUnique.mockResolvedValue({ companyId: 'c1' })
         db.ivrMenu.update.mockResolvedValue({ ...MENU, audioId: 'audio1' })
+        db.flowEdge.findMany.mockResolvedValue([])
         const menu = await IvrService.updateIvrMenu('ivr1', { audioId: 'audio1' }) as any
         expect(menu.hasAudio).toBe(true)
         expect(IvrRepository.regenerate).toHaveBeenCalledWith('c1')
@@ -282,6 +287,7 @@ describe('IvrService.updateIvrMenu', () => {
         const withAudio = { ...MENU, audioId: 'audio1' }
         db.ivrMenu.findUnique.mockResolvedValueOnce(withAudio) // existing
         db.ivrMenu.update.mockResolvedValue({ ...MENU, audioId: null })
+        db.flowEdge.findMany.mockResolvedValue([])
         const menu = await IvrService.updateIvrMenu('ivr1', { audioId: null }) as any
         expect(menu.hasAudio).toBe(false)
         expect(IvrRepository.regenerate).toHaveBeenCalledWith('c1')
@@ -307,6 +313,7 @@ describe('IvrService.updateIvrMenu', () => {
             ...withAudio, options: [{ id: 'o1', digit: '1', destination: { type: 'extension', id: 'e1' } }],
         })
         db.extension.findUnique.mockResolvedValue(EXT)
+        db.flowEdge.findMany.mockResolvedValue([])
 
         const menu = await IvrService.updateIvrMenu('ivr1', { options: [{ digit: '1', destination: { type: 'extension', id: 'e1' } }] }) as any
 
@@ -320,6 +327,7 @@ describe('IvrService.updateIvrMenu', () => {
         db.ivrMenu.findUnique.mockResolvedValueOnce(MENU)
         db.ivrMenu.update.mockResolvedValue(MENU)
         db.ivrMenu.findUniqueOrThrow.mockResolvedValue(MENU)
+        db.flowEdge.findMany.mockResolvedValue([])
         await IvrService.updateIvrMenu('ivr1', { options: [] })
         expect(IvrRepository.regenerate).toHaveBeenCalledWith('c1')
     })
@@ -356,6 +364,7 @@ describe('IvrService.updateIvrMenu', () => {
         db.ivrMenu.findUnique.mockResolvedValueOnce(MENU)
         db.ivrMenu.update.mockResolvedValue({ ...MENU, type: 'collect', variableName: 'CPF_CLIENTE', maxDigits: 11 })
         db.ivrMenu.findUniqueOrThrow.mockResolvedValue({ ...MENU, type: 'collect', variableName: 'CPF_CLIENTE', maxDigits: 11 })
+        db.flowEdge.findMany.mockResolvedValue([])
         const menu = await IvrService.updateIvrMenu('ivr1', {
             type: 'collect', variableName: 'CPF_CLIENTE', maxDigits: 11, options: [],
         }) as any
@@ -367,11 +376,19 @@ describe('IvrService.updateIvrMenu', () => {
 // ─── deleteIvrMenu ──────────────────────────────────────────────────────────────
 describe('IvrService.deleteIvrMenu', () => {
     it('deletes menu and dialplan entry', async () => {
-        db.ivrMenu.findUnique.mockResolvedValue({ id: 'ivr1', companyId: 'c1' })
+        db.ivrMenu.findUnique.mockResolvedValue({ id: 'ivr1', companyId: 'c1', options: [] })
+        db.flowEdge.findMany.mockResolvedValue([])
         db.ivrMenu.delete.mockResolvedValue(MENU)
         await IvrService.deleteIvrMenu('ivr1')
         expect(IvrRepository.regenerate).toHaveBeenCalledWith('c1')
         expect(db.ivrMenu.delete).toHaveBeenCalledWith({ where: { id: 'ivr1' } })
+    })
+
+    it('throws 409 when still referenced by another flow', async () => {
+        db.ivrMenu.findUnique.mockResolvedValue({ id: 'ivr1', companyId: 'c1', options: [] })
+        db.flowEdge.findMany.mockResolvedValue([{ sourceType: 'timecondition', sourceId: 'tc1', slot: 'true' }])
+        await expect(IvrService.deleteIvrMenu('ivr1')).rejects.toMatchObject({ statusCode: 409 })
+        expect(db.ivrMenu.delete).not.toHaveBeenCalled()
     })
 
     it('throws 404 with non-existent id', async () => {

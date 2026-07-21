@@ -14,7 +14,10 @@ import { Input } from "@/components/ui/input"
 import { useCompanies } from "@/hooks/use-companies"
 import { useCompanyFilter } from "@/hooks/use-company-filter"
 import { usePagination } from "@/hooks/use-pagination"
-import { useVariableConditions, type VariableCondition } from "@/hooks/use-variable-conditions"
+import {
+    useVariableConditions,
+    type VariableCondition,
+} from "@/hooks/use-variable-conditions"
 
 export default function VariableConditionsPage() {
     const { companies } = useCompanies()
@@ -31,10 +34,16 @@ export default function VariableConditionsPage() {
     } = useVariableConditions(companyFilter)
 
     const [createOpen, setCreateOpen] = useState(false)
-    const [editVariableCondition, setEditVariableCondition] = useState<VariableCondition | null>(null)
-    const [deleteTarget, setDeleteTarget] = useState<VariableCondition | null>(null)
+    const [editVariableCondition, setEditVariableCondition] =
+        useState<VariableCondition | null>(null)
+    const [deleteTarget, setDeleteTarget] = useState<VariableCondition | null>(
+        null
+    )
 
-    const { paginated, page, setPage, totalPages, total } = usePagination(variableConditions, 15)
+    const { paginated, page, setPage, totalPages, total } = usePagination(
+        variableConditions,
+        15
+    )
 
     const handleDelete = async () => {
         if (!deleteTarget) return false
@@ -45,7 +54,7 @@ export default function VariableConditionsPage() {
         <div className="flex flex-col gap-4">
             <PageHeader
                 title="Condições de variável"
-                description="Valida variáveis de canal (preenchida, tamanho, igualdade, regex, numérica) e direciona por trueRoute/falseRoute"
+                description="Valida variáveis de canal (preenchida, tamanho, igualdade, regex, numérica) — o destino verdadeiro/falso se conecta pelo canvas do Flow"
             >
                 <Button onClick={() => setCreateOpen(true)}>
                     <PlusIcon />
@@ -75,7 +84,12 @@ export default function VariableConditionsPage() {
                 onDelete={setDeleteTarget}
             />
 
-            <DataPagination page={page} totalPages={totalPages} total={total} onPageChange={setPage} />
+            <DataPagination
+                page={page}
+                totalPages={totalPages}
+                total={total}
+                onPageChange={setPage}
+            />
 
             {createOpen && (
                 <VariableConditionFormDialog
@@ -90,10 +104,14 @@ export default function VariableConditionsPage() {
             {editVariableCondition && (
                 <VariableConditionFormDialog
                     open={!!editVariableCondition}
-                    onOpenChange={(open) => !open && setEditVariableCondition(null)}
+                    onOpenChange={(open) =>
+                        !open && setEditVariableCondition(null)
+                    }
                     variableCondition={editVariableCondition}
                     companies={companies}
-                    onSave={(form) => updateVariableCondition(editVariableCondition.id, form)}
+                    onSave={(form) =>
+                        updateVariableCondition(editVariableCondition.id, form)
+                    }
                 />
             )}
 

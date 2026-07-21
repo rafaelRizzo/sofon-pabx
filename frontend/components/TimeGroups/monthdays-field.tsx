@@ -21,7 +21,11 @@ export function MonthdaysField({
 
     function setRange(nextStart: string, nextEnd: string) {
         if (!nextStart) return onChange("1")
-        onChange(nextEnd && nextEnd !== nextStart ? `${nextStart}-${nextEnd}` : nextStart)
+        onChange(
+            nextEnd && nextEnd !== nextStart
+                ? `${nextStart}-${nextEnd}`
+                : nextStart
+        )
     }
 
     return (
@@ -43,7 +47,9 @@ export function MonthdaysField({
                         value={start}
                         onChange={(e) => setRange(e.target.value, end)}
                     />
-                    <span className="text-xs text-muted-foreground">até (opcional)</span>
+                    <span className="text-xs text-muted-foreground">
+                        até (opcional)
+                    </span>
                     <NumberInput
                         min={1}
                         max={31}

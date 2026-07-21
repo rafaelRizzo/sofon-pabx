@@ -1,51 +1,19 @@
 import { prisma } from '../lib/prisma'
 import type { RouteDestination } from '../schemas/route-destination.schema'
-import { queueAppExten } from './queue.repository'
-import {
-    TC_CONTEXT, tcEntry, ANNOUNCEMENT_CONTEXT, announcementExten, IVR_CONTEXT, ivrExten,
-    REQUEST_TEMPLATE_CONTEXT, requestTemplateExten, HOL_CONTEXT, holEntry,
-    VAR_CONTEXT, varEntry, VARCOND_CONTEXT, varCondEntry,
-} from './dialplan-names'
+import { VAR_CONTEXT, varEntry } from './dialplan-names'
 import { resolveAsteriskId, withDialplanLock, writeContextFile, reloadDialplan, type DialplanRow } from './dialplan-file.repository'
+import { resolveRouteDestinationToDialplan } from './route-destination-resolver'
+import { FlowEdgeRepository } from './flow-edge.repository'
+import { isSafeDialplanValue } from '../modules/variables/schemas/variable.schema'
+import { nodeExitCheck } from './flow-node-runtime'
 
 export { VAR_CONTEXT, varEntry }
 
 type Assignment = { variable: string; value: string }
 
-// "context,exten,priority" para destinos fora do exten atual, ou null para hangup —
-// mesmo contrato de resolveRoute() em timecondition.repository.ts
 async function resolveTarget(dest: RouteDestination): Promise<string | null> {
-    if (!dest || dest.type === 'hangup') return null
-
-    switch (dest.type) {
-        case 'extension': {
-            const ext = await prisma.extension.findUnique({ where: { id: dest.id }, select: { context: true, number: true } })
-            return ext ? `${ext.context},${ext.number},1` : null
-        }
-        case 'queue': {
-            const q = await prisma.queue.findUnique({
-                where: { id: dest.id },
-                select: { number: true, company: { select: { asteriskId: true } } },
-            })
-            return q?.number ? `queues-app,${queueAppExten(q.company.asteriskId, q.number)},1` : null
-        }
-        case 'voicemail':
-            return `vm,${dest.id},1`
-        case 'timecondition':
-            return `${TC_CONTEXT},${tcEntry(dest.id)},1`
-        case 'holiday':
-            return `${HOL_CONTEXT},${holEntry(dest.id)},1`
-        case 'announcement':
-            return `${ANNOUNCEMENT_CONTEXT},${announcementExten(dest.id)},1`
-        case 'ivr':
-            return `${IVR_CONTEXT},${ivrExten(dest.id)},1`
-        case 'request':
-            return `${REQUEST_TEMPLATE_CONTEXT},${requestTemplateExten(dest.id)},1`
-        case 'variable-set':
-            return `${VAR_CONTEXT},${varEntry(dest.id)},1`
-        case 'variable-condition':
-            return `${VARCOND_CONTEXT},${varCondEntry(dest.id)},1`
-    }
+    const target = await resolveRouteDestinationToDialplan(dest)
+    return target ? `${target.context},${target.exten},${target.priority}` : null
 }
 
 // value pode conter interpolação nativa do Asterisk (${OUTRAVAR}) — resolvida em tempo de chamada
@@ -57,7 +25,10 @@ export function buildDialplan(id: string, name: string, assignments: Assignment[
 
     let priority = 2
     for (const a of assignments) {
-        entries.push({ context, exten, priority, app: 'Set', appdata: `${a.variable}=${a.value}` })
+        // Defesa em profundidade para registros legados, criados antes da validação de schema:
+        // nunca materializa expressões arbitrárias (ex.: ${SHELL(...)}) no dialplan.
+        const value = isSafeDialplanValue(a.value) ? a.value : ''
+        entries.push({ context, exten, priority, app: 'Set', appdata: `${a.variable}=${value}` })
         priority++
     }
 
@@ -71,11 +42,22 @@ export const VariableRepository = {
     async regenerate(companyId: string) {
         const asteriskId = await resolveAsteriskId(companyId)
         return withDialplanLock(`${VAR_CONTEXT}:${asteriskId}`, async () => {
-            const sets = await prisma.variableSet.findMany({ where: { companyId } })
+            const [sets, edges] = await Promise.all([
+                prisma.variableSet.findMany({ where: { companyId } }),
+                FlowEdgeRepository.getBySource(companyId, 'variableset'),
+            ])
             const entries: DialplanRow[] = []
             for (const s of sets) {
-                const target = await resolveTarget(s.destination as RouteDestination)
-                entries.push(...buildDialplan(s.id, s.name, s.assignments as Assignment[], target))
+                const target = await resolveTarget(edges.get(s.id)?.default ?? null)
+                const rows = buildDialplan(s.id, s.name, s.assignments as Assignment[], target)
+                const terminal = rows.at(-1)!
+                terminal.priority++
+                rows.push(nodeExitCheck(VAR_CONTEXT, varEntry(s.id), terminal.priority - 1, 'default'))
+                // writeContextFile precisa das prioridades na mesma ordem do exten; move o check
+                // imediatamente antes do terminal depois de criá-lo sem alterar o builder puro.
+                const check = rows.pop()!
+                rows.splice(rows.length - 1, 0, check)
+                entries.push(...rows)
             }
             await writeContextFile(VAR_CONTEXT, asteriskId, entries)
             reloadDialplan()

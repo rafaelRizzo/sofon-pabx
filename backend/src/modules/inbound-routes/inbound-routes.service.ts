@@ -1,8 +1,8 @@
-import { Prisma } from '../../../generated/prisma/client'
 import { prisma } from '../../lib/prisma'
 import { getCompanyById } from '../companies/companies.service'
 import { InboundRoutesCache } from './cache/inbound-routes.cache'
 import { InboundRouteRepository } from '../../asterisk/inboundroute.repository'
+import { FlowEdgeRepository } from '../../asterisk/flow-edge.repository'
 import { validateRouteDestination } from '../../schemas/route-destination.validate'
 import { resolveDestinationLabels, withDestinationLabel } from '../../schemas/route-destination-label'
 import type { RouteDestination } from '../../schemas/route-destination.schema'
@@ -17,13 +17,12 @@ const inboundRouteSelect = {
     trunkId: true,
     did: { select: { id: true, number: true } },
     trunk: { select: { id: true, name: true } },
-    destination: true,
     createdAt: true,
     updatedAt: true,
 } as const
 
 const _byId = () => prisma.inboundRoute.findUnique({ where: { id: '' }, select: inboundRouteSelect })
-export type InboundRouteDto = NonNullable<Awaited<ReturnType<typeof _byId>>>
+export type InboundRouteDto = NonNullable<Awaited<ReturnType<typeof _byId>>> & { destination: RouteDestination }
 
 const validateDestination = (dest: InboundDest | undefined | null, companyId: string) =>
     validateRouteDestination(dest ?? null, companyId)
@@ -51,7 +50,11 @@ export const getInboundRoutesByCompany = async (companyId: string) => {
 
     await getCompanyById(companyId)
 
-    const routes = await withDestinationLabels(await prisma.inboundRoute.findMany({ where: { companyId }, select: inboundRouteSelect }))
+    const [rows, edges] = await Promise.all([
+        prisma.inboundRoute.findMany({ where: { companyId }, select: inboundRouteSelect }),
+        FlowEdgeRepository.getBySource(companyId, 'inboundroute'),
+    ])
+    const routes = await withDestinationLabels(rows.map((r) => ({ ...r, destination: edges.get(r.id)?.default ?? null })))
     await InboundRoutesCache.setByCompany(companyId, routes)
     return routes
 }
@@ -67,12 +70,12 @@ export const getAllInboundRoutes = async (companyIds?: string[], userId?: string
         if (cached) return cached
     }
 
-    const routes = await withDestinationLabels(
-        await prisma.inboundRoute.findMany({
-            where: companyIds ? { companyId: { in: companyIds } } : undefined,
-            select: inboundRouteSelect,
-        }),
-    )
+    const rows = await prisma.inboundRoute.findMany({
+        where: companyIds ? { companyId: { in: companyIds } } : undefined,
+        select: inboundRouteSelect,
+    })
+    const edges = await FlowEdgeRepository.getBySourceIds('inboundroute', rows.map((r) => r.id))
+    const routes = await withDestinationLabels(rows.map((r) => ({ ...r, destination: edges.get(r.id)?.default ?? null })))
 
     if (!companyIds) await InboundRoutesCache.setAll(routes)
     else if (userId) await InboundRoutesCache.setForScope(userId, routes)
@@ -86,7 +89,8 @@ export const getInboundRouteById = async (id: string): Promise<InboundRouteDto> 
     const found = await prisma.inboundRoute.findUnique({ where: { id }, select: inboundRouteSelect })
     if (!found) throw new AppError('Inbound route not found', 404)
 
-    const route = (await withDestinationLabels([found]))[0]!
+    const destination = await FlowEdgeRepository.getOne('inboundroute', id, 'default')
+    const route = (await withDestinationLabels([{ ...found, destination }]))[0]!
     await InboundRoutesCache.setRoute(id, route)
     return route
 }
@@ -122,18 +126,18 @@ export const createInboundRoute = async (data: CreateInboundRouteInput) => {
                 companyId: data.companyId,
                 didId: data.didId,
                 trunkId: data.trunkId,
-                destination: data.destination ?? undefined,
             },
             select: inboundRouteSelect,
         })
 
+        await FlowEdgeRepository.setSlot(tx, data.companyId, 'inboundroute', created.id, 'default', data.destination ?? null)
         await InboundRouteRepository.create(tx, data.trunkId, did.number, data.destination ?? null, trunk.maxInChannels)
         return created
     })
 
     await InboundRoutesCache.invalidateByCompany(data.companyId)
     await InboundRoutesCache.invalidateNamespace()
-    return route
+    return { ...route, destination: data.destination ?? null }
 }
 
 export const updateInboundRoute = async (id: string, data: UpdateInboundRouteInput) => {
@@ -150,18 +154,18 @@ export const updateInboundRoute = async (id: string, data: UpdateInboundRouteInp
         await validateDestination(data.destination, existing.companyId)
     }
 
-    const newDest = data.destination !== undefined ? data.destination : (existing.destination as InboundDest)
+    const newDest: InboundDest = data.destination !== undefined ? data.destination : await FlowEdgeRepository.getOne('inboundroute', id, 'default')
 
     const route = await prisma.$transaction(async (tx) => {
         const updated = await tx.inboundRoute.update({
             where: { id },
-            data: {
-                name: data.name,
-                destination: data.destination === undefined ? undefined : (data.destination ?? Prisma.JsonNull),
-            },
+            data: { name: data.name },
             select: inboundRouteSelect,
         })
 
+        if (data.destination !== undefined) {
+            await FlowEdgeRepository.setSlot(tx, existing.companyId, 'inboundroute', id, 'default', data.destination)
+        }
         await InboundRouteRepository.update(tx, existing.trunkId, existing.did.number, newDest, existing.trunk.maxInChannels)
         return updated
     })
@@ -169,7 +173,7 @@ export const updateInboundRoute = async (id: string, data: UpdateInboundRouteInp
     await InboundRoutesCache.invalidateRoute(id)
     await InboundRoutesCache.invalidateByCompany(existing.companyId)
     await InboundRoutesCache.invalidateNamespace()
-    return route
+    return { ...route, destination: newDest }
 }
 
 export const deleteInboundRoute = async (id: string) => {
@@ -182,6 +186,7 @@ export const deleteInboundRoute = async (id: string) => {
     await prisma.$transaction(async (tx) => {
         await InboundRouteRepository.delete(tx, existing.trunkId, existing.did.number)
         await tx.inboundRoute.delete({ where: { id } })
+        await FlowEdgeRepository.deleteAllForSource(tx, 'inboundroute', id)
     })
 
     await InboundRoutesCache.invalidateRoute(id)

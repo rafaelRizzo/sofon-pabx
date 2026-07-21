@@ -31,7 +31,10 @@ export type RoutingRule = {
 // Campo de texto opcional — string vazia (campo não preenchido no form) vira undefined em vez
 // de cair na validação de formato (regex/max), que só é aplicada quando o campo é usado
 const optionalText = (inner: z.ZodString) =>
-    z.preprocess((v) => (v === "" || v === undefined ? undefined : v), inner.optional())
+    z.preprocess(
+        (v) => (v === "" || v === undefined ? undefined : v),
+        inner.optional()
+    )
 
 // Espelha routingConditionsSchema de
 // backend/src/modules/callcenter/routing-rules/schemas/routing-rule.schema.ts
@@ -42,15 +45,24 @@ const routingConditionsFormSchema = z.object({
         (v) => (Array.isArray(v) && v.length === 0 ? undefined : v),
         z.array(z.enum(WEEKDAYS)).min(1, "Selecione ao menos um dia").optional()
     ),
-    startTime: optionalText(z.string().regex(timeRegex, "Horário inválido (HH:MM)")),
-    endTime: optionalText(z.string().regex(timeRegex, "Horário inválido (HH:MM)")),
+    startTime: optionalText(
+        z.string().regex(timeRegex, "Horário inválido (HH:MM)")
+    ),
+    endTime: optionalText(
+        z.string().regex(timeRegex, "Horário inválido (HH:MM)")
+    ),
 })
 
 // companyId só existe no create — o PUT do backend não permite trocar a empresa da regra
 export const createRoutingRuleFormSchema = z.object({
     name: z.string().min(1, "Informe o nome").max(80, "Máximo 80 caracteres"),
     companyId: z.string().min(1, "Selecione uma empresa"),
-    priority: z.coerce.number().int().min(0, "Mínimo 0").max(99, "Máximo 99").default(0),
+    priority: z.coerce
+        .number()
+        .int()
+        .min(0, "Mínimo 0")
+        .max(99, "Máximo 99")
+        .default(0),
     conditions: routingConditionsFormSchema.default({}),
     active: z.boolean().default(true),
 })
@@ -79,7 +91,9 @@ export function useRoutingRules(companyId?: string) {
         }
         setLoading(true)
         try {
-            const { data } = await api.get(`/callcenter/routing-rules/company/${companyId}`)
+            const { data } = await api.get(
+                `/callcenter/routing-rules/company/${companyId}`
+            )
             setRoutingRules(data.routingRules ?? [])
         } catch (err) {
             toast.error(apiError(err, "Erro ao buscar regras de prioridade"))
@@ -101,7 +115,10 @@ export function useRoutingRules(companyId?: string) {
         }
     }
 
-    const updateRoutingRule = async (routingRuleId: string, form: RoutingRuleUpdateForm) => {
+    const updateRoutingRule = async (
+        routingRuleId: string,
+        form: RoutingRuleUpdateForm
+    ) => {
         const id = toast.loading("Atualizando regra...")
         try {
             await api.put(`/callcenter/routing-rules/${routingRuleId}`, form)
@@ -127,10 +144,16 @@ export function useRoutingRules(companyId?: string) {
         }
     }
 
-    const fetchStateRef = useRef<{ key?: string; fetched: boolean }>({ fetched: false })
+    const fetchStateRef = useRef<{ key?: string; fetched: boolean }>({
+        fetched: false,
+    })
 
     useEffect(() => {
-        if (fetchStateRef.current.fetched && fetchStateRef.current.key === companyId) return
+        if (
+            fetchStateRef.current.fetched &&
+            fetchStateRef.current.key === companyId
+        )
+            return
         fetchStateRef.current = { key: companyId, fetched: true }
         fetchRoutingRules()
     }, [fetchRoutingRules, companyId])

@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { timestamp, cuidParam, ok } from '../../../schemas/responses'
 import { ROUTE_DEST_TYPES, routeDestinationSchema, routeDestinationResponseSchema } from '../../../schemas/route-destination.schema'
+import { usedBySchema } from '../../../schemas/flow-reference-label'
 
 export const ROUTE_TYPES = ROUTE_DEST_TYPES
 
@@ -39,6 +40,7 @@ export const TimeConditionSchema = z.object({
     companyId:  z.string(),
     trueRoute:  routeDestinationResponseSchema,
     falseRoute: routeDestinationResponseSchema,
+    usedBy:     usedBySchema,
     timeGroups: z.array(z.object({ timeGroup: TimeGroupRefSchema })),
     createdAt:  timestamp,
     updatedAt:  timestamp,

@@ -31,7 +31,13 @@ type Props = {
     onDelete: (did: Did) => void
 }
 
-export function DidsTable({ dids, companies, loading, onEdit, onDelete }: Props) {
+export function DidsTable({
+    dids,
+    companies,
+    loading,
+    onEdit,
+    onDelete,
+}: Props) {
     const companyName = (companyId: string) =>
         companies.find((c) => c.id === companyId)?.name ?? companyId
 

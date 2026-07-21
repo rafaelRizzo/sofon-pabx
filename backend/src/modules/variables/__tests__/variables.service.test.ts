@@ -74,6 +74,7 @@ describe('VariablesService.createVariableSet', () => {
 describe('VariablesService.getVariableSetById', () => {
     it('returns variable set by id', async () => {
         db.variableSet.findUnique.mockResolvedValue(VARSET)
+        db.flowEdge.findMany.mockResolvedValue([])
         const found = await VariablesService.getVariableSetById('v1') as any
         expect(found.id).toBe('v1')
     })
@@ -89,6 +90,7 @@ describe('VariablesService.getVariableSetById', () => {
 describe('VariablesService.updateVariableSet', () => {
     it('replaces assignments and regenerates dialplan', async () => {
         db.variableSet.findUnique.mockResolvedValueOnce(VARSET) // existing
+        db.flowEdge.findMany.mockResolvedValue([])
         db.variableSet.update.mockResolvedValue({ ...VARSET, assignments: [{ variable: 'X', value: '2' }] })
         const updated = await VariablesService.updateVariableSet('v1', { assignments: [{ variable: 'X', value: '2' }] }) as any
         expect(updated.assignments).toEqual([{ variable: 'X', value: '2' }])
@@ -106,6 +108,7 @@ describe('VariablesService.updateVariableSet', () => {
 describe('VariablesService.deleteVariableSet', () => {
     it('deletes variable set and regenerates dialplan', async () => {
         db.variableSet.findUnique.mockResolvedValue({ id: 'v1', companyId: 'c1' })
+        db.flowEdge.findMany.mockResolvedValue([]) // ninguém referencia — assertNotReferenced passa
         db.variableSet.delete.mockResolvedValue(VARSET)
         await VariablesService.deleteVariableSet('v1')
         expect(VariableRepository.regenerate).toHaveBeenCalledWith('c1')
@@ -116,5 +119,12 @@ describe('VariablesService.deleteVariableSet', () => {
         db.variableSet.findUnique.mockResolvedValue(null)
         await expect(VariablesService.deleteVariableSet('clxxxxxxxxxxxxxxxxxxxxxxxxx'))
             .rejects.toMatchObject({ statusCode: 404 })
+    })
+
+    it('throws 409 when still referenced by another flow', async () => {
+        db.variableSet.findUnique.mockResolvedValue({ id: 'v1', companyId: 'c1' })
+        db.flowEdge.findMany.mockResolvedValue([{ sourceType: 'timecondition', sourceId: 'tc1', slot: 'true' }])
+        await expect(VariablesService.deleteVariableSet('v1')).rejects.toMatchObject({ statusCode: 409 })
+        expect(db.variableSet.delete).not.toHaveBeenCalled()
     })
 })

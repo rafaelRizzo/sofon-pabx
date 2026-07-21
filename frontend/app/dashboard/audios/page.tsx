@@ -34,7 +34,10 @@ export default function AudiosPage() {
         deleteAudio,
     } = useAudios(companyFilter)
 
-    const { paginated, page, setPage, totalPages, total } = usePagination(audios, 15)
+    const { paginated, page, setPage, totalPages, total } = usePagination(
+        audios,
+        15
+    )
 
     const handleDelete = async () => {
         if (!deleteTarget) return false
@@ -75,7 +78,12 @@ export default function AudiosPage() {
                 onDelete={setDeleteTarget}
             />
 
-            <DataPagination page={page} totalPages={totalPages} total={total} onPageChange={setPage} />
+            <DataPagination
+                page={page}
+                totalPages={totalPages}
+                total={total}
+                onPageChange={setPage}
+            />
 
             {createOpen && (
                 <AudioFormDialog
@@ -83,7 +91,9 @@ export default function AudiosPage() {
                     onOpenChange={setCreateOpen}
                     audio={null}
                     companies={companies}
-                    onSave={(form, file) => createAudio(file!, form.name, form.companyId)}
+                    onSave={(form, file) =>
+                        createAudio(file!, form.name, form.companyId)
+                    }
                 />
             )}
 

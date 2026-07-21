@@ -30,7 +30,8 @@ type Props = {
 }
 
 export function AgentScopesPanel({ companyId }: Props) {
-    const { scopes, loading, createScope, toggleScopeActive, deleteScope } = useAgentScopes(companyId)
+    const { scopes, loading, createScope, toggleScopeActive, deleteScope } =
+        useAgentScopes(companyId)
     const { extensions } = useExtensions(companyId)
 
     const [selectedExtensionId, setSelectedExtensionId] = useState<string>("")
@@ -44,12 +45,17 @@ export function AgentScopesPanel({ companyId }: Props) {
     const availableExtensions = extensions.filter(
         (e) => !scopes.some((s) => s.extensionId === e.id)
     )
-    const selectedExtension = availableExtensions.find((e) => e.id === selectedExtensionId) ?? null
+    const selectedExtension =
+        availableExtensions.find((e) => e.id === selectedExtensionId) ?? null
 
     async function handleAdd() {
         if (!selectedExtensionId) return
         setAdding(true)
-        const ok = await createScope({ extensionId: selectedExtensionId, companyId, active: true })
+        const ok = await createScope({
+            extensionId: selectedExtensionId,
+            companyId,
+            active: true,
+        })
         setAdding(false)
         if (ok) setSelectedExtensionId("")
     }
@@ -57,8 +63,9 @@ export function AgentScopesPanel({ companyId }: Props) {
     return (
         <div className="flex flex-col gap-4">
             <p className="text-sm text-muted-foreground">
-                Restringe quais ramais podem atender chamadas dessa empresa. Se nenhum ramal for
-                vinculado aqui, todos os membros das filas continuam elegíveis normalmente.
+                Restringe quais ramais podem atender chamadas dessa empresa. Se
+                nenhum ramal for vinculado aqui, todos os membros das filas
+                continuam elegíveis normalmente.
             </p>
 
             <div className="flex items-end gap-2">
@@ -69,7 +76,10 @@ export function AgentScopesPanel({ companyId }: Props) {
                     isItemEqualToValue={(a, b) => a.id === b.id}
                     onValueChange={(e) => setSelectedExtensionId(e?.id ?? "")}
                 >
-                    <ComboboxInput placeholder="Buscar ramal..." className="w-72" />
+                    <ComboboxInput
+                        placeholder="Buscar ramal..."
+                        className="w-72"
+                    />
                     <ComboboxContent>
                         <ComboboxEmpty>
                             {availableExtensions.length === 0
@@ -85,7 +95,11 @@ export function AgentScopesPanel({ companyId }: Props) {
                         </ComboboxList>
                     </ComboboxContent>
                 </Combobox>
-                <Button type="button" disabled={!selectedExtensionId || adding} onClick={handleAdd}>
+                <Button
+                    type="button"
+                    disabled={!selectedExtensionId || adding}
+                    onClick={handleAdd}
+                >
                     <PlusIcon />
                     Vincular
                 </Button>
@@ -97,7 +111,9 @@ export function AgentScopesPanel({ companyId }: Props) {
                         <TableRow>
                             <TableHead>Ramal</TableHead>
                             <TableHead>Status</TableHead>
-                            <TableHead className="w-16 text-right">Ações</TableHead>
+                            <TableHead className="w-16 text-right">
+                                Ações
+                            </TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -113,8 +129,12 @@ export function AgentScopesPanel({ companyId }: Props) {
                             ))
                         ) : scopes.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">
-                                    Nenhum ramal vinculado: todos os membros das filas são elegíveis
+                                <TableCell
+                                    colSpan={3}
+                                    className="h-24 text-center text-muted-foreground"
+                                >
+                                    Nenhum ramal vinculado: todos os membros das
+                                    filas são elegíveis
                                 </TableCell>
                             </TableRow>
                         ) : (
@@ -128,11 +148,16 @@ export function AgentScopesPanel({ companyId }: Props) {
                                             <Switch
                                                 checked={scope.active}
                                                 onCheckedChange={(checked) =>
-                                                    toggleScopeActive(scope.id, checked)
+                                                    toggleScopeActive(
+                                                        scope.id,
+                                                        checked
+                                                    )
                                                 }
                                             />
                                             <span className="text-xs text-muted-foreground">
-                                                {scope.active ? "Elegível" : "Inelegível"}
+                                                {scope.active
+                                                    ? "Elegível"
+                                                    : "Inelegível"}
                                             </span>
                                         </div>
                                     </TableCell>
@@ -142,10 +167,14 @@ export function AgentScopesPanel({ companyId }: Props) {
                                             variant="ghost"
                                             size="icon-sm"
                                             className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                                            onClick={() => deleteScope(scope.id)}
+                                            onClick={() =>
+                                                deleteScope(scope.id)
+                                            }
                                         >
                                             <Trash2Icon />
-                                            <span className="sr-only">Remover</span>
+                                            <span className="sr-only">
+                                                Remover
+                                            </span>
                                         </Button>
                                     </TableCell>
                                 </TableRow>

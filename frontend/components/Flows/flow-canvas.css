@@ -1,0 +1,99 @@
+/* Reaproveita os design tokens do app (ver app/globals.css) nas variáveis de tema do
+ * @xyflow/react. Sem isso, Controls/MiniMap/Background usam sempre o tema claro padrão da lib
+ * (branco), porque a lib só troca pro tema escuro dela com uma classe .dark no próprio elemento
+ * .react-flow — e o app aplica .dark na <html> via next-themes, não nesse elemento.
+ */
+.react-flow {
+    --xy-background-color: var(--color-background);
+    --xy-background-pattern-color: var(--color-border);
+
+    --xy-edge-stroke: var(--color-border);
+    --xy-edge-stroke-selected: var(--color-primary);
+    --xy-edge-stroke-width: 1.5;
+    --xy-connectionline-stroke: var(--color-primary);
+    --xy-connectionline-stroke-width: 1.5;
+    --xy-edge-label-background-color: var(--color-card);
+    --xy-edge-label-color: var(--color-foreground);
+
+    --xy-node-background-color: var(--color-card);
+    --xy-node-color: var(--color-foreground);
+    --xy-node-border: 1px solid var(--color-border);
+    --xy-node-boxshadow-hover: 0 1px 4px 1px
+        color-mix(in oklch, var(--color-foreground) 8%, transparent);
+    --xy-node-boxshadow-selected: 0 0 0 2px var(--color-primary);
+
+    --xy-handle-background-color: var(--color-primary);
+    --xy-handle-border-color: var(--color-background);
+
+    --xy-selection-background-color: color-mix(
+        in oklch,
+        var(--color-primary) 8%,
+        transparent
+    );
+    --xy-selection-border: 1px dotted var(--color-primary);
+
+    --xy-controls-button-background-color: var(--color-card);
+    --xy-controls-button-background-color-hover: var(--color-accent);
+    --xy-controls-button-color: var(--color-foreground);
+    --xy-controls-button-color-hover: var(--color-foreground);
+    --xy-controls-button-border-color: var(--color-border);
+    --xy-controls-box-shadow: 0 1px 2px 0
+        color-mix(in oklch, var(--color-foreground) 10%, transparent);
+
+    --xy-minimap-background-color: var(--color-card);
+    --xy-minimap-mask-background-color: color-mix(
+        in oklch,
+        var(--color-foreground) 12%,
+        transparent
+    );
+    --xy-minimap-mask-stroke-color: var(--color-border);
+    --xy-minimap-node-background-color: var(--color-muted-foreground);
+    --xy-minimap-node-stroke-color: var(--color-border);
+
+    --xy-attribution-background-color: transparent;
+    --flow-branch-positive: oklch(0.696 0.17 162.48);
+    --flow-branch-negative: oklch(0.645 0.222 16.439);
+}
+
+.react-flow__node-flowNode,
+.react-flow__node-startNode {
+    cursor: grab;
+}
+
+.react-flow__node-flowNode:active,
+.react-flow__node-startNode:active {
+    cursor: grabbing;
+}
+
+.react-flow__handle {
+    cursor: crosshair;
+}
+
+.react-flow__handle.flow-node-output-handle {
+    bottom: -6px;
+    box-shadow:
+        0 0 0 1px color-mix(in oklch, var(--color-foreground) 12%, transparent),
+        0 2px 4px color-mix(in oklch, var(--color-foreground) 16%, transparent);
+}
+
+.react-flow__edge-path {
+    transition:
+        stroke 150ms ease,
+        stroke-width 150ms ease;
+}
+
+.react-flow__controls {
+    overflow: hidden;
+    border-radius: var(--radius-md);
+    box-shadow: var(--xy-controls-box-shadow);
+}
+
+.react-flow__controls-button {
+    border-bottom-color: var(--color-border);
+}
+
+.react-flow__minimap {
+    overflow: hidden;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+}

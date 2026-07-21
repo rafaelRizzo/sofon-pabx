@@ -46,6 +46,7 @@ describe('HolidayGroupsService.getHolidayGroupsByCompany', () => {
     it('returns list of groups', async () => {
         db.company.findUnique.mockResolvedValue(COMPANY)
         db.holidayGroup.findMany.mockResolvedValue([HG])
+        db.flowEdge.findMany.mockResolvedValue([])
         const groups = await HolidayGroupsService.getHolidayGroupsByCompany('c1') as any[]
         expect(groups[0].id).toBe('hg1')
     })
@@ -61,6 +62,7 @@ describe('HolidayGroupsService.getHolidayGroupsByCompany', () => {
 describe('HolidayGroupsService.getHolidayGroupById', () => {
     it('returns group by id', async () => {
         db.holidayGroup.findUnique.mockResolvedValue(HG)
+        db.flowEdge.findMany.mockResolvedValue([])
         const hg = await HolidayGroupsService.getHolidayGroupById('hg1') as any
         expect(hg.id).toBe('hg1')
     })
@@ -133,6 +135,7 @@ describe('HolidayGroupsService.createHolidayGroup', () => {
 describe('HolidayGroupsService.updateHolidayGroup', () => {
     it('updates name', async () => {
         db.holidayGroup.findUnique.mockResolvedValueOnce({ ...HG, dates: [DATE1] }).mockResolvedValueOnce(null)
+        db.flowEdge.findMany.mockResolvedValue([])
         db.holidayGroup.update.mockResolvedValue({ ...HG, name: 'Feriados' })
         const hg = await HolidayGroupsService.updateHolidayGroup('hg1', { name: 'Feriados' }) as any
         expect(hg.name).toBe('Feriados')
@@ -140,6 +143,7 @@ describe('HolidayGroupsService.updateHolidayGroup', () => {
 
     it('replaces dates manually when no url configured', async () => {
         db.holidayGroup.findUnique.mockResolvedValue({ ...HG, dates: [DATE1] })
+        db.flowEdge.findMany.mockResolvedValue([])
         db.holidayGroup.update.mockResolvedValue(HG)
         await HolidayGroupsService.updateHolidayGroup('hg1', { dates: [{ name: 'Ano Novo', month: 1, day: 1 }] })
         expect(db.holidayDate.deleteMany).toHaveBeenCalledWith({ where: { holidayGroupId: 'hg1' } })
@@ -154,6 +158,7 @@ describe('HolidayGroupsService.updateHolidayGroup', () => {
 
     it('fetches initial dates when url is just set', async () => {
         db.holidayGroup.findUnique.mockResolvedValue({ ...HG, url: null, dates: [] })
+        db.flowEdge.findMany.mockResolvedValue([])
         db.holidayGroup.update.mockResolvedValue({ ...HG, url: 'https://example.com/feriados' })
         ;(fetchHolidaysFromUrl as any).mockResolvedValue([{ name: 'Natal', month: 12, day: 25 }])
 
@@ -174,6 +179,7 @@ describe('HolidayGroupsService.updateHolidayGroup', () => {
 describe('HolidayGroupsService.deleteHolidayGroup', () => {
     it('deletes holiday group', async () => {
         db.holidayGroup.findUnique.mockResolvedValue(HG)
+        db.flowEdge.findMany.mockResolvedValue([]) // ninguém referencia — assertNotReferenced passa
         db.holidayGroup.delete.mockResolvedValue(HG)
         await HolidayGroupsService.deleteHolidayGroup('hg1')
         expect(db.holidayGroup.delete).toHaveBeenCalled()
@@ -183,5 +189,12 @@ describe('HolidayGroupsService.deleteHolidayGroup', () => {
         db.holidayGroup.findUnique.mockResolvedValue(null)
         await expect(HolidayGroupsService.deleteHolidayGroup('clxxxxxxxxxxxxxxxxxxxxxxxxx'))
             .rejects.toMatchObject({ statusCode: 404 })
+    })
+
+    it('throws 409 when still referenced by another flow', async () => {
+        db.holidayGroup.findUnique.mockResolvedValue(HG)
+        db.flowEdge.findMany.mockResolvedValue([{ sourceType: 'timecondition', sourceId: 'tc1', slot: 'true' }])
+        await expect(HolidayGroupsService.deleteHolidayGroup('hg1')).rejects.toMatchObject({ statusCode: 409 })
+        expect(db.holidayGroup.delete).not.toHaveBeenCalled()
     })
 })

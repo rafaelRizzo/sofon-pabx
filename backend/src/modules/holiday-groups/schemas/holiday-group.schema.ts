@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { timestamp, cuidParam, ok } from '../../../schemas/responses'
 import { routeDestinationSchema, routeDestinationResponseSchema } from '../../../schemas/route-destination.schema'
+import { usedBySchema } from '../../../schemas/flow-reference-label'
 
 export const routeDestSchema = routeDestinationSchema
 
@@ -57,6 +58,7 @@ export const HolidayGroupSchema = z.object({
     trueRoute:  routeDestinationResponseSchema,
     falseRoute: routeDestinationResponseSchema,
     dates:      z.array(HolidayDateResponseSchema),
+    usedBy:     usedBySchema,
     createdAt:  timestamp,
     updatedAt:  timestamp,
 })

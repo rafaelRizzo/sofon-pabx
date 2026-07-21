@@ -15,7 +15,11 @@ export type OutboundDialPattern = {
     position: number
 }
 
-export type OutboundRouteTrunkLink = { id: string; trunkId: string; position: number }
+export type OutboundRouteTrunkLink = {
+    id: string
+    trunkId: string
+    position: number
+}
 export type OutboundRouteExtensionLink = { id: string; extensionId: string }
 
 export type OutboundRoute = {
@@ -32,12 +36,16 @@ export type OutboundRoute = {
 
 const optNumber = (min: number) =>
     z.preprocess(
-        (v) => (v === "" || v === undefined || v === null ? undefined : Number(v)),
+        (v) =>
+            v === "" || v === undefined || v === null ? undefined : Number(v),
         z.number().int().min(min, `Mínimo ${min}`)
     )
 
 const patternFieldSchema = z.object({
-    pattern: z.string().min(1, "Informe o padrão").max(40, "Máximo 40 caracteres"),
+    pattern: z
+        .string()
+        .min(1, "Informe o padrão")
+        .max(40, "Máximo 40 caracteres"),
     prepend: z.string().max(40, "Máximo 40 caracteres").optional(),
     prefix: z.string().max(40, "Máximo 40 caracteres").optional(),
 })
@@ -58,10 +66,19 @@ export const outboundRouteFormSchema = z.object({
 export const DIAL_PATTERN_PRESETS = [
     { label: "Celular local (9 dígitos)", pattern: `_9${"X".repeat(8)}` },
     { label: "Fixo local (8 dígitos)", pattern: `_${"X".repeat(8)}` },
-    { label: "Interurbano fixo (0 + DDD + fixo)", pattern: `_0${"X".repeat(10)}` },
-    { label: "Interurbano celular (0 + DDD + celular)", pattern: `_0${"X".repeat(11)}` },
+    {
+        label: "Interurbano fixo (0 + DDD + fixo)",
+        pattern: `_0${"X".repeat(10)}`,
+    },
+    {
+        label: "Interurbano celular (0 + DDD + celular)",
+        pattern: `_0${"X".repeat(11)}`,
+    },
     { label: "0800 (11 dígitos)", pattern: `_0800${"X".repeat(7)}` },
-    { label: "Utilidade pública (3 dígitos, ex: 180, 190)", pattern: `_${"X".repeat(3)}` },
+    {
+        label: "Utilidade pública (3 dígitos, ex: 180, 190)",
+        pattern: `_${"X".repeat(3)}`,
+    },
     { label: "Internacional (00 + país)", pattern: "_00." },
 ] as const
 
@@ -107,13 +124,18 @@ export function useOutboundRoutes(companyId?: string) {
         }
     }, [companyId])
 
-    const createRoute = async (form: OutboundRouteForm, targetCompanyId: string) => {
+    const createRoute = async (
+        form: OutboundRouteForm,
+        targetCompanyId: string
+    ) => {
         const id = toast.loading("Criando rota de saída...")
         try {
             await api.post("/outbound-routes", {
                 ...toPayload(form),
                 companyId: targetCompanyId,
-                extensionIds: form.extensionIds?.length ? form.extensionIds : undefined,
+                extensionIds: form.extensionIds?.length
+                    ? form.extensionIds
+                    : undefined,
             })
             toast.success("Rota de saída criada", { id })
             await fetchRoutes()
@@ -131,13 +153,20 @@ export function useOutboundRoutes(companyId?: string) {
 
             // Restrição a ramais não faz parte do PUT em lote — endpoints próprios de add/remove
             const existing = routes.find((r) => r.id === routeId)
-            const currentExtensionIds = existing?.extensions.map((e) => e.extensionId) ?? []
+            const currentExtensionIds =
+                existing?.extensions.map((e) => e.extensionId) ?? []
             const nextExtensionIds = form.extensionIds ?? []
-            const toAdd = nextExtensionIds.filter((eid) => !currentExtensionIds.includes(eid))
-            const toRemove = currentExtensionIds.filter((eid) => !nextExtensionIds.includes(eid))
+            const toAdd = nextExtensionIds.filter(
+                (eid) => !currentExtensionIds.includes(eid)
+            )
+            const toRemove = currentExtensionIds.filter(
+                (eid) => !nextExtensionIds.includes(eid)
+            )
             await Promise.all([
                 ...toAdd.map((eid) =>
-                    api.post(`/outbound-routes/${routeId}/extensions`, { extensionId: eid })
+                    api.post(`/outbound-routes/${routeId}/extensions`, {
+                        extensionId: eid,
+                    })
                 ),
                 ...toRemove.map((eid) =>
                     api.delete(`/outbound-routes/${routeId}/extensions/${eid}`)
@@ -148,7 +177,9 @@ export function useOutboundRoutes(companyId?: string) {
             await fetchRoutes()
             return true
         } catch (err) {
-            toast.error(apiError(err, "Erro ao atualizar rota de saída"), { id })
+            toast.error(apiError(err, "Erro ao atualizar rota de saída"), {
+                id,
+            })
             return false
         }
     }
@@ -170,10 +201,16 @@ export function useOutboundRoutes(companyId?: string) {
         r.name.toLowerCase().includes(filter.toLowerCase())
     )
 
-    const fetchStateRef = useRef<{ key?: string; fetched: boolean }>({ fetched: false })
+    const fetchStateRef = useRef<{ key?: string; fetched: boolean }>({
+        fetched: false,
+    })
 
     useEffect(() => {
-        if (fetchStateRef.current.fetched && fetchStateRef.current.key === companyId) return
+        if (
+            fetchStateRef.current.fetched &&
+            fetchStateRef.current.key === companyId
+        )
+            return
         fetchStateRef.current = { key: companyId, fetched: true }
         fetchRoutes()
     }, [fetchRoutes, companyId])

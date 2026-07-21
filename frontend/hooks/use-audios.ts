@@ -40,7 +40,11 @@ export function useAudios(companyId?: string) {
 
     // Multipart: o backend lê file.fields, que só é populado com as partes já recebidas
     // ANTES do arquivo no stream — por isso name/companyId são anexados antes do file
-    const createAudio = async (file: File, name: string, targetCompanyId: string) => {
+    const createAudio = async (
+        file: File,
+        name: string,
+        targetCompanyId: string
+    ) => {
         const id = toast.loading("Enviando áudio...")
         try {
             const form = new FormData()
@@ -83,12 +87,20 @@ export function useAudios(companyId?: string) {
         }
     }
 
-    const filtered = audios.filter((a) => a.name.toLowerCase().includes(filter.toLowerCase()))
+    const filtered = audios.filter((a) =>
+        a.name.toLowerCase().includes(filter.toLowerCase())
+    )
 
-    const fetchStateRef = useRef<{ key?: string; fetched: boolean }>({ fetched: false })
+    const fetchStateRef = useRef<{ key?: string; fetched: boolean }>({
+        fetched: false,
+    })
 
     useEffect(() => {
-        if (fetchStateRef.current.fetched && fetchStateRef.current.key === companyId) return
+        if (
+            fetchStateRef.current.fetched &&
+            fetchStateRef.current.key === companyId
+        )
+            return
         fetchStateRef.current = { key: companyId, fetched: true }
         fetchAudios()
     }, [fetchAudios, companyId])

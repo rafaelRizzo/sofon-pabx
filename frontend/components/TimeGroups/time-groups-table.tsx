@@ -21,7 +21,12 @@ import {
 } from "@/components/ui/tooltip"
 import { WEEKDAY_LABELS } from "@/components/TimeGroups/weekday-checkboxes"
 import { type Company } from "@/hooks/use-companies"
-import { WEEKDAYS, type TimeGroup, type TimeRange, type Weekday } from "@/hooks/use-time-groups"
+import {
+    WEEKDAYS,
+    type TimeGroup,
+    type TimeRange,
+    type Weekday,
+} from "@/hooks/use-time-groups"
 
 const MONTH_LABELS: Record<string, string> = {
     jan: "Jan",
@@ -129,7 +134,9 @@ export function TimeGroupsTable({
                                 colSpan={4}
                                 className="h-24 text-center text-muted-foreground"
                             >
-                                {companySelected ? "Nenhum grupo de horário encontrado" : "Selecione uma empresa para listar"}
+                                {companySelected
+                                    ? "Nenhum grupo de horário encontrado"
+                                    : "Selecione uma empresa para listar"}
                             </TableCell>
                         </TableRow>
                     ) : (

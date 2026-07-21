@@ -1,11 +1,13 @@
-import { Prisma } from '../../../generated/prisma/client'
+import { createId } from '@paralleldrive/cuid2'
 import { prisma } from '../../lib/prisma'
 import { getCompanyById } from '../companies/companies.service'
 import { IvrCache } from './cache/ivr.cache'
 import { IvrRepository } from '../../asterisk/ivr.repository'
+import { FlowEdgeRepository } from '../../asterisk/flow-edge.repository'
 import { assertAudioBelongsToCompany } from '../audios/audios.service'
-import { validateRouteDestination } from '../../schemas/route-destination.validate'
+import { validateRouteDestination, assertNotReferenced } from '../../schemas/route-destination.validate'
 import { resolveDestinationLabels, withDestinationLabel } from '../../schemas/route-destination-label'
+import { resolveUsedByLabels, type UsedByRef } from '../../schemas/flow-reference-label'
 import type { CreateIvrMenuInput, UpdateIvrMenuInput, IvrDest } from './schemas/ivr.schema'
 import { AppError } from '../../utils/errors/app.error'
 
@@ -19,19 +21,16 @@ const ivrMenuSelect = {
     maxDigits: true,
     digitTimeout: true,
     invalidRetries: true,
-    invalidDestination: true,
     timeoutRetries: true,
-    timeoutDestination: true,
-    longDestination: true,
     options: {
-        select: { id: true, digit: true, destination: true },
+        select: { id: true, digit: true },
         orderBy: { digit: 'asc' },
     },
     createdAt: true,
     updatedAt: true,
 } as const
 
-const toDto = <T extends { audioId: string | null }>(m: T) => ({ ...m, hasAudio: m.audioId !== null })
+const toDto = <T extends { audioId: string | null; usedBy: UsedByRef[] }>(m: T) => ({ ...m, hasAudio: m.audioId !== null })
 
 const validateDest = (dest: IvrDest | undefined | null, companyId: string, label: string) =>
     validateRouteDestination(dest ?? null, companyId, label)
@@ -89,7 +88,21 @@ export const getIvrMenusByCompany = async (companyId: string) => {
 
     await getCompanyById(companyId)
 
-    const menus = await withDestinationLabels((await prisma.ivrMenu.findMany({ where: { companyId }, select: ivrMenuSelect })).map(toDto), companyId)
+    const [rows, menuEdges, optionEdges] = await Promise.all([
+        prisma.ivrMenu.findMany({ where: { companyId }, select: ivrMenuSelect }),
+        FlowEdgeRepository.getBySource(companyId, 'ivrmenu'),
+        FlowEdgeRepository.getBySource(companyId, 'ivroption'),
+    ])
+    const usedByMap = await resolveUsedByLabels('ivr', rows.map((m) => m.id), companyId)
+    const withDest = rows.map((m) => ({
+        ...m,
+        invalidDestination: menuEdges.get(m.id)?.invalid ?? null,
+        timeoutDestination: menuEdges.get(m.id)?.timeout ?? null,
+        longDestination: menuEdges.get(m.id)?.long ?? null,
+        options: m.options.map((o) => ({ ...o, destination: optionEdges.get(o.id)?.default ?? null })),
+        usedBy: usedByMap.get(m.id) ?? [],
+    }))
+    const menus = await withDestinationLabels(withDest.map(toDto), companyId)
     await IvrCache.setByCompany(companyId, menus)
     return menus
 }
@@ -101,7 +114,21 @@ export const getIvrMenuById = async (id: string) => {
     const menu = await prisma.ivrMenu.findUnique({ where: { id }, select: ivrMenuSelect })
     if (!menu) throw new AppError('IVR menu not found', 404)
 
-    const dto = (await withDestinationLabels([toDto(menu)], menu.companyId))[0]!
+    const [invalidDestination, timeoutDestination, longDestination, optionDests, usedByMap] = await Promise.all([
+        FlowEdgeRepository.getOne('ivrmenu', id, 'invalid'),
+        FlowEdgeRepository.getOne('ivrmenu', id, 'timeout'),
+        FlowEdgeRepository.getOne('ivrmenu', id, 'long'),
+        Promise.all(menu.options.map((o) => FlowEdgeRepository.getOne('ivroption', o.id, 'default'))),
+        resolveUsedByLabels('ivr', [id], menu.companyId),
+    ])
+    const withDest = {
+        ...menu,
+        invalidDestination, timeoutDestination, longDestination,
+        options: menu.options.map((o, i) => ({ ...o, destination: optionDests[i] ?? null })),
+        usedBy: usedByMap.get(id) ?? [],
+    }
+
+    const dto = (await withDestinationLabels([toDto(withDest)], menu.companyId))[0]!
     await IvrCache.setMenu(id, dto)
     return dto
 }
@@ -125,6 +152,8 @@ export const createIvrMenu = async (data: CreateIvrMenuInput) => {
         await validateDest(opt.destination, data.companyId, `option ${opt.digit}`)
     }
 
+    const optionIds = options.map(() => createId())
+
     const menu = await prisma.$transaction(async (tx) => {
         const created = await tx.ivrMenu.create({
             data: {
@@ -136,16 +165,21 @@ export const createIvrMenu = async (data: CreateIvrMenuInput) => {
                 maxDigits: data.maxDigits,
                 digitTimeout: data.digitTimeout,
                 invalidRetries: data.invalidRetries,
-                invalidDestination: data.invalidDestination ?? undefined,
                 timeoutRetries: data.timeoutRetries,
-                timeoutDestination: data.timeoutDestination ?? undefined,
-                longDestination: data.longDestination ?? undefined,
             },
         })
+        await Promise.all([
+            FlowEdgeRepository.setSlot(tx, data.companyId, 'ivrmenu', created.id, 'invalid', data.invalidDestination ?? null),
+            FlowEdgeRepository.setSlot(tx, data.companyId, 'ivrmenu', created.id, 'timeout', data.timeoutDestination ?? null),
+            FlowEdgeRepository.setSlot(tx, data.companyId, 'ivrmenu', created.id, 'long', data.longDestination ?? null),
+        ])
         if (options.length > 0) {
             await tx.ivrOption.createMany({
-                data: options.map((o) => ({ ivrMenuId: created.id, digit: o.digit, destination: o.destination ?? undefined })),
+                data: options.map((o, i) => ({ id: optionIds[i], ivrMenuId: created.id, digit: o.digit })),
             })
+            await Promise.all(options.map((o, i) =>
+                FlowEdgeRepository.setSlot(tx, data.companyId, 'ivroption', optionIds[i]!, 'default', o.destination ?? null),
+            ))
         }
         return tx.ivrMenu.findUniqueOrThrow({ where: { id: created.id }, select: ivrMenuSelect })
     })
@@ -155,11 +189,22 @@ export const createIvrMenu = async (data: CreateIvrMenuInput) => {
     } finally {
         await IvrCache.invalidateByCompany(data.companyId)
     }
-    return toDto(menu)
+    const optionDestById = new Map(optionIds.map((oid, i) => [oid, options[i]?.destination ?? null]))
+    return toDto({
+        ...menu,
+        invalidDestination: data.invalidDestination ?? null,
+        timeoutDestination: data.timeoutDestination ?? null,
+        longDestination: data.longDestination ?? null,
+        options: menu.options.map((o) => ({ ...o, destination: optionDestById.get(o.id) ?? null })),
+        usedBy: [],
+    })
 }
 
 export const updateIvrMenu = async (id: string, data: UpdateIvrMenuInput) => {
-    const existing = await prisma.ivrMenu.findUnique({ where: { id }, include: { _count: { select: { options: true } } } })
+    const existing = await prisma.ivrMenu.findUnique({
+        where: { id },
+        include: { _count: { select: { options: true } }, options: { select: { id: true } } },
+    })
     if (!existing) throw new AppError('IVR menu not found', 404)
 
     if (data.name && data.name !== existing.name) {
@@ -186,6 +231,8 @@ export const updateIvrMenu = async (id: string, data: UpdateIvrMenuInput) => {
         }
     }
 
+    const newOptionIds = data.options?.map(() => createId())
+
     const menu = await prisma.$transaction(async (tx) => {
         const updated = await tx.ivrMenu.update({
             where: { id },
@@ -197,19 +244,27 @@ export const updateIvrMenu = async (id: string, data: UpdateIvrMenuInput) => {
                 maxDigits: data.maxDigits,
                 digitTimeout: data.digitTimeout,
                 invalidRetries: data.invalidRetries,
-                invalidDestination: data.invalidDestination === undefined ? undefined : (data.invalidDestination ?? Prisma.JsonNull),
                 timeoutRetries: data.timeoutRetries,
-                timeoutDestination: data.timeoutDestination === undefined ? undefined : (data.timeoutDestination ?? Prisma.JsonNull),
-                longDestination: data.longDestination === undefined ? undefined : (data.longDestination ?? Prisma.JsonNull),
             },
             select: ivrMenuSelect,
         })
+        await Promise.all([
+            data.invalidDestination !== undefined ? FlowEdgeRepository.setSlot(tx, existing.companyId, 'ivrmenu', id, 'invalid', data.invalidDestination) : null,
+            data.timeoutDestination !== undefined ? FlowEdgeRepository.setSlot(tx, existing.companyId, 'ivrmenu', id, 'timeout', data.timeoutDestination) : null,
+            data.longDestination !== undefined ? FlowEdgeRepository.setSlot(tx, existing.companyId, 'ivrmenu', id, 'long', data.longDestination) : null,
+        ])
         if (data.options !== undefined) {
+            if (existing.options.length > 0) {
+                await FlowEdgeRepository.deleteAllForSources(tx, 'ivroption', existing.options.map((o) => o.id))
+            }
             await tx.ivrOption.deleteMany({ where: { ivrMenuId: id } })
             if (data.options.length > 0) {
                 await tx.ivrOption.createMany({
-                    data: data.options.map((o) => ({ ivrMenuId: id, digit: o.digit, destination: o.destination ?? undefined })),
+                    data: data.options.map((o, i) => ({ id: newOptionIds![i], ivrMenuId: id, digit: o.digit })),
                 })
+                await Promise.all(data.options.map((o, i) =>
+                    FlowEdgeRepository.setSlot(tx, existing.companyId, 'ivroption', newOptionIds![i]!, 'default', o.destination ?? null),
+                ))
             }
         }
         if (data.options === undefined) return updated
@@ -222,15 +277,38 @@ export const updateIvrMenu = async (id: string, data: UpdateIvrMenuInput) => {
         await IvrCache.invalidateMenu(id)
         await IvrCache.invalidateByCompany(existing.companyId)
     }
-    return toDto(menu)
+
+    const [invalidDestination, timeoutDestination, longDestination, usedByMap] = await Promise.all([
+        data.invalidDestination !== undefined ? data.invalidDestination : FlowEdgeRepository.getOne('ivrmenu', id, 'invalid'),
+        data.timeoutDestination !== undefined ? data.timeoutDestination : FlowEdgeRepository.getOne('ivrmenu', id, 'timeout'),
+        data.longDestination !== undefined ? data.longDestination : FlowEdgeRepository.getOne('ivrmenu', id, 'long'),
+        resolveUsedByLabels('ivr', [id], existing.companyId),
+    ])
+    const options = data.options !== undefined
+        ? (() => {
+            const optionDestById = new Map(newOptionIds!.map((oid, i) => [oid, data.options![i]?.destination ?? null]))
+            return menu.options.map((o) => ({ ...o, destination: optionDestById.get(o.id) ?? null }))
+        })()
+        : await Promise.all(menu.options.map(async (o) => ({ ...o, destination: await FlowEdgeRepository.getOne('ivroption', o.id, 'default') })))
+
+    return toDto({ ...menu, invalidDestination, timeoutDestination, longDestination, options, usedBy: usedByMap.get(id) ?? [] })
 }
 
 export const deleteIvrMenu = async (id: string) => {
-    const existing = await prisma.ivrMenu.findUnique({ where: { id }, select: { companyId: true } })
+    const existing = await prisma.ivrMenu.findUnique({
+        where: { id },
+        select: { companyId: true, options: { select: { id: true } } },
+    })
     if (!existing) throw new AppError('IVR menu not found', 404)
+
+    await assertNotReferenced('ivr', id)
 
     await prisma.$transaction(async (tx) => {
         await tx.ivrMenu.delete({ where: { id } })
+        await FlowEdgeRepository.deleteAllForSource(tx, 'ivrmenu', id)
+        if (existing.options.length > 0) {
+            await FlowEdgeRepository.deleteAllForSources(tx, 'ivroption', existing.options.map((o) => o.id))
+        }
     })
 
     try {

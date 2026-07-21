@@ -103,7 +103,10 @@ export default function TimeGroupsPage() {
                     timeGroup={editTimeGroup}
                     companies={companies}
                     onSave={(form) =>
-                        updateTimeGroup(editTimeGroup.id, { name: form.name, ranges: form.ranges })
+                        updateTimeGroup(editTimeGroup.id, {
+                            name: form.name,
+                            ranges: form.ranges,
+                        })
                     }
                 />
             )}

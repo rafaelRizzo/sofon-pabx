@@ -21,15 +21,25 @@ export default function QueuesPage() {
     const { companies } = useCompanies()
     const [companyFilter, setCompanyFilter] = useCompanyFilter()
 
-    const { queues, loading, filter, setFilter, createQueue, updateQueue, deleteQueue } =
-        useQueues(companyFilter)
+    const {
+        queues,
+        loading,
+        filter,
+        setFilter,
+        createQueue,
+        updateQueue,
+        deleteQueue,
+    } = useQueues(companyFilter)
 
     const [createOpen, setCreateOpen] = useState(false)
     const [editQueue, setEditQueue] = useState<Queue | null>(null)
     const [membersQueue, setMembersQueue] = useState<Queue | null>(null)
     const [deleteTarget, setDeleteTarget] = useState<Queue | null>(null)
 
-    const { paginated, page, setPage, totalPages, total } = usePagination(queues, 15)
+    const { paginated, page, setPage, totalPages, total } = usePagination(
+        queues,
+        15
+    )
 
     const handleDelete = async () => {
         if (!deleteTarget) return false
@@ -72,7 +82,12 @@ export default function QueuesPage() {
                 onDelete={setDeleteTarget}
             />
 
-            <DataPagination page={page} totalPages={totalPages} total={total} onPageChange={setPage} />
+            <DataPagination
+                page={page}
+                totalPages={totalPages}
+                total={total}
+                onPageChange={setPage}
+            />
 
             {createOpen && (
                 <QueueFormDialog
@@ -104,12 +119,12 @@ export default function QueuesPage() {
                             announceFrequency: form.announceFrequency,
                             announcePosition: form.announcePosition,
                             periodicAnnounce: form.periodicAnnounce,
-                            periodicAnnounceFrequency: form.periodicAnnounceFrequency,
+                            periodicAnnounceFrequency:
+                                form.periodicAnnounceFrequency,
                             agentAnnounce: form.agentAnnounce,
                             joinEmpty: form.joinEmpty,
                             leaveWhenEmpty: form.leaveWhenEmpty,
                             weight: form.weight,
-                            postQueueDestination: form.postQueueDestination,
                             surveyAudioId: form.surveyAudioId,
                             callcenterEnabled: form.callcenterEnabled,
                         })

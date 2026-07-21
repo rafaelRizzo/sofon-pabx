@@ -67,7 +67,13 @@ const optPort = z.preprocess(
 // continua significando "sem alteração" (usa optPort, sem default).
 const optPortWithDefault = z.preprocess(
     (v) => (v === "" || v === undefined || v === null ? undefined : Number(v)),
-    z.number().int().min(1, "Mínimo 1").max(65535, "Máximo 65535").optional().default(5060)
+    z
+        .number()
+        .int()
+        .min(1, "Mínimo 1")
+        .max(65535, "Máximo 65535")
+        .optional()
+        .default(5060)
 )
 
 const optQualifyFrequency = z.preprocess(

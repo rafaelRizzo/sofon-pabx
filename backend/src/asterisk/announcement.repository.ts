@@ -1,48 +1,17 @@
 import { prisma } from '../lib/prisma'
 import type { RouteDestination } from '../schemas/route-destination.schema'
-import { queueAppExten } from './queue.repository'
 import { audioSoundPath } from './audio.repository'
-import {
-    ANNOUNCEMENT_CONTEXT, announcementExten, TC_CONTEXT, tcEntry, IVR_CONTEXT, ivrExten,
-    REQUEST_TEMPLATE_CONTEXT, requestTemplateExten, HOL_CONTEXT, holEntry,
-    VAR_CONTEXT, varEntry, VARCOND_CONTEXT, varCondEntry,
-} from './dialplan-names'
+import { ANNOUNCEMENT_CONTEXT, announcementExten } from './dialplan-names'
 import { resolveAsteriskId, withDialplanLock, writeContextFile, reloadDialplan, type DialplanRow } from './dialplan-file.repository'
+import { resolveRouteDestinationToDialplan } from './route-destination-resolver'
+import { FlowEdgeRepository } from './flow-edge.repository'
+import { nodeExitCheck } from './flow-node-runtime'
 
 export { ANNOUNCEMENT_CONTEXT, announcementExten }
 
 async function resolveTarget(dest: RouteDestination): Promise<string | null> {
-    if (!dest || dest.type === 'hangup') return null
-
-    switch (dest.type) {
-        case 'extension': {
-            const ext = await prisma.extension.findUnique({ where: { id: dest.id }, select: { context: true, number: true } })
-            return ext ? `${ext.context},${ext.number},1` : null
-        }
-        case 'queue': {
-            const q = await prisma.queue.findUnique({
-                where: { id: dest.id },
-                select: { number: true, company: { select: { asteriskId: true } } },
-            })
-            return q?.number ? `queues-app,${queueAppExten(q.company.asteriskId, q.number)},1` : null
-        }
-        case 'voicemail':
-            return `vm,${dest.id},1`
-        case 'timecondition':
-            return `${TC_CONTEXT},${tcEntry(dest.id)},1`
-        case 'holiday':
-            return `${HOL_CONTEXT},${holEntry(dest.id)},1`
-        case 'announcement':
-            return `${ANNOUNCEMENT_CONTEXT},${announcementExten(dest.id)},1`
-        case 'ivr':
-            return `${IVR_CONTEXT},${ivrExten(dest.id)},1`
-        case 'request':
-            return `${REQUEST_TEMPLATE_CONTEXT},${requestTemplateExten(dest.id)},1`
-        case 'variable-set':
-            return `${VAR_CONTEXT},${varEntry(dest.id)},1`
-        case 'variable-condition':
-            return `${VARCOND_CONTEXT},${varCondEntry(dest.id)},1`
-    }
+    const target = await resolveRouteDestinationToDialplan(dest)
+    return target ? `${target.context},${target.exten},${target.priority}` : null
 }
 
 // soundPath: caminho absoluto SEM extensão (Playback resolve o formato sozinho), ou null quando não
@@ -52,10 +21,12 @@ function buildDialplan(id: string, soundPath: string | null, target: string | nu
     return soundPath
         ? [
             { context: ANNOUNCEMENT_CONTEXT, exten, priority: 1, app: 'Playback', appdata: soundPath },
-            { context: ANNOUNCEMENT_CONTEXT, exten, priority: 2, app: target ? 'Goto' : 'Hangup', appdata: target },
+            nodeExitCheck(ANNOUNCEMENT_CONTEXT, exten, 2, 'default'),
+            { context: ANNOUNCEMENT_CONTEXT, exten, priority: 3, app: target ? 'Goto' : 'Hangup', appdata: target },
           ]
         : [
-            { context: ANNOUNCEMENT_CONTEXT, exten, priority: 1, app: target ? 'Goto' : 'Hangup', appdata: target },
+            nodeExitCheck(ANNOUNCEMENT_CONTEXT, exten, 1, 'default'),
+            { context: ANNOUNCEMENT_CONTEXT, exten, priority: 2, app: target ? 'Goto' : 'Hangup', appdata: target },
           ]
 }
 
@@ -65,11 +36,14 @@ export const AnnouncementRepository = {
     async regenerate(companyId: string) {
         const asteriskId = await resolveAsteriskId(companyId)
         return withDialplanLock(`${ANNOUNCEMENT_CONTEXT}:${asteriskId}`, async () => {
-            const announcements = await prisma.announcement.findMany({ where: { companyId } })
+            const [announcements, edges] = await Promise.all([
+                prisma.announcement.findMany({ where: { companyId } }),
+                FlowEdgeRepository.getBySource(companyId, 'announcement'),
+            ])
             const entries: DialplanRow[] = []
             for (const a of announcements) {
                 const soundPath = a.audioId ? audioSoundPath(asteriskId, a.audioId) : null
-                const target = await resolveTarget(a.destination as RouteDestination)
+                const target = await resolveTarget(edges.get(a.id)?.default ?? null)
                 entries.push(...buildDialplan(a.id, soundPath, target))
             }
             await writeContextFile(ANNOUNCEMENT_CONTEXT, asteriskId, entries)

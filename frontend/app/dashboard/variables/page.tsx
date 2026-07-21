@@ -31,10 +31,15 @@ export default function VariablesPage() {
     } = useVariables(companyFilter)
 
     const [createOpen, setCreateOpen] = useState(false)
-    const [editVariableSet, setEditVariableSet] = useState<VariableSet | null>(null)
+    const [editVariableSet, setEditVariableSet] = useState<VariableSet | null>(
+        null
+    )
     const [deleteTarget, setDeleteTarget] = useState<VariableSet | null>(null)
 
-    const { paginated, page, setPage, totalPages, total } = usePagination(variableSets, 15)
+    const { paginated, page, setPage, totalPages, total } = usePagination(
+        variableSets,
+        15
+    )
 
     const handleDelete = async () => {
         if (!deleteTarget) return false
@@ -75,7 +80,12 @@ export default function VariablesPage() {
                 onDelete={setDeleteTarget}
             />
 
-            <DataPagination page={page} totalPages={totalPages} total={total} onPageChange={setPage} />
+            <DataPagination
+                page={page}
+                totalPages={totalPages}
+                total={total}
+                onPageChange={setPage}
+            />
 
             {createOpen && (
                 <VariableSetFormDialog
@@ -93,7 +103,9 @@ export default function VariablesPage() {
                     onOpenChange={(open) => !open && setEditVariableSet(null)}
                     variableSet={editVariableSet}
                     companies={companies}
-                    onSave={(form) => updateVariableSet(editVariableSet.id, form)}
+                    onSave={(form) =>
+                        updateVariableSet(editVariableSet.id, form)
+                    }
                 />
             )}
 

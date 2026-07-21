@@ -14,7 +14,10 @@ import { Input } from "@/components/ui/input"
 import { useCompanies } from "@/hooks/use-companies"
 import { useCompanyFilter } from "@/hooks/use-company-filter"
 import { usePagination } from "@/hooks/use-pagination"
-import { useTimeConditions, type TimeCondition } from "@/hooks/use-time-conditions"
+import {
+    useTimeConditions,
+    type TimeCondition,
+} from "@/hooks/use-time-conditions"
 
 export default function TimeConditionsPage() {
     const { companies } = useCompanies()
@@ -31,10 +34,14 @@ export default function TimeConditionsPage() {
     } = useTimeConditions(companyFilter)
 
     const [createOpen, setCreateOpen] = useState(false)
-    const [editTimeCondition, setEditTimeCondition] = useState<TimeCondition | null>(null)
+    const [editTimeCondition, setEditTimeCondition] =
+        useState<TimeCondition | null>(null)
     const [deleteTarget, setDeleteTarget] = useState<TimeCondition | null>(null)
 
-    const { paginated, page, setPage, totalPages, total } = usePagination(timeConditions, 15)
+    const { paginated, page, setPage, totalPages, total } = usePagination(
+        timeConditions,
+        15
+    )
 
     const handleDelete = async () => {
         if (!deleteTarget) return false
@@ -75,7 +82,12 @@ export default function TimeConditionsPage() {
                 onDelete={setDeleteTarget}
             />
 
-            <DataPagination page={page} totalPages={totalPages} total={total} onPageChange={setPage} />
+            <DataPagination
+                page={page}
+                totalPages={totalPages}
+                total={total}
+                onPageChange={setPage}
+            />
 
             {createOpen && (
                 <TimeConditionFormDialog
@@ -96,8 +108,6 @@ export default function TimeConditionsPage() {
                     onSave={(form) =>
                         updateTimeCondition(editTimeCondition.id, {
                             name: form.name,
-                            trueRoute: form.trueRoute,
-                            falseRoute: form.falseRoute,
                         })
                     }
                 />

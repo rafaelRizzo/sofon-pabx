@@ -29,7 +29,13 @@ type Props = {
     onDelete: (route: InboundRoute) => void
 }
 
-export function InboundRoutesTable({ routes, loading, companySelected, onEdit, onDelete }: Props) {
+export function InboundRoutesTable({
+    routes,
+    loading,
+    companySelected,
+    onEdit,
+    onDelete,
+}: Props) {
     return (
         <div className="rounded-md border">
             <Table>
@@ -55,18 +61,27 @@ export function InboundRoutesTable({ routes, loading, companySelected, onEdit, o
                         ))
                     ) : routes.length === 0 ? (
                         <TableRow>
-                            <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                                {companySelected ? "Nenhuma rota de entrada encontrada" : "Selecione uma empresa para listar"}
+                            <TableCell
+                                colSpan={5}
+                                className="h-24 text-center text-muted-foreground"
+                            >
+                                {companySelected
+                                    ? "Nenhuma rota de entrada encontrada"
+                                    : "Selecione uma empresa para listar"}
                             </TableCell>
                         </TableRow>
                     ) : (
                         routes.map((route) => (
                             <TableRow key={route.id}>
-                                <TableCell className="font-medium">{route.name}</TableCell>
+                                <TableCell className="font-medium">
+                                    {route.name}
+                                </TableCell>
                                 <TableCell>{route.did.number}</TableCell>
                                 <TableCell>{route.trunk.name}</TableCell>
                                 <TableCell>
-                                    <RouteDestinationBadge destination={route.destination} />
+                                    <RouteDestinationBadge
+                                        destination={route.destination}
+                                    />
                                 </TableCell>
                                 <TableCell>
                                     <TooltipProvider delay={100}>
@@ -77,14 +92,20 @@ export function InboundRoutesTable({ routes, loading, companySelected, onEdit, o
                                                         <Button
                                                             variant="outline"
                                                             size="icon"
-                                                            onClick={() => onEdit(route)}
+                                                            onClick={() =>
+                                                                onEdit(route)
+                                                            }
                                                         >
                                                             <PencilIcon />
-                                                            <span className="sr-only">Editar</span>
+                                                            <span className="sr-only">
+                                                                Editar
+                                                            </span>
                                                         </Button>
                                                     }
                                                 />
-                                                <TooltipContent>Editar rota</TooltipContent>
+                                                <TooltipContent>
+                                                    Editar rota
+                                                </TooltipContent>
                                             </Tooltip>
                                             <Tooltip>
                                                 <TooltipTrigger
@@ -92,14 +113,20 @@ export function InboundRoutesTable({ routes, loading, companySelected, onEdit, o
                                                         <Button
                                                             variant="destructive"
                                                             size="icon"
-                                                            onClick={() => onDelete(route)}
+                                                            onClick={() =>
+                                                                onDelete(route)
+                                                            }
                                                         >
                                                             <Trash2Icon />
-                                                            <span className="sr-only">Deletar</span>
+                                                            <span className="sr-only">
+                                                                Deletar
+                                                            </span>
                                                         </Button>
                                                     }
                                                 />
-                                                <TooltipContent>Deletar rota</TooltipContent>
+                                                <TooltipContent>
+                                                    Deletar rota
+                                                </TooltipContent>
                                             </Tooltip>
                                         </div>
                                     </TooltipProvider>

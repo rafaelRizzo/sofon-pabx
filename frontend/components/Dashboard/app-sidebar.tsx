@@ -3,20 +3,12 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
-    BracesIcon,
     Building2Icon,
-    CalendarClockIcon,
-    CalendarDaysIcon,
-    ClockIcon,
     FileAudioIcon,
     FileClockIcon,
-    FilterIcon,
     HashIcon,
-    HeadsetIcon,
     LayoutDashboardIcon,
-    ListOrderedIcon,
     LogOutIcon,
-    MegaphoneIcon,
     MoonIcon,
     NetworkIcon,
     PhoneIcon,
@@ -24,7 +16,6 @@ import {
     PhoneOutgoingIcon,
     SunIcon,
     UsersIcon,
-    WebhookIcon,
     WorkflowIcon,
     type LucideIcon,
 } from "lucide-react"
@@ -63,8 +54,7 @@ type NavGroup = {
     items: NavItem[]
 }
 
-// Grupos organizados pelo fluxo da chamada:
-// tronco/DID → rota de entrada → atendimento (URA/fila/ramal) → rota de saída
+// Recursos reutilizáveis são criados e configurados no contexto do Flow, sem poluir a navegação.
 const NAV: NavGroup[] = [
     {
         label: "Geral",
@@ -108,30 +98,6 @@ const NAV: NavGroup[] = [
                 icon: PhoneIcon,
                 permission: "extensions",
             },
-            {
-                title: "Filas",
-                href: "/dashboard/queues",
-                icon: ListOrderedIcon,
-                permission: "queues",
-            },
-            {
-                title: "URA",
-                href: "/dashboard/ivr",
-                icon: WorkflowIcon,
-                permission: "ivr",
-            },
-            {
-                title: "Anúncios",
-                href: "/dashboard/announcements",
-                icon: MegaphoneIcon,
-                permission: "announcements",
-            },
-            {
-                title: "Callcenter",
-                href: "/dashboard/callcenter",
-                icon: HeadsetIcon,
-                permission: "callcenter",
-            },
         ],
     },
     {
@@ -173,40 +139,10 @@ const NAV: NavGroup[] = [
                 permission: "audios",
             },
             {
-                title: "Grupos de horário",
-                href: "/dashboard/time-groups",
-                icon: ClockIcon,
-                permission: "time-groups",
-            },
-            {
-                title: "Condições de horário",
-                href: "/dashboard/time-conditions",
-                icon: CalendarClockIcon,
-                permission: "time-conditions",
-            },
-            {
-                title: "Feriados",
-                href: "/dashboard/holiday-groups",
-                icon: CalendarDaysIcon,
-                permission: "holiday-groups",
-            },
-            {
-                title: "Templates de requisição",
-                href: "/dashboard/request-templates",
-                icon: WebhookIcon,
-                permission: "request-templates",
-            },
-            {
-                title: "Variáveis",
-                href: "/dashboard/variables",
-                icon: BracesIcon,
-                permission: "variables",
-            },
-            {
-                title: "Condições de variável",
-                href: "/dashboard/variable-conditions",
-                icon: FilterIcon,
-                permission: "variable-conditions",
+                title: "Flows",
+                href: "/dashboard/flows",
+                icon: WorkflowIcon,
+                permission: "flows",
             },
         ],
     },
@@ -260,7 +196,9 @@ export function AppSidebar() {
                                                         }
                                                     >
                                                         <item.icon />
-                                                        <span>{item.title}</span>
+                                                        <span>
+                                                            {item.title}
+                                                        </span>
                                                     </Link>
                                                 }
                                             />
@@ -279,7 +217,9 @@ export function AppSidebar() {
                                 tooltip="Alternar tema"
                                 onClick={() =>
                                     setTheme(
-                                        resolvedTheme === "dark" ? "light" : "dark"
+                                        resolvedTheme === "dark"
+                                            ? "light"
+                                            : "dark"
                                     )
                                 }
                             >

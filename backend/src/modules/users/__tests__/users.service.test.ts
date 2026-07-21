@@ -10,6 +10,9 @@ mock.module('../cache/users.cache', () => ({
 mock.module('../../companies/cache/companies.cache', () => ({
     CompaniesCache: { getCompaniesByUser: mock(() => null), setCompaniesByUser: mock(), invalidateCompaniesByUser: mock() },
 }))
+mock.module('../../../lib/jti', () => ({
+    jtiManager: { revokeByUserId: mock(() => Promise.resolve()) },
+}))
 
 import * as UsersService from '../users.service'
 
@@ -96,6 +99,14 @@ describe('UsersService.updateUser', () => {
         await expect(UsersService.updateUser('clxxxxxxxxxxxxxxxxxxxxxxxxx', { name: 'X' }))
             .rejects.toMatchObject({ statusCode: 404 })
     })
+
+    it('revokes existing sessions when the password changes', async () => {
+        const { jtiManager } = await import('../../../lib/jti')
+        db.user.findUnique.mockResolvedValue(USER)
+        db.user.findUniqueOrThrow.mockResolvedValue(USER)
+        await UsersService.updateUser('u1', { password: 'new-secret' })
+        expect(jtiManager.revokeByUserId).toHaveBeenCalledWith('u1')
+    })
 })
 
 // ─── getCompaniesByUser ───────────────────────────────────────────────────────
@@ -120,5 +131,7 @@ describe('UsersService.deleteUser', () => {
         db.user.delete.mockResolvedValue(USER)
         await UsersService.deleteUser('u1')
         expect(db.user.delete).toHaveBeenCalledWith({ where: { id: 'u1' } })
+        const { jtiManager } = await import('../../../lib/jti')
+        expect(jtiManager.revokeByUserId).toHaveBeenCalledWith('u1')
     })
 })

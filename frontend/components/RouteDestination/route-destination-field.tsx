@@ -12,6 +12,7 @@ import {
     PhoneOffIcon,
     ClockIcon,
     UsersIcon,
+    WorkflowIcon,
     type LucideIcon,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -48,6 +49,7 @@ export const ROUTE_DEST_TYPES = [
     "request",
     "variable-set",
     "variable-condition",
+    "flow",
 ] as const
 
 export type RouteDestinationType = (typeof ROUTE_DEST_TYPES)[number]
@@ -63,11 +65,15 @@ export const ROUTE_DEST_LABELS: Record<RouteDestinationType, string> = {
     request: "Request Template",
     "variable-set": "Setar variável",
     "variable-condition": "Validar variável",
+    flow: "Flow",
 }
 
 // Passado como `items` pro Select — sem isso o trigger mostra o value cru (ex: "extension")
 // em vez do label traduzido enquanto o SelectContent ainda não foi montado
-const SELECT_ITEMS = ROUTE_DEST_TYPES.map((t) => ({ value: t, label: ROUTE_DEST_LABELS[t] }))
+const SELECT_ITEMS = ROUTE_DEST_TYPES.map((t) => ({
+    value: t,
+    label: ROUTE_DEST_LABELS[t],
+}))
 
 export const ROUTE_DEST_ICONS: Record<RouteDestinationType, LucideIcon> = {
     hangup: PhoneOffIcon,
@@ -80,6 +86,7 @@ export const ROUTE_DEST_ICONS: Record<RouteDestinationType, LucideIcon> = {
     request: GlobeIcon,
     "variable-set": BracesIcon,
     "variable-condition": FilterIcon,
+    flow: WorkflowIcon,
 }
 
 const idSchema = z.string().min(1, "Campo obrigatório")
@@ -90,29 +97,69 @@ const labelSchema = z.string().nullable().optional()
 
 export const routeDestinationSchema = z
     .discriminatedUnion("type", [
-        z.object({ type: z.literal("extension"), id: idSchema, label: labelSchema }),
-        z.object({ type: z.literal("queue"), id: idSchema, label: labelSchema }),
-        z.object({ type: z.literal("timecondition"), id: idSchema, label: labelSchema }),
-        z.object({ type: z.literal("holiday"), id: idSchema, label: labelSchema }),
-        z.object({ type: z.literal("announcement"), id: idSchema, label: labelSchema }),
+        z.object({
+            type: z.literal("extension"),
+            id: idSchema,
+            label: labelSchema,
+        }),
+        z.object({
+            type: z.literal("queue"),
+            id: idSchema,
+            label: labelSchema,
+        }),
+        z.object({
+            type: z.literal("timecondition"),
+            id: idSchema,
+            label: labelSchema,
+        }),
+        z.object({
+            type: z.literal("holiday"),
+            id: idSchema,
+            label: labelSchema,
+        }),
+        z.object({
+            type: z.literal("announcement"),
+            id: idSchema,
+            label: labelSchema,
+        }),
         z.object({ type: z.literal("ivr"), id: idSchema, label: labelSchema }),
-        z.object({ type: z.literal("request"), id: idSchema, label: labelSchema }),
-        z.object({ type: z.literal("variable-set"), id: idSchema, label: labelSchema }),
-        z.object({ type: z.literal("variable-condition"), id: idSchema, label: labelSchema }),
+        z.object({
+            type: z.literal("request"),
+            id: idSchema,
+            label: labelSchema,
+        }),
+        z.object({
+            type: z.literal("variable-set"),
+            id: idSchema,
+            label: labelSchema,
+        }),
+        z.object({
+            type: z.literal("variable-condition"),
+            id: idSchema,
+            label: labelSchema,
+        }),
+        z.object({ type: z.literal("flow"), id: idSchema, label: labelSchema }),
         z.object({ type: z.literal("hangup") }),
     ])
     .nullable()
 
 export type RouteDestination = z.infer<typeof routeDestinationSchema>
 
-export type DestinationOption = { id: string; label: string; disabledReason?: string }
+export type DestinationOption = {
+    id: string
+    label: string
+    disabledReason?: string
+}
 
 export type FetchableDestinationType = Exclude<RouteDestinationType, "hangup">
 type FetchableType = FetchableDestinationType
 
 // Mensagem exibida no combobox quando a empresa ainda não tem nenhum registro desse
 // recurso — evita parecer erro quando na verdade é só "ainda não cadastrou nada"
-export const ROUTE_DEST_EMPTY_MESSAGES: Record<FetchableDestinationType, string> = {
+export const ROUTE_DEST_EMPTY_MESSAGES: Record<
+    FetchableDestinationType,
+    string
+> = {
     extension: "Nenhum ramal cadastrado ainda",
     queue: "Nenhuma fila cadastrada ainda",
     timecondition: "Nenhuma condição de horário cadastrada ainda",
@@ -122,6 +169,7 @@ export const ROUTE_DEST_EMPTY_MESSAGES: Record<FetchableDestinationType, string>
     request: "Nenhum request template cadastrado ainda",
     "variable-set": "Nenhuma variável cadastrada ainda",
     "variable-condition": "Nenhuma condição de variável cadastrada ainda",
+    flow: "Nenhum flow cadastrado ainda",
 }
 
 // Cada tipo com FK busca sua própria lista (filtrada por empresa) — sem hook de CRUD
@@ -133,32 +181,63 @@ export async function fetchDestinationOptions(
 ): Promise<DestinationOption[]> {
     switch (type) {
         case "extension": {
-            const { data } = await api.get("/extensions", { params: { companyId } })
+            const { data } = await api.get("/extensions", {
+                params: { companyId },
+            })
             const grouped = data.extensions as {
                 sip?: { id: string; alias: string; name: string }[]
                 pjsip?: { id: string; alias: string; name: string }[]
             }
-            const extensions = [...(grouped?.sip ?? []), ...(grouped?.pjsip ?? [])]
-            return extensions.map((e) => ({ id: e.id, label: `${e.alias} - ${e.name}` }))
+            const extensions = [
+                ...(grouped?.sip ?? []),
+                ...(grouped?.pjsip ?? []),
+            ]
+            return extensions.map((e) => ({
+                id: e.id,
+                label: `${e.alias} - ${e.name}`,
+            }))
         }
         case "queue": {
             const { data } = await api.get("/queues", { params: { companyId } })
-            const queues = (data.queues ?? []) as { id: string; name: string; number: string }[]
-            return queues.map((q) => ({ id: q.id, label: `${q.name} (${q.number})` }))
+            const queues = (data.queues ?? []) as {
+                id: string
+                name: string
+                number: string
+            }[]
+            return queues.map((q) => ({
+                id: q.id,
+                label: `${q.name} (${q.number})`,
+            }))
         }
         case "timecondition": {
-            const { data } = await api.get("/time-conditions", { params: { companyId } })
-            const timeConditions = (data.timeConditions ?? []) as { id: string; name: string }[]
+            const { data } = await api.get("/time-conditions", {
+                params: { companyId },
+            })
+            const timeConditions = (data.timeConditions ?? []) as {
+                id: string
+                name: string
+            }[]
             return timeConditions.map((t) => ({ id: t.id, label: t.name }))
         }
         case "holiday": {
-            const { data } = await api.get("/holiday-groups", { params: { companyId } })
-            const holidayGroups = (data.holidayGroups ?? []) as { id: string; name: string }[]
+            const { data } = await api.get("/holiday-groups", {
+                params: { companyId },
+            })
+            const holidayGroups = (data.holidayGroups ?? []) as {
+                id: string
+                name: string
+            }[]
             return holidayGroups.map((h) => ({ id: h.id, label: h.name }))
         }
         case "announcement": {
-            const { data } = await api.get("/announcements", { params: { companyId } })
-            const announcements = (data.announcements ?? []) as { id: string; name: string; hasAudio: boolean }[]
+            const { data } = await api.get("/announcements", {
+                params: { companyId },
+            })
+            const announcements = (data.announcements ?? []) as {
+                id: string
+                name: string
+                hasAudio: boolean
+            }[]
             return announcements.map((a) => ({
                 id: a.id,
                 label: a.name,
@@ -166,8 +245,14 @@ export async function fetchDestinationOptions(
             }))
         }
         case "ivr": {
-            const { data } = await api.get("/ivr-menus", { params: { companyId } })
-            const ivrMenus = (data.ivrMenus ?? []) as { id: string; name: string; hasAudio: boolean }[]
+            const { data } = await api.get("/ivr-menus", {
+                params: { companyId },
+            })
+            const ivrMenus = (data.ivrMenus ?? []) as {
+                id: string
+                name: string
+                hasAudio: boolean
+            }[]
             return ivrMenus.map((i) => ({
                 id: i.id,
                 label: i.name,
@@ -175,19 +260,39 @@ export async function fetchDestinationOptions(
             }))
         }
         case "request": {
-            const { data } = await api.get("/request-templates", { params: { companyId } })
-            const requestTemplates = (data.requestTemplates ?? []) as { id: string; name: string }[]
+            const { data } = await api.get("/request-templates", {
+                params: { companyId },
+            })
+            const requestTemplates = (data.requestTemplates ?? []) as {
+                id: string
+                name: string
+            }[]
             return requestTemplates.map((r) => ({ id: r.id, label: r.name }))
         }
         case "variable-set": {
-            const { data } = await api.get("/variables", { params: { companyId } })
-            const variableSets = (data.variableSets ?? []) as { id: string; name: string }[]
+            const { data } = await api.get("/variables", {
+                params: { companyId },
+            })
+            const variableSets = (data.variableSets ?? []) as {
+                id: string
+                name: string
+            }[]
             return variableSets.map((v) => ({ id: v.id, label: v.name }))
         }
         case "variable-condition": {
-            const { data } = await api.get("/variable-conditions", { params: { companyId } })
-            const variableConditions = (data.variableConditions ?? []) as { id: string; name: string }[]
+            const { data } = await api.get("/variable-conditions", {
+                params: { companyId },
+            })
+            const variableConditions = (data.variableConditions ?? []) as {
+                id: string
+                name: string
+            }[]
             return variableConditions.map((v) => ({ id: v.id, label: v.name }))
+        }
+        case "flow": {
+            const { data } = await api.get("/flows", { params: { companyId } })
+            const flows = (data.flows ?? []) as { id: string; name: string }[]
+            return flows.map((f) => ({ id: f.id, label: f.name }))
         }
     }
 }
@@ -210,7 +315,10 @@ function useDestinationOptions(type: RouteDestinationType, companyId: string) {
                 if (!cancelled) setOptions(opts)
             })
             .catch((err) => {
-                if (!cancelled) toast.error(apiError(err, "Erro ao buscar opções de destino"))
+                if (!cancelled)
+                    toast.error(
+                        apiError(err, "Erro ao buscar opções de destino")
+                    )
             })
             .finally(() => {
                 if (!cancelled) setLoading(false)
@@ -228,16 +336,27 @@ type Props = {
     onChange: (destination: RouteDestination) => void
     companyId: string
     className?: string
+    allowedTypes?: readonly RouteDestinationType[]
 }
 
-export function RouteDestinationField({ value, onChange, companyId, className }: Props) {
+export function RouteDestinationField({
+    value,
+    onChange,
+    companyId,
+    className,
+    allowedTypes = ROUTE_DEST_TYPES,
+}: Props) {
     const type: RouteDestinationType = value?.type ?? "hangup"
     const id = value && "id" in value ? value.id : ""
     const { options, loading } = useDestinationOptions(type, companyId)
     const selectedOption = options.find((o) => o.id === id) ?? null
 
     function handleTypeChange(nextType: RouteDestinationType) {
-        onChange(nextType === "hangup" ? { type: "hangup" } : { type: nextType, id: "" })
+        onChange(
+            nextType === "hangup"
+                ? { type: "hangup" }
+                : { type: nextType, id: "" }
+        )
     }
 
     function handleIdChange(nextId: string) {
@@ -255,13 +374,17 @@ export function RouteDestinationField({ value, onChange, companyId, className }:
                 <Select
                     items={SELECT_ITEMS}
                     value={type}
-                    onValueChange={(v) => handleTypeChange(v as RouteDestinationType)}
+                    onValueChange={(v) =>
+                        handleTypeChange(v as RouteDestinationType)
+                    }
                 >
-                    <SelectTrigger className={cn("w-full", hasIdField && "sm:w-52")}>
+                    <SelectTrigger
+                        className={cn("w-full", hasIdField && "sm:w-52")}
+                    >
                         <SelectValue placeholder="Tipo de destino" />
                     </SelectTrigger>
                     <SelectContent>
-                        {ROUTE_DEST_TYPES.map((t) => {
+                        {allowedTypes.map((t) => {
                             const Icon = ROUTE_DEST_ICONS[t]
                             return (
                                 <SelectItem key={t} value={t}>
@@ -303,7 +426,11 @@ export function RouteDestinationField({ value, onChange, companyId, className }:
                             </ComboboxEmpty>
                             <ComboboxList>
                                 {(opt: DestinationOption) => (
-                                    <ComboboxItem key={opt.id} value={opt} disabled={!!opt.disabledReason}>
+                                    <ComboboxItem
+                                        key={opt.id}
+                                        value={opt}
+                                        disabled={!!opt.disabledReason}
+                                    >
                                         {opt.label}
                                         {opt.disabledReason && (
                                             <span className="text-xs text-muted-foreground">

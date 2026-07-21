@@ -4,7 +4,7 @@ import { QueueMembersCache } from './cache/queue-members.cache'
 import { getQueueById, type QueueDto } from '../queues/queues.service'
 import { getExtensionDto } from '../extensions/extensions.service'
 import { assertAgentEligible } from '../callcenter/agents/agents.service'
-import { AsteriskQueueRepository, toAsteriskInterface } from '../../asterisk/queue.repository'
+import { AsteriskQueueRepository, toAsteriskInterface, toAsteriskQueueName } from '../../asterisk/queue.repository'
 import type { AddMemberInput, UpdateMemberInput } from './schemas/queue-member.schema'
 import { AppError } from '../../utils/errors/app.error'
 
@@ -21,8 +21,6 @@ const memberSelect = {
         select: { id: true, name: true, number: true, alias: true, type: true, companyId: true },
     },
 } as const
-
-const toAsteriskQueueName = (asteriskId: string, queueName: string) => `${asteriskId}-${queueName}`
 
 export const getQueueMembers = async (queueId: string) => {
     const cached = await QueueMembersCache.getMembers(queueId)
@@ -50,7 +48,7 @@ export const addMember = async (queueId: string, data: AddMemberInput) => {
     })
     if (alreadyMember) throw new AppError('Extension is already a member of this queue', 409)
 
-    const asteriskName = toAsteriskQueueName(queue.company.asteriskId, queue.name)
+    const asteriskName = toAsteriskQueueName(queue.company.asteriskId, queue.number)
     const iface = toAsteriskInterface(extension.type, extension.username)
 
     const member = await prisma.$transaction(async (tx) => {
@@ -80,7 +78,7 @@ export const updateMember = async (queueId: string, memberId: string, data: Upda
     })
     if (!member || member.queueId !== queueId) throw new AppError('Member not found', 404)
 
-    const asteriskName = toAsteriskQueueName(member.queue.company.asteriskId, member.queue.name)
+    const asteriskName = toAsteriskQueueName(member.queue.company.asteriskId, member.queue.number)
     const iface = toAsteriskInterface(member.extension.type, member.extension.number)
 
     const updated = await prisma.$transaction(async (tx) => {
@@ -104,7 +102,7 @@ export const removeMember = async (queueId: string, memberId: string) => {
     })
     if (!member || member.queueId !== queueId) throw new AppError('Member not found', 404)
 
-    const asteriskName = toAsteriskQueueName(member.queue.company.asteriskId, member.queue.name)
+    const asteriskName = toAsteriskQueueName(member.queue.company.asteriskId, member.queue.number)
     const iface = toAsteriskInterface(member.extension.type, member.extension.number)
 
     await prisma.$transaction(async (tx) => {

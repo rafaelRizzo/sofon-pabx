@@ -94,7 +94,8 @@ export function TrunksTable({
                                 <TableCell>
                                     <Badge
                                         variant={
-                                            trunk.registrationMode === "outbound"
+                                            trunk.registrationMode ===
+                                            "outbound"
                                                 ? "secondary"
                                                 : "outline"
                                         }

@@ -15,8 +15,13 @@ type Props = {
 }
 
 export function RoutingRulesPanel({ companyId }: Props) {
-    const { routingRules, loading, createRoutingRule, updateRoutingRule, deleteRoutingRule } =
-        useRoutingRules(companyId)
+    const {
+        routingRules,
+        loading,
+        createRoutingRule,
+        updateRoutingRule,
+        deleteRoutingRule,
+    } = useRoutingRules(companyId)
     const { trunks } = useTrunks(companyId)
 
     const [createOpen, setCreateOpen] = useState(false)
@@ -32,8 +37,9 @@ export function RoutingRulesPanel({ companyId }: Props) {
         <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between gap-4">
                 <p className="text-sm text-muted-foreground">
-                    Define QUEUE_PRIO antes do Queue() nativo com base em tronco, horário, dia da
-                    semana ou padrão de callerId. A regra ativa de maior prioridade vence.
+                    Define QUEUE_PRIO antes do Queue() nativo com base em
+                    tronco, horário, dia da semana ou padrão de callerId. A
+                    regra ativa de maior prioridade vence.
                 </p>
                 <Button onClick={() => setCreateOpen(true)}>
                     <PlusIcon />

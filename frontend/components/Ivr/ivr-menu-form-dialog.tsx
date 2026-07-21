@@ -416,13 +416,13 @@ export function IvrMenuFormDialog({
                                             </FieldError>
                                         )}
                                         <FieldDescription>
-                                            Guarda o que o cliente digitou
-                                            aqui, dá pra usar depois em outro
-                                            passo do fluxo (ex: um Request
-                                            Template que consulta o CPF/CNPJ
-                                            num sistema externo, ou uma
-                                            Validar Variável que confere se o
-                                            número é válido antes de seguir).
+                                            Guarda o que o cliente digitou aqui,
+                                            dá pra usar depois em outro passo do
+                                            fluxo (ex: um Request Template que
+                                            consulta o CPF/CNPJ num sistema
+                                            externo, ou uma Validar Variável que
+                                            confere se o número é válido antes
+                                            de seguir).
                                         </FieldDescription>
                                     </Field>
                                 )}
@@ -474,12 +474,11 @@ export function IvrMenuFormDialog({
                                         {isCollect ? (
                                             <FieldDescription>
                                                 Use o maior tamanho possível
-                                                (ex: 14, do CNPJ): se o
-                                                cliente digitar só o CPF (11)
-                                                e parar, a URA aceita normal:
-                                                ela para de esperar assim que
-                                                ele pausa, não precisa bater
-                                                o número exato.
+                                                (ex: 14, do CNPJ): se o cliente
+                                                digitar só o CPF (11) e parar, a
+                                                URA aceita normal: ela para de
+                                                esperar assim que ele pausa, não
+                                                precisa bater o número exato.
                                             </FieldDescription>
                                         ) : (
                                             <FieldDescription>

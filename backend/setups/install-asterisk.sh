@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-# INSTALADOR SOFON PBX v6.1 - NATIVO (sem Docker)
+# INSTALADOR SOFON PBX v6.2 - NATIVO (sem Docker)
 # Debian 11+ | Ubuntu 24.04+
 # ============================================================
 
@@ -36,7 +36,7 @@ show_header() {
     clear
     echo ""
     echo -e "${CYAN}════════════════════════════════════════════════════════${NC}"
-    echo -e "  ${BOLD}INSTALADOR SOFON PBX v6.0${NC}"
+    echo -e "  ${BOLD}INSTALADOR SOFON PBX v6.2${NC}"
     echo -e "${CYAN}════════════════════════════════════════════════════════${NC}"
     echo ""
 }
@@ -524,6 +524,12 @@ exten => i,1,Noop(DID sem rota: ${EXTEN})
 
 [callcenter-surveys]
 #tryinclude "dialplan-extra/callcenter-surveys/*.conf"
+
+[flows]
+#tryinclude "dialplan-extra/flows/*.conf"
+
+[flow-nodes]
+#tryinclude "dialplan-extra/flow-nodes/*.conf"
 EOF
 
 # modules.conf — garante chan_sip carregado se necessário
@@ -672,7 +678,7 @@ log "Diretório de anúncios criado → /var/lib/asterisk/sounds"
 # --- Dialplan estático por empresa (queues-app/timeconditions/announcements/ivrs/holidays/
 # request-templates/variables/variable-conditions/callcenter-surveys) — arquivos gerados pela API, incluídos via #include em extensions.conf
 # (ver src/asterisk/dialplan-file.repository.ts) ---
-mkdir -p /etc/asterisk/dialplan-extra/{queues-app,timeconditions,announcements,ivrs,holidays,request-templates,variables,variable-conditions,callcenter-surveys}
+mkdir -p /etc/asterisk/dialplan-extra/{queues-app,timeconditions,announcements,ivrs,holidays,request-templates,variables,variable-conditions,callcenter-surveys,flows,flow-nodes}
 chown -R asterisk:asterisk /etc/asterisk/dialplan-extra
 chmod 755 /etc/asterisk/dialplan-extra
 log "Diretório de dialplan estático criado → /etc/asterisk/dialplan-extra"

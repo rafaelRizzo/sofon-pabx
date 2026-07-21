@@ -114,7 +114,7 @@ export const deleteAudio = async (id: string) => {
         prisma.queue.findMany({
             where: { OR: [{ announce: id }, { periodicAnnounce: id }, { agentAnnounce: id }] },
             select: {
-                id: true, name: true, companyId: true,
+                id: true, name: true, number: true, companyId: true,
                 announce: true, periodicAnnounce: true, agentAnnounce: true,
                 company: { select: { asteriskId: true } },
             },
@@ -134,7 +134,7 @@ export const deleteAudio = async (id: string) => {
             if (q.periodicAnnounce === id) update.periodicAnnounce = null
             if (q.agentAnnounce === id) update.announce = null
             if (Object.keys(update).length > 0)
-                await AsteriskQueueRepository.updateQueue(tx, toAsteriskQueueName(q.company.asteriskId, q.name), update)
+                await AsteriskQueueRepository.updateQueue(tx, toAsteriskQueueName(q.company.asteriskId, q.number ?? q.name), update)
         }
     })
 

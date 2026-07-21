@@ -38,8 +38,8 @@ import {
     FieldGroup,
     FieldLabel,
 } from "@/components/ui/field"
+import { EntityFormDialogSkeletonContent } from "@/components/entity-form-dialog-skeleton"
 import { Input } from "@/components/ui/input"
-import { RouteDestinationField } from "@/components/RouteDestination/route-destination-field"
 import { type Audio, useAudios } from "@/hooks/use-audios"
 import {
     createAnnouncementFormSchema,
@@ -51,16 +51,22 @@ type Props = {
     open: boolean
     onOpenChange: (open: boolean) => void
     announcement: Announcement | null
+    // true enquanto o registro ainda está sendo buscado por id (ver EditNodeDialog) — nesse caso
+    // `announcement` também é null, mas não significa "criação": mostra skeleton em vez do form
+    loading?: boolean
     companyId: string
     onSave: (form: AnnouncementForm) => Promise<boolean>
+    onDelete?: () => void
 }
 
 export function AnnouncementFormDialog({
     open,
     onOpenChange,
     announcement,
+    loading = false,
     companyId,
     onSave,
+    onDelete,
 }: Props) {
     const isEdit = !!announcement
 
@@ -78,19 +84,16 @@ export function AnnouncementFormDialog({
         defaultValues: {
             name: "",
             audioId: null,
-            destination: { type: "hangup" },
         },
     })
 
     const audioId = watch("audioId")
-    const destination = watch("destination")
 
     useEffect(() => {
         if (!open) return
         reset({
             name: announcement?.name ?? "",
             audioId: announcement?.audioId ?? null,
-            destination: announcement?.destination ?? { type: "hangup" },
         })
     }, [open, announcement, reset])
 
@@ -115,108 +118,148 @@ export function AnnouncementFormDialog({
         <>
             <Dialog open={open} onOpenChange={requestClose}>
                 <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-lg">
-                    <DialogHeader>
-                        <DialogTitle>{isEdit ? "Editar anúncio" : "Novo anúncio"}</DialogTitle>
-                        <DialogDescription>
-                            {isEdit
-                                ? `Anúncio ${announcement.name}`
-                                : "Preencha os dados para criar o anúncio"}
-                        </DialogDescription>
-                    </DialogHeader>
+                    {loading ? (
+                        <EntityFormDialogSkeletonContent fieldCount={2} />
+                    ) : (
+                        <>
+                            <DialogHeader>
+                                <DialogTitle>
+                                    {isEdit ? "Editar anúncio" : "Novo anúncio"}
+                                </DialogTitle>
+                                <DialogDescription>
+                                    {isEdit
+                                        ? `Anúncio ${announcement.name}`
+                                        : "Preencha os dados para criar o anúncio"}
+                                </DialogDescription>
+                            </DialogHeader>
 
-                    <form
-                        id="announcement-form"
-                        onSubmit={onSubmit}
-                        className="flex min-h-0 flex-1 flex-col"
-                    >
-                        <div className="flex-1 overflow-x-hidden overflow-y-auto">
-                            <FieldGroup>
-                                <Field>
-                                    <FieldLabel>Nome</FieldLabel>
-                                    <Input placeholder="Ex: aviso-manutencao" {...register("name")} />
-                                    {errors.name && <FieldError>{errors.name.message}</FieldError>}
-                                </Field>
+                            <form
+                                id="announcement-form"
+                                onSubmit={onSubmit}
+                                className="flex min-h-0 flex-1 flex-col"
+                            >
+                                <div className="flex-1 overflow-x-hidden overflow-y-auto">
+                                    <FieldGroup>
+                                        <Field>
+                                            <FieldLabel>Nome</FieldLabel>
+                                            <Input
+                                                placeholder="Ex: aviso-manutencao"
+                                                {...register("name")}
+                                            />
+                                            {errors.name && (
+                                                <FieldError>
+                                                    {errors.name.message}
+                                                </FieldError>
+                                            )}
+                                        </Field>
 
-                                <Field>
-                                    <FieldLabel>Áudio</FieldLabel>
-                                    <Combobox<Audio>
-                                        items={audios}
-                                        value={selectedAudio}
-                                        itemToStringLabel={(a) => a.name}
-                                        isItemEqualToValue={(a, b) => a.id === b.id}
-                                        onValueChange={(a) =>
-                                            setValue("audioId", a?.id ?? null, { shouldDirty: true })
-                                        }
+                                        <Field>
+                                            <FieldLabel>Áudio</FieldLabel>
+                                            <Combobox<Audio>
+                                                items={audios}
+                                                value={selectedAudio}
+                                                itemToStringLabel={(a) =>
+                                                    a.name
+                                                }
+                                                isItemEqualToValue={(a, b) =>
+                                                    a.id === b.id
+                                                }
+                                                onValueChange={(a) =>
+                                                    setValue(
+                                                        "audioId",
+                                                        a?.id ?? null,
+                                                        { shouldDirty: true }
+                                                    )
+                                                }
+                                            >
+                                                <ComboboxInput placeholder="Buscar áudio..." />
+                                                <ComboboxContent>
+                                                    <ComboboxEmpty>
+                                                        Nenhum áudio cadastrado
+                                                        para essa empresa
+                                                    </ComboboxEmpty>
+                                                    <ComboboxList>
+                                                        {(a: Audio) => (
+                                                            <ComboboxItem
+                                                                key={a.id}
+                                                                value={a}
+                                                            >
+                                                                {a.name}
+                                                            </ComboboxItem>
+                                                        )}
+                                                    </ComboboxList>
+                                                </ComboboxContent>
+                                            </Combobox>
+                                            <FieldDescription>
+                                                Sem áudio vinculado, o anúncio
+                                                não pode ser usado como destino
+                                                em outras rotas até um ser
+                                                enviado (em Áudios) e
+                                                selecionado aqui.
+                                            </FieldDescription>
+                                        </Field>
+                                    </FieldGroup>
+                                </div>
+                            </form>
+
+                            <DialogFooter className="pt-4">
+                                {isEdit && onDelete && (
+                                    <Button
+                                        type="button"
+                                        variant="destructive"
+                                        className="mr-auto"
+                                        onClick={onDelete}
                                     >
-                                        <ComboboxInput placeholder="Buscar áudio..." />
-                                        <ComboboxContent>
-                                            <ComboboxEmpty>
-                                                Nenhum áudio cadastrado para essa empresa
-                                            </ComboboxEmpty>
-                                            <ComboboxList>
-                                                {(a: Audio) => (
-                                                    <ComboboxItem key={a.id} value={a}>
-                                                        {a.name}
-                                                    </ComboboxItem>
-                                                )}
-                                            </ComboboxList>
-                                        </ComboboxContent>
-                                    </Combobox>
-                                    <FieldDescription>
-                                        Sem áudio vinculado, o anúncio não pode ser usado como destino em
-                                        outras rotas até um ser enviado (em Áudios) e selecionado aqui.
-                                    </FieldDescription>
-                                </Field>
-
-                                <Field>
-                                    <FieldLabel>Destino</FieldLabel>
-                                    <RouteDestinationField
-                                        value={destination}
-                                        onChange={(d) =>
-                                            setValue("destination", d, {
-                                                shouldValidate: true,
-                                                shouldDirty: true,
-                                            })
-                                        }
-                                        companyId={companyId}
-                                    />
-                                    <FieldDescription>
-                                        Para onde a chamada segue depois de tocar o áudio deste anúncio.
-                                    </FieldDescription>
-                                </Field>
-                            </FieldGroup>
-                        </div>
-                    </form>
-
-                    <DialogFooter className="pt-4">
-                        <Button type="button" variant="outline" onClick={() => requestClose(false)}>
-                            Cancelar
-                        </Button>
-                        <Button type="submit" form="announcement-form" disabled={isSubmitting}>
-                            {isSubmitting
-                                ? isEdit
-                                    ? "Salvando..."
-                                    : "Criando..."
-                                : isEdit
-                                  ? "Salvar"
-                                  : "Criar"}
-                        </Button>
-                    </DialogFooter>
+                                        Excluir recurso
+                                    </Button>
+                                )}
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => requestClose(false)}
+                                >
+                                    Cancelar
+                                </Button>
+                                <Button
+                                    type="submit"
+                                    form="announcement-form"
+                                    disabled={isSubmitting}
+                                >
+                                    {isSubmitting
+                                        ? isEdit
+                                            ? "Salvando..."
+                                            : "Criando..."
+                                        : isEdit
+                                          ? "Salvar"
+                                          : "Criar"}
+                                </Button>
+                            </DialogFooter>
+                        </>
+                    )}
                 </DialogContent>
             </Dialog>
 
-            <AlertDialog open={confirmDiscardOpen} onOpenChange={setConfirmDiscardOpen}>
+            <AlertDialog
+                open={confirmDiscardOpen}
+                onOpenChange={setConfirmDiscardOpen}
+            >
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Descartar alterações?</AlertDialogTitle>
+                        <AlertDialogTitle>
+                            Descartar alterações?
+                        </AlertDialogTitle>
                         <AlertDialogDescription>
                             Você tem alterações não salvas
-                            {isEdit ? ` no anúncio "${announcement.name}"` : " neste anúncio"}. Se sair
-                            agora, elas serão perdidas.
+                            {isEdit
+                                ? ` no anúncio "${announcement.name}"`
+                                : " neste anúncio"}
+                            . Se sair agora, elas serão perdidas.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel>Continuar editando</AlertDialogCancel>
+                        <AlertDialogCancel>
+                            Continuar editando
+                        </AlertDialogCancel>
                         <AlertDialogAction
                             variant="destructive"
                             onClick={() => {

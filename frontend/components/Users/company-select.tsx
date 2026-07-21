@@ -14,7 +14,12 @@ type Props = {
     className?: string
 }
 
-export function CompanySelect({ companies, value, onChange, className }: Props) {
+export function CompanySelect({
+    companies,
+    value,
+    onChange,
+    className,
+}: Props) {
     const [search, setSearch] = useState("")
     const filtered = companies.filter((c) =>
         c.name.toLowerCase().includes(search.toLowerCase())
@@ -48,9 +53,7 @@ export function CompanySelect({ companies, value, onChange, className }: Props) 
                                 key={company.id}
                                 className={cn(
                                     "flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm font-normal transition-colors",
-                                    selected
-                                        ? "bg-input"
-                                        : "hover:bg-accent/60"
+                                    selected ? "bg-input" : "hover:bg-accent/60"
                                 )}
                             >
                                 <Checkbox

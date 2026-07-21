@@ -8,7 +8,10 @@ import { PjsipRepository } from '../../asterisk/pjsip.repository'
 import { SipRepository } from '../../asterisk/sip.repository'
 import { DialplanRepository } from '../../asterisk/dialplan.repository'
 import { AsteriskQueueRepository } from '../../asterisk/queue.repository'
+import { assertNotReferenced } from '../../schemas/route-destination.validate'
+import { resolveUsedByLabels, type UsedByRef } from '../../schemas/flow-reference-label'
 import { AppError } from '../../utils/errors/app.error'
+import { logger } from '../../utils/logger'
 
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 
@@ -16,6 +19,12 @@ const CHARSET = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
 const generatePassword = () => {
     const bytes = randomBytes(20)
     return Array.from(bytes, (b) => CHARSET[b % CHARSET.length]).join('')
+}
+
+const regenerateFlowNodesSafely = (companyId: string) => {
+    void import('../../asterisk/flow-node.repository')
+        .then(({ FlowNodeRepository }) => FlowNodeRepository.regenerate(companyId))
+        .catch((error) => logger.warn({ event: 'flow-nodes.regenerate.failed', companyId, error: error instanceof Error ? error.message : String(error) }))
 }
 
 export type BatchResult = {
@@ -188,9 +197,25 @@ export const getAllExtensions = async (companyIds?: string[], userId?: string) =
     const pjsipSynced = new Set(pjsipSync.map((e: any) => e.id))
     const sipSynced = new Set(sipSync.map((e: any) => e.name))
 
+    // usedBy é resolvido por empresa (query de FlowEdgeRepository.getReferencesToMany é global,
+    // mas o nome de quem referencia precisa ser buscado escopado à empresa de cada extensão —
+    // ver resolveUsedByLabels). Nas listagens cross-empresa (isAll/isMultiCompanyScope) as
+    // extensões podem pertencer a empresas diferentes, então agrupa por companyId antes de resolver.
+    const idsByCompany = new Map<string, string[]>()
+    for (const e of mapped) {
+        const ids = idsByCompany.get(e.companyId) ?? []
+        ids.push(e.id)
+        idsByCompany.set(e.companyId, ids)
+    }
+    const usedByMapsByCompany = await Promise.all(
+        [...idsByCompany.entries()].map(([cId, ids]) => resolveUsedByLabels('extension', ids, cId)),
+    )
+    const usedByMap = new Map<string, UsedByRef[]>()
+    for (const map of usedByMapsByCompany) for (const [id, labels] of map) usedByMap.set(id, labels)
+
     grouped = {
-        sip: sip.map((e) => ({ ...e, synced: sipSynced.has(e.username) })),
-        pjsip: pjsip.map((e) => ({ ...e, synced: pjsipSynced.has(e.username) })),
+        sip: sip.map((e) => ({ ...e, synced: sipSynced.has(e.username), usedBy: usedByMap.get(e.id) ?? [] })),
+        pjsip: pjsip.map((e) => ({ ...e, synced: pjsipSynced.has(e.username), usedBy: usedByMap.get(e.id) ?? [] })),
     }
 
     if (singleCompanyId) await ExtensionsCache.setByCompany(singleCompanyId, grouped)
@@ -283,12 +308,17 @@ export const getExtensionDto = async (id: string): Promise<ExtensionDto> => {
     return dto
 }
 
-export const getExtensionById = async (id: string): Promise<ExtensionDto & { synced: boolean }> => {
+export const getExtensionById = async (id: string): Promise<ExtensionDto & { synced: boolean; usedBy: UsedByRef[] }> => {
     const dto = await getExtensionDto(id)
+
+    // Não cacheado junto com live details — resolvido fresco a cada leitura (mesma decisão de
+    // flow-reference-label.ts, indicador não crítico o bastante pra justificar cache próprio).
+    const usedByMap = await resolveUsedByLabels('extension', [id], dto.companyId)
+    const usedBy = usedByMap.get(id) ?? []
 
     type LiveDetails = { synced: boolean } & Record<string, any>
     const cachedLive = await ExtensionsCache.getLiveDetails<LiveDetails>(id)
-    if (cachedLive) return { ...dto, ...cachedLive }
+    if (cachedLive) return { ...dto, ...cachedLive, usedBy }
 
     const [synced, details] = await Promise.all([
         checkAsteriskSync(dto.username, dto.type),
@@ -296,7 +326,7 @@ export const getExtensionById = async (id: string): Promise<ExtensionDto & { syn
     ])
     const live: LiveDetails = { ...details, synced }
     await ExtensionsCache.setLiveDetails(id, live)
-    return { ...dto, ...live }
+    return { ...dto, ...live, usedBy }
 }
 
 export const createExtension = async (data: CreateExtensionInput) => {
@@ -447,6 +477,7 @@ export const updateExtension = async (id: string, data: UpdateExtensionInput) =>
     await ExtensionsCache.invalidateExtension(id)
     await ExtensionsCache.invalidateLiveDetails(id)
     await ExtensionsCache.invalidateAllExtensions()
+    if (aliasChanged || contextChanged) regenerateFlowNodesSafely(existing.companyId)
     const updated = await getExtensionById(id)
     return provisionedPassword ? { ...updated, provisioned: true, password: provisionedPassword } : updated
 }
@@ -510,6 +541,8 @@ export const createExtensionBatch = async (items: CreateExtensionInput[]): Promi
 export const deleteExtension = async (id: string) => {
     const existing = await prisma.extension.findUnique({ where: { id } })
     if (!existing) throw new AppError('Extension not found', 404)
+
+    await assertNotReferenced('extension', id)
 
     const { alias, companyId, number, type } = existing
     const asteriskInterface = `${type.toUpperCase()}/${number}`

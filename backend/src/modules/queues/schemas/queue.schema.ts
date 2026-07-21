@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { timestamp, ok } from '../../../schemas/responses'
 import { routeDestinationSchema, routeDestinationResponseSchema } from '../../../schemas/route-destination.schema'
+import { usedBySchema } from '../../../schemas/flow-reference-label'
 
 export const QUEUE_STRATEGIES = [
     'ringall',
@@ -112,6 +113,7 @@ export const QueueSchema = z.object({
     joinEmpty: z.boolean(),
     leaveWhenEmpty: z.boolean(),
     postQueueDestination: routeDestinationResponseSchema,
+    usedBy: usedBySchema,
     surveyAudioId: z.string().nullable(),
     hasSurveyAudio: z.boolean(),
     callcenterEnabled: z.boolean(),

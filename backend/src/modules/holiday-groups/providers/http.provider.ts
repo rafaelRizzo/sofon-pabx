@@ -1,5 +1,5 @@
 import { logger } from '../../../utils/logger'
-import { assertSafeUrl } from '../../../utils/net/safe-url'
+import { safeFetch } from '../../../utils/net/safe-url'
 
 const TIMEOUT_MS = 3000
 
@@ -18,8 +18,7 @@ export async function fetchHolidaysFromUrl(baseUrl: string, year: number): Promi
 
     try {
         const target = `${baseUrl.replace(/\/$/, '')}/${year}`
-        await assertSafeUrl(target) // SSRF: bloqueia URL apontando pra host interno/privado
-        const res = await fetch(target, { signal: controller.signal })
+        const res = await safeFetch(target, { signal: controller.signal })
         if (!res.ok) {
             logger.warn({ event: 'holidays.provider.error', url: baseUrl, status: res.status })
             return null

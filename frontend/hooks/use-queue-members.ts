@@ -19,7 +19,12 @@ export type QueueMember = {
 
 export const addQueueMemberSchema = z.object({
     extensionId: z.string().min(1, "Selecione um ramal"),
-    penalty: z.number().int().min(0, "Mínimo 0").max(100, "Máximo 100").default(0),
+    penalty: z
+        .number()
+        .int()
+        .min(0, "Mínimo 0")
+        .max(100, "Máximo 100")
+        .default(0),
     paused: z.boolean().default(false),
 })
 
@@ -66,7 +71,10 @@ export function useQueueMembers(queueId?: string) {
         }
     }
 
-    const updateMember = async (memberId: string, form: UpdateQueueMemberForm) => {
+    const updateMember = async (
+        memberId: string,
+        form: UpdateQueueMemberForm
+    ) => {
         if (!queueId) return false
         const id = toast.loading("Atualizando membro...")
         try {
@@ -94,10 +102,16 @@ export function useQueueMembers(queueId?: string) {
         }
     }
 
-    const fetchStateRef = useRef<{ key?: string; fetched: boolean }>({ fetched: false })
+    const fetchStateRef = useRef<{ key?: string; fetched: boolean }>({
+        fetched: false,
+    })
 
     useEffect(() => {
-        if (fetchStateRef.current.fetched && fetchStateRef.current.key === queueId) return
+        if (
+            fetchStateRef.current.fetched &&
+            fetchStateRef.current.key === queueId
+        )
+            return
         fetchStateRef.current = { key: queueId, fetched: true }
         fetchMembers()
     }, [fetchMembers, queueId])

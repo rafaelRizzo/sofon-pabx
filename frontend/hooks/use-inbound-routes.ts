@@ -5,7 +5,10 @@ import { toast } from "sonner"
 import { z } from "zod"
 
 import { api, apiError } from "@/lib/api"
-import { routeDestinationSchema, type RouteDestination } from "@/components/RouteDestination/route-destination-field"
+import {
+    routeDestinationSchema,
+    type RouteDestination,
+} from "@/components/RouteDestination/route-destination-field"
 
 export type InboundRoute = {
     id: string
@@ -35,7 +38,9 @@ export const updateInboundRouteFormSchema = z.object({
 })
 
 export type InboundRouteForm = z.infer<typeof createInboundRouteFormSchema>
-export type InboundRouteUpdateForm = z.infer<typeof updateInboundRouteFormSchema>
+export type InboundRouteUpdateForm = z.infer<
+    typeof updateInboundRouteFormSchema
+>
 
 // companyId opcional — enquanto não informado, a lista não é buscada (filtro de empresa
 // da página exige seleção antes de consultar o backend). Diferente da empresa do formulário
@@ -65,10 +70,16 @@ export function useInboundRoutes(companyId?: string) {
         }
     }, [companyId])
 
-    const createRoute = async (form: InboundRouteForm, targetCompanyId: string) => {
+    const createRoute = async (
+        form: InboundRouteForm,
+        targetCompanyId: string
+    ) => {
         const id = toast.loading("Criando rota de entrada...")
         try {
-            await api.post("/inbound-routes", { ...form, companyId: targetCompanyId })
+            await api.post("/inbound-routes", {
+                ...form,
+                companyId: targetCompanyId,
+            })
             toast.success("Rota de entrada criada", { id })
             await fetchRoutes()
             return true
@@ -78,7 +89,10 @@ export function useInboundRoutes(companyId?: string) {
         }
     }
 
-    const updateRoute = async (routeId: string, form: InboundRouteUpdateForm) => {
+    const updateRoute = async (
+        routeId: string,
+        form: InboundRouteUpdateForm
+    ) => {
         const id = toast.loading("Atualizando rota de entrada...")
         try {
             await api.put(`/inbound-routes/${routeId}`, form)
@@ -86,7 +100,9 @@ export function useInboundRoutes(companyId?: string) {
             await fetchRoutes()
             return true
         } catch (err) {
-            toast.error(apiError(err, "Erro ao atualizar rota de entrada"), { id })
+            toast.error(apiError(err, "Erro ao atualizar rota de entrada"), {
+                id,
+            })
             return false
         }
     }
@@ -99,19 +115,29 @@ export function useInboundRoutes(companyId?: string) {
             await fetchRoutes()
             return true
         } catch (err) {
-            toast.error(apiError(err, "Erro ao deletar rota de entrada"), { id })
+            toast.error(apiError(err, "Erro ao deletar rota de entrada"), {
+                id,
+            })
             return false
         }
     }
 
     const filtered = routes.filter((r) =>
-        `${r.name} ${r.did.number} ${r.trunk.name}`.toLowerCase().includes(filter.toLowerCase())
+        `${r.name} ${r.did.number} ${r.trunk.name}`
+            .toLowerCase()
+            .includes(filter.toLowerCase())
     )
 
-    const fetchStateRef = useRef<{ key?: string; fetched: boolean }>({ fetched: false })
+    const fetchStateRef = useRef<{ key?: string; fetched: boolean }>({
+        fetched: false,
+    })
 
     useEffect(() => {
-        if (fetchStateRef.current.fetched && fetchStateRef.current.key === companyId) return
+        if (
+            fetchStateRef.current.fetched &&
+            fetchStateRef.current.key === companyId
+        )
+            return
         fetchStateRef.current = { key: companyId, fetched: true }
         fetchRoutes()
     }, [fetchRoutes, companyId])

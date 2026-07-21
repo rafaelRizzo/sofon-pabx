@@ -361,9 +361,9 @@ export function TrunkFormDialog({
     // no resolver/defaultValues dos dois useForm acima)
     const r = (isEdit ? updateForm.register : createForm.register) as any
     const control = (isEdit ? updateForm.control : createForm.control) as any
-    const errors = (isEdit
-        ? updateForm.formState.errors
-        : createForm.formState.errors) as any
+    const errors = (
+        isEdit ? updateForm.formState.errors : createForm.formState.errors
+    ) as any
     const isSubmitting = isEdit
         ? updateForm.formState.isSubmitting
         : createForm.formState.isSubmitting
@@ -607,13 +607,12 @@ export function TrunkFormDialog({
                                                     IAX2 outbound não envia
                                                     REGISTER pro provedor
                                                     (limitação do Asterisk, sem
-                                                    tabela realtime de
-                                                    registro pra IAX2). Esse
-                                                    tronco funciona como peer
-                                                    estático autenticado por
-                                                    IP + secret, não como
-                                                    registro dinâmico. Use
-                                                    apenas com provedores de
+                                                    tabela realtime de registro
+                                                    pra IAX2). Esse tronco
+                                                    funciona como peer estático
+                                                    autenticado por IP + secret,
+                                                    não como registro dinâmico.
+                                                    Use apenas com provedores de
                                                     IP fixo.
                                                 </FieldDescription>
                                             )}
@@ -744,381 +743,412 @@ export function TrunkFormDialog({
 
                                     <Accordion multiple>
                                         {!isIaxType && (
-                                        <AccordionItem value="advanced">
-                                            <AccordionTrigger>
-                                                Avançado (PJSIP)
-                                            </AccordionTrigger>
-                                            <AccordionContent>
-                                                <div className="space-y-3">
-                                                    <div className="grid grid-cols-2 gap-3">
-                                                        <AdvancedSelect
-                                                            label="Transport"
-                                                            name="transport"
-                                                            control={control}
-                                                            items={
-                                                                TRANSPORT_OPTIONS
-                                                            }
-                                                        />
-                                                        <AdvancedSelect
-                                                            label="DTMF Mode"
-                                                            name="dtmfMode"
-                                                            control={control}
-                                                            items={
-                                                                DTMF_MODE_OPTIONS
-                                                            }
-                                                        />
-                                                    </div>
-                                                    <div className="grid grid-cols-2 gap-3">
-                                                        <Field>
-                                                            <FieldLabel>
-                                                                Qualify
-                                                                Frequency (s)
-                                                            </FieldLabel>
-                                                            <NumberInput
-                                                                placeholder="60"
-                                                                {...r(
-                                                                    "qualifyFrequency"
-                                                                )}
-                                                            />
-                                                            {errors.qualifyFrequency && (
-                                                                <FieldError>
-                                                                    {
-                                                                        errors
-                                                                            .qualifyFrequency
-                                                                            .message as string
-                                                                    }
-                                                                </FieldError>
-                                                            )}
-                                                        </Field>
-                                                        <Field>
-                                                            <FieldLabel>
-                                                                Qualify Timeout
-                                                                (s)
-                                                            </FieldLabel>
-                                                            <NumberInput
-                                                                placeholder="3"
-                                                                {...r(
-                                                                    "qualifyTimeout"
-                                                                )}
-                                                            />
-                                                            {errors.qualifyTimeout && (
-                                                                <FieldError>
-                                                                    {
-                                                                        errors
-                                                                            .qualifyTimeout
-                                                                            .message as string
-                                                                    }
-                                                                </FieldError>
-                                                            )}
-                                                        </Field>
-                                                    </div>
-                                                    <div className="grid grid-cols-2 gap-3">
-                                                        <AdvancedSelect
-                                                            label="100rel"
-                                                            name="rel"
-                                                            control={control}
-                                                            items={REL_OPTIONS}
-                                                        />
-                                                        <AdvancedSelect
-                                                            label="Session Timers"
-                                                            name="timers"
-                                                            control={control}
-                                                            items={
-                                                                TIMERS_OPTIONS
-                                                            }
-                                                        />
-                                                    </div>
-                                                    <div className="grid grid-cols-2 gap-3">
-                                                        <Field>
-                                                            <FieldLabel>
-                                                                Timers Min-SE
-                                                            </FieldLabel>
-                                                            <NumberInput
-                                                                placeholder="90"
-                                                                {...r(
-                                                                    "timersMinSe"
-                                                                )}
-                                                            />
-                                                            {errors.timersMinSe && (
-                                                                <FieldError>
-                                                                    {
-                                                                        errors
-                                                                            .timersMinSe
-                                                                            .message as string
-                                                                    }
-                                                                </FieldError>
-                                                            )}
-                                                        </Field>
-                                                        <Field>
-                                                            <FieldLabel>
-                                                                Timers
-                                                                Sess-Expires
-                                                            </FieldLabel>
-                                                            <NumberInput
-                                                                placeholder="1800"
-                                                                {...r(
-                                                                    "timersSessExpires"
-                                                                )}
-                                                            />
-                                                            {errors.timersSessExpires && (
-                                                                <FieldError>
-                                                                    {
-                                                                        errors
-                                                                            .timersSessExpires
-                                                                            .message as string
-                                                                    }
-                                                                </FieldError>
-                                                            )}
-                                                        </Field>
-                                                    </div>
-                                                    <Field>
-                                                        <FieldLabel>
-                                                            Outbound Proxy
-                                                        </FieldLabel>
-                                                        <Input
-                                                            placeholder="sip:proxy.provedor.com.br"
-                                                            {...r(
-                                                                "outboundProxy"
-                                                            )}
-                                                        />
-                                                        {errors.outboundProxy && (
-                                                            <FieldError>
-                                                                {
-                                                                    errors
-                                                                        .outboundProxy
-                                                                        .message as string
+                                            <AccordionItem value="advanced">
+                                                <AccordionTrigger>
+                                                    Avançado (PJSIP)
+                                                </AccordionTrigger>
+                                                <AccordionContent>
+                                                    <div className="space-y-3">
+                                                        <div className="grid grid-cols-2 gap-3">
+                                                            <AdvancedSelect
+                                                                label="Transport"
+                                                                name="transport"
+                                                                control={
+                                                                    control
                                                                 }
-                                                            </FieldError>
-                                                        )}
-                                                    </Field>
-                                                    <div className="grid grid-cols-3 gap-3">
-                                                        <AdvancedSwitch
-                                                            label="Direct Media"
-                                                            name="directMedia"
-                                                            control={control}
-                                                        />
-                                                        <AdvancedSwitch
-                                                            label="ICE Support"
-                                                            name="iceSupport"
-                                                            control={control}
-                                                        />
-                                                        <AdvancedSwitch
-                                                            label="Send Diversion"
-                                                            name="sendDiversion"
-                                                            control={control}
-                                                        />
+                                                                items={
+                                                                    TRANSPORT_OPTIONS
+                                                                }
+                                                            />
+                                                            <AdvancedSelect
+                                                                label="DTMF Mode"
+                                                                name="dtmfMode"
+                                                                control={
+                                                                    control
+                                                                }
+                                                                items={
+                                                                    DTMF_MODE_OPTIONS
+                                                                }
+                                                            />
+                                                        </div>
+                                                        <div className="grid grid-cols-2 gap-3">
+                                                            <Field>
+                                                                <FieldLabel>
+                                                                    Qualify
+                                                                    Frequency
+                                                                    (s)
+                                                                </FieldLabel>
+                                                                <NumberInput
+                                                                    placeholder="60"
+                                                                    {...r(
+                                                                        "qualifyFrequency"
+                                                                    )}
+                                                                />
+                                                                {errors.qualifyFrequency && (
+                                                                    <FieldError>
+                                                                        {
+                                                                            errors
+                                                                                .qualifyFrequency
+                                                                                .message as string
+                                                                        }
+                                                                    </FieldError>
+                                                                )}
+                                                            </Field>
+                                                            <Field>
+                                                                <FieldLabel>
+                                                                    Qualify
+                                                                    Timeout (s)
+                                                                </FieldLabel>
+                                                                <NumberInput
+                                                                    placeholder="3"
+                                                                    {...r(
+                                                                        "qualifyTimeout"
+                                                                    )}
+                                                                />
+                                                                {errors.qualifyTimeout && (
+                                                                    <FieldError>
+                                                                        {
+                                                                            errors
+                                                                                .qualifyTimeout
+                                                                                .message as string
+                                                                        }
+                                                                    </FieldError>
+                                                                )}
+                                                            </Field>
+                                                        </div>
+                                                        <div className="grid grid-cols-2 gap-3">
+                                                            <AdvancedSelect
+                                                                label="100rel"
+                                                                name="rel"
+                                                                control={
+                                                                    control
+                                                                }
+                                                                items={
+                                                                    REL_OPTIONS
+                                                                }
+                                                            />
+                                                            <AdvancedSelect
+                                                                label="Session Timers"
+                                                                name="timers"
+                                                                control={
+                                                                    control
+                                                                }
+                                                                items={
+                                                                    TIMERS_OPTIONS
+                                                                }
+                                                            />
+                                                        </div>
+                                                        <div className="grid grid-cols-2 gap-3">
+                                                            <Field>
+                                                                <FieldLabel>
+                                                                    Timers
+                                                                    Min-SE
+                                                                </FieldLabel>
+                                                                <NumberInput
+                                                                    placeholder="90"
+                                                                    {...r(
+                                                                        "timersMinSe"
+                                                                    )}
+                                                                />
+                                                                {errors.timersMinSe && (
+                                                                    <FieldError>
+                                                                        {
+                                                                            errors
+                                                                                .timersMinSe
+                                                                                .message as string
+                                                                        }
+                                                                    </FieldError>
+                                                                )}
+                                                            </Field>
+                                                            <Field>
+                                                                <FieldLabel>
+                                                                    Timers
+                                                                    Sess-Expires
+                                                                </FieldLabel>
+                                                                <NumberInput
+                                                                    placeholder="1800"
+                                                                    {...r(
+                                                                        "timersSessExpires"
+                                                                    )}
+                                                                />
+                                                                {errors.timersSessExpires && (
+                                                                    <FieldError>
+                                                                        {
+                                                                            errors
+                                                                                .timersSessExpires
+                                                                                .message as string
+                                                                        }
+                                                                    </FieldError>
+                                                                )}
+                                                            </Field>
+                                                        </div>
+                                                        <Field>
+                                                            <FieldLabel>
+                                                                Outbound Proxy
+                                                            </FieldLabel>
+                                                            <Input
+                                                                placeholder="sip:proxy.provedor.com.br"
+                                                                {...r(
+                                                                    "outboundProxy"
+                                                                )}
+                                                            />
+                                                            {errors.outboundProxy && (
+                                                                <FieldError>
+                                                                    {
+                                                                        errors
+                                                                            .outboundProxy
+                                                                            .message as string
+                                                                    }
+                                                                </FieldError>
+                                                            )}
+                                                        </Field>
+                                                        <div className="grid grid-cols-3 gap-3">
+                                                            <AdvancedSwitch
+                                                                label="Direct Media"
+                                                                name="directMedia"
+                                                                control={
+                                                                    control
+                                                                }
+                                                            />
+                                                            <AdvancedSwitch
+                                                                label="ICE Support"
+                                                                name="iceSupport"
+                                                                control={
+                                                                    control
+                                                                }
+                                                            />
+                                                            <AdvancedSwitch
+                                                                label="Send Diversion"
+                                                                name="sendDiversion"
+                                                                control={
+                                                                    control
+                                                                }
+                                                            />
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            </AccordionContent>
-                                        </AccordionItem>
+                                                </AccordionContent>
+                                            </AccordionItem>
                                         )}
 
                                         {isIaxType && (
-                                        <AccordionItem value="advanced-iax">
-                                            <AccordionTrigger>
-                                                Avançado (IAX2)
-                                            </AccordionTrigger>
-                                            <AccordionContent>
-                                                <div className="space-y-3">
-                                                    <div className="grid grid-cols-2 gap-3">
-                                                        <AdvancedSelect
-                                                            label="Qualify"
-                                                            name="qualify"
-                                                            control={control}
-                                                            items={
-                                                                IAX_QUALIFY_OPTIONS
-                                                            }
-                                                        />
-                                                        <AdvancedSelect
-                                                            label="Transfer"
-                                                            name="transfer"
-                                                            control={control}
-                                                            items={
-                                                                IAX_TRANSFER_OPTIONS
-                                                            }
-                                                        />
+                                            <AccordionItem value="advanced-iax">
+                                                <AccordionTrigger>
+                                                    Avançado (IAX2)
+                                                </AccordionTrigger>
+                                                <AccordionContent>
+                                                    <div className="space-y-3">
+                                                        <div className="grid grid-cols-2 gap-3">
+                                                            <AdvancedSelect
+                                                                label="Qualify"
+                                                                name="qualify"
+                                                                control={
+                                                                    control
+                                                                }
+                                                                items={
+                                                                    IAX_QUALIFY_OPTIONS
+                                                                }
+                                                            />
+                                                            <AdvancedSelect
+                                                                label="Transfer"
+                                                                name="transfer"
+                                                                control={
+                                                                    control
+                                                                }
+                                                                items={
+                                                                    IAX_TRANSFER_OPTIONS
+                                                                }
+                                                            />
+                                                        </div>
+                                                        <div className="grid grid-cols-3 gap-3">
+                                                            <AdvancedSwitch
+                                                                label="Trunk mode"
+                                                                name="trunkMode"
+                                                                control={
+                                                                    control
+                                                                }
+                                                            />
+                                                            <AdvancedSwitch
+                                                                label="Encryption"
+                                                                name="encryption"
+                                                                control={
+                                                                    control
+                                                                }
+                                                            />
+                                                            <AdvancedSwitch
+                                                                label="Jitterbuffer"
+                                                                name="jitterbuffer"
+                                                                control={
+                                                                    control
+                                                                }
+                                                            />
+                                                        </div>
+                                                        <FieldDescription>
+                                                            Trunk mode otimiza o
+                                                            transporte pra alto
+                                                            volume de chamadas
+                                                            ponto a ponto
+                                                            (meta-frame).
+                                                            Encryption usa
+                                                            AES128 nativo do
+                                                            IAX2 com o secret
+                                                            configurado acima,
+                                                            só funciona se o
+                                                            outro lado também
+                                                            suportar.
+                                                        </FieldDescription>
                                                     </div>
-                                                    <div className="grid grid-cols-3 gap-3">
-                                                        <AdvancedSwitch
-                                                            label="Trunk mode"
-                                                            name="trunkMode"
-                                                            control={control}
-                                                        />
-                                                        <AdvancedSwitch
-                                                            label="Encryption"
-                                                            name="encryption"
-                                                            control={control}
-                                                        />
-                                                        <AdvancedSwitch
-                                                            label="Jitterbuffer"
-                                                            name="jitterbuffer"
-                                                            control={control}
-                                                        />
-                                                    </div>
-                                                    <FieldDescription>
-                                                        Trunk mode otimiza o
-                                                        transporte pra alto
-                                                        volume de chamadas
-                                                        ponto a ponto
-                                                        (meta-frame). Encryption
-                                                        usa AES128 nativo do
-                                                        IAX2 com o secret
-                                                        configurado acima, só
-                                                        funciona se o outro
-                                                        lado também suportar.
-                                                    </FieldDescription>
-                                                </div>
-                                            </AccordionContent>
-                                        </AccordionItem>
+                                                </AccordionContent>
+                                            </AccordionItem>
                                         )}
 
                                         {!isIaxType && (
-                                        <AccordionItem value="headers">
-                                            <AccordionTrigger>
-                                                Headers SIP customizados
-                                                (outbound)
-                                            </AccordionTrigger>
-                                            <AccordionContent>
-                                                <div className="space-y-3">
-                                                    <div className="flex items-center justify-between">
-                                                        <FieldDescription>
-                                                            Injetados via{" "}
-                                                            <code>
-                                                                Set(PJSIP_HEADER(add,...))
-                                                            </code>{" "}
-                                                            antes de cada
-                                                            tentativa de Dial
-                                                            nas rotas de saída
-                                                            que usam essa trunk.
-                                                            Valor literal, sem
-                                                            interpolação de
-                                                            variável.
-                                                        </FieldDescription>
-                                                        <Button
-                                                            type="button"
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() =>
-                                                                headerFields.append(
-                                                                    emptyCustomHeader,
-                                                                    {
-                                                                        shouldFocus: false,
-                                                                    }
-                                                                )
-                                                            }
-                                                        >
-                                                            <PlusIcon />
-                                                            Adicionar
-                                                        </Button>
-                                                    </div>
-                                                    {headerFields.fields
-                                                        .length === 0 ? (
-                                                        <FieldDescription>
-                                                            Nenhum header
-                                                            configurado.
-                                                        </FieldDescription>
-                                                    ) : (
-                                                        <div className="space-y-2 rounded-md border p-2">
-                                                            <div className="grid grid-cols-[1fr_1fr_1.75rem] gap-2">
-                                                                <span className="text-xs font-medium text-muted-foreground">
-                                                                    Nome
-                                                                </span>
-                                                                <span className="text-xs font-medium text-muted-foreground">
-                                                                    Valor
-                                                                </span>
-                                                                <span />
-                                                            </div>
-                                                            {headerFields.fields.map(
-                                                                (
-                                                                    field,
-                                                                    index
-                                                                ) => (
-                                                                    <div
-                                                                        key={
-                                                                            field.id
+                                            <AccordionItem value="headers">
+                                                <AccordionTrigger>
+                                                    Headers SIP customizados
+                                                    (outbound)
+                                                </AccordionTrigger>
+                                                <AccordionContent>
+                                                    <div className="space-y-3">
+                                                        <div className="flex items-center justify-between">
+                                                            <FieldDescription>
+                                                                Injetados via{" "}
+                                                                <code>
+                                                                    Set(PJSIP_HEADER(add,...))
+                                                                </code>{" "}
+                                                                antes de cada
+                                                                tentativa de
+                                                                Dial nas rotas
+                                                                de saída que
+                                                                usam essa trunk.
+                                                                Valor literal,
+                                                                sem interpolação
+                                                                de variável.
+                                                            </FieldDescription>
+                                                            <Button
+                                                                type="button"
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={() =>
+                                                                    headerFields.append(
+                                                                        emptyCustomHeader,
+                                                                        {
+                                                                            shouldFocus: false,
                                                                         }
-                                                                        className="grid grid-cols-[1fr_1fr_1.75rem] items-start gap-2"
-                                                                    >
-                                                                        <div>
-                                                                            <Input
-                                                                                placeholder="X-Custom-Header"
-                                                                                {...r(
-                                                                                    `customHeaders.${index}.name`
-                                                                                )}
-                                                                            />
-                                                                            {(
-                                                                                errors as any
-                                                                            )
-                                                                                .customHeaders?.[
-                                                                                index
-                                                                            ]
-                                                                                ?.name && (
-                                                                                <FieldError>
-                                                                                    {
-                                                                                        (
-                                                                                            errors as any
-                                                                                        )
-                                                                                            .customHeaders[
-                                                                                            index
-                                                                                        ]
-                                                                                            .name
-                                                                                            .message
-                                                                                    }
-                                                                                </FieldError>
-                                                                            )}
-                                                                        </div>
-                                                                        <div>
-                                                                            <Input
-                                                                                placeholder="valor"
-                                                                                {...r(
-                                                                                    `customHeaders.${index}.value`
-                                                                                )}
-                                                                            />
-                                                                            {(
-                                                                                errors as any
-                                                                            )
-                                                                                .customHeaders?.[
-                                                                                index
-                                                                            ]
-                                                                                ?.value && (
-                                                                                <FieldError>
-                                                                                    {
-                                                                                        (
-                                                                                            errors as any
-                                                                                        )
-                                                                                            .customHeaders[
-                                                                                            index
-                                                                                        ]
-                                                                                            .value
-                                                                                            .message
-                                                                                    }
-                                                                                </FieldError>
-                                                                            )}
-                                                                        </div>
-                                                                        <Button
-                                                                            type="button"
-                                                                            variant="outline"
-                                                                            size="icon"
-                                                                            onClick={() =>
-                                                                                headerFields.remove(
-                                                                                    index
-                                                                                )
-                                                                            }
-                                                                        >
-                                                                            <XIcon />
-                                                                            <span className="sr-only">
-                                                                                Remover
-                                                                                header
-                                                                            </span>
-                                                                        </Button>
-                                                                    </div>
-                                                                )
-                                                            )}
+                                                                    )
+                                                                }
+                                                            >
+                                                                <PlusIcon />
+                                                                Adicionar
+                                                            </Button>
                                                         </div>
-                                                    )}
-                                                </div>
-                                            </AccordionContent>
-                                        </AccordionItem>
+                                                        {headerFields.fields
+                                                            .length === 0 ? (
+                                                            <FieldDescription>
+                                                                Nenhum header
+                                                                configurado.
+                                                            </FieldDescription>
+                                                        ) : (
+                                                            <div className="space-y-2 rounded-md border p-2">
+                                                                <div className="grid grid-cols-[1fr_1fr_1.75rem] gap-2">
+                                                                    <span className="text-xs font-medium text-muted-foreground">
+                                                                        Nome
+                                                                    </span>
+                                                                    <span className="text-xs font-medium text-muted-foreground">
+                                                                        Valor
+                                                                    </span>
+                                                                    <span />
+                                                                </div>
+                                                                {headerFields.fields.map(
+                                                                    (
+                                                                        field,
+                                                                        index
+                                                                    ) => (
+                                                                        <div
+                                                                            key={
+                                                                                field.id
+                                                                            }
+                                                                            className="grid grid-cols-[1fr_1fr_1.75rem] items-start gap-2"
+                                                                        >
+                                                                            <div>
+                                                                                <Input
+                                                                                    placeholder="X-Custom-Header"
+                                                                                    {...r(
+                                                                                        `customHeaders.${index}.name`
+                                                                                    )}
+                                                                                />
+                                                                                {(
+                                                                                    errors as any
+                                                                                )
+                                                                                    .customHeaders?.[
+                                                                                    index
+                                                                                ]
+                                                                                    ?.name && (
+                                                                                    <FieldError>
+                                                                                        {
+                                                                                            (
+                                                                                                errors as any
+                                                                                            )
+                                                                                                .customHeaders[
+                                                                                                index
+                                                                                            ]
+                                                                                                .name
+                                                                                                .message
+                                                                                        }
+                                                                                    </FieldError>
+                                                                                )}
+                                                                            </div>
+                                                                            <div>
+                                                                                <Input
+                                                                                    placeholder="valor"
+                                                                                    {...r(
+                                                                                        `customHeaders.${index}.value`
+                                                                                    )}
+                                                                                />
+                                                                                {(
+                                                                                    errors as any
+                                                                                )
+                                                                                    .customHeaders?.[
+                                                                                    index
+                                                                                ]
+                                                                                    ?.value && (
+                                                                                    <FieldError>
+                                                                                        {
+                                                                                            (
+                                                                                                errors as any
+                                                                                            )
+                                                                                                .customHeaders[
+                                                                                                index
+                                                                                            ]
+                                                                                                .value
+                                                                                                .message
+                                                                                        }
+                                                                                    </FieldError>
+                                                                                )}
+                                                                            </div>
+                                                                            <Button
+                                                                                type="button"
+                                                                                variant="outline"
+                                                                                size="icon"
+                                                                                onClick={() =>
+                                                                                    headerFields.remove(
+                                                                                        index
+                                                                                    )
+                                                                                }
+                                                                            >
+                                                                                <XIcon />
+                                                                                <span className="sr-only">
+                                                                                    Remover
+                                                                                    header
+                                                                                </span>
+                                                                            </Button>
+                                                                        </div>
+                                                                    )
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </AccordionContent>
+                                            </AccordionItem>
                                         )}
                                     </Accordion>
                                 </>

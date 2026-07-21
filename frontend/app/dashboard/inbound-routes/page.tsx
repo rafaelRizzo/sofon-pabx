@@ -43,7 +43,10 @@ export default function InboundRoutesPage() {
         deleteRoute,
     } = useInboundRoutes(companyFilter)
 
-    const { paginated, page, setPage, totalPages, total } = usePagination(routes, 15)
+    const { paginated, page, setPage, totalPages, total } = usePagination(
+        routes,
+        15
+    )
 
     const handleDelete = async () => {
         if (!deleteTarget) return false
@@ -87,7 +90,12 @@ export default function InboundRoutesPage() {
                 onDelete={setDeleteTarget}
             />
 
-            <DataPagination page={page} totalPages={totalPages} total={total} onPageChange={setPage} />
+            <DataPagination
+                page={page}
+                totalPages={totalPages}
+                total={total}
+                onPageChange={setPage}
+            />
 
             {createOpen && companyFilter && (
                 <InboundRouteFormDialog
@@ -112,7 +120,10 @@ export default function InboundRoutesPage() {
                     trunks={formTrunks}
                     existingRoutes={allRoutes}
                     onSave={(form) =>
-                        updateRoute(editRoute.id, { name: form.name, destination: form.destination })
+                        updateRoute(editRoute.id, {
+                            name: form.name,
+                            destination: form.destination,
+                        })
                     }
                 />
             )}

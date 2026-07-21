@@ -1,6 +1,9 @@
 import { z } from 'zod'
 import { timestamp, cuidParam, ok } from '../../../schemas/responses'
 import { routeDestinationSchema, routeDestinationResponseSchema } from '../../../schemas/route-destination.schema'
+import { usedBySchema } from '../../../schemas/flow-reference-label'
+
+export type RouteDest = z.infer<typeof routeDestinationSchema>
 
 export const idParamSchema = z.object({ id: cuidParam })
 export const companyQuerySchema = z.object({ companyId: z.cuid2() })
@@ -68,6 +71,7 @@ export const VariableConditionSchema = z.object({
     rules: z.array(VariableRuleResponseSchema),
     trueRoute: routeDestinationResponseSchema,
     falseRoute: routeDestinationResponseSchema,
+    usedBy: usedBySchema,
     createdAt: timestamp,
     updatedAt: timestamp,
 })

@@ -6,7 +6,15 @@ import { z } from "zod"
 
 import { api, apiError } from "@/lib/api"
 
-export const WEEKDAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const
+export const WEEKDAYS = [
+    "mon",
+    "tue",
+    "wed",
+    "thu",
+    "fri",
+    "sat",
+    "sun",
+] as const
 export type Weekday = (typeof WEEKDAYS)[number]
 
 export type TimeRange = {
@@ -30,7 +38,8 @@ export type TimeGroup = {
 
 const timeRegex = /^([01]\d|2[0-3]):[0-5]\d$/
 const monthdaysRegex = /^(\*|([1-9]|[12]\d|3[01])(-([1-9]|[12]\d|3[01]))?)$/
-const monthsRegex = /^(\*|(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)(-[a-z]{3})?)$/
+const monthsRegex =
+    /^(\*|(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)(-[a-z]{3})?)$/
 
 // Espelha timeRangeSchema de backend/src/modules/time-groups/schemas/time-group.schema.ts
 const timeRangeFormSchema = z.object({
@@ -109,7 +118,10 @@ export function useTimeGroups(companyId?: string) {
         }
     }
 
-    const updateTimeGroup = async (timeGroupId: string, form: TimeGroupUpdateForm) => {
+    const updateTimeGroup = async (
+        timeGroupId: string,
+        form: TimeGroupUpdateForm
+    ) => {
         const id = toast.loading("Atualizando grupo de horário...")
         try {
             await api.put(`/time-groups/${timeGroupId}`, form)
@@ -117,7 +129,9 @@ export function useTimeGroups(companyId?: string) {
             await fetchTimeGroups()
             return true
         } catch (err) {
-            toast.error(apiError(err, "Erro ao atualizar grupo de horário"), { id })
+            toast.error(apiError(err, "Erro ao atualizar grupo de horário"), {
+                id,
+            })
             return false
         }
     }
@@ -130,7 +144,9 @@ export function useTimeGroups(companyId?: string) {
             await fetchTimeGroups()
             return true
         } catch (err) {
-            toast.error(apiError(err, "Erro ao deletar grupo de horário"), { id })
+            toast.error(apiError(err, "Erro ao deletar grupo de horário"), {
+                id,
+            })
             return false
         }
     }
@@ -139,10 +155,16 @@ export function useTimeGroups(companyId?: string) {
         g.name.toLowerCase().includes(filter.toLowerCase())
     )
 
-    const fetchStateRef = useRef<{ key?: string; fetched: boolean }>({ fetched: false })
+    const fetchStateRef = useRef<{ key?: string; fetched: boolean }>({
+        fetched: false,
+    })
 
     useEffect(() => {
-        if (fetchStateRef.current.fetched && fetchStateRef.current.key === companyId) return
+        if (
+            fetchStateRef.current.fetched &&
+            fetchStateRef.current.key === companyId
+        )
+            return
         fetchStateRef.current = { key: companyId, fetched: true }
         fetchTimeGroups()
     }, [fetchTimeGroups, companyId])

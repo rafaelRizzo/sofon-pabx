@@ -37,6 +37,7 @@ import { variableConditionsRoutes } from './modules/variable-conditions/variable
 import { callcenterAgentsRoutes } from './modules/callcenter/agents/agents.routes'
 import { routingRulesRoutes } from './modules/callcenter/routing-rules/routing-rules.routes'
 import { callcenterRatingsRoutes } from './modules/callcenter/ratings/ratings.routes'
+import { flowsRoutes } from './modules/flows/flows.routes'
 
 const env = validateEnv()
 
@@ -145,7 +146,14 @@ app.register(rateLimit, {
 })
 app.register(cookiePlugin)
 app.register(multipart, {
-    limits: { fileSize: 15 * 1024 * 1024, files: 1 },
+    limits: {
+        fileSize: 15 * 1024 * 1024,
+        files: 1,
+        fields: 2,
+        fieldSize: 10 * 1024,
+        parts: 3,
+    },
+    throwFileSizeLimit: true,
 })
 
 // Error handler
@@ -193,6 +201,7 @@ app.register(variableConditionsRoutes)
 app.register(callcenterAgentsRoutes)
 app.register(routingRulesRoutes)
 app.register(callcenterRatingsRoutes)
+app.register(flowsRoutes)
 
 // Health check
 app.get('/health', async (req, reply) => {
@@ -213,4 +222,3 @@ app.register(async (router) => {
 })
 
 export { app }
-

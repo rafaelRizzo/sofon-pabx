@@ -18,7 +18,11 @@ import {
     ComboboxList,
 } from "@/components/ui/combobox"
 import { Input } from "@/components/ui/input"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover"
 import {
     Select,
     SelectContent,
@@ -81,7 +85,8 @@ export function CallRatingsPanel({ companyId }: Props) {
         order,
     })
 
-    const selectedExtension = extensions.find((e) => e.id === extensionId) ?? null
+    const selectedExtension =
+        extensions.find((e) => e.id === extensionId) ?? null
     const extensionLabel = (id: string) => {
         const ext = extensions.find((e) => e.id === id)
         return ext ? `${ext.alias} - ${ext.name}` : id
@@ -105,7 +110,8 @@ export function CallRatingsPanel({ companyId }: Props) {
     return (
         <div className="flex flex-col gap-4">
             <p className="text-sm text-muted-foreground">
-                Notas de 1 a 5 dadas pelo cliente na pesquisa de satisfação pós-atendimento
+                Notas de 1 a 5 dadas pelo cliente na pesquisa de satisfação
+                pós-atendimento
                 {total > 0 && ` (${total} registro(s))`}.
             </p>
 
@@ -117,7 +123,10 @@ export function CallRatingsPanel({ companyId }: Props) {
                     isItemEqualToValue={(a, b) => a.id === b.id}
                     onValueChange={(e) => setExtensionId(e?.id ?? "")}
                 >
-                    <ComboboxInput placeholder="Filtrar por ramal..." className="w-56" />
+                    <ComboboxInput
+                        placeholder="Filtrar por ramal..."
+                        className="w-56"
+                    />
                     <ComboboxContent>
                         <ComboboxEmpty>Nenhum ramal</ComboboxEmpty>
                         <ComboboxList>
@@ -138,7 +147,10 @@ export function CallRatingsPanel({ companyId }: Props) {
                 <Popover>
                     <PopoverTrigger
                         render={
-                            <Button variant="outline" className="w-48 justify-start font-normal">
+                            <Button
+                                variant="outline"
+                                className="w-48 justify-start font-normal"
+                            >
                                 <CalendarIcon />
                                 {dateRangeLabel}
                             </Button>
@@ -211,7 +223,10 @@ export function CallRatingsPanel({ companyId }: Props) {
                             ))
                         ) : ratings.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
+                                <TableCell
+                                    colSpan={4}
+                                    className="h-24 text-center text-muted-foreground"
+                                >
                                     Nenhuma nota registrada
                                 </TableCell>
                             </TableRow>
@@ -223,13 +238,18 @@ export function CallRatingsPanel({ companyId }: Props) {
                                     </TableCell>
                                     <TableCell>{rating.number}</TableCell>
                                     <TableCell>
-                                        <Badge variant="outline" className="gap-1.5">
+                                        <Badge
+                                            variant="outline"
+                                            className="gap-1.5"
+                                        >
                                             <StarIcon className="size-3" />
                                             {rating.score}/5
                                         </Badge>
                                     </TableCell>
                                     <TableCell className="text-muted-foreground">
-                                        {new Date(rating.createdAt).toLocaleString("pt-BR")}
+                                        {new Date(
+                                            rating.createdAt
+                                        ).toLocaleString("pt-BR")}
                                     </TableCell>
                                 </TableRow>
                             ))

@@ -34,7 +34,10 @@ export default function IvrPage() {
     const [editIvrMenu, setEditIvrMenu] = useState<IvrMenu | null>(null)
     const [deleteTarget, setDeleteTarget] = useState<IvrMenu | null>(null)
 
-    const { paginated, page, setPage, totalPages, total } = usePagination(ivrMenus, 15)
+    const { paginated, page, setPage, totalPages, total } = usePagination(
+        ivrMenus,
+        15
+    )
 
     const handleDelete = async () => {
         if (!deleteTarget) return false
@@ -75,7 +78,12 @@ export default function IvrPage() {
                 onDelete={setDeleteTarget}
             />
 
-            <DataPagination page={page} totalPages={totalPages} total={total} onPageChange={setPage} />
+            <DataPagination
+                page={page}
+                totalPages={totalPages}
+                total={total}
+                onPageChange={setPage}
+            />
 
             {createOpen && (
                 <IvrMenuFormDialog

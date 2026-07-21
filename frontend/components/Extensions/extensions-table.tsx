@@ -25,6 +25,7 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { UsedByBadge } from "@/components/RouteDestination/used-by-badge"
 import { type Company } from "@/hooks/use-companies"
 import { type Extension } from "@/hooks/use-extensions"
 
@@ -60,16 +61,15 @@ export function ExtensionsTable({
                         <TableHead>Tipo</TableHead>
                         <TableHead>Empresa</TableHead>
                         <TableHead className="text-center">Saída</TableHead>
-                        <TableHead className="w-30 text-right">
-                            Ações
-                        </TableHead>
+                        <TableHead>Usado por</TableHead>
+                        <TableHead className="w-30 text-right">Ações</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
                     {loading ? (
                         Array.from({ length: 3 }).map((_, i) => (
                             <TableRow key={i}>
-                                {Array.from({ length: 6 }).map((_, j) => (
+                                {Array.from({ length: 7 }).map((_, j) => (
                                     <TableCell key={j}>
                                         <Skeleton className="h-4 w-full" />
                                     </TableCell>
@@ -79,7 +79,7 @@ export function ExtensionsTable({
                     ) : extensions.length === 0 ? (
                         <TableRow>
                             <TableCell
-                                colSpan={6}
+                                colSpan={7}
                                 className="h-24 text-center text-muted-foreground"
                             >
                                 {companySelected
@@ -116,6 +116,9 @@ export function ExtensionsTable({
                                     ) : (
                                         <XIcon className="mx-auto size-4 text-muted-foreground" />
                                     )}
+                                </TableCell>
+                                <TableCell>
+                                    <UsedByBadge usedBy={ext.usedBy} />
                                 </TableCell>
                                 <TableCell>
                                     <TooltipProvider delay={100}>

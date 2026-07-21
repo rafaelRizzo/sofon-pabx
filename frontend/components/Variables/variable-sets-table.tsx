@@ -20,6 +20,7 @@ import {
     TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { RouteDestinationBadge } from "@/components/RouteDestination/route-destination-badge"
+import { UsedByBadge } from "@/components/RouteDestination/used-by-badge"
 import { type VariableSet } from "@/hooks/use-variables"
 
 type Props = {
@@ -30,7 +31,13 @@ type Props = {
     onDelete: (variableSet: VariableSet) => void
 }
 
-export function VariableSetsTable({ variableSets, loading, companySelected, onEdit, onDelete }: Props) {
+export function VariableSetsTable({
+    variableSets,
+    loading,
+    companySelected,
+    onEdit,
+    onDelete,
+}: Props) {
     return (
         <div className="rounded-md border">
             <Table>
@@ -39,6 +46,7 @@ export function VariableSetsTable({ variableSets, loading, companySelected, onEd
                         <TableHead>Nome</TableHead>
                         <TableHead>Atribuições</TableHead>
                         <TableHead>Destino</TableHead>
+                        <TableHead>Usado por</TableHead>
                         <TableHead className="w-30 text-right">Ações</TableHead>
                     </TableRow>
                 </TableHeader>
@@ -46,7 +54,7 @@ export function VariableSetsTable({ variableSets, loading, companySelected, onEd
                     {loading ? (
                         Array.from({ length: 3 }).map((_, i) => (
                             <TableRow key={i}>
-                                {Array.from({ length: 4 }).map((_, j) => (
+                                {Array.from({ length: 5 }).map((_, j) => (
                                     <TableCell key={j}>
                                         <Skeleton className="h-4 w-full" />
                                     </TableCell>
@@ -55,25 +63,41 @@ export function VariableSetsTable({ variableSets, loading, companySelected, onEd
                         ))
                     ) : variableSets.length === 0 ? (
                         <TableRow>
-                            <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
-                                {companySelected ? "Nenhuma variável encontrada" : "Selecione uma empresa para listar"}
+                            <TableCell
+                                colSpan={5}
+                                className="h-24 text-center text-muted-foreground"
+                            >
+                                {companySelected
+                                    ? "Nenhuma variável encontrada"
+                                    : "Selecione uma empresa para listar"}
                             </TableCell>
                         </TableRow>
                     ) : (
                         variableSets.map((v) => (
                             <TableRow key={v.id}>
-                                <TableCell className="font-medium">{v.name}</TableCell>
+                                <TableCell className="font-medium">
+                                    {v.name}
+                                </TableCell>
                                 <TableCell>
                                     <div className="flex flex-wrap gap-1">
                                         {v.assignments.map((a, i) => (
-                                            <Badge key={i} variant="secondary" className="font-mono text-xs">
+                                            <Badge
+                                                key={i}
+                                                variant="secondary"
+                                                className="font-mono text-xs"
+                                            >
                                                 {a.variable}={a.value}
                                             </Badge>
                                         ))}
                                     </div>
                                 </TableCell>
                                 <TableCell>
-                                    <RouteDestinationBadge destination={v.destination} />
+                                    <RouteDestinationBadge
+                                        destination={v.destination}
+                                    />
+                                </TableCell>
+                                <TableCell>
+                                    <UsedByBadge usedBy={v.usedBy} />
                                 </TableCell>
                                 <TableCell>
                                     <TooltipProvider delay={100}>
@@ -84,14 +108,20 @@ export function VariableSetsTable({ variableSets, loading, companySelected, onEd
                                                         <Button
                                                             variant="outline"
                                                             size="icon"
-                                                            onClick={() => onEdit(v)}
+                                                            onClick={() =>
+                                                                onEdit(v)
+                                                            }
                                                         >
                                                             <PencilIcon />
-                                                            <span className="sr-only">Editar</span>
+                                                            <span className="sr-only">
+                                                                Editar
+                                                            </span>
                                                         </Button>
                                                     }
                                                 />
-                                                <TooltipContent>Editar variável</TooltipContent>
+                                                <TooltipContent>
+                                                    Editar variável
+                                                </TooltipContent>
                                             </Tooltip>
                                             <Tooltip>
                                                 <TooltipTrigger
@@ -99,14 +129,20 @@ export function VariableSetsTable({ variableSets, loading, companySelected, onEd
                                                         <Button
                                                             variant="destructive"
                                                             size="icon"
-                                                            onClick={() => onDelete(v)}
+                                                            onClick={() =>
+                                                                onDelete(v)
+                                                            }
                                                         >
                                                             <Trash2Icon />
-                                                            <span className="sr-only">Deletar</span>
+                                                            <span className="sr-only">
+                                                                Deletar
+                                                            </span>
                                                         </Button>
                                                     }
                                                 />
-                                                <TooltipContent>Deletar variável</TooltipContent>
+                                                <TooltipContent>
+                                                    Deletar variável
+                                                </TooltipContent>
                                             </Tooltip>
                                         </div>
                                     </TooltipProvider>

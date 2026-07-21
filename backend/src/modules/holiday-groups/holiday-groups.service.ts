@@ -1,11 +1,12 @@
-import { Prisma } from '../../../generated/prisma/client'
 import { prisma } from '../../lib/prisma'
 import { getCompanyById } from '../companies/companies.service'
 import { HolidayGroupsCache } from './cache/holiday-groups.cache'
 import type { CreateHolidayGroupInput, UpdateHolidayGroupInput, RouteDest } from './schemas/holiday-group.schema'
 import { HolidayGroupRepository } from '../../asterisk/holidaygroup.repository'
-import { validateRouteDestination } from '../../schemas/route-destination.validate'
+import { FlowEdgeRepository } from '../../asterisk/flow-edge.repository'
+import { validateRouteDestination, assertNotReferenced } from '../../schemas/route-destination.validate'
 import { resolveDestinationLabels, withDestinationLabel } from '../../schemas/route-destination-label'
+import { resolveUsedByLabels, type UsedByRef } from '../../schemas/flow-reference-label'
 import { fetchHolidaysFromUrl } from './providers/http.provider'
 import { AppError } from '../../utils/errors/app.error'
 import { logger } from '../../utils/logger'
@@ -15,15 +16,13 @@ const holidayGroupSelect = {
     name: true,
     companyId: true,
     url: true,
-    trueRoute: true,
-    falseRoute: true,
     dates: { select: { id: true, name: true, month: true, day: true } },
     createdAt: true,
     updatedAt: true,
 } as const
 
 const _byId = () => prisma.holidayGroup.findUnique({ where: { id: '' }, select: holidayGroupSelect })
-export type HolidayGroupDto = NonNullable<Awaited<ReturnType<typeof _byId>>>
+export type HolidayGroupDto = NonNullable<Awaited<ReturnType<typeof _byId>>> & { trueRoute: RouteDest; falseRoute: RouteDest; usedBy: UsedByRef[] }
 
 type DateInput = { name: string; month: number; day: number }
 
@@ -46,7 +45,7 @@ async function datesFromUrl(url: string, year: number): Promise<DateInput[]> {
 export async function resyncHolidayGroupFromUrl(tx: Tx, id: string, year: number) {
     const hg = await tx.holidayGroup.findUnique({
         where: { id },
-        select: { name: true, url: true, trueRoute: true, falseRoute: true },
+        select: { name: true, url: true },
     })
     if (!hg || !hg.url) return
 
@@ -96,7 +95,17 @@ export const getHolidayGroupsByCompany = async (companyId: string) => {
 
     await getCompanyById(companyId)
 
-    const groups = await withDestinationLabels(await prisma.holidayGroup.findMany({ where: { companyId }, select: holidayGroupSelect }), companyId)
+const [rows, edges] = await Promise.all([
+        prisma.holidayGroup.findMany({ where: { companyId }, select: holidayGroupSelect }),
+        FlowEdgeRepository.getBySource(companyId, 'holidaygroup'),
+    ])
+    const usedByMap = await resolveUsedByLabels('holiday', rows.map((h) => h.id), companyId)
+    const groups = await withDestinationLabels(rows.map((hg) => ({
+        ...hg,
+        trueRoute: edges.get(hg.id)?.true ?? null,
+        falseRoute: edges.get(hg.id)?.false ?? null,
+        usedBy: usedByMap.get(hg.id) ?? [],
+    })), companyId)
     await HolidayGroupsCache.setByCompany(companyId, groups)
     return groups
 }
@@ -108,7 +117,12 @@ export const getHolidayGroupById = async (id: string): Promise<HolidayGroupDto> 
     const found = await prisma.holidayGroup.findUnique({ where: { id }, select: holidayGroupSelect })
     if (!found) throw new AppError('Holiday group not found', 404)
 
-    const hg = (await withDestinationLabels([found], found.companyId))[0]!
+    const [trueRoute, falseRoute, usedByMap] = await Promise.all([
+        FlowEdgeRepository.getOne('holidaygroup', id, 'true'),
+        FlowEdgeRepository.getOne('holidaygroup', id, 'false'),
+        resolveUsedByLabels('holiday', [id], found.companyId),
+    ])
+    const hg = (await withDestinationLabels([{ ...found, trueRoute, falseRoute, usedBy: usedByMap.get(id) ?? [] }], found.companyId))[0]!
     await HolidayGroupsCache.setHolidayGroup(id, hg)
     return hg
 }
@@ -132,13 +146,14 @@ export const createHolidayGroup = async (data: CreateHolidayGroupInput) => {
                 name: data.name,
                 companyId: data.companyId,
                 url: data.url ?? null,
-                trueRoute: data.trueRoute ?? undefined,
-                falseRoute: data.falseRoute ?? undefined,
                 dates: initialDates.length > 0 ? { create: initialDates } : undefined,
             },
             select: holidayGroupSelect,
         })
-
+        await Promise.all([
+            FlowEdgeRepository.setSlot(tx, data.companyId, 'holidaygroup', created.id, 'true', data.trueRoute ?? null),
+            FlowEdgeRepository.setSlot(tx, data.companyId, 'holidaygroup', created.id, 'false', data.falseRoute ?? null),
+        ])
         return created
     })
 
@@ -147,7 +162,7 @@ export const createHolidayGroup = async (data: CreateHolidayGroupInput) => {
     } finally {
         await HolidayGroupsCache.invalidateByCompany(data.companyId)
     }
-    return hg
+    return { ...hg, trueRoute: data.trueRoute ?? null, falseRoute: data.falseRoute ?? null, usedBy: [] }
 }
 
 export const updateHolidayGroup = async (id: string, data: UpdateHolidayGroupInput) => {
@@ -164,8 +179,6 @@ export const updateHolidayGroup = async (id: string, data: UpdateHolidayGroupInp
     if (data.trueRoute !== undefined) await validateRoute(data.trueRoute, existing.companyId, 'trueRoute')
     if (data.falseRoute !== undefined) await validateRoute(data.falseRoute, existing.companyId, 'falseRoute')
 
-    const newTrue = data.trueRoute !== undefined ? data.trueRoute : (existing.trueRoute as RouteDest)
-    const newFalse = data.falseRoute !== undefined ? data.falseRoute : (existing.falseRoute as RouteDest)
     const newUrl = data.url !== undefined ? data.url : existing.url
 
     if (data.dates !== undefined && newUrl) throw new AppError('Cannot set dates manually when url is configured', 400)
@@ -190,11 +203,13 @@ export const updateHolidayGroup = async (id: string, data: UpdateHolidayGroupInp
             data: {
                 name: data.name,
                 url: data.url === undefined ? undefined : data.url,
-                trueRoute: data.trueRoute === undefined ? undefined : (data.trueRoute ?? Prisma.JsonNull),
-                falseRoute: data.falseRoute === undefined ? undefined : (data.falseRoute ?? Prisma.JsonNull),
             },
             select: holidayGroupSelect,
         })
+        await Promise.all([
+            data.trueRoute !== undefined ? FlowEdgeRepository.setSlot(tx, existing.companyId, 'holidaygroup', id, 'true', data.trueRoute) : null,
+            data.falseRoute !== undefined ? FlowEdgeRepository.setSlot(tx, existing.companyId, 'holidaygroup', id, 'false', data.falseRoute) : null,
+        ])
 
         return updated
     })
@@ -205,15 +220,23 @@ export const updateHolidayGroup = async (id: string, data: UpdateHolidayGroupInp
         await HolidayGroupsCache.invalidateHolidayGroup(id)
         await HolidayGroupsCache.invalidateByCompany(existing.companyId)
     }
-    return hg
+    const [trueRoute, falseRoute, usedByMap] = await Promise.all([
+        data.trueRoute !== undefined ? data.trueRoute : FlowEdgeRepository.getOne('holidaygroup', id, 'true'),
+        data.falseRoute !== undefined ? data.falseRoute : FlowEdgeRepository.getOne('holidaygroup', id, 'false'),
+        resolveUsedByLabels('holiday', [id], existing.companyId),
+    ])
+    return { ...hg, trueRoute, falseRoute, usedBy: usedByMap.get(id) ?? [] }
 }
 
 export const deleteHolidayGroup = async (id: string) => {
     const existing = await prisma.holidayGroup.findUnique({ where: { id } })
     if (!existing) throw new AppError('Holiday group not found', 404)
 
+    await assertNotReferenced('holiday', id)
+
     await prisma.$transaction(async (tx) => {
         await tx.holidayGroup.delete({ where: { id } })
+        await FlowEdgeRepository.deleteAllForSource(tx, 'holidaygroup', id)
     })
 
     try {

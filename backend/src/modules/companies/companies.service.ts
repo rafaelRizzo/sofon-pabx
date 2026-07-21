@@ -20,7 +20,8 @@ import { RequestTemplateRepository } from '../../asterisk/request-template.repos
 import { VariableRepository } from '../../asterisk/variable.repository'
 import { VariableConditionRepository } from '../../asterisk/variablecondition.repository'
 import { CallcenterSurveyRepository } from '../../asterisk/callcenter-survey.repository'
-import { TC_CONTEXT, HOL_CONTEXT, ANNOUNCEMENT_CONTEXT, IVR_CONTEXT, REQUEST_TEMPLATE_CONTEXT, VAR_CONTEXT, VARCOND_CONTEXT, SURVEY_CONTEXT } from '../../asterisk/dialplan-names'
+import { FlowNodeRepository } from '../../asterisk/flow-node.repository'
+import { TC_CONTEXT, HOL_CONTEXT, ANNOUNCEMENT_CONTEXT, IVR_CONTEXT, REQUEST_TEMPLATE_CONTEXT, VAR_CONTEXT, VARCOND_CONTEXT, SURVEY_CONTEXT, FLOW_NODE_CONTEXT } from '../../asterisk/dialplan-names'
 import { RequestTemplatesCache } from '../request-templates/cache/request-templates.cache'
 import { HolidayGroupsCache } from '../holiday-groups/cache/holiday-groups.cache'
 import { VariablesCache } from '../variables/cache/variables.cache'
@@ -30,7 +31,7 @@ import { invalidateUserCompanyIds } from '../../utils/auth/access'
 
 const DIALPLAN_FILE_CONTEXTS = [
     TC_CONTEXT, HOL_CONTEXT, ANNOUNCEMENT_CONTEXT, IVR_CONTEXT, REQUEST_TEMPLATE_CONTEXT, QUEUE_APP_CONTEXT,
-    VAR_CONTEXT, VARCOND_CONTEXT, SURVEY_CONTEXT,
+    VAR_CONTEXT, VARCOND_CONTEXT, SURVEY_CONTEXT, FLOW_NODE_CONTEXT,
 ]
 import type { CreateCompanyInput, UpdateCompanyInput } from './schemas/company.schema'
 import { AppError } from '../../utils/errors/app.error'
@@ -160,6 +161,7 @@ export const resyncDialplan = async (id: string) => {
     await RequestTemplateRepository.regenerate(company.id)
     await VariableRepository.regenerate(company.id)
     await VariableConditionRepository.regenerate(company.id)
+    await FlowNodeRepository.regenerate(company.id)
     await CallcenterSurveyRepository.regenerate(company.id)
 }
 

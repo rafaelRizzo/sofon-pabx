@@ -8,6 +8,17 @@ import {
     ListAudiosResponse, GetAudioResponse, CreateAudioResponse, UpdateAudioResponse,
 } from './schemas/audio.schema'
 import { errors, deleted } from '../../schemas/responses'
+import { validateEnv } from '../../config/env'
+
+const env = validateEnv()
+const uploadRateLimit = {
+    config: {
+        rateLimit: {
+            max: env.AUDIO_UPLOAD_RATE_LIMIT_MAX,
+            timeWindow: env.AUDIO_UPLOAD_RATE_LIMIT_WINDOW,
+        },
+    },
+}
 
 export const audiosRoutes = async (app: FastifyInstance) => {
     const router = app.withTypeProvider<ZodTypeProvider>()
@@ -44,6 +55,7 @@ export const audiosRoutes = async (app: FastifyInstance) => {
     }, AudiosController.getAudioById as any)
 
     router.post('/audios', {
+        ...uploadRateLimit,
         onRequest: [...protectedRoute, requirePermission('audios', 'manage')],
         schema: {
             tags: ['Audios'],

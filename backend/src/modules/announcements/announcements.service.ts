@@ -1,11 +1,12 @@
-import { Prisma } from '../../../generated/prisma/client'
 import { prisma } from '../../lib/prisma'
 import { getCompanyById } from '../companies/companies.service'
 import { AnnouncementsCache } from './cache/announcements.cache'
 import { AnnouncementRepository } from '../../asterisk/announcement.repository'
+import { FlowEdgeRepository } from '../../asterisk/flow-edge.repository'
 import { assertAudioBelongsToCompany } from '../audios/audios.service'
-import { validateRouteDestination } from '../../schemas/route-destination.validate'
+import { validateRouteDestination, assertNotReferenced } from '../../schemas/route-destination.validate'
 import { resolveDestinationLabels, withDestinationLabel } from '../../schemas/route-destination-label'
+import { resolveUsedByLabels, type UsedByRef } from '../../schemas/flow-reference-label'
 import type { RouteDestination } from '../../schemas/route-destination.schema'
 import type { CreateAnnouncementInput, UpdateAnnouncementInput } from './schemas/announcement.schema'
 import { AppError } from '../../utils/errors/app.error'
@@ -15,12 +16,11 @@ const select = {
     name: true,
     companyId: true,
     audioId: true,
-    destination: true,
     createdAt: true,
     updatedAt: true,
 } as const
 
-const toDto = <T extends { audioId: string | null }>(a: T) => ({ ...a, hasAudio: a.audioId !== null })
+const toDto = <T extends { audioId: string | null; destination: RouteDestination; usedBy: UsedByRef[] }>(a: T) => ({ ...a, hasAudio: a.audioId !== null })
 
 // Anexa o nome legível de destination (resolvido no backend, cache-first — ver
 // route-destination-label.ts). Todas as chamadas aqui são de uma única empresa por vez.
@@ -36,7 +36,15 @@ export const getAnnouncementsByCompany = async (companyId: string) => {
 
     await getCompanyById(companyId)
 
-    const dtos = await withDestinationLabels((await prisma.announcement.findMany({ where: { companyId }, select })).map(toDto), companyId)
+    const [rows, edges] = await Promise.all([
+        prisma.announcement.findMany({ where: { companyId }, select }),
+        FlowEdgeRepository.getBySource(companyId, 'announcement'),
+    ])
+    const usedByMap = await resolveUsedByLabels('announcement', rows.map((a) => a.id), companyId)
+    const dtos = await withDestinationLabels(
+        rows.map((a) => toDto({ ...a, destination: edges.get(a.id)?.default ?? null, usedBy: usedByMap.get(a.id) ?? [] })),
+        companyId,
+    )
     await AnnouncementsCache.setByCompany(companyId, dtos)
     return dtos
 }
@@ -48,7 +56,11 @@ export const getAnnouncementById = async (id: string) => {
     const announcement = await prisma.announcement.findUnique({ where: { id }, select })
     if (!announcement) throw new AppError('Announcement not found', 404)
 
-    const dto = (await withDestinationLabels([toDto(announcement)], announcement.companyId))[0]!
+    const [destination, usedByMap] = await Promise.all([
+        FlowEdgeRepository.getOne('announcement', id, 'default'),
+        resolveUsedByLabels('announcement', [id], announcement.companyId),
+    ])
+    const dto = (await withDestinationLabels([toDto({ ...announcement, destination, usedBy: usedByMap.get(id) ?? [] })], announcement.companyId))[0]!
     await AnnouncementsCache.setAnnouncement(id, dto)
     return dto
 }
@@ -70,10 +82,10 @@ export const createAnnouncement = async (data: CreateAnnouncementInput) => {
                 name: data.name,
                 companyId: data.companyId,
                 audioId: data.audioId,
-                destination: data.destination ?? undefined,
             },
             select,
         })
+        await FlowEdgeRepository.setSlot(tx, data.companyId, 'announcement', created.id, 'default', data.destination ?? null)
         return created
     })
 
@@ -82,7 +94,7 @@ export const createAnnouncement = async (data: CreateAnnouncementInput) => {
     } finally {
         await AnnouncementsCache.invalidateByCompany(data.companyId)
     }
-    return toDto(announcement)
+    return toDto({ ...announcement, destination: data.destination ?? null, usedBy: [] })
 }
 
 export const updateAnnouncement = async (id: string, data: UpdateAnnouncementInput) => {
@@ -105,10 +117,12 @@ export const updateAnnouncement = async (id: string, data: UpdateAnnouncementInp
             data: {
                 name: data.name,
                 audioId: data.audioId,
-                destination: data.destination === undefined ? undefined : (data.destination ?? Prisma.JsonNull),
             },
             select,
         })
+        if (data.destination !== undefined) {
+            await FlowEdgeRepository.setSlot(tx, existing.companyId, 'announcement', id, 'default', data.destination)
+        }
         return updated
     })
 
@@ -118,15 +132,22 @@ export const updateAnnouncement = async (id: string, data: UpdateAnnouncementInp
         await AnnouncementsCache.invalidateAnnouncement(id)
         await AnnouncementsCache.invalidateByCompany(existing.companyId)
     }
-    return toDto(announcement)
+    const [destination, usedByMap] = await Promise.all([
+        data.destination !== undefined ? data.destination : FlowEdgeRepository.getOne('announcement', id, 'default'),
+        resolveUsedByLabels('announcement', [id], existing.companyId),
+    ])
+    return toDto({ ...announcement, destination, usedBy: usedByMap.get(id) ?? [] })
 }
 
 export const deleteAnnouncement = async (id: string) => {
     const existing = await prisma.announcement.findUnique({ where: { id }, select: { companyId: true } })
     if (!existing) throw new AppError('Announcement not found', 404)
 
+    await assertNotReferenced('announcement', id)
+
     await prisma.$transaction(async (tx) => {
         await tx.announcement.delete({ where: { id } })
+        await FlowEdgeRepository.deleteAllForSource(tx, 'announcement', id)
     })
 
     try {

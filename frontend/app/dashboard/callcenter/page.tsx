@@ -35,9 +35,15 @@ export default function CallcenterPage() {
             ) : (
                 <Tabs defaultValue="agent-scopes">
                     <TabsList>
-                        <TabsTrigger value="agent-scopes">Elegibilidade de agentes</TabsTrigger>
-                        <TabsTrigger value="routing-rules">Regras de prioridade</TabsTrigger>
-                        <TabsTrigger value="ratings">Notas de atendimento</TabsTrigger>
+                        <TabsTrigger value="agent-scopes">
+                            Elegibilidade de agentes
+                        </TabsTrigger>
+                        <TabsTrigger value="routing-rules">
+                            Regras de prioridade
+                        </TabsTrigger>
+                        <TabsTrigger value="ratings">
+                            Notas de atendimento
+                        </TabsTrigger>
                     </TabsList>
                     <TabsContent value="agent-scopes">
                         <AgentScopesPanel companyId={companyId} />

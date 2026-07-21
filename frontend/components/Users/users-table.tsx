@@ -122,10 +122,14 @@ export function UsersTable({
                                 <TableCell>
                                     {user.companies.length === 0 ? (
                                         <span className="text-sm text-muted-foreground">
-                                            {user.role === "admin" ? "Todas" : "-"}
+                                            {user.role === "admin"
+                                                ? "Todas"
+                                                : "-"}
                                         </span>
                                     ) : (
-                                        <CompanyBadges companies={user.companies} />
+                                        <CompanyBadges
+                                            companies={user.companies}
+                                        />
                                     )}
                                 </TableCell>
                                 <TableCell>

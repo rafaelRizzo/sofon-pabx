@@ -42,7 +42,11 @@ export function MonthsField({
 
     function setRange(nextStart: string, nextEnd: string) {
         if (!nextStart) return onChange("jan")
-        onChange(nextEnd && nextEnd !== nextStart ? `${nextStart}-${nextEnd}` : nextStart)
+        onChange(
+            nextEnd && nextEnd !== nextStart
+                ? `${nextStart}-${nextEnd}`
+                : nextStart
+        )
     }
 
     return (
@@ -50,7 +54,9 @@ export function MonthsField({
             <label className="flex items-center gap-2 text-sm font-normal">
                 <Switch
                     checked={isAll}
-                    onCheckedChange={(checked) => onChange(checked ? "*" : "jan")}
+                    onCheckedChange={(checked) =>
+                        onChange(checked ? "*" : "jan")
+                    }
                 />
                 Todos os meses
             </label>
@@ -72,7 +78,9 @@ export function MonthsField({
                             ))}
                         </SelectContent>
                     </Select>
-                    <span className="text-xs text-muted-foreground">até (opcional)</span>
+                    <span className="text-xs text-muted-foreground">
+                        até (opcional)
+                    </span>
                     <Select
                         items={MONTH_OPTIONS}
                         value={end}

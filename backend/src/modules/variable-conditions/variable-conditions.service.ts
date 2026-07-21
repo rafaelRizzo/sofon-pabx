@@ -1,11 +1,12 @@
-import { Prisma } from '../../../generated/prisma/client'
 import { prisma } from '../../lib/prisma'
 import { getCompanyById } from '../companies/companies.service'
 import { VariableConditionsCache } from './cache/variable-conditions.cache'
 import { VariableConditionRepository } from '../../asterisk/variablecondition.repository'
-import { validateRouteDestination } from '../../schemas/route-destination.validate'
+import { FlowEdgeRepository } from '../../asterisk/flow-edge.repository'
+import { validateRouteDestination, assertNotReferenced } from '../../schemas/route-destination.validate'
 import { resolveDestinationLabels, withDestinationLabel } from '../../schemas/route-destination-label'
-import type { RouteDestination } from '../../schemas/route-destination.schema'
+import { resolveUsedByLabels, type UsedByRef } from '../../schemas/flow-reference-label'
+import type { RouteDestination as RouteDest } from '../../schemas/route-destination.schema'
 import type { CreateVariableConditionInput, UpdateVariableConditionInput } from './schemas/variable-condition.schema'
 import { AppError } from '../../utils/errors/app.error'
 
@@ -15,11 +16,15 @@ const select = {
     companyId: true,
     combinator: true,
     rules: true,
-    trueRoute: true,
-    falseRoute: true,
     createdAt: true,
     updatedAt: true,
 } as const
+
+const _byId = () => prisma.variableCondition.findUnique({ where: { id: '' }, select })
+export type VariableConditionDto = NonNullable<Awaited<ReturnType<typeof _byId>>> & { trueRoute: RouteDest; falseRoute: RouteDest; usedBy: UsedByRef[] }
+
+const validateRoute = (route: RouteDest | undefined | null, companyId: string, label: string) =>
+    validateRouteDestination(route ?? null, companyId, label)
 
 // Anexa o nome legível de trueRoute/falseRoute (resolvido no backend, cache-first — ver
 // route-destination-label.ts). Agrupa por companyId — getAllVariableConditions pode misturar
@@ -28,10 +33,10 @@ async function withDestinationLabels<T extends { trueRoute: unknown; falseRoute:
     conditions: T[],
 ): Promise<T[]> {
     if (conditions.length === 0) return conditions
-    const byCompany = new Map<string, RouteDestination[]>()
+    const byCompany = new Map<string, RouteDest[]>()
     for (const c of conditions) {
         const arr = byCompany.get(c.companyId) ?? []
-        arr.push(c.trueRoute as RouteDestination, c.falseRoute as RouteDestination)
+        arr.push(c.trueRoute as RouteDest, c.falseRoute as RouteDest)
         byCompany.set(c.companyId, arr)
     }
     const labelMaps = new Map(
@@ -41,10 +46,26 @@ async function withDestinationLabels<T extends { trueRoute: unknown; falseRoute:
         const labelMap = labelMaps.get(c.companyId)!
         return {
             ...c,
-            trueRoute: withDestinationLabel(c.trueRoute as RouteDestination, labelMap),
-            falseRoute: withDestinationLabel(c.falseRoute as RouteDestination, labelMap),
+            trueRoute: withDestinationLabel(c.trueRoute as RouteDest, labelMap),
+            falseRoute: withDestinationLabel(c.falseRoute as RouteDest, labelMap),
         }
     })
+}
+
+// Resolve "usado por" em lote — agrupa por companyId pelo mesmo motivo de withDestinationLabels
+// acima (getAllVariableConditions pode misturar empresas na mesma lista).
+async function resolveUsedByLabelsBatched(rows: { id: string; companyId: string }[]): Promise<Map<string, UsedByRef[]>> {
+    if (rows.length === 0) return new Map()
+    const byCompany = new Map<string, string[]>()
+    for (const r of rows) {
+        const arr = byCompany.get(r.companyId) ?? []
+        arr.push(r.id)
+        byCompany.set(r.companyId, arr)
+    }
+    const maps = await Promise.all(
+        [...byCompany.entries()].map(([companyId, ids]) => resolveUsedByLabels('variable-condition', ids, companyId)),
+    )
+    return new Map(maps.flatMap((m) => [...m]))
 }
 
 export const getVariableConditionsByCompany = async (companyId: string) => {
@@ -53,7 +74,17 @@ export const getVariableConditionsByCompany = async (companyId: string) => {
 
     await getCompanyById(companyId)
 
-    const variableConditions = await withDestinationLabels(await prisma.variableCondition.findMany({ where: { companyId }, select }))
+    const [rows, edges] = await Promise.all([
+        prisma.variableCondition.findMany({ where: { companyId }, select }),
+        FlowEdgeRepository.getBySource(companyId, 'variablecondition'),
+    ])
+    const usedByMap = await resolveUsedByLabels('variable-condition', rows.map((vc) => vc.id), companyId)
+    const variableConditions = await withDestinationLabels(rows.map((vc) => ({
+        ...vc,
+        trueRoute: edges.get(vc.id)?.true ?? null,
+        falseRoute: edges.get(vc.id)?.false ?? null,
+        usedBy: usedByMap.get(vc.id) ?? [],
+    })))
     await VariableConditionsCache.setByCompany(companyId, variableConditions)
     return variableConditions
 }
@@ -66,25 +97,36 @@ export const getAllVariableConditions = async (companyIds?: string[]) => {
         if (cached) return cached
     }
 
-    const variableConditions = await withDestinationLabels(
-        await prisma.variableCondition.findMany({
-            where: companyIds ? { companyId: { in: companyIds } } : undefined,
-            select,
-        }),
-    )
+    const rows = await prisma.variableCondition.findMany({
+        where: companyIds ? { companyId: { in: companyIds } } : undefined,
+        select,
+    })
+    const edges = await FlowEdgeRepository.getBySourceIds('variablecondition', rows.map((vc) => vc.id))
+    const usedByMap = await resolveUsedByLabelsBatched(rows)
+    const variableConditions = await withDestinationLabels(rows.map((vc) => ({
+        ...vc,
+        trueRoute: edges.get(vc.id)?.true ?? null,
+        falseRoute: edges.get(vc.id)?.false ?? null,
+        usedBy: usedByMap.get(vc.id) ?? [],
+    })))
 
     if (!companyIds) await VariableConditionsCache.setAll(variableConditions)
     return variableConditions
 }
 
-export const getVariableConditionById = async (id: string) => {
+export const getVariableConditionById = async (id: string): Promise<VariableConditionDto> => {
     const cached = await VariableConditionsCache.getVariableCondition(id)
-    if (cached) return cached
+    if (cached) return cached as VariableConditionDto
 
     const found = await prisma.variableCondition.findUnique({ where: { id }, select })
     if (!found) throw new AppError('Variable condition not found', 404)
 
-    const variableCondition = (await withDestinationLabels([found]))[0]!
+    const [trueRoute, falseRoute, usedByMap] = await Promise.all([
+        FlowEdgeRepository.getOne('variablecondition', id, 'true'),
+        FlowEdgeRepository.getOne('variablecondition', id, 'false'),
+        resolveUsedByLabels('variable-condition', [id], found.companyId),
+    ])
+    const variableCondition = (await withDestinationLabels([{ ...found, trueRoute, falseRoute, usedBy: usedByMap.get(id) ?? [] }]))[0]!
     await VariableConditionsCache.setVariableCondition(id, variableCondition)
     return variableCondition
 }
@@ -97,8 +139,8 @@ export const createVariableCondition = async (data: CreateVariableConditionInput
     })
     if (existing) throw new AppError('Variable condition already exists for this company', 409)
 
-    await validateRouteDestination(data.trueRoute ?? null, data.companyId, 'trueRoute')
-    await validateRouteDestination(data.falseRoute ?? null, data.companyId, 'falseRoute')
+    await validateRoute(data.trueRoute, data.companyId, 'trueRoute')
+    await validateRoute(data.falseRoute, data.companyId, 'falseRoute')
 
     const variableCondition = await prisma.$transaction(async (tx) => {
         const created = await tx.variableCondition.create({
@@ -107,11 +149,13 @@ export const createVariableCondition = async (data: CreateVariableConditionInput
                 companyId: data.companyId,
                 combinator: data.combinator,
                 rules: data.rules,
-                trueRoute: data.trueRoute ?? undefined,
-                falseRoute: data.falseRoute ?? undefined,
             },
             select,
         })
+        await Promise.all([
+            FlowEdgeRepository.setSlot(tx, data.companyId, 'variablecondition', created.id, 'true', data.trueRoute ?? null),
+            FlowEdgeRepository.setSlot(tx, data.companyId, 'variablecondition', created.id, 'false', data.falseRoute ?? null),
+        ])
         return created
     })
 
@@ -121,7 +165,7 @@ export const createVariableCondition = async (data: CreateVariableConditionInput
         await VariableConditionsCache.invalidateByCompany(data.companyId)
         await VariableConditionsCache.invalidateAll()
     }
-    return variableCondition
+    return { ...variableCondition, trueRoute: data.trueRoute ?? null, falseRoute: data.falseRoute ?? null, usedBy: [] }
 }
 
 export const updateVariableCondition = async (id: string, data: UpdateVariableConditionInput) => {
@@ -135,8 +179,8 @@ export const updateVariableCondition = async (id: string, data: UpdateVariableCo
         if (conflict) throw new AppError('Variable condition name already in use for this company', 409)
     }
 
-    if (data.trueRoute !== undefined) await validateRouteDestination(data.trueRoute, existing.companyId, 'trueRoute')
-    if (data.falseRoute !== undefined) await validateRouteDestination(data.falseRoute, existing.companyId, 'falseRoute')
+    if (data.trueRoute !== undefined) await validateRoute(data.trueRoute, existing.companyId, 'trueRoute')
+    if (data.falseRoute !== undefined) await validateRoute(data.falseRoute, existing.companyId, 'falseRoute')
 
     const variableCondition = await prisma.$transaction(async (tx) => {
         const updated = await tx.variableCondition.update({
@@ -145,11 +189,13 @@ export const updateVariableCondition = async (id: string, data: UpdateVariableCo
                 name: data.name,
                 combinator: data.combinator,
                 rules: data.rules,
-                trueRoute: data.trueRoute === undefined ? undefined : (data.trueRoute ?? Prisma.JsonNull),
-                falseRoute: data.falseRoute === undefined ? undefined : (data.falseRoute ?? Prisma.JsonNull),
             },
             select,
         })
+        await Promise.all([
+            data.trueRoute !== undefined ? FlowEdgeRepository.setSlot(tx, existing.companyId, 'variablecondition', id, 'true', data.trueRoute) : null,
+            data.falseRoute !== undefined ? FlowEdgeRepository.setSlot(tx, existing.companyId, 'variablecondition', id, 'false', data.falseRoute) : null,
+        ])
         return updated
     })
 
@@ -160,15 +206,23 @@ export const updateVariableCondition = async (id: string, data: UpdateVariableCo
         await VariableConditionsCache.invalidateByCompany(existing.companyId)
         await VariableConditionsCache.invalidateAll()
     }
-    return variableCondition
+    const [trueRoute, falseRoute, usedByMap] = await Promise.all([
+        data.trueRoute !== undefined ? data.trueRoute : FlowEdgeRepository.getOne('variablecondition', id, 'true'),
+        data.falseRoute !== undefined ? data.falseRoute : FlowEdgeRepository.getOne('variablecondition', id, 'false'),
+        resolveUsedByLabels('variable-condition', [id], existing.companyId),
+    ])
+    return { ...variableCondition, trueRoute, falseRoute, usedBy: usedByMap.get(id) ?? [] }
 }
 
 export const deleteVariableCondition = async (id: string) => {
     const existing = await prisma.variableCondition.findUnique({ where: { id }, select: { companyId: true } })
     if (!existing) throw new AppError('Variable condition not found', 404)
 
+    await assertNotReferenced('variable-condition', id)
+
     await prisma.$transaction(async (tx) => {
         await tx.variableCondition.delete({ where: { id } })
+        await FlowEdgeRepository.deleteAllForSource(tx, 'variablecondition', id)
     })
 
     try {

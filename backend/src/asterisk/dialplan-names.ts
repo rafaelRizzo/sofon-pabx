@@ -25,6 +25,16 @@ export const varEntry = (id: string) => `var-${id}`
 export const VARCOND_CONTEXT = 'variable-conditions'
 export const varCondEntry = (id: string) => `varcond-${id}`
 
+export const FLOW_CONTEXT = 'flows'
+export const flowExten = (id: string) => `flow-${id}`
+
+// Contexto materializado por instância de nó. Recursos continuam nos seus contextos próprios;
+// este contexto só inicia um nó e recebe seus ports de saída, preservando a reutilização do
+// recurso Asterisk entre vários workflows.
+export const FLOW_NODE_CONTEXT = 'flow-nodes'
+export const flowNodeExten = (id: string) => `node-${id}`
+export const flowNodeExitExten = (id: string, port: string) => `exit-${id}-${port.replace(/[^a-zA-Z0-9_-]/g, '_')}`
+
 // setado no entry point de from-trunk-routed (inboundroute.repository.ts), lido pelo AGI
 // queue-route (agi-server.ts) pra casar RoutingRule.conditions.trunkId — variável de canal
 // sobrevive a qualquer Goto intermediário (timecondition/holiday/ivr) até chegar na fila

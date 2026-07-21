@@ -53,9 +53,7 @@ export function ExtensionRestrictSelect({
                                 key={ext.id}
                                 className={cn(
                                     "flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm font-normal transition-colors",
-                                    selected
-                                        ? "bg-input"
-                                        : "hover:bg-accent/60"
+                                    selected ? "bg-input" : "hover:bg-accent/60"
                                 )}
                             >
                                 <Checkbox

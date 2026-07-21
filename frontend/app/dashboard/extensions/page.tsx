@@ -70,8 +70,9 @@ export default function ExtensionsPage() {
     const [deleteTarget, setDeleteTarget] = useState<Extension | null>(null)
     const [resetTarget, setResetTarget] = useState<Extension | null>(null)
     const [resetting, setResetting] = useState(false)
-    const [passwordReveal, setPasswordReveal] =
-        useState<PasswordReveal | null>(null)
+    const [passwordReveal, setPasswordReveal] = useState<PasswordReveal | null>(
+        null
+    )
 
     const filteredExtensions = extensions.filter(
         (e) => typeFilter === "all" || e.type === typeFilter

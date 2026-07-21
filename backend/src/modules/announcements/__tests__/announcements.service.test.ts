@@ -78,6 +78,7 @@ describe('AnnouncementsService.createAnnouncement', () => {
 describe('AnnouncementsService.getAnnouncementById', () => {
     it('returns hasAudio=true when audioId is set', async () => {
         db.announcement.findUnique.mockResolvedValue({ ...ANNOUNCEMENT, audioId: 'audio1' })
+        db.flowEdge.findMany.mockResolvedValue([])
         const announcement = await AnnouncementsService.getAnnouncementById('a1') as any
         expect(announcement.hasAudio).toBe(true)
         expect(announcement.audioId).toBe('audio1')
@@ -95,6 +96,7 @@ describe('AnnouncementsService.updateAnnouncement', () => {
     it('links a new audioId and syncs dialplan', async () => {
         db.announcement.findUnique.mockResolvedValueOnce({ ...ANNOUNCEMENT }) // existing
         db.audio.findUnique.mockResolvedValue({ companyId: 'c1' })
+        db.flowEdge.findMany.mockResolvedValue([])
         db.announcement.update.mockResolvedValue({ ...ANNOUNCEMENT, audioId: 'audio1' })
         const announcement = await AnnouncementsService.updateAnnouncement('a1', { audioId: 'audio1' })
         expect(announcement.hasAudio).toBe(true)
@@ -103,6 +105,7 @@ describe('AnnouncementsService.updateAnnouncement', () => {
 
     it('unlinks audioId and keeps dialplan with hangup', async () => {
         db.announcement.findUnique.mockResolvedValueOnce({ ...ANNOUNCEMENT, audioId: 'audio1' }) // existing
+        db.flowEdge.findMany.mockResolvedValue([])
         db.announcement.update.mockResolvedValue({ ...ANNOUNCEMENT, audioId: null })
         const announcement = await AnnouncementsService.updateAnnouncement('a1', { audioId: null })
         expect(announcement.hasAudio).toBe(false)
@@ -120,6 +123,7 @@ describe('AnnouncementsService.updateAnnouncement', () => {
 describe('AnnouncementsService.deleteAnnouncement', () => {
     it('deletes announcement and dialplan entry', async () => {
         db.announcement.findUnique.mockResolvedValue({ id: 'a1', companyId: 'c1' })
+        db.flowEdge.findMany.mockResolvedValue([]) // ninguém referencia — assertNotReferenced passa
         db.announcement.delete.mockResolvedValue(ANNOUNCEMENT)
         await AnnouncementsService.deleteAnnouncement('a1')
         expect(AnnouncementRepository.regenerate).toHaveBeenCalledWith('c1')
@@ -130,5 +134,12 @@ describe('AnnouncementsService.deleteAnnouncement', () => {
         db.announcement.findUnique.mockResolvedValue(null)
         await expect(AnnouncementsService.deleteAnnouncement('clxxxxxxxxxxxxxxxxxxxxxxxxx'))
             .rejects.toMatchObject({ statusCode: 404 })
+    })
+
+    it('throws 409 when still referenced by another flow', async () => {
+        db.announcement.findUnique.mockResolvedValue({ id: 'a1', companyId: 'c1' })
+        db.flowEdge.findMany.mockResolvedValue([{ sourceType: 'timecondition', sourceId: 'tc1', slot: 'true' }])
+        await expect(AnnouncementsService.deleteAnnouncement('a1')).rejects.toMatchObject({ statusCode: 409 })
+        expect(db.announcement.delete).not.toHaveBeenCalled()
     })
 })

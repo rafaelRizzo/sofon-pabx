@@ -1,366 +1,362 @@
 generator client {
-    provider = "prisma-client"
-    output   = "../generated/prisma"
+  provider = "prisma-client"
+  output   = "../generated/prisma"
 }
 
 datasource db {
-    provider = "postgresql"
+  provider = "postgresql"
 }
 
 // ─── Application Models ───────────────────────────────────────────────────────
 
 model Company {
-    id               String            @id @default(cuid())
-    asteriskId       String            @unique @default(dbgenerated("substring(replace(gen_random_uuid()::text, '-', ''), 1, 10)")) @db.VarChar(10)
-    name             String
-    doc              String?
-    status           String            @default("active") // active | inactive | blocked
-    // padrão de storage é sempre UTC (Timestamptz); este campo só define o fuso de exibição na API
-    timezone         String            @default("America/Sao_Paulo") @db.VarChar(64)
-    metadata         Json              @default("{}")
-    createdAt        DateTime          @default(now()) @db.Timestamptz(3)
-    updatedAt        DateTime          @updatedAt @db.Timestamptz(3)
-    users            UserCompany[]
-    dids             Did[]
-    extensions       Extension[]
-    queues           Queue[]
-    trunks           Trunk[]
-    outboundRoutes   OutboundRoute[]
-    timeGroups       TimeGroup[]
-    timeConditions   TimeCondition[]
-    inboundRoutes    InboundRoute[]
-    announcements    Announcement[]
-    ivrMenus         IvrMenu[]
-    requestTemplates RequestTemplate[]
-    audios           Audio[]
-    holidayGroups    HolidayGroup[]
-    agentCompanyScopes AgentCompanyScope[]
-    routingRules       RoutingRule[]
-    callRatings        CallRating[]
-    agentAffinities    AgentAffinity[]
-    variableSets       VariableSet[]
-    variableConditions VariableCondition[]
+  id                 String              @id @default(cuid())
+  asteriskId         String              @unique @default(dbgenerated("substring(replace(gen_random_uuid()::text, '-', ''), 1, 10)")) @db.VarChar(10)
+  name               String
+  doc                String?
+  status             String              @default("active") // active | inactive | blocked
+  // padrão de storage é sempre UTC (Timestamptz); este campo só define o fuso de exibição na API
+  timezone           String              @default("America/Sao_Paulo") @db.VarChar(64)
+  metadata           Json                @default("{}")
+  createdAt          DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime            @updatedAt @db.Timestamptz(3)
+  users              UserCompany[]
+  dids               Did[]
+  extensions         Extension[]
+  queues             Queue[]
+  trunks             Trunk[]
+  outboundRoutes     OutboundRoute[]
+  timeGroups         TimeGroup[]
+  timeConditions     TimeCondition[]
+  inboundRoutes      InboundRoute[]
+  announcements      Announcement[]
+  ivrMenus           IvrMenu[]
+  requestTemplates   RequestTemplate[]
+  audios             Audio[]
+  holidayGroups      HolidayGroup[]
+  agentCompanyScopes AgentCompanyScope[]
+  routingRules       RoutingRule[]
+  callRatings        CallRating[]
+  agentAffinities    AgentAffinity[]
+  variableSets       VariableSet[]
+  variableConditions VariableCondition[]
+  flowEdges          FlowEdge[]
+  flows              Flow[]
 
-    @@unique([name, doc])
-    @@map("companies")
+  @@unique([name, doc])
+  @@map("companies")
 }
 
 model Did {
-    id            String         @id @default(cuid())
-    number        String
-    companyId     String
-    company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
-    inboundRoutes InboundRoute[]
-    status        String         @default("active") // active | inactive | blocked
-    createdAt     DateTime       @default(now()) @db.Timestamptz(3)
-    updatedAt     DateTime       @updatedAt @db.Timestamptz(3)
+  id            String         @id @default(cuid())
+  number        String
+  companyId     String
+  company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  inboundRoutes InboundRoute[]
+  status        String         @default("active") // active | inactive | blocked
+  createdAt     DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime       @updatedAt @db.Timestamptz(3)
 
-    @@unique([number, companyId])
-    @@index([companyId])
-    @@map("dids")
+  @@unique([number, companyId])
+  @@index([companyId])
+  @@map("dids")
 }
 
 model User {
-    id           String        @id @default(cuid())
-    webhookSlug  String        @unique @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-    name         String
-    username     String        @unique
-    password     String
-    token        String?       @unique
-    role         String        @default("user")
-    status       String        @default("active")
-    // relevante só para role="user"; admin/reseller têm acesso irrestrito (ver requirePermission)
-    permissions  String[]      @default([])
-    extensionId  String?       @unique
-    createdBy    String?
-    creator      User?         @relation("UserCreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
-    createdUsers User[]        @relation("UserCreatedBy")
-    extension    Extension?    @relation(fields: [extensionId], references: [id], onDelete: SetNull)
-    createdAt    DateTime      @default(now()) @db.Timestamptz(3)
-    updatedAt    DateTime      @updatedAt @db.Timestamptz(3)
-    companies    UserCompany[]
+  id           String        @id @default(cuid())
+  webhookSlug  String        @unique @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String
+  username     String        @unique
+  password     String
+  token        String?       @unique
+  role         String        @default("user")
+  status       String        @default("active")
+  // relevante só para role="user"; admin/reseller têm acesso irrestrito (ver requirePermission)
+  permissions  String[]      @default([])
+  extensionId  String?       @unique
+  createdBy    String?
+  creator      User?         @relation("UserCreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
+  createdUsers User[]        @relation("UserCreatedBy")
+  extension    Extension?    @relation(fields: [extensionId], references: [id], onDelete: SetNull)
+  createdAt    DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime      @updatedAt @db.Timestamptz(3)
+  companies    UserCompany[]
 
-    @@index([createdBy])
-    @@map("users")
+  @@index([createdBy])
+  @@map("users")
 }
 
 model UserCompany {
-    userId    String
-    companyId String
-    user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-    company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  userId    String
+  companyId String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
-    @@id([userId, companyId])
-    @@index([companyId])
-    @@map("user_companies")
+  @@id([userId, companyId])
+  @@index([companyId])
+  @@map("user_companies")
 }
 
 model Extension {
-    id               String                   @id @default(cuid())
-    alias            String
-    number           String                   @unique
-    type             String
-    name             String
-    context          String                   @default("ramais")
-    allowOutbound    Boolean                  @default(true)
-    companyId        String
-    company          Company                  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-    createdAt        DateTime                 @default(now()) @db.Timestamptz(3)
-    updatedAt        DateTime                 @updatedAt @db.Timestamptz(3)
-    queueMemberships QueueMember[]
-    user             User?
-    outboundRoutes   OutboundRouteExtension[]
-    agentCompanyScopes AgentCompanyScope[]
-    callRatings        CallRating[]
-    agentAffinities    AgentAffinity[]
+  id                 String                   @id @default(cuid())
+  alias              String
+  number             String                   @unique
+  type               String
+  name               String
+  context            String                   @default("ramais")
+  allowOutbound      Boolean                  @default(true)
+  companyId          String
+  company            Company                  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt          DateTime                 @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime                 @updatedAt @db.Timestamptz(3)
+  queueMemberships   QueueMember[]
+  user               User?
+  outboundRoutes     OutboundRouteExtension[]
+  agentCompanyScopes AgentCompanyScope[]
+  callRatings        CallRating[]
+  agentAffinities    AgentAffinity[]
 
-    @@unique([alias, companyId])
-    @@index([companyId])
-    @@map("phone_extensions")
+  @@unique([alias, companyId])
+  @@index([companyId])
+  @@map("phone_extensions")
 }
 
 model Queue {
-    id                   String        @id @default(cuid())
-    name                 String        @db.VarChar(80)
-    number               String        @db.VarChar(20)
-    companyId            String
-    company              Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
-    strategy             String        @default("ringall")
-    musicOnHold          String        @default("default")
-    timeout              Int           @default(15)
-    retry                Int           @default(5)
-    maxLen               Int           @default(0)
-    wrapupTime           Int           @default(5)
-    // announce ("join announcement"): id de um Audio tocado uma única vez pro CLIENTE ao entrar na
-    // fila — vira um Playback no dialplan antes do Queue() (ver AsteriskQueueRepository.regenerate),
-    // não a coluna `announce` nativa do Asterisk (essa é o agentAnnounce abaixo)
-    announce             String?
-    announceAudio        Audio?        @relation("QueueAnnounceAudio", fields: [announce], references: [id], onDelete: SetNull)
-    // agentAnnounce ("agent announcement"): id de um Audio tocado pro ATENDENTE bem antes de a
-    // ligação ser conectada a ele — é o `announce` nativo do Asterisk em queues.conf/tabela
-    // realtime (grava como path absoluto resolvido, ver AsteriskQueueRepository/audioSoundPath)
-    agentAnnounce        String?
-    agentAnnounceAudio   Audio?        @relation("QueueAgentAnnounceAudio", fields: [agentAnnounce], references: [id], onDelete: SetNull)
-    // announceFrequency/announcePosition: junto formam o "diz sua posição/tempo de espera" do
-    // Asterisk (`announce-frequency` + `announce-position`) — announceFrequency só tem efeito
-    // com announcePosition=true
-    announceFrequency    Int           @default(0)
-    announcePosition     Boolean       @default(false)
-    // periodicAnnounce/periodicAnnounceFrequency: id de um Audio repetido periodicamente durante a
-    // espera (Asterisk `periodic-announce` + `periodic-announce-frequency`) — diferente do announce
-    // acima, que toca só uma vez
-    periodicAnnounce     String?
-    periodicAnnounceAudio Audio?       @relation("QueuePeriodicAnnounceAudio", fields: [periodicAnnounce], references: [id], onDelete: SetNull)
-    periodicAnnounceFrequency Int      @default(60)
-    joinEmpty            Boolean       @default(true)
-    leaveWhenEmpty       Boolean       @default(false)
-    weight               Int           @default(0)
-    metadata             Json          @default("{}")
-    // Destino no dialplan quando a fila termina sem o cliente ter desligado (timeout, sem agente,
-    // ou agente desliga primeiro) — route destination compartilhado (ver route-destination.schema.ts).
-    // null/omitido = Hangup (comportamento atual)
-    postQueueDestination Json?
-    // Áudio da pesquisa de satisfação pós-atendimento ("digite uma nota de 1 a 5") — mesmo padrão
-    // audioId nullable de Announcement/IvrMenu: null = pesquisa desligada pra essa fila (hasAudio: false)
-    surveyAudioId        String?
-    surveyAudio          Audio?        @relation("QueueSurveyAudio", fields: [surveyAudioId], references: [id], onDelete: SetNull)
-    // Liga prioridade dinâmica (RoutingRule via QUEUE_PRIO) e roteamento por afinidade (penalty
-    // recalculado por agent-affinity-recalc.job.ts) pra essa fila. false = comportamento nativo
-    // puro, sem AGI de pré-roteamento e sem o job mexendo no penalty dos membros. Pesquisa de
-    // satisfação (surveyAudioId) e elegibilidade agente×empresa (AgentCompanyScope) têm toggle
-    // próprio, independente deste
-    callcenterEnabled    Boolean       @default(false)
-    createdAt            DateTime      @default(now()) @db.Timestamptz(3)
-    updatedAt            DateTime      @updatedAt @db.Timestamptz(3)
-    members              QueueMember[]
+  id                        String        @id @default(cuid())
+  name                      String        @db.VarChar(80)
+  number                    String        @db.VarChar(20)
+  companyId                 String
+  company                   Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  strategy                  String        @default("ringall")
+  musicOnHold               String        @default("default")
+  timeout                   Int           @default(15)
+  retry                     Int           @default(5)
+  maxLen                    Int           @default(0)
+  wrapupTime                Int           @default(5)
+  // announce ("join announcement"): id de um Audio tocado uma única vez pro CLIENTE ao entrar na
+  // fila — vira um Playback no dialplan antes do Queue() (ver AsteriskQueueRepository.regenerate),
+  // não a coluna `announce` nativa do Asterisk (essa é o agentAnnounce abaixo)
+  announce                  String?
+  announceAudio             Audio?        @relation("QueueAnnounceAudio", fields: [announce], references: [id], onDelete: SetNull)
+  // agentAnnounce ("agent announcement"): id de um Audio tocado pro ATENDENTE bem antes de a
+  // ligação ser conectada a ele — é o `announce` nativo do Asterisk em queues.conf/tabela
+  // realtime (grava como path absoluto resolvido, ver AsteriskQueueRepository/audioSoundPath)
+  agentAnnounce             String?
+  agentAnnounceAudio        Audio?        @relation("QueueAgentAnnounceAudio", fields: [agentAnnounce], references: [id], onDelete: SetNull)
+  // announceFrequency/announcePosition: junto formam o "diz sua posição/tempo de espera" do
+  // Asterisk (`announce-frequency` + `announce-position`) — announceFrequency só tem efeito
+  // com announcePosition=true
+  announceFrequency         Int           @default(0)
+  announcePosition          Boolean       @default(false)
+  // periodicAnnounce/periodicAnnounceFrequency: id de um Audio repetido periodicamente durante a
+  // espera (Asterisk `periodic-announce` + `periodic-announce-frequency`) — diferente do announce
+  // acima, que toca só uma vez
+  periodicAnnounce          String?
+  periodicAnnounceAudio     Audio?        @relation("QueuePeriodicAnnounceAudio", fields: [periodicAnnounce], references: [id], onDelete: SetNull)
+  periodicAnnounceFrequency Int           @default(60)
+  joinEmpty                 Boolean       @default(true)
+  leaveWhenEmpty            Boolean       @default(false)
+  weight                    Int           @default(0)
+  metadata                  Json          @default("{}")
+  // Áudio da pesquisa de satisfação pós-atendimento ("digite uma nota de 1 a 5") — mesmo padrão
+  // audioId nullable de Announcement/IvrMenu: null = pesquisa desligada pra essa fila (hasAudio: false)
+  surveyAudioId             String?
+  surveyAudio               Audio?        @relation("QueueSurveyAudio", fields: [surveyAudioId], references: [id], onDelete: SetNull)
+  // Liga prioridade dinâmica (RoutingRule via QUEUE_PRIO) e roteamento por afinidade (penalty
+  // recalculado por agent-affinity-recalc.job.ts) pra essa fila. false = comportamento nativo
+  // puro, sem AGI de pré-roteamento e sem o job mexendo no penalty dos membros. Pesquisa de
+  // satisfação (surveyAudioId) e elegibilidade agente×empresa (AgentCompanyScope) têm toggle
+  // próprio, independente deste
+  callcenterEnabled         Boolean       @default(false)
+  createdAt                 DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt                 DateTime      @updatedAt @db.Timestamptz(3)
+  members                   QueueMember[]
 
-    @@unique([name, companyId])
-    @@unique([number, companyId])
-    @@index([companyId])
-    @@index([surveyAudioId])
-    @@index([announce])
-    @@index([periodicAnnounce])
-    @@index([agentAnnounce])
-    @@map("queues_app")
+  @@unique([name, companyId])
+  @@unique([number, companyId])
+  @@index([companyId])
+  @@index([surveyAudioId])
+  @@index([announce])
+  @@index([periodicAnnounce])
+  @@index([agentAnnounce])
+  @@map("queues_app")
 }
 
 model QueueMember {
-    id          String    @id @default(cuid())
-    queueId     String
-    queue       Queue     @relation(fields: [queueId], references: [id], onDelete: Cascade)
-    extensionId String
-    extension   Extension @relation(fields: [extensionId], references: [id], onDelete: Cascade)
-    penalty     Int       @default(0)
-    paused      Boolean   @default(false)
-    pauseReason String?   @db.VarChar(80)
-    createdAt   DateTime  @default(now()) @db.Timestamptz(3)
-    updatedAt   DateTime  @updatedAt @db.Timestamptz(3)
+  id          String    @id @default(cuid())
+  queueId     String
+  queue       Queue     @relation(fields: [queueId], references: [id], onDelete: Cascade)
+  extensionId String
+  extension   Extension @relation(fields: [extensionId], references: [id], onDelete: Cascade)
+  penalty     Int       @default(0)
+  paused      Boolean   @default(false)
+  pauseReason String?   @db.VarChar(80)
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime  @updatedAt @db.Timestamptz(3)
 
-    @@unique([queueId, extensionId])
-    @@index([extensionId])
-    @@map("queue_members_app")
+  @@unique([queueId, extensionId])
+  @@index([extensionId])
+  @@map("queue_members_app")
 }
 
 model Trunk {
-    id               String               @id @default(cuid())
-    name             String               @db.VarChar(20)
-    companyId        String
-    company          Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
-    type             String               @default("pjsip") @db.VarChar(10) // "pjsip" | "iax"
-    registrationMode String               @db.VarChar(10)
-    identifyBy       String?              @db.VarChar(10) // "ip" | "username" — só p/ registrationMode inbound
-    host             String?              @db.VarChar(255)
-    port             Int?
-    username         String?              @db.VarChar(80)
-    password         String?              @db.VarChar(80)
-    context          String               @default("from-trunk") @db.VarChar(40)
-    codecs           String               @default("ulaw,alaw") @db.VarChar(200)
-    techPrefix       String?              @db.VarChar(20)
-    maxInChannels    Int?
-    maxOutChannels   Int?
-    transport        String?              @db.VarChar(40) // "transport-udp" | "transport-tcp"
-    dtmfMode         String?              @db.VarChar(40) // rfc4733 | inband | info | auto
-    directMedia      Boolean?
-    qualifyFrequency Int?
-    qualifyTimeout   Float?
-    outboundProxy    String?              @db.VarChar(40)
-    iceSupport       Boolean?
-    rel              String?              @db.VarChar(40) // 100rel: no | yes | required
-    timers           String?              @db.VarChar(40) // no | yes | always
-    timersMinSe      Int?
-    timersSessExpires Int?
-    sendDiversion    Boolean?
-    // Campos abaixo só se aplicam a type="iax" — sem equivalente em PJSIP (SIP headers, 100rel,
-    // session timers etc. não existem no IAX2; ver iax.repository.ts)
-    qualify          String?              @db.VarChar(10) // yes | no
-    trunkMode        Boolean? // "trunk" do iax.conf — otimização de meta-frame p/ alto volume ponto-a-ponto
-    encryption       Boolean? // AES128 nativo do IAX2 usando o secret
-    transfer         String?              @db.VarChar(10) // yes | no | mediaonly
-    jitterbuffer     Boolean?
-    // [{name, value}] — headers SIP customizados injetados via Set(PJSIP_HEADER(add,name)=value)
-    // antes de cada Dial() de saída (ver outbound-routes.service.ts); só se aplica a chamadas outbound e type="pjsip"
-    customHeaders    Json                 @default("[]")
-    metadata         Json                 @default("{}")
-    createdAt        DateTime             @default(now()) @db.Timestamptz(3)
-    updatedAt        DateTime             @updatedAt @db.Timestamptz(3)
-    outboundRoutes   OutboundRouteTrunk[]
-    inboundRoutes    InboundRoute[]
+  id                String               @id @default(cuid())
+  name              String               @db.VarChar(20)
+  companyId         String
+  company           Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  type              String               @default("pjsip") @db.VarChar(10) // "pjsip" | "iax"
+  registrationMode  String               @db.VarChar(10)
+  identifyBy        String?              @db.VarChar(10) // "ip" | "username" — só p/ registrationMode inbound
+  host              String?              @db.VarChar(255)
+  port              Int?
+  username          String?              @db.VarChar(80)
+  password          String?              @db.VarChar(80)
+  context           String               @default("from-trunk") @db.VarChar(40)
+  codecs            String               @default("ulaw,alaw") @db.VarChar(200)
+  techPrefix        String?              @db.VarChar(20)
+  maxInChannels     Int?
+  maxOutChannels    Int?
+  transport         String?              @db.VarChar(40) // "transport-udp" | "transport-tcp"
+  dtmfMode          String?              @db.VarChar(40) // rfc4733 | inband | info | auto
+  directMedia       Boolean?
+  qualifyFrequency  Int?
+  qualifyTimeout    Float?
+  outboundProxy     String?              @db.VarChar(40)
+  iceSupport        Boolean?
+  rel               String?              @db.VarChar(40) // 100rel: no | yes | required
+  timers            String?              @db.VarChar(40) // no | yes | always
+  timersMinSe       Int?
+  timersSessExpires Int?
+  sendDiversion     Boolean?
+  // Campos abaixo só se aplicam a type="iax" — sem equivalente em PJSIP (SIP headers, 100rel,
+  // session timers etc. não existem no IAX2; ver iax.repository.ts)
+  qualify           String?              @db.VarChar(10) // yes | no
+  trunkMode         Boolean? // "trunk" do iax.conf — otimização de meta-frame p/ alto volume ponto-a-ponto
+  encryption        Boolean? // AES128 nativo do IAX2 usando o secret
+  transfer          String?              @db.VarChar(10) // yes | no | mediaonly
+  jitterbuffer      Boolean?
+  // [{name, value}] — headers SIP customizados injetados via Set(PJSIP_HEADER(add,name)=value)
+  // antes de cada Dial() de saída (ver outbound-routes.service.ts); só se aplica a chamadas outbound e type="pjsip"
+  customHeaders     Json                 @default("[]")
+  metadata          Json                 @default("{}")
+  createdAt         DateTime             @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime             @updatedAt @db.Timestamptz(3)
+  outboundRoutes    OutboundRouteTrunk[]
+  inboundRoutes     InboundRoute[]
 
-    @@unique([name, companyId])
-    @@index([companyId])
-    @@map("trunks_app")
+  @@unique([name, companyId])
+  @@index([companyId])
+  @@map("trunks_app")
 }
 
 model OutboundRoute {
-    id         String                   @id @default(cuid())
-    name       String
-    companyId  String
-    company    Company                  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-    position   Int                      @default(0)
-    patterns   OutboundDialPattern[]
-    trunks     OutboundRouteTrunk[]
-    extensions OutboundRouteExtension[]
-    createdAt  DateTime                 @default(now()) @db.Timestamptz(3)
-    updatedAt  DateTime                 @updatedAt @db.Timestamptz(3)
+  id         String                   @id @default(cuid())
+  name       String
+  companyId  String
+  company    Company                  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  position   Int                      @default(0)
+  patterns   OutboundDialPattern[]
+  trunks     OutboundRouteTrunk[]
+  extensions OutboundRouteExtension[]
+  createdAt  DateTime                 @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime                 @updatedAt @db.Timestamptz(3)
 
-    @@index([companyId])
-    @@map("outbound_routes")
+  @@index([companyId])
+  @@map("outbound_routes")
 }
 
 model OutboundDialPattern {
-    id        String        @id @default(cuid())
-    routeId   String
-    route     OutboundRoute @relation(fields: [routeId], references: [id], onDelete: Cascade)
-    pattern   String        @db.VarChar(40)
-    prepend   String?       @db.VarChar(40)
-    prefix    String?       @db.VarChar(40)
-    position  Int           @default(0)
-    createdAt DateTime      @default(now()) @db.Timestamptz(3)
+  id        String        @id @default(cuid())
+  routeId   String
+  route     OutboundRoute @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  pattern   String        @db.VarChar(40)
+  prepend   String?       @db.VarChar(40)
+  prefix    String?       @db.VarChar(40)
+  position  Int           @default(0)
+  createdAt DateTime      @default(now()) @db.Timestamptz(3)
 
-    @@index([routeId])
-    @@map("outbound_dial_patterns")
+  @@index([routeId])
+  @@map("outbound_dial_patterns")
 }
 
 model OutboundRouteTrunk {
-    id       String        @id @default(cuid())
-    routeId  String
-    route    OutboundRoute @relation(fields: [routeId], references: [id], onDelete: Cascade)
-    trunkId  String
-    trunk    Trunk         @relation(fields: [trunkId], references: [id], onDelete: Cascade)
-    position Int           @default(0)
+  id       String        @id @default(cuid())
+  routeId  String
+  route    OutboundRoute @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  trunkId  String
+  trunk    Trunk         @relation(fields: [trunkId], references: [id], onDelete: Cascade)
+  position Int           @default(0)
 
-    @@unique([routeId, trunkId])
-    @@index([routeId])
-    @@map("outbound_route_trunks")
+  @@unique([routeId, trunkId])
+  @@index([routeId])
+  @@map("outbound_route_trunks")
 }
 
 model OutboundRouteExtension {
-    id          String        @id @default(cuid())
-    routeId     String
-    route       OutboundRoute @relation(fields: [routeId], references: [id], onDelete: Cascade)
-    extensionId String
-    extension   Extension     @relation(fields: [extensionId], references: [id], onDelete: Cascade)
+  id          String        @id @default(cuid())
+  routeId     String
+  route       OutboundRoute @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  extensionId String
+  extension   Extension     @relation(fields: [extensionId], references: [id], onDelete: Cascade)
 
-    @@unique([routeId, extensionId])
-    @@index([routeId])
-    @@map("outbound_route_extensions")
+  @@unique([routeId, extensionId])
+  @@index([routeId])
+  @@map("outbound_route_extensions")
 }
 
 model TimeGroup {
-    id         String                   @id @default(cuid())
-    name       String                   @db.VarChar(80)
-    companyId  String
-    company    Company                  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-    ranges     TimeRange[]
-    conditions TimeConditionTimeGroup[]
-    createdAt  DateTime                 @default(now()) @db.Timestamptz(3)
-    updatedAt  DateTime                 @updatedAt @db.Timestamptz(3)
+  id         String                   @id @default(cuid())
+  name       String                   @db.VarChar(80)
+  companyId  String
+  company    Company                  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  ranges     TimeRange[]
+  conditions TimeConditionTimeGroup[]
+  createdAt  DateTime                 @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime                 @updatedAt @db.Timestamptz(3)
 
-    @@unique([name, companyId])
-    @@index([companyId])
-    @@map("time_groups")
+  @@unique([name, companyId])
+  @@index([companyId])
+  @@map("time_groups")
 }
 
 model TimeRange {
-    id          String    @id @default(cuid())
-    timeGroupId String
-    timeGroup   TimeGroup @relation(fields: [timeGroupId], references: [id], onDelete: Cascade)
-    startTime   String    @db.VarChar(5)
-    endTime     String    @db.VarChar(5)
-    weekdays    String[]
-    monthdays   String    @default("*") @db.VarChar(20)
-    months      String    @default("*") @db.VarChar(40)
-    createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+  id          String    @id @default(cuid())
+  timeGroupId String
+  timeGroup   TimeGroup @relation(fields: [timeGroupId], references: [id], onDelete: Cascade)
+  startTime   String    @db.VarChar(5)
+  endTime     String    @db.VarChar(5)
+  weekdays    String[]
+  monthdays   String    @default("*") @db.VarChar(20)
+  months      String    @default("*") @db.VarChar(40)
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
 
-    @@index([timeGroupId])
-    @@map("time_ranges")
+  @@index([timeGroupId])
+  @@map("time_ranges")
 }
 
 model TimeCondition {
-    id         String                   @id @default(cuid())
-    name       String                   @db.VarChar(80)
-    companyId  String
-    company    Company                  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-    trueRoute  Json?
-    falseRoute Json?
-    timeGroups TimeConditionTimeGroup[]
-    createdAt  DateTime                 @default(now()) @db.Timestamptz(3)
-    updatedAt  DateTime                 @updatedAt @db.Timestamptz(3)
+  id         String                   @id @default(cuid())
+  name       String                   @db.VarChar(80)
+  companyId  String
+  company    Company                  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  timeGroups TimeConditionTimeGroup[]
+  createdAt  DateTime                 @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime                 @updatedAt @db.Timestamptz(3)
 
-    @@unique([name, companyId])
-    @@index([companyId])
-    @@map("time_conditions")
+  @@unique([name, companyId])
+  @@index([companyId])
+  @@map("time_conditions")
 }
 
 model TimeConditionTimeGroup {
-    timeConditionId String
-    timeGroupId     String
-    timeCondition   TimeCondition @relation(fields: [timeConditionId], references: [id], onDelete: Cascade)
-    timeGroup       TimeGroup     @relation(fields: [timeGroupId], references: [id], onDelete: Cascade)
+  timeConditionId String
+  timeGroupId     String
+  timeCondition   TimeCondition @relation(fields: [timeConditionId], references: [id], onDelete: Cascade)
+  timeGroup       TimeGroup     @relation(fields: [timeGroupId], references: [id], onDelete: Cascade)
 
-    @@id([timeConditionId, timeGroupId])
-    @@index([timeGroupId])
-    @@map("time_condition_time_groups")
+  @@id([timeConditionId, timeGroupId])
+  @@index([timeGroupId])
+  @@map("time_condition_time_groups")
 }
 
 // Por empresa, igual ao par TimeGroup/TimeCondition só que num recurso só: lista de datas (HolidayDate,
@@ -369,203 +365,283 @@ model TimeConditionTimeGroup {
 // bloqueia edição manual de `dates` enquanto ela existir — sem `url`, `dates` é editado à mão, igual
 // ranges de TimeGroup.
 model HolidayGroup {
-    id         String        @id @default(cuid())
-    name       String        @db.VarChar(80)
-    companyId  String
-    company    Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
-    url        String?       @db.VarChar(500)
-    trueRoute  Json?
-    falseRoute Json?
-    dates      HolidayDate[]
-    createdAt  DateTime      @default(now()) @db.Timestamptz(3)
-    updatedAt  DateTime      @updatedAt @db.Timestamptz(3)
+  id        String        @id @default(cuid())
+  name      String        @db.VarChar(80)
+  companyId String
+  company   Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  url       String?       @db.VarChar(500)
+  dates     HolidayDate[]
+  createdAt DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime      @updatedAt @db.Timestamptz(3)
 
-    @@unique([name, companyId])
-    @@index([companyId])
-    @@map("holiday_groups")
+  @@unique([name, companyId])
+  @@index([companyId])
+  @@map("holiday_groups")
 }
 
 model HolidayDate {
-    id             String       @id @default(cuid())
-    holidayGroupId String
-    holidayGroup   HolidayGroup @relation(fields: [holidayGroupId], references: [id], onDelete: Cascade)
-    name           String       @db.VarChar(80)
-    month          Int
-    day            Int
-    createdAt      DateTime     @default(now()) @db.Timestamptz(3)
+  id             String       @id @default(cuid())
+  holidayGroupId String
+  holidayGroup   HolidayGroup @relation(fields: [holidayGroupId], references: [id], onDelete: Cascade)
+  name           String       @db.VarChar(80)
+  month          Int
+  day            Int
+  createdAt      DateTime     @default(now()) @db.Timestamptz(3)
 
-    @@index([holidayGroupId])
-    @@map("holiday_dates")
+  @@index([holidayGroupId])
+  @@map("holiday_dates")
 }
 
 model InboundRoute {
-    id          String   @id @default(cuid())
-    name        String   @db.VarChar(80)
-    companyId   String
-    company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-    didId       String
-    did         Did      @relation(fields: [didId], references: [id], onDelete: Cascade)
-    trunkId     String
-    trunk       Trunk    @relation(fields: [trunkId], references: [id], onDelete: Cascade)
-    destination Json?
-    createdAt   DateTime @default(now()) @db.Timestamptz(3)
-    updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+  id        String   @id @default(cuid())
+  name      String   @db.VarChar(80)
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  didId     String
+  did       Did      @relation(fields: [didId], references: [id], onDelete: Cascade)
+  trunkId   String
+  trunk     Trunk    @relation(fields: [trunkId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
-    @@unique([trunkId, didId])
-    @@index([companyId])
-    @@map("inbound_routes")
+  @@unique([trunkId, didId])
+  @@index([companyId])
+  @@map("inbound_routes")
 }
 
 model Announcement {
-    id          String   @id @default(cuid())
-    name        String   @db.VarChar(80)
-    companyId   String
-    company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-    // null até vincular um Audio — só então o Playback existe no dialplan (ver AnnouncementRepository)
-    audioId     String?
-    audio       Audio?   @relation(fields: [audioId], references: [id], onDelete: SetNull)
-    destination Json?
-    createdAt   DateTime @default(now()) @db.Timestamptz(3)
-    updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+  id        String   @id @default(cuid())
+  name      String   @db.VarChar(80)
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  // null até vincular um Audio — só então o Playback existe no dialplan (ver AnnouncementRepository)
+  audioId   String?
+  audio     Audio?   @relation(fields: [audioId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
-    @@unique([name, companyId])
-    @@index([companyId])
-    @@index([audioId])
-    @@map("announcements")
+  @@unique([name, companyId])
+  @@index([companyId])
+  @@index([audioId])
+  @@map("announcements")
 }
 
 model Audio {
-    id        String   @id @default(cuid())
-    name      String   @db.VarChar(80)
-    companyId String
-    company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-    createdAt DateTime @default(now()) @db.Timestamptz(3)
-    updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  id        String   @id @default(cuid())
+  name      String   @db.VarChar(80)
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
-    announcements Announcement[]
-    ivrMenus      IvrMenu[]
-    surveyQueues  Queue[] @relation("QueueSurveyAudio")
-    announceQueues Queue[] @relation("QueueAnnounceAudio")
-    periodicAnnounceQueues Queue[] @relation("QueuePeriodicAnnounceAudio")
-    agentAnnounceQueues Queue[] @relation("QueueAgentAnnounceAudio")
+  announcements          Announcement[]
+  ivrMenus               IvrMenu[]
+  surveyQueues           Queue[]        @relation("QueueSurveyAudio")
+  announceQueues         Queue[]        @relation("QueueAnnounceAudio")
+  periodicAnnounceQueues Queue[]        @relation("QueuePeriodicAnnounceAudio")
+  agentAnnounceQueues    Queue[]        @relation("QueueAgentAnnounceAudio")
 
-    @@unique([name, companyId])
-    @@index([companyId])
-    @@map("audios")
+  @@unique([name, companyId])
+  @@index([companyId])
+  @@map("audios")
 }
 
 model IvrMenu {
-    id                 String      @id @default(cuid())
-    name               String      @db.VarChar(80)
-    companyId          String
-    company            Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
-    // "menu" = opções de 1 dígito (options); "collect" = coleta uma sequência fixa de dígitos
-    // (ex: CPF/CNPJ) sem opções, expondo o valor em variableName pra outros módulos (Request
-    // Template, Validar Variável): ver IvrRepository e ivr.service.ts:assertTypeConsistency
-    type               String      @default("menu")
-    // nome da variável de canal que recebe os dígitos coletados, só usado quando type="collect"
-    variableName       String?     @db.VarChar(80)
-    // null até vincular um Audio — mesmo padrão de Announcement.audioId (ver IvrRepository)
-    audioId            String?
-    audio              Audio?      @relation(fields: [audioId], references: [id], onDelete: SetNull)
-    // quantos dígitos o Read() aceita antes de parar de esperar — 1 = só opções de menu, >1 permite
-    // sequência longa (ex: CPF) tratada via longDestination quando não bate com nenhuma opção de 1 dígito
-    maxDigits          Int         @default(1)
-    // segundos que o Read() aguarda por dígito antes de contar como timeout (sem nenhum dígito digitado)
-    digitTimeout       Int         @default(5)
-    invalidRetries     Int         @default(3)
-    invalidDestination Json?
-    timeoutRetries     Int         @default(3)
-    timeoutDestination Json?
-    // destino quando o chamador digita mais de 1 dígito (até maxDigits) sem bater com opção de 1 dígito
-    longDestination    Json?
-    options            IvrOption[]
-    createdAt          DateTime    @default(now()) @db.Timestamptz(3)
-    updatedAt          DateTime    @updatedAt @db.Timestamptz(3)
+  id             String      @id @default(cuid())
+  name           String      @db.VarChar(80)
+  companyId      String
+  company        Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  // "menu" = opções de 1 dígito (options); "collect" = coleta uma sequência fixa de dígitos
+  // (ex: CPF/CNPJ) sem opções, expondo o valor em variableName pra outros módulos (Request
+  // Template, Validar Variável): ver IvrRepository e ivr.service.ts:assertTypeConsistency
+  type           String      @default("menu")
+  // nome da variável de canal que recebe os dígitos coletados, só usado quando type="collect"
+  variableName   String?     @db.VarChar(80)
+  // null até vincular um Audio — mesmo padrão de Announcement.audioId (ver IvrRepository)
+  audioId        String?
+  audio          Audio?      @relation(fields: [audioId], references: [id], onDelete: SetNull)
+  // quantos dígitos o Read() aceita antes de parar de esperar — 1 = só opções de menu, >1 permite
+  // sequência longa (ex: CPF) tratada via longDestination quando não bate com nenhuma opção de 1 dígito
+  maxDigits      Int         @default(1)
+  // segundos que o Read() aguarda por dígito antes de contar como timeout (sem nenhum dígito digitado)
+  digitTimeout   Int         @default(5)
+  invalidRetries Int         @default(3)
+  timeoutRetries Int         @default(3)
+  options        IvrOption[]
+  createdAt      DateTime    @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime    @updatedAt @db.Timestamptz(3)
 
-    @@unique([name, companyId])
-    @@index([companyId])
-    @@index([audioId])
-    @@map("ivr_menus")
+  @@unique([name, companyId])
+  @@index([companyId])
+  @@index([audioId])
+  @@map("ivr_menus")
 }
 
 model IvrOption {
-    id          String   @id @default(cuid())
-    ivrMenuId   String
-    ivrMenu     IvrMenu  @relation(fields: [ivrMenuId], references: [id], onDelete: Cascade)
-    digit       String   @db.VarChar(1)
-    destination Json?
-    createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  id        String   @id @default(cuid())
+  ivrMenuId String
+  ivrMenu   IvrMenu  @relation(fields: [ivrMenuId], references: [id], onDelete: Cascade)
+  digit     String   @db.VarChar(1)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
 
-    @@unique([ivrMenuId, digit])
-    @@index([ivrMenuId])
-    @@map("ivr_options")
+  @@unique([ivrMenuId, digit])
+  @@index([ivrMenuId])
+  @@map("ivr_options")
 }
 
 // Template de requisição HTTP síncrona executada em tempo de chamada via AGI (ver src/asterisk/agi-server.ts) —
 // usada como RouteDestination (type: "request") em Inbound Routes/Time Conditions/Queue postQueueDestination.
 // url/headers/body podem conter placeholders {{VAR}} resolvidos via AGI GET VARIABLE (ex: {{CALLERID(num)}}, {{EXTEN}}).
 model RequestTemplate {
-    id               String   @id @default(cuid())
-    name             String   @db.VarChar(80)
-    companyId        String
-    company          Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-    method           String   @default("GET") @db.VarChar(10)
-    url              String
-    headers          Json?
-    body             Json?
-    timeoutMs        Int      @default(5000)
-    // [{ path: "data.client[0].id", variable: "crm_client_id" }] — path avaliado sobre o JSON de resposta,
-    // resultado setado como variável de canal via AGI SET VARIABLE (disponível no dialplan após o request)
-    variableMappings Json     @default("[]")
-    onSuccess        Json?
-    onError          Json?
-    createdAt        DateTime @default(now()) @db.Timestamptz(3)
-    updatedAt        DateTime @updatedAt @db.Timestamptz(3)
+  id               String   @id @default(cuid())
+  name             String   @db.VarChar(80)
+  companyId        String
+  company          Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  method           String   @default("GET") @db.VarChar(10)
+  url              String
+  headers          Json?
+  body             Json?
+  timeoutMs        Int      @default(5000)
+  // [{ path: "data.client[0].id", variable: "crm_client_id" }] — path avaliado sobre o JSON de resposta,
+  // resultado setado como variável de canal via AGI SET VARIABLE (disponível no dialplan após o request)
+  variableMappings Json     @default("[]")
+  createdAt        DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime @updatedAt @db.Timestamptz(3)
 
-    @@unique([name, companyId])
-    @@index([companyId])
-    @@map("request_templates")
+  @@unique([name, companyId])
+  @@index([companyId])
+  @@map("request_templates")
 }
 
 // usada como RouteDestination (type: "variable-set") — seta 1+ variáveis de canal via Set() e segue
 // pro destino configurado. value pode conter interpolação nativa do Asterisk (${OUTRAVAR}), resolvida
 // em tempo de chamada pelo próprio Set() — sem AGI, ao contrário de RequestTemplate.variableMappings.
 model VariableSet {
-    id          String   @id @default(cuid())
-    name        String   @db.VarChar(80)
-    companyId   String
-    company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-    // [{ variable: "MYVAR", value: "algum valor ou ${OUTRAVAR}" }]
-    assignments Json     @default("[]")
-    destination Json?
-    createdAt   DateTime @default(now()) @db.Timestamptz(3)
-    updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+  id          String   @id @default(cuid())
+  name        String   @db.VarChar(80)
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  // [{ variable: "MYVAR", value: "algum valor ou ${OUTRAVAR}" }]
+  assignments Json     @default("[]")
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
 
-    @@unique([name, companyId])
-    @@index([companyId])
-    @@map("variable_sets")
+  @@unique([name, companyId])
+  @@index([companyId])
+  @@map("variable_sets")
 }
 
 // usada como RouteDestination (type: "variable-condition") — valida variável(is) de canal (preenchida,
 // tamanho, igualdade, regex, numérica) e direciona por trueRoute/falseRoute, combinando as regras por
 // combinator ("and": todas devem bater | "or": qualquer uma).
 model VariableCondition {
-    id          String   @id @default(cuid())
-    name        String   @db.VarChar(80)
-    companyId   String
-    company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-    combinator  String   @default("and")
-    // [{ variable: "CALLERID(num)", operator: "length_gte", value: "11" }]
-    rules       Json     @default("[]")
-    trueRoute   Json?
-    falseRoute  Json?
-    createdAt   DateTime @default(now()) @db.Timestamptz(3)
-    updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+  id         String   @id @default(cuid())
+  name       String   @db.VarChar(80)
+  companyId  String
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  combinator String   @default("and")
+  // [{ variable: "CALLERID(num)", operator: "length_gte", value: "11" }]
+  rules      Json     @default("[]")
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime @updatedAt @db.Timestamptz(3)
 
-    @@unique([name, companyId])
-    @@index([companyId])
-    @@map("variable_conditions")
+  @@unique([name, companyId])
+  @@index([companyId])
+  @@map("variable_conditions")
+}
+
+// Edge normalizado de RouteDestination — única fonte de roteamento pra todos os nós (InboundRoute/
+// TimeCondition/HolidayGroup/Announcement/IvrMenu/IvrOption/RequestTemplate/VariableSet/
+// VariableCondition/Queue); nenhum desses models tem mais campo Json inline de destino.
+// sourceType+sourceId identificam a
+// origem (ex: "timecondition"+<id>), slot identifica qual campo (ex: "true"/"false"), targetType+
+// targetId são o RouteDestination resolvido — ausência de linha para um slot = hangup, mesma
+// convenção que o `null` tinha antes. Ver src/asterisk/flow-edge.repository.ts.
+model FlowEdge {
+  id         String   @id @default(cuid())
+  companyId  String
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  sourceType String
+  sourceId   String
+  slot       String
+  targetType String?
+  targetId   String?
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime @updatedAt @db.Timestamptz(3)
+
+  @@unique([sourceType, sourceId, slot])
+  @@index([companyId])
+  @@index([targetType, targetId])
+  @@map("flow_edges")
+}
+
+// Alias nomeado e reaproveitável de um RouteDestination — usado como `type: "flow"` em
+// qualquer RouteDestination (Inbound Routes, Time Conditions, Queues, etc). O destino em si
+// (`entryDestination`) vive em FlowEdge (sourceType "flow", slot "entry"), igual todo o resto —
+// aqui só fica o nome e o layout visual do canvas (posição de cada nó já visitado a partir do
+// entryDestination, ver GET /flows/:id/graph). Um mesmo nó (ex: Announcement X) pode aparecer em
+// mais de um Flow com posições diferentes — por isso a posição pertence ao Flow, não ao nó.
+model Flow {
+  id          String    @id @default(cuid())
+  name        String    @db.VarChar(80)
+  companyId   String
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  // O entry point é uma INSTÂNCIA de nó, nunca o recurso Asterisk diretamente. Isso permite a
+  // mesma Queue/URA aparecer em fluxos distintos com saídas independentes.
+  entryNodeId String?   @unique
+  entryNode   FlowNode? @relation("FlowEntry", fields: [entryNodeId], references: [id], onDelete: SetNull)
+  nodes       FlowNode[] @relation("FlowNodes")
+  nodeEdges   FlowNodeEdge[]
+  // [{ nodeType: "announcement", nodeId: "...", name?: "...", x: 120, y: 80 }]
+  layout    Json     @default("[]")
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@unique([name, companyId])
+  @@index([companyId])
+  @@map("flows")
+}
+
+// Card instanciado dentro de um Flow. `resourceId` é polimórfico de propósito: aponta para o
+// recurso da biblioteca da empresa (Queue, IvrMenu, Announcement etc.), sem duplicar a configuração
+// nem o provisionamento no Asterisk. A integridade tipo→recurso e empresa é validada no service.
+model FlowNode {
+  id         String         @id @default(cuid())
+  flowId     String
+  flow       Flow           @relation("FlowNodes", fields: [flowId], references: [id], onDelete: Cascade)
+  entryFor   Flow?          @relation("FlowEntry")
+  type       String         @db.VarChar(40)
+  resourceId String?
+  label      String?        @db.VarChar(80)
+  position   Json           @default("{\"x\":0,\"y\":0}")
+  createdAt  DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime       @updatedAt @db.Timestamptz(3)
+  sourceEdges FlowNodeEdge[] @relation("FlowNodeSourceEdges")
+  targetEdges FlowNodeEdge[] @relation("FlowNodeTargetEdges")
+
+  @@index([flowId])
+  @@index([type, resourceId])
+  @@map("flow_nodes")
+}
+
+// Conexão entre duas instâncias do canvas. `sourcePort` é "default", "true", "false",
+// "success", "timeout", "digit:1" etc. Cada saída tem no máximo uma conexão.
+model FlowNodeEdge {
+  id           String   @id @default(cuid())
+  flowId       String
+  flow         Flow     @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  sourceNodeId String
+  sourceNode   FlowNode @relation("FlowNodeSourceEdges", fields: [sourceNodeId], references: [id], onDelete: Cascade)
+  sourcePort   String   @db.VarChar(40)
+  targetNodeId String
+  targetNode   FlowNode @relation("FlowNodeTargetEdges", fields: [targetNodeId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(3)
+
+  @@unique([sourceNodeId, sourcePort])
+  @@index([flowId])
+  @@index([targetNodeId])
+  @@map("flow_node_edges")
 }
 
 // ─── Callcenter (Queue Engine) ─────────────────────────────────────────────────
@@ -574,292 +650,292 @@ model VariableCondition {
 // compartilhados entre empresas (cenário BPO), diferente da membership estática de QueueMember.
 // Consumido pelo motor de roteamento (AGI de pré-fila) para filtrar agentes elegíveis por chamada.
 model AgentCompanyScope {
-    id          String    @id @default(cuid())
-    extensionId String
-    extension   Extension @relation(fields: [extensionId], references: [id], onDelete: Cascade)
-    companyId   String
-    company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-    active      Boolean   @default(true)
-    createdAt   DateTime  @default(now()) @db.Timestamptz(3)
-    updatedAt   DateTime  @updatedAt @db.Timestamptz(3)
+  id          String    @id @default(cuid())
+  extensionId String
+  extension   Extension @relation(fields: [extensionId], references: [id], onDelete: Cascade)
+  companyId   String
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime  @updatedAt @db.Timestamptz(3)
 
-    @@unique([extensionId, companyId])
-    @@index([companyId])
-    @@map("agent_company_scopes")
+  @@unique([extensionId, companyId])
+  @@index([companyId])
+  @@map("agent_company_scopes")
 }
 
 // Motor de prioridade configurável — avaliado pelo AGI de pré-roteamento antes do Queue() nativo
 // assumir. `conditions` casa com o vocabulário de Time Groups (weekdays/startTime/endTime HH:MM).
 model RoutingRule {
-    id         String   @id @default(cuid())
-    companyId  String
-    company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-    name       String   @db.VarChar(80)
-    priority   Int      @default(0) // maior = mais prioridade
-    conditions Json     @default("{}") // { trunkId?, callerIdPattern?, weekdays?, startTime?, endTime? }
-    active     Boolean  @default(true)
-    createdAt  DateTime @default(now()) @db.Timestamptz(3)
-    updatedAt  DateTime @updatedAt @db.Timestamptz(3)
+  id         String   @id @default(cuid())
+  companyId  String
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name       String   @db.VarChar(80)
+  priority   Int      @default(0) // maior = mais prioridade
+  conditions Json     @default("{}") // { trunkId?, callerIdPattern?, weekdays?, startTime?, endTime? }
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime @updatedAt @db.Timestamptz(3)
 
-    @@unique([name, companyId])
-    @@index([companyId])
-    @@map("routing_rules")
+  @@unique([name, companyId])
+  @@index([companyId])
+  @@map("routing_rules")
 }
 
 // Nota de atendimento (1-5) capturada via IVR de pesquisa pós-chamada — fonte de dado para
 // AgentAffinity (Fase 2 recalcula a partir daqui).
 model CallRating {
-    id          String    @id @default(cuid())
-    companyId   String
-    company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-    extensionId String
-    extension   Extension @relation(fields: [extensionId], references: [id], onDelete: Cascade)
-    number      String    @db.VarChar(80) // número do cliente (CALLERID)
-    uniqueid    String?   @db.VarChar(150) // referência solta ao CDR, sem FK (cdr é fonte nativa do Asterisk)
-    score       Int
-    createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+  id          String    @id @default(cuid())
+  companyId   String
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  extensionId String
+  extension   Extension @relation(fields: [extensionId], references: [id], onDelete: Cascade)
+  number      String    @db.VarChar(80) // número do cliente (CALLERID)
+  uniqueid    String?   @db.VarChar(150) // referência solta ao CDR, sem FK (cdr é fonte nativa do Asterisk)
+  score       Int
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
 
-    @@index([companyId, createdAt])
-    @@index([extensionId, createdAt])
-    @@map("call_ratings")
+  @@index([companyId, createdAt])
+  @@index([extensionId, createdAt])
+  @@map("call_ratings")
 }
 
 // Afinidade agente×empresa derivada de CallRating — recálculo automático (job) e consumo pelo
 // motor de roteamento entram na Fase 2. Nesta fase o model existe só como base de dados.
 model AgentAffinity {
-    id          String    @id @default(cuid())
-    extensionId String
-    extension   Extension @relation(fields: [extensionId], references: [id], onDelete: Cascade)
-    companyId   String
-    company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-    score       Float     @default(0)
-    sampleSize  Int       @default(0)
-    updatedAt   DateTime  @updatedAt @db.Timestamptz(3)
+  id          String    @id @default(cuid())
+  extensionId String
+  extension   Extension @relation(fields: [extensionId], references: [id], onDelete: Cascade)
+  companyId   String
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  score       Float     @default(0)
+  sampleSize  Int       @default(0)
+  updatedAt   DateTime  @updatedAt @db.Timestamptz(3)
 
-    @@unique([extensionId, companyId])
-    @@index([companyId])
-    @@map("agent_affinities")
+  @@unique([extensionId, companyId])
+  @@index([companyId])
+  @@map("agent_affinities")
 }
 
 // ─── Asterisk Realtime Models ─────────────────────────────────────────────────
 
 model extensions {
-    id       BigInt  @id @default(autoincrement())
-    context  String  @default("ramais") @db.VarChar(40)
-    exten    String  @db.VarChar(40)
-    priority Int
-    app      String  @db.VarChar(40)
-    appdata  String? @db.VarChar(256)
+  id       BigInt  @id @default(autoincrement())
+  context  String  @default("ramais") @db.VarChar(40)
+  exten    String  @db.VarChar(40)
+  priority Int
+  app      String  @db.VarChar(40)
+  appdata  String? @db.VarChar(256)
 
-    @@unique([context, exten, priority])
-    @@index([context, exten])
+  @@unique([context, exten, priority])
+  @@index([context, exten])
 }
 
 model ps_aors {
-    id                   String   @id @db.VarChar(40)
-    contact              String?  @db.VarChar(255)
-    default_expiration   Int?     @default(3600)
-    max_contacts         Int?     @default(1)
-    minimum_expiration   Int?     @default(60)
-    maximum_expiration   Int?     @default(7200)
-    remove_existing      Boolean? @default(true)
-    qualify_frequency    Int?     @default(60)
-    qualify_timeout      Float?   @default(3.0)
-    authenticate_qualify Boolean? @default(false)
-    outbound_proxy       String?  @db.VarChar(40)
-    support_path         Boolean? @default(false)
-    mailboxes            String?  @db.VarChar(80)
+  id                   String   @id @db.VarChar(40)
+  contact              String?  @db.VarChar(255)
+  default_expiration   Int?     @default(3600)
+  max_contacts         Int?     @default(1)
+  minimum_expiration   Int?     @default(60)
+  maximum_expiration   Int?     @default(7200)
+  remove_existing      Boolean? @default(true)
+  qualify_frequency    Int?     @default(60)
+  qualify_timeout      Float?   @default(3.0)
+  authenticate_qualify Boolean? @default(false)
+  outbound_proxy       String?  @db.VarChar(40)
+  support_path         Boolean? @default(false)
+  mailboxes            String?  @db.VarChar(80)
 }
 
 model ps_auths {
-    id             String  @id @db.VarChar(40)
-    auth_type      String? @default("userpass") @db.VarChar(40)
-    password       String? @db.VarChar(80)
-    username       String? @db.VarChar(40)
-    realm          String? @db.VarChar(40)
-    md5_cred       String? @db.VarChar(40)
-    nonce_lifetime Int?
+  id             String  @id @db.VarChar(40)
+  auth_type      String? @default("userpass") @db.VarChar(40)
+  password       String? @db.VarChar(80)
+  username       String? @db.VarChar(40)
+  realm          String? @db.VarChar(40)
+  md5_cred       String? @db.VarChar(40)
+  nonce_lifetime Int?
 }
 
 model ps_contacts {
-    id                   String   @id @db.VarChar(255)
-    uri                  String?  @db.VarChar(255)
-    expiration_time      BigInt?
-    qualify_frequency    Int?
-    outbound_proxy       String?  @db.VarChar(40)
-    path                 String?
-    user_agent           String?  @db.VarChar(255)
-    qualify_timeout      Float?
-    reg_server           String?  @db.VarChar(20)
-    authenticate_qualify Boolean?
-    via_addr             String?  @db.VarChar(40)
-    via_port             Int?
-    call_id              String?  @db.VarChar(255)
-    endpoint             String?  @db.VarChar(40)
-    prune_on_boot        Boolean? @default(false)
-    qualify_2xx_only     Boolean? @default(false)
+  id                   String   @id @db.VarChar(255)
+  uri                  String?  @db.VarChar(255)
+  expiration_time      BigInt?
+  qualify_frequency    Int?
+  outbound_proxy       String?  @db.VarChar(40)
+  path                 String?
+  user_agent           String?  @db.VarChar(255)
+  qualify_timeout      Float?
+  reg_server           String?  @db.VarChar(20)
+  authenticate_qualify Boolean?
+  via_addr             String?  @db.VarChar(40)
+  via_port             Int?
+  call_id              String?  @db.VarChar(255)
+  endpoint             String?  @db.VarChar(40)
+  prune_on_boot        Boolean? @default(false)
+  qualify_2xx_only     Boolean? @default(false)
 
-    @@index([endpoint])
+  @@index([endpoint])
 }
 
 // rel usa @map("100rel") porque Prisma não aceita campos começando com número, mas o Asterisk lê a coluna "100rel"
 // outbound_auth: autenticação para chamadas saintes (trunks) — separado do auth que é para chamadas entrantes
 model ps_endpoints {
-    id                  String   @id @db.VarChar(40)
-    transport           String?  @db.VarChar(40)
-    aors                String?  @db.VarChar(200)
-    auth                String?  @db.VarChar(200)
-    context             String?  @default("ramais") @db.VarChar(40)
-    disallow            String?  @default("all") @db.VarChar(200)
-    allow               String?  @default("ulaw,alaw") @db.VarChar(200)
-    direct_media        Boolean? @default(false)
-    dtmf_mode           String?  @default("rfc4733") @db.VarChar(40)
-    force_rport         Boolean? @default(true)
-    ice_support         Boolean? @default(false)
-    // NAT: sem RTP simétrico o áudio tenta ir pro IP anunciado no SDP (privado, atrás de NAT) em vez do IP real de
-    // onde chega — causa "sem áudio" só em pjsip (chan_sip já tem nat=force_rport,comedia fixo no sip.conf global)
-    rewrite_contact     Boolean? @default(true)
-    rtp_symmetric       Boolean? @default(true)
-    send_diversion      Boolean? @default(true)
-    timers              String?  @default("yes") @db.VarChar(40)
-    timers_min_se       Int?     @default(90)
-    timers_sess_expires Int?     @default(1800)
-    callerid            String?  @db.VarChar(40)
-    language            String?  @default("pt_BR") @db.VarChar(10)
-    one_touch_recording Boolean? @default(false)
-    allow_transfer      Boolean? @default(true)
-    allow_subscribe     Boolean? @default(true)
-    from_user           String?  @db.VarChar(40)
-    from_domain         String?  @db.VarChar(40)
-    outbound_proxy      String?  @db.VarChar(40)
-    mailboxes           String?  @db.VarChar(40)
-    moh_suggest         String?  @default("default") @db.VarChar(40)
-    outbound_auth       String?  @db.VarChar(200)
-    rel                 String?  @default("yes") @map("100rel") @db.VarChar(40)
-    // Asterisk lê a opção pjsip real com underscore — coluna física precisa bater exatamente
-    namedcallgroup      String?  @map("named_call_group") @db.VarChar(256)
-    namedpickupgroup    String?  @map("named_pickup_group") @db.VarChar(256)
-    setvar              String?  @map("set_var") @db.VarChar(200)
-    // sempre = Company.asteriskId — isola CDR por empresa via account_code, sem depender de parsing de canal/contexto
-    accountcode         String?  @db.VarChar(40)
+  id                  String   @id @db.VarChar(40)
+  transport           String?  @db.VarChar(40)
+  aors                String?  @db.VarChar(200)
+  auth                String?  @db.VarChar(200)
+  context             String?  @default("ramais") @db.VarChar(40)
+  disallow            String?  @default("all") @db.VarChar(200)
+  allow               String?  @default("ulaw,alaw") @db.VarChar(200)
+  direct_media        Boolean? @default(false)
+  dtmf_mode           String?  @default("rfc4733") @db.VarChar(40)
+  force_rport         Boolean? @default(true)
+  ice_support         Boolean? @default(false)
+  // NAT: sem RTP simétrico o áudio tenta ir pro IP anunciado no SDP (privado, atrás de NAT) em vez do IP real de
+  // onde chega — causa "sem áudio" só em pjsip (chan_sip já tem nat=force_rport,comedia fixo no sip.conf global)
+  rewrite_contact     Boolean? @default(true)
+  rtp_symmetric       Boolean? @default(true)
+  send_diversion      Boolean? @default(true)
+  timers              String?  @default("yes") @db.VarChar(40)
+  timers_min_se       Int?     @default(90)
+  timers_sess_expires Int?     @default(1800)
+  callerid            String?  @db.VarChar(40)
+  language            String?  @default("pt_BR") @db.VarChar(10)
+  one_touch_recording Boolean? @default(false)
+  allow_transfer      Boolean? @default(true)
+  allow_subscribe     Boolean? @default(true)
+  from_user           String?  @db.VarChar(40)
+  from_domain         String?  @db.VarChar(40)
+  outbound_proxy      String?  @db.VarChar(40)
+  mailboxes           String?  @db.VarChar(40)
+  moh_suggest         String?  @default("default") @db.VarChar(40)
+  outbound_auth       String?  @db.VarChar(200)
+  rel                 String?  @default("yes") @map("100rel") @db.VarChar(40)
+  // Asterisk lê a opção pjsip real com underscore — coluna física precisa bater exatamente
+  namedcallgroup      String?  @map("named_call_group") @db.VarChar(256)
+  namedpickupgroup    String?  @map("named_pickup_group") @db.VarChar(256)
+  setvar              String?  @map("set_var") @db.VarChar(200)
+  // sempre = Company.asteriskId — isola CDR por empresa via account_code, sem depender de parsing de canal/contexto
+  accountcode         String?  @db.VarChar(40)
 }
 
 // CDR nativo do Asterisk (cdr_adaptive_odbc) — account_code = Company.asteriskId, setado em todo ps_endpoints/sip_peers
 model cdr {
-    id          BigInt    @id @default(autoincrement())
-    src         String?   @db.VarChar(80)
-    dst         String?   @db.VarChar(80)
-    context     String?   @map("dcontext") @db.VarChar(80)
-    callerid    String?   @map("clid") @db.VarChar(80)
-    srcChannel  String?   @map("channel") @db.VarChar(80)
-    dstChannel  String?   @map("dstchannel") @db.VarChar(80)
-    lastApp     String?   @map("lastapp") @db.VarChar(80)
-    lastData    String?   @map("lastdata") @db.VarChar(200)
-    // sem @db.Timestamptz de propósito: o Asterisk grava esses campos com a hora LOCAL do SO (America/Sao_Paulo,
-    // ver setups/install-asterisk.sh), não UTC. O driver pg lê os dígitos como se fossem UTC — qualquer código que
-    // ler/filtrar por esses campos precisa compensar isso via parseNaiveLocalDate/formatNaiveLocalISOString
-    // (src/utils/timezone.ts), nunca tratar como instante UTC real como os outros DateTime deste schema.
-    startTime   DateTime? @map("start")
-    answerTime  DateTime? @map("answer")
-    // "end" é palavra reservada no Postgres (CASE...END) — INSERT sem aspas quebra a sintaxe, por isso o @map difere do nome real do CDR
-    endTime     DateTime? @map("endtime")
-    duration    Int?
-    billsec     Int?
-    disposition String?   @db.VarChar(45)
-    amaflags    Int?
-    accountcode String?   @db.VarChar(80)
-    uniqueid    String?   @db.VarChar(150)
+  id          BigInt    @id @default(autoincrement())
+  src         String?   @db.VarChar(80)
+  dst         String?   @db.VarChar(80)
+  context     String?   @map("dcontext") @db.VarChar(80)
+  callerid    String?   @map("clid") @db.VarChar(80)
+  srcChannel  String?   @map("channel") @db.VarChar(80)
+  dstChannel  String?   @map("dstchannel") @db.VarChar(80)
+  lastApp     String?   @map("lastapp") @db.VarChar(80)
+  lastData    String?   @map("lastdata") @db.VarChar(200)
+  // sem @db.Timestamptz de propósito: o Asterisk grava esses campos com a hora LOCAL do SO (America/Sao_Paulo,
+  // ver setups/install-asterisk.sh), não UTC. O driver pg lê os dígitos como se fossem UTC — qualquer código que
+  // ler/filtrar por esses campos precisa compensar isso via parseNaiveLocalDate/formatNaiveLocalISOString
+  // (src/utils/timezone.ts), nunca tratar como instante UTC real como os outros DateTime deste schema.
+  startTime   DateTime? @map("start")
+  answerTime  DateTime? @map("answer")
+  // "end" é palavra reservada no Postgres (CASE...END) — INSERT sem aspas quebra a sintaxe, por isso o @map difere do nome real do CDR
+  endTime     DateTime? @map("endtime")
+  duration    Int?
+  billsec     Int?
+  disposition String?   @db.VarChar(45)
+  amaflags    Int?
+  accountcode String?   @db.VarChar(80)
+  uniqueid    String?   @db.VarChar(150)
 
-    // composto: toda query filtra por accountcode e ordena por startTime desc — cobre WHERE+ORDER BY num único index scan
-    @@index([accountcode, startTime(sort: Desc)])
+  // composto: toda query filtra por accountcode e ordena por startTime desc — cobre WHERE+ORDER BY num único index scan
+  @@index([accountcode, startTime(sort: Desc)])
 }
 
 // name é o identificador real do peer no Asterisk (chan_sip busca por name, não por id)
 // campos com hífen (session-timers, session-expires, etc.) usam @map — Prisma não aceita hífen em nomes de campo
 model sip_peers {
-    id                Int     @id @default(autoincrement())
-    name              String  @unique @db.VarChar(40)
-    ipaddr            String? @db.VarChar(45)
-    port              String? @default("5062") @db.VarChar(6)
-    regseconds        BigInt? @default(0)
-    defaultuser       String? @db.VarChar(40)
-    fullcontact       String? @db.VarChar(80)
-    regserver         String? @db.VarChar(20)
-    useragent         String? @db.VarChar(40)
-    lastms            Int?    @default(0)
-    host              String? @default("dynamic") @db.VarChar(40)
-    type              String? @default("friend") @db.VarChar(10)
-    context           String? @default("ramais") @db.VarChar(40)
-    permit            String? @db.VarChar(95)
-    deny              String? @db.VarChar(95)
-    secret            String? @db.VarChar(80)
-    md5secret         String? @db.VarChar(40)
-    remotesecret      String? @db.VarChar(40)
-    transport         String? @db.VarChar(10)
-    dtmfmode          String? @default("rfc2833") @db.VarChar(10)
-    directmedia       String? @default("no") @db.VarChar(10)
-    nat               String? @default("force_rport,comedia") @db.VarChar(40)
-    callgroup         String? @db.VarChar(40)
-    pickupgroup       String? @db.VarChar(40)
-    language          String? @default("pt_BR") @db.VarChar(40)
-    disallow          String? @default("all") @db.VarChar(200)
-    allow             String? @default("ulaw,alaw,g729") @db.VarChar(200)
-    insecure          String? @default("port,invite") @db.VarChar(40)
-    trustrpid         String? @db.VarChar(10)
-    progressinband    String? @db.VarChar(10)
-    promiscredir      String? @db.VarChar(10)
-    useclientcode     String? @db.VarChar(10)
-    accountcode       String? @db.VarChar(40)
-    setvar            String? @db.VarChar(200)
-    callerid          String? @db.VarChar(40)
-    amaflags          String? @db.VarChar(40)
-    callcounter       String? @db.VarChar(10)
-    busylevel         Int?
-    allowoverlap      String? @db.VarChar(10)
-    allowsubscribe    String? @db.VarChar(10)
-    videosupport      String? @db.VarChar(10)
-    maxcallbitrate    Int?
-    rfc2833compensate String? @db.VarChar(10)
-    mailbox           String? @db.VarChar(40)
-    sessionTimers     String? @map("session-timers") @db.VarChar(10)
-    sessionExpires    Int?    @map("session-expires")
-    sessionMinse      Int?    @map("session-minse")
-    sessionRefresher  String? @map("session-refresher") @db.VarChar(10)
-    t38ptUsertpsource String? @map("t38pt_usertpsource") @db.VarChar(10)
-    regexten          String? @db.VarChar(40)
-    fromdomain        String? @db.VarChar(40)
-    fromuser          String? @db.VarChar(40)
-    qualify           String? @default("yes") @db.VarChar(10)
-    defaultip         String? @db.VarChar(45)
-    rtptimeout        Int?
-    rtpholdtimeout    Int?
-    sendrpid          String? @db.VarChar(10)
-    outboundproxy     String? @db.VarChar(40)
-    callbackextension String? @db.VarChar(40)
-    timert1           Int?
-    timerb            Int?
-    qualifyfreq       Int?
-    constantssrc      String? @db.VarChar(10)
-    contactpermit     String? @db.VarChar(95)
-    contactdeny       String? @db.VarChar(95)
-    usereqphone       String? @db.VarChar(10)
-    textsupport       String? @db.VarChar(10)
-    faxdetect         String? @db.VarChar(10)
-    buggymwi          String? @db.VarChar(10)
-    auth              String? @db.VarChar(40)
-    fullname          String? @db.VarChar(40)
-    trunkname         String? @db.VarChar(40)
-    cidNumber         String? @map("cid_number") @db.VarChar(40)
-    callingpres       String? @db.VarChar(20)
-    mohinterpret      String? @db.VarChar(40)
-    mohsuggest        String? @db.VarChar(40)
-    parkinglot        String? @db.VarChar(40)
-    hasvoicemail      String? @db.VarChar(10)
-    subscribecontext  String? @db.VarChar(80)
-    subscribemwi      String? @db.VarChar(10)
-    vmexten           String? @db.VarChar(40)
-    autoframing       String? @db.VarChar(10)
-    rtpkeepalive      Int?
+  id                Int     @id @default(autoincrement())
+  name              String  @unique @db.VarChar(40)
+  ipaddr            String? @db.VarChar(45)
+  port              String? @default("5062") @db.VarChar(6)
+  regseconds        BigInt? @default(0)
+  defaultuser       String? @db.VarChar(40)
+  fullcontact       String? @db.VarChar(80)
+  regserver         String? @db.VarChar(20)
+  useragent         String? @db.VarChar(40)
+  lastms            Int?    @default(0)
+  host              String? @default("dynamic") @db.VarChar(40)
+  type              String? @default("friend") @db.VarChar(10)
+  context           String? @default("ramais") @db.VarChar(40)
+  permit            String? @db.VarChar(95)
+  deny              String? @db.VarChar(95)
+  secret            String? @db.VarChar(80)
+  md5secret         String? @db.VarChar(40)
+  remotesecret      String? @db.VarChar(40)
+  transport         String? @db.VarChar(10)
+  dtmfmode          String? @default("rfc2833") @db.VarChar(10)
+  directmedia       String? @default("no") @db.VarChar(10)
+  nat               String? @default("force_rport,comedia") @db.VarChar(40)
+  callgroup         String? @db.VarChar(40)
+  pickupgroup       String? @db.VarChar(40)
+  language          String? @default("pt_BR") @db.VarChar(40)
+  disallow          String? @default("all") @db.VarChar(200)
+  allow             String? @default("ulaw,alaw,g729") @db.VarChar(200)
+  insecure          String? @default("port,invite") @db.VarChar(40)
+  trustrpid         String? @db.VarChar(10)
+  progressinband    String? @db.VarChar(10)
+  promiscredir      String? @db.VarChar(10)
+  useclientcode     String? @db.VarChar(10)
+  accountcode       String? @db.VarChar(40)
+  setvar            String? @db.VarChar(200)
+  callerid          String? @db.VarChar(40)
+  amaflags          String? @db.VarChar(40)
+  callcounter       String? @db.VarChar(10)
+  busylevel         Int?
+  allowoverlap      String? @db.VarChar(10)
+  allowsubscribe    String? @db.VarChar(10)
+  videosupport      String? @db.VarChar(10)
+  maxcallbitrate    Int?
+  rfc2833compensate String? @db.VarChar(10)
+  mailbox           String? @db.VarChar(40)
+  sessionTimers     String? @map("session-timers") @db.VarChar(10)
+  sessionExpires    Int?    @map("session-expires")
+  sessionMinse      Int?    @map("session-minse")
+  sessionRefresher  String? @map("session-refresher") @db.VarChar(10)
+  t38ptUsertpsource String? @map("t38pt_usertpsource") @db.VarChar(10)
+  regexten          String? @db.VarChar(40)
+  fromdomain        String? @db.VarChar(40)
+  fromuser          String? @db.VarChar(40)
+  qualify           String? @default("yes") @db.VarChar(10)
+  defaultip         String? @db.VarChar(45)
+  rtptimeout        Int?
+  rtpholdtimeout    Int?
+  sendrpid          String? @db.VarChar(10)
+  outboundproxy     String? @db.VarChar(40)
+  callbackextension String? @db.VarChar(40)
+  timert1           Int?
+  timerb            Int?
+  qualifyfreq       Int?
+  constantssrc      String? @db.VarChar(10)
+  contactpermit     String? @db.VarChar(95)
+  contactdeny       String? @db.VarChar(95)
+  usereqphone       String? @db.VarChar(10)
+  textsupport       String? @db.VarChar(10)
+  faxdetect         String? @db.VarChar(10)
+  buggymwi          String? @db.VarChar(10)
+  auth              String? @db.VarChar(40)
+  fullname          String? @db.VarChar(40)
+  trunkname         String? @db.VarChar(40)
+  cidNumber         String? @map("cid_number") @db.VarChar(40)
+  callingpres       String? @db.VarChar(20)
+  mohinterpret      String? @db.VarChar(40)
+  mohsuggest        String? @db.VarChar(40)
+  parkinglot        String? @db.VarChar(40)
+  hasvoicemail      String? @db.VarChar(10)
+  subscribecontext  String? @db.VarChar(80)
+  subscribemwi      String? @db.VarChar(10)
+  vmexten           String? @db.VarChar(40)
+  autoframing       String? @db.VarChar(10)
+  rtpkeepalive      Int?
 }
 
 // chan_iax2 realtime (family iaxpeers/iaxusers, ambas apontando pra essa mesma tabela — ver
@@ -867,105 +943,105 @@ model sip_peers {
 // como sip_peers (chan_iax2 é pré-sorcery, não tem o esquema multi-tabela do pjsip).
 // regseconds/ipaddr/port são só estado de registro que o próprio Asterisk grava de volta.
 model iax_friends {
-    id               Int     @id @default(autoincrement())
-    name             String  @unique @db.VarChar(40)
-    type             String? @default("friend") @db.VarChar(10)
-    host             String? @default("dynamic") @db.VarChar(40)
-    secret           String? @db.VarChar(80)
-    context          String? @default("ramais") @db.VarChar(40)
-    permit           String? @db.VarChar(95)
-    deny             String? @db.VarChar(95)
-    disallow         String? @default("all") @db.VarChar(200)
-    allow            String? @default("ulaw,alaw") @db.VarChar(200)
-    callerid         String? @db.VarChar(40)
-    accountcode      String? @db.VarChar(40)
-    qualify          String? @default("yes") @db.VarChar(10)
-    trunk            String? @default("no") @db.VarChar(10)
-    encryption       String? @default("no") @db.VarChar(10)
-    transfer         String? @default("mediaonly") @db.VarChar(10)
-    jitterbuffer     String? @default("no") @db.VarChar(10)
-    requirecalltoken String? @default("yes") @db.VarChar(10)
-    setvar           String? @db.VarChar(200)
-    regseconds       BigInt? @default(0)
-    ipaddr           String? @db.VarChar(45)
-    port             String? @db.VarChar(6)
+  id               Int     @id @default(autoincrement())
+  name             String  @unique @db.VarChar(40)
+  type             String? @default("friend") @db.VarChar(10)
+  host             String? @default("dynamic") @db.VarChar(40)
+  secret           String? @db.VarChar(80)
+  context          String? @default("ramais") @db.VarChar(40)
+  permit           String? @db.VarChar(95)
+  deny             String? @db.VarChar(95)
+  disallow         String? @default("all") @db.VarChar(200)
+  allow            String? @default("ulaw,alaw") @db.VarChar(200)
+  callerid         String? @db.VarChar(40)
+  accountcode      String? @db.VarChar(40)
+  qualify          String? @default("yes") @db.VarChar(10)
+  trunk            String? @default("no") @db.VarChar(10)
+  encryption       String? @default("no") @db.VarChar(10)
+  transfer         String? @default("mediaonly") @db.VarChar(10)
+  jitterbuffer     String? @default("no") @db.VarChar(10)
+  requirecalltoken String? @default("yes") @db.VarChar(10)
+  setvar           String? @db.VarChar(200)
+  regseconds       BigInt? @default(0)
+  ipaddr           String? @db.VarChar(45)
+  port             String? @db.VarChar(6)
 }
 
 // name é a PK — Asterisk identifica filas por nome, não por UUID
 // announceFreq/announcePosition/periodicAnnounce* usam @map pelo mesmo motivo do hífen em sip_peers
 model queues {
-    name                 String  @id @db.VarChar(128)
-    strategy             String? @default("ringall") @db.VarChar(40)
-    musiconhold          String? @default("default") @db.VarChar(128)
-    timeout              Int?    @default(15)
-    retry                Int?    @default(5)
-    maxlen               Int?    @default(0)
-    wrapuptime           Int?    @default(5)
-    announce             String? @db.VarChar(128)
-    announceFreq         Int?    @default(0) @map("announce-frequency")
-    announcePosition     String? @default("no") @db.VarChar(10) @map("announce-position")
-    periodicAnnounce     String? @db.VarChar(128) @map("periodic-announce")
-    periodicAnnounceFreq Int?    @default(60) @map("periodic-announce-frequency")
-    joinempty            String? @default("yes") @db.VarChar(40)
-    leavewhenempty       String? @default("no") @db.VarChar(40)
-    weight               Int?    @default(0)
-    reportholdtime       String? @default("no") @db.VarChar(10)
-    ringinuse            String? @default("yes") @db.VarChar(10)
+  name                 String  @id @db.VarChar(128)
+  strategy             String? @default("ringall") @db.VarChar(40)
+  musiconhold          String? @default("default") @db.VarChar(128)
+  timeout              Int?    @default(15)
+  retry                Int?    @default(5)
+  maxlen               Int?    @default(0)
+  wrapuptime           Int?    @default(5)
+  announce             String? @db.VarChar(128)
+  announceFreq         Int?    @default(0) @map("announce-frequency")
+  announcePosition     String? @default("no") @map("announce-position") @db.VarChar(10)
+  periodicAnnounce     String? @map("periodic-announce") @db.VarChar(128)
+  periodicAnnounceFreq Int?    @default(60) @map("periodic-announce-frequency")
+  joinempty            String? @default("yes") @db.VarChar(40)
+  leavewhenempty       String? @default("no") @db.VarChar(40)
+  weight               Int?    @default(0)
+  reportholdtime       String? @default("no") @db.VarChar(10)
+  ringinuse            String? @default("yes") @db.VarChar(10)
 }
 
 // uniqueid é o nome exato que o Asterisk Realtime espera — não renomear para id
 model queue_members {
-    uniqueid        BigInt  @id @default(autoincrement())
-    queue_name      String  @db.VarChar(128)
-    interface       String  @db.VarChar(128)
-    membername      String? @db.VarChar(80)
-    state_interface String? @db.VarChar(128)
-    penalty         Int?    @default(0)
-    paused          Int?    @default(0)
-    reason_paused   String? @db.VarChar(80)
-    wrapuptime      Int?    @default(0)
+  uniqueid        BigInt  @id @default(autoincrement())
+  queue_name      String  @db.VarChar(128)
+  interface       String  @db.VarChar(128)
+  membername      String? @db.VarChar(80)
+  state_interface String? @db.VarChar(128)
+  penalty         Int?    @default(0)
+  paused          Int?    @default(0)
+  reason_paused   String? @db.VarChar(80)
+  wrapuptime      Int?    @default(0)
 
-    @@unique([queue_name, interface])
+  @@unique([queue_name, interface])
 }
 
 // Asterisk Realtime — identifica endpoint pelo IP de origem da requisição
 model ps_identifies {
-    id           String  @id @db.VarChar(40)
-    endpoint     String? @db.VarChar(40)
-    match        String? @db.VarChar(80)
-    srv_lookups  String? @default("no") @db.VarChar(3)
-    match_header String? @db.VarChar(255)
+  id           String  @id @db.VarChar(40)
+  endpoint     String? @db.VarChar(40)
+  match        String? @db.VarChar(80)
+  srv_lookups  String? @default("no") @db.VarChar(3)
+  match_header String? @db.VarChar(255)
 
-    @@index([endpoint])
+  @@index([endpoint])
 }
 
 // Asterisk Realtime — registro de saída PJSIP (Asterisk registra no provedor)
 model ps_registrations {
-    id                       String   @id @db.VarChar(40)
-    transport                String?  @db.VarChar(40)
-    outbound_auth            String?  @db.VarChar(40)
-    server_uri               String?  @db.VarChar(256)
-    client_uri               String?  @db.VarChar(256)
-    contact_user             String?  @db.VarChar(40)
-    expiration               Int?     @default(3600)
-    retry_interval           Int?     @default(60)
-    max_retries              Int?     @default(10)
-    auth_rejection_permanent Boolean? @default(true)
-    support_path             Boolean? @default(false)
-    endpoint                 String?  @db.VarChar(40)
+  id                       String   @id @db.VarChar(40)
+  transport                String?  @db.VarChar(40)
+  outbound_auth            String?  @db.VarChar(40)
+  server_uri               String?  @db.VarChar(256)
+  client_uri               String?  @db.VarChar(256)
+  contact_user             String?  @db.VarChar(40)
+  expiration               Int?     @default(3600)
+  retry_interval           Int?     @default(60)
+  max_retries              Int?     @default(10)
+  auth_rejection_permanent Boolean? @default(true)
+  support_path             Boolean? @default(false)
+  endpoint                 String?  @db.VarChar(40)
 }
 
 // uniqueid é o nome exato que o Asterisk Realtime espera — não renomear para id
 model voicemail_users {
-    uniqueid  Int       @id @default(autoincrement())
-    context   String?   @default("default") @db.VarChar(80)
-    mailbox   String    @db.VarChar(80)
-    password  String?   @default("0000") @db.VarChar(80)
-    fullname  String?   @db.VarChar(80)
-    email     String?   @db.VarChar(80)
-    attach    String?   @default("yes") @db.VarChar(4)
-    delete_vm String?   @default("no") @db.VarChar(4)
-    stamp     DateTime? @default(now()) @db.Timestamp(6)
+  uniqueid  Int       @id @default(autoincrement())
+  context   String?   @default("default") @db.VarChar(80)
+  mailbox   String    @db.VarChar(80)
+  password  String?   @default("0000") @db.VarChar(80)
+  fullname  String?   @db.VarChar(80)
+  email     String?   @db.VarChar(80)
+  attach    String?   @default("yes") @db.VarChar(4)
+  delete_vm String?   @default("no") @db.VarChar(4)
+  stamp     DateTime? @default(now()) @db.Timestamp(6)
 
-    @@unique([context, mailbox])
+  @@unique([context, mailbox])
 }

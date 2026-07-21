@@ -88,8 +88,9 @@ function PriorityHint() {
                 <InfoIcon className="size-3" />
             </TooltipTrigger>
             <TooltipContent side="top">
-                Define a ordem de atendimento: quanto menor o número, mais cedo esse ramal recebe
-                chamadas. Ramais com o mesmo valor têm a mesma prioridade.
+                Define a ordem de atendimento: quanto menor o número, mais cedo
+                esse ramal recebe chamadas. Ramais com o mesmo valor têm a mesma
+                prioridade.
             </TooltipContent>
         </Tooltip>
     )
@@ -100,7 +101,9 @@ function MemberStatusLabel({ paused }: { paused: boolean }) {
         <span
             className={cn(
                 "text-xs font-medium",
-                paused ? "text-muted-foreground" : "text-emerald-600 dark:text-emerald-400"
+                paused
+                    ? "text-muted-foreground"
+                    : "text-emerald-600 dark:text-emerald-400"
             )}
         >
             {paused ? "Pausado" : "Disponível"}
@@ -116,13 +119,21 @@ function MemberRow({
 }: {
     member: QueueMember
     label: string
-    onUpdate: (memberId: string, form: { penalty?: number; paused?: boolean }) => void
+    onUpdate: (
+        memberId: string,
+        form: { penalty?: number; paused?: boolean }
+    ) => void
     onRemove: (memberId: string) => void
 }) {
     const [penalty, setPenalty] = useState(String(member.penalty))
 
     return (
-        <div className={cn("grid items-center gap-2 rounded-md border p-2", MEMBER_ROW_COLS)}>
+        <div
+            className={cn(
+                "grid items-center gap-2 rounded-md border p-2",
+                MEMBER_ROW_COLS
+            )}
+        >
             <div className="truncate text-xs font-medium">{label}</div>
             <NumberInput
                 min={0}
@@ -143,9 +154,13 @@ function MemberRow({
             <div className="flex items-center gap-1.5">
                 <Switch
                     checked={!member.paused}
-                    onCheckedChange={(checked) => onUpdate(member.id, { paused: !checked })}
+                    onCheckedChange={(checked) =>
+                        onUpdate(member.id, { paused: !checked })
+                    }
                     aria-label={
-                        member.paused ? "Pausado, clique para reativar" : "Disponível, clique para pausar"
+                        member.paused
+                            ? "Pausado, clique para reativar"
+                            : "Disponível, clique para pausar"
                     }
                 />
                 <MemberStatusLabel paused={member.paused} />
@@ -165,10 +180,11 @@ function MemberRow({
 }
 
 export function QueueMembersSheet({ open, onOpenChange, queue }: Props) {
-    const { members, loading, addMember, updateMember, removeMember } = useQueueMembers(
-        open ? queue?.id : undefined
+    const { members, loading, addMember, updateMember, removeMember } =
+        useQueueMembers(open ? queue?.id : undefined)
+    const { extensions } = useCompanyExtensions(
+        open ? queue?.companyId : undefined
     )
-    const { extensions } = useCompanyExtensions(open ? queue?.companyId : undefined)
 
     const [selectedExtensionId, setSelectedExtensionId] = useState<string>("")
     const [penalty, setPenalty] = useState("0")
@@ -188,7 +204,8 @@ export function QueueMembersSheet({ open, onOpenChange, queue }: Props) {
     )
     const extensionLabel = (extensionId: string) =>
         extensions.find((e) => e.id === extensionId)?.label ?? extensionId
-    const selectedExtension = availableExtensions.find((e) => e.id === selectedExtensionId) ?? null
+    const selectedExtension =
+        availableExtensions.find((e) => e.id === selectedExtensionId) ?? null
 
     async function handleAdd() {
         if (!selectedExtensionId) return
@@ -239,7 +256,9 @@ export function QueueMembersSheet({ open, onOpenChange, queue }: Props) {
                                 <Skeleton key={i} className="h-10 w-full" />
                             ))
                         ) : members.length === 0 ? (
-                            <p className="text-xs text-muted-foreground">Nenhum membro adicionado ainda</p>
+                            <p className="text-xs text-muted-foreground">
+                                Nenhum membro adicionado ainda
+                            </p>
                         ) : (
                             members.map((member) => (
                                 <MemberRow
@@ -254,13 +273,17 @@ export function QueueMembersSheet({ open, onOpenChange, queue }: Props) {
                     </div>
 
                     <div className="flex flex-col gap-2 border-t pt-4">
-                        <span className="text-xs font-medium">Adicionar membro</span>
+                        <span className="text-xs font-medium">
+                            Adicionar membro
+                        </span>
                         <Combobox<DestinationOption>
                             items={availableExtensions}
                             value={selectedExtension}
                             itemToStringLabel={(e) => e.label}
                             isItemEqualToValue={(a, b) => a.id === b.id}
-                            onValueChange={(e) => setSelectedExtensionId(e?.id ?? "")}
+                            onValueChange={(e) =>
+                                setSelectedExtensionId(e?.id ?? "")
+                            }
                         >
                             <ComboboxInput placeholder="Buscar ramal..." />
                             <ComboboxContent>
@@ -298,7 +321,10 @@ export function QueueMembersSheet({ open, onOpenChange, queue }: Props) {
                                     Status inicial
                                 </span>
                                 <div className="flex h-7 items-center gap-1.5">
-                                    <Switch checked={!paused} onCheckedChange={(c) => setPaused(!c)} />
+                                    <Switch
+                                        checked={!paused}
+                                        onCheckedChange={(c) => setPaused(!c)}
+                                    />
                                     <MemberStatusLabel paused={paused} />
                                 </div>
                             </div>

@@ -5,7 +5,11 @@ import { toast } from "sonner"
 import { z } from "zod"
 
 import { api, apiError } from "@/lib/api"
-import { routeDestinationSchema, type RouteDestination } from "@/components/RouteDestination/route-destination-field"
+import {
+    routeDestinationSchema,
+    type RouteDestination,
+} from "@/components/RouteDestination/route-destination-field"
+import type { UsedByRef } from "@/components/RouteDestination/used-by-badge"
 
 export type IvrOption = {
     id: string
@@ -32,13 +36,15 @@ export type IvrMenu = {
     timeoutDestination: RouteDestination
     longDestination: RouteDestination
     options: IvrOption[]
+    usedBy: UsedByRef[]
     createdAt: string
     updatedAt: string
 }
 
 const intField = (min: number, max: number) =>
     z.preprocess(
-        (v) => (v === "" || v === undefined || v === null ? undefined : Number(v)),
+        (v) =>
+            v === "" || v === undefined || v === null ? undefined : Number(v),
         z.number().int().min(min, `Mínimo ${min}`).max(max, `Máximo ${max}`)
     )
 
@@ -62,8 +68,14 @@ const variableNameSchema = z
     .string()
     .min(1, "Informe o nome da variável")
     .max(80, "Máximo 80 caracteres")
-    .regex(/^[A-Za-z_][A-Za-z0-9_]*$/, "Use letras, números e _, começando com letra ou _")
-    .refine((v) => !RESERVED_IVR_VARIABLES.includes(v), "Nome reservado pelo sistema")
+    .regex(
+        /^[A-Za-z_][A-Za-z0-9_]*$/,
+        "Use letras, números e _, começando com letra ou _"
+    )
+    .refine(
+        (v) => !RESERVED_IVR_VARIABLES.includes(v),
+        "Nome reservado pelo sistema"
+    )
 
 // Espelha create/updateIvrMenuSchema de backend/src/modules/ivr/schemas/ivr.schema.ts:
 // companyId só existe no create, o PUT do backend não permite trocar a empresa da URA. A
@@ -93,29 +105,55 @@ type TypeConsistencyFields = {
     options: unknown[]
 }
 
-function checkTypeConsistency(data: TypeConsistencyFields, ctx: z.RefinementCtx) {
+function checkTypeConsistency(
+    data: TypeConsistencyFields,
+    ctx: z.RefinementCtx
+) {
     if (data.type === "collect") {
         if (!data.variableName) {
-            ctx.addIssue({ code: "custom", path: ["variableName"], message: "Informe o nome da variável" })
+            ctx.addIssue({
+                code: "custom",
+                path: ["variableName"],
+                message: "Informe o nome da variável",
+            })
         } else {
             const parsed = variableNameSchema.safeParse(data.variableName)
             if (!parsed.success) {
-                ctx.addIssue({ code: "custom", path: ["variableName"], message: parsed.error.issues[0].message })
+                ctx.addIssue({
+                    code: "custom",
+                    path: ["variableName"],
+                    message: parsed.error.issues[0].message,
+                })
             }
         }
         if (data.options.length > 0) {
-            ctx.addIssue({ code: "custom", path: ["options"], message: "Coleta de dígitos não tem opções de tecla" })
+            ctx.addIssue({
+                code: "custom",
+                path: ["options"],
+                message: "Coleta de dígitos não tem opções de tecla",
+            })
         }
         if (data.maxDigits < 2) {
-            ctx.addIssue({ code: "custom", path: ["maxDigits"], message: "Mínimo 2 dígitos para coleta" })
+            ctx.addIssue({
+                code: "custom",
+                path: ["maxDigits"],
+                message: "Mínimo 2 dígitos para coleta",
+            })
         }
     } else if (data.variableName) {
-        ctx.addIssue({ code: "custom", path: ["variableName"], message: "Nome de variável só se aplica ao tipo coleta" })
+        ctx.addIssue({
+            code: "custom",
+            path: ["variableName"],
+            message: "Nome de variável só se aplica ao tipo coleta",
+        })
     }
 }
 
-export const createIvrMenuFormSchema = ivrMenuBaseFormSchema.superRefine(checkTypeConsistency)
-export const updateIvrMenuFormSchema = ivrMenuBaseFormSchema.omit({ companyId: true }).superRefine(checkTypeConsistency)
+export const createIvrMenuFormSchema =
+    ivrMenuBaseFormSchema.superRefine(checkTypeConsistency)
+export const updateIvrMenuFormSchema = ivrMenuBaseFormSchema
+    .omit({ companyId: true })
+    .superRefine(checkTypeConsistency)
 
 export type IvrMenuForm = z.infer<typeof createIvrMenuFormSchema>
 export type IvrMenuUpdateForm = z.infer<typeof updateIvrMenuFormSchema>
@@ -171,7 +209,9 @@ export function useIvr(companyId?: string) {
         }
         setLoading(true)
         try {
-            const { data } = await api.get("/ivr-menus", { params: { companyId } })
+            const { data } = await api.get("/ivr-menus", {
+                params: { companyId },
+            })
             setIvrMenus(data.ivrMenus ?? [])
         } catch (err) {
             toast.error(apiError(err, "Erro ao buscar menus de URA"))
@@ -180,7 +220,10 @@ export function useIvr(companyId?: string) {
         }
     }, [companyId])
 
-    const createIvrMenu = async (form: IvrMenuForm, targetCompanyId: string) => {
+    const createIvrMenu = async (
+        form: IvrMenuForm,
+        targetCompanyId: string
+    ) => {
         const id = toast.loading("Criando menu de URA...")
         try {
             await api.post("/ivr-menus", toCreatePayload(form, targetCompanyId))
@@ -193,7 +236,10 @@ export function useIvr(companyId?: string) {
         }
     }
 
-    const updateIvrMenu = async (ivrMenuId: string, form: IvrMenuUpdateForm) => {
+    const updateIvrMenu = async (
+        ivrMenuId: string,
+        form: IvrMenuUpdateForm
+    ) => {
         const id = toast.loading("Atualizando menu de URA...")
         try {
             await api.put(`/ivr-menus/${ivrMenuId}`, toUpdatePayload(form))
@@ -219,12 +265,20 @@ export function useIvr(companyId?: string) {
         }
     }
 
-    const filtered = ivrMenus.filter((m) => m.name.toLowerCase().includes(filter.toLowerCase()))
+    const filtered = ivrMenus.filter((m) =>
+        m.name.toLowerCase().includes(filter.toLowerCase())
+    )
 
-    const fetchStateRef = useRef<{ key?: string; fetched: boolean }>({ fetched: false })
+    const fetchStateRef = useRef<{ key?: string; fetched: boolean }>({
+        fetched: false,
+    })
 
     useEffect(() => {
-        if (fetchStateRef.current.fetched && fetchStateRef.current.key === companyId) return
+        if (
+            fetchStateRef.current.fetched &&
+            fetchStateRef.current.key === companyId
+        )
+            return
         fetchStateRef.current = { key: companyId, fetched: true }
         fetchIvrMenus()
     }, [fetchIvrMenus, companyId])

@@ -53,21 +53,21 @@ const STATUS_OPTIONS: { value: DidStatus; label: string }[] = [
 
 type Props =
     | {
-        open: boolean
-        onOpenChange: (open: boolean) => void
-        did: null
-        companies: Company[]
-        onCreate: (form: DidCreateForm) => Promise<boolean>
-        onUpdate?: never
-    }
+          open: boolean
+          onOpenChange: (open: boolean) => void
+          did: null
+          companies: Company[]
+          onCreate: (form: DidCreateForm) => Promise<boolean>
+          onUpdate?: never
+      }
     | {
-        open: boolean
-        onOpenChange: (open: boolean) => void
-        did: Did
-        companies: Company[]
-        onCreate?: never
-        onUpdate: (form: DidUpdateForm) => Promise<boolean>
-    }
+          open: boolean
+          onOpenChange: (open: boolean) => void
+          did: Did
+          companies: Company[]
+          onCreate?: never
+          onUpdate: (form: DidUpdateForm) => Promise<boolean>
+      }
 
 export function DidFormDialog({
     open,
@@ -112,7 +112,9 @@ export function DidFormDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>{isEdit ? "Editar DID" : "Novo DID"}</DialogTitle>
+                    <DialogTitle>
+                        {isEdit ? "Editar DID" : "Novo DID"}
+                    </DialogTitle>
                     <DialogDescription>
                         {isEdit
                             ? `Número ${did.number}`
@@ -140,7 +142,9 @@ export function DidFormDialog({
                                             <Combobox<Company>
                                                 items={companies}
                                                 value={sel}
-                                                itemToStringLabel={(c) => c.name}
+                                                itemToStringLabel={(c) =>
+                                                    c.name
+                                                }
                                                 isItemEqualToValue={(a, b) =>
                                                     a.id === b.id
                                                 }
@@ -191,21 +195,21 @@ export function DidFormDialog({
                             />
                             {isEdit
                                 ? updateForm.formState.errors.number && (
-                                    <FieldError>
-                                        {
-                                            updateForm.formState.errors.number
-                                                .message as string
-                                        }
-                                    </FieldError>
-                                )
+                                      <FieldError>
+                                          {
+                                              updateForm.formState.errors.number
+                                                  .message as string
+                                          }
+                                      </FieldError>
+                                  )
                                 : createForm.formState.errors.number && (
-                                    <FieldError>
-                                        {
-                                            createForm.formState.errors.number
-                                                .message as string
-                                        }
-                                    </FieldError>
-                                )}
+                                      <FieldError>
+                                          {
+                                              createForm.formState.errors.number
+                                                  .message as string
+                                          }
+                                      </FieldError>
+                                  )}
                         </Field>
 
                         {isEdit && (
@@ -271,8 +275,8 @@ export function DidFormDialog({
                                 ? "Salvando..."
                                 : "Salvar"
                             : createForm.formState.isSubmitting
-                                ? "Criando..."
-                                : "Criar"}
+                              ? "Criando..."
+                              : "Criar"}
                     </Button>
                 </DialogFooter>
             </DialogContent>

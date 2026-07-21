@@ -1,12 +1,10 @@
 import { prisma } from '../lib/prisma'
 import type { RouteDest } from '../modules/holiday-groups/schemas/holiday-group.schema'
-import { queueAppExten } from './queue.repository'
-import {
-    TC_CONTEXT, tcEntry, ANNOUNCEMENT_CONTEXT, announcementExten, IVR_CONTEXT, ivrExten,
-    REQUEST_TEMPLATE_CONTEXT, requestTemplateExten, HOL_CONTEXT, holEntry,
-    VAR_CONTEXT, varEntry, VARCOND_CONTEXT, varCondEntry,
-} from './dialplan-names'
+import { HOL_CONTEXT, holEntry } from './dialplan-names'
 import { resolveAsteriskId, withDialplanLock, writeContextFile, reloadDialplan, type DialplanRow } from './dialplan-file.repository'
+import { resolveRouteDestinationToDialplan } from './route-destination-resolver'
+import { FlowEdgeRepository } from './flow-edge.repository'
+import { nodeExitCheck } from './flow-node-runtime'
 
 export { HOL_CONTEXT, holEntry }
 
@@ -17,42 +15,8 @@ const MONTH_CODES = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'se
 export type HolidayDate = { month: number; day: number }
 
 async function resolveRoute(route: RouteDest): Promise<string | null> {
-    if (!route) return null
-
-    switch (route.type) {
-        case 'extension': {
-            const ext = await prisma.extension.findUnique({
-                where: { id: route.id },
-                select: { context: true, number: true },
-            })
-            return ext ? `${ext.context},${ext.number},1` : null
-        }
-        case 'queue': {
-            const q = await prisma.queue.findUnique({
-                where: { id: route.id },
-                select: { number: true, company: { select: { asteriskId: true } } },
-            })
-            return q?.number ? `queues-app,${queueAppExten(q.company.asteriskId, q.number)},1` : null
-        }
-        case 'voicemail':
-            return `vm,${route.id},1`
-        case 'timecondition':
-            return `${TC_CONTEXT},${tcEntry(route.id)},1`
-        case 'holiday':
-            return `${HOL_CONTEXT},${holEntry(route.id)},1`
-        case 'announcement':
-            return `${ANNOUNCEMENT_CONTEXT},${announcementExten(route.id)},1`
-        case 'ivr':
-            return `${IVR_CONTEXT},${ivrExten(route.id)},1`
-        case 'request':
-            return `${REQUEST_TEMPLATE_CONTEXT},${requestTemplateExten(route.id)},1`
-        case 'variable-set':
-            return `${VAR_CONTEXT},${varEntry(route.id)},1`
-        case 'variable-condition':
-            return `${VARCOND_CONTEXT},${varCondEntry(route.id)},1`
-        case 'hangup':
-            return null
-    }
+    const target = await resolveRouteDestinationToDialplan(route)
+    return target ? `${target.context},${target.exten},${target.priority}` : null
 }
 
 function buildDialplan(
@@ -81,12 +45,22 @@ function buildDialplan(
 
     entries.push({
         context, exten: entry, priority,
+        app: 'GotoIf',
+        appdata: nodeExitCheck(context, entry, priority, 'false').appdata,
+    })
+    entries.push({
+        context, exten: entry, priority: priority + 1,
         app: falseAsterisk ? 'Goto' : 'Hangup',
         appdata: falseAsterisk,
     })
 
     entries.push({
         context, exten: matched, priority: 1,
+        app: 'GotoIf',
+        appdata: nodeExitCheck(context, matched, 1, 'true').appdata,
+    })
+    entries.push({
+        context, exten: matched, priority: 2,
         app: trueAsterisk ? 'Goto' : 'Hangup',
         appdata: trueAsterisk,
     })
@@ -102,12 +76,15 @@ export const HolidayGroupRepository = {
     async regenerate(companyId: string) {
         const asteriskId = await resolveAsteriskId(companyId)
         return withDialplanLock(`${HOL_CONTEXT}:${asteriskId}`, async () => {
-            const groups = await prisma.holidayGroup.findMany({ where: { companyId }, include: { dates: true } })
+            const [groups, edges] = await Promise.all([
+                prisma.holidayGroup.findMany({ where: { companyId }, include: { dates: true } }),
+                FlowEdgeRepository.getBySource(companyId, 'holidaygroup'),
+            ])
             const entries: DialplanRow[] = []
             for (const g of groups) {
                 const [trueAsterisk, falseAsterisk] = await Promise.all([
-                    resolveRoute(g.trueRoute as RouteDest),
-                    resolveRoute(g.falseRoute as RouteDest),
+                    resolveRoute(edges.get(g.id)?.true ?? null),
+                    resolveRoute(edges.get(g.id)?.false ?? null),
                 ])
                 entries.push(...buildDialplan(g.id, g.name, g.dates, trueAsterisk, falseAsterisk))
             }

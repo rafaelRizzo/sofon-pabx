@@ -97,9 +97,15 @@ export function OutboundRoutesTable({
                                 <TableCell>
                                     <div className="flex flex-wrap gap-1">
                                         {[...route.trunks]
-                                            .sort((a, b) => a.position - b.position)
+                                            .sort(
+                                                (a, b) =>
+                                                    a.position - b.position
+                                            )
                                             .map((t) => (
-                                                <Badge key={t.id} variant="secondary">
+                                                <Badge
+                                                    key={t.id}
+                                                    variant="secondary"
+                                                >
                                                     {trunkName(t.trunkId)}
                                                 </Badge>
                                             ))}

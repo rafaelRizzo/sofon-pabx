@@ -55,10 +55,7 @@ export function CompanyFilter({
                 <ComboboxEmpty>Nenhuma empresa</ComboboxEmpty>
                 <ComboboxList>
                     {(company: CompanyFilterOption) => (
-                        <ComboboxItem
-                            key={company.id || "all"}
-                            value={company}
-                        >
+                        <ComboboxItem key={company.id || "all"} value={company}>
                             {company.name}
                         </ComboboxItem>
                     )}

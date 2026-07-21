@@ -5,6 +5,7 @@ import type { CreateUserInput, UpdateUserInput } from './schemas/user.schema'
 import argon2 from 'argon2'
 import { AppError } from '../../utils/errors/app.error'
 import { invalidateUserCompanyIds, invalidateUserPermissions } from '../../utils/auth/access'
+import { jtiManager } from '../../lib/jti'
 
 const userSelect = {
     id: true,
@@ -141,6 +142,9 @@ export const updateUser = async (id: string, data: UpdateUserInput) => {
         await CompaniesCache.invalidateCompaniesByUser(id)
         await CompaniesCache.invalidateCompaniesForScope(id)
     }
+    if (data.password || data.permissions !== undefined || companyIds) {
+        await jtiManager.revokeByUserId(id)
+    }
     return user
 }
 
@@ -178,5 +182,6 @@ export const deleteUser = async (id: string) => {
     await UsersCache.invalidateUser(id)
     await UsersCache.invalidateAllUsers()
     if (user.createdBy) await UsersCache.invalidateUsersByCreatedBy(user.createdBy)
+    await jtiManager.revokeByUserId(id)
     return user
 }

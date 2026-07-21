@@ -30,7 +30,10 @@ export type CallRatingFilters = {
 export const createCallRatingFormSchema = z.object({
     companyId: z.string().min(1, "Selecione uma empresa"),
     extensionId: z.string().min(1, "Selecione um ramal"),
-    number: z.string().min(1, "Informe o número").max(80, "Máximo 80 caracteres"),
+    number: z
+        .string()
+        .min(1, "Informe o número")
+        .max(80, "Máximo 80 caracteres"),
     uniqueid: z.string().max(150).optional(),
     score: z.coerce.number().int().min(1, "Mínimo 1").max(5, "Máximo 5"),
 })
@@ -40,7 +43,10 @@ export type CallRatingForm = z.infer<typeof createCallRatingFormSchema>
 const DEFAULT_LIMIT = 50
 
 // companyId é obrigatório na query do backend — sem opção de "todas as empresas" aqui
-export function useCallRatings(companyId?: string, filters: CallRatingFilters = {}) {
+export function useCallRatings(
+    companyId?: string,
+    filters: CallRatingFilters = {}
+) {
     const [ratings, setRatings] = useState<CallRating[]>([])
     const [total, setTotal] = useState(0)
     const [loading, setLoading] = useState(true)

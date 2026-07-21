@@ -14,6 +14,10 @@ const assertSelfOrAdmin = (req: FastifyRequest, id: string) => {
 export const getAllUsers = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
         const { role, id } = req.user!
+        if (role === 'user') {
+            const user = await UsersService.getUserById(id)
+            return reply.send({ success: true, message: 'Users fetched successfully', users: [user] })
+        }
         const users = await UsersService.getAllUsers(
             role === 'reseller' ? { createdBy: id } : undefined
         )

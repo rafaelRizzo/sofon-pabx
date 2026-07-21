@@ -109,7 +109,9 @@ export function InboundRouteFormDialog({
     // o PUT não permite trocar DID/tronco de uma rota existente
     const duplicateRouteName = useMemo(() => {
         if (isEdit || !didId || !trunkId) return null
-        const dup = existingRoutes.find((r) => r.didId === didId && r.trunkId === trunkId)
+        const dup = existingRoutes.find(
+            (r) => r.didId === didId && r.trunkId === trunkId
+        )
         return dup?.name ?? null
     }, [isEdit, didId, trunkId, existingRoutes])
 
@@ -118,7 +120,9 @@ export function InboundRouteFormDialog({
 
     const onSubmit = handleSubmit(async (form) => {
         if (duplicateRouteName) {
-            toast.error(`Já existe uma rota para esse DID + tronco: "${duplicateRouteName}"`)
+            toast.error(
+                `Já existe uma rota para esse DID + tronco: "${duplicateRouteName}"`
+            )
             return
         }
         const ok = await onSave(form)
@@ -141,7 +145,9 @@ export function InboundRouteFormDialog({
                 <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-lg">
                     <DialogHeader>
                         <DialogTitle>
-                            {isEdit ? "Editar rota de entrada" : "Nova rota de entrada"}
+                            {isEdit
+                                ? "Editar rota de entrada"
+                                : "Nova rota de entrada"}
                         </DialogTitle>
                         <DialogDescription>
                             {isEdit
@@ -159,30 +165,49 @@ export function InboundRouteFormDialog({
                             <FieldGroup>
                                 <Field>
                                     <FieldLabel>Nome</FieldLabel>
-                                    <Input placeholder="Ex: 0800-suporte" {...register("name")} />
-                                    {errors.name && <FieldError>{errors.name.message}</FieldError>}
+                                    <Input
+                                        placeholder="Ex: 0800-suporte"
+                                        {...register("name")}
+                                    />
+                                    {errors.name && (
+                                        <FieldError>
+                                            {errors.name.message}
+                                        </FieldError>
+                                    )}
                                 </Field>
 
                                 <Field>
                                     <FieldLabel>DID</FieldLabel>
                                     {isEdit ? (
-                                        <Input disabled value={route.did.number} />
+                                        <Input
+                                            disabled
+                                            value={route.did.number}
+                                        />
                                     ) : (
                                         <Combobox<Did>
                                             items={dids}
                                             value={selectedDid}
                                             itemToStringLabel={(d) => d.number}
-                                            isItemEqualToValue={(a, b) => a.id === b.id}
+                                            isItemEqualToValue={(a, b) =>
+                                                a.id === b.id
+                                            }
                                             onValueChange={(d) =>
-                                                setValue("didId", d?.id ?? "", { shouldValidate: true })
+                                                setValue("didId", d?.id ?? "", {
+                                                    shouldValidate: true,
+                                                })
                                             }
                                         >
                                             <ComboboxInput placeholder="Buscar DID..." />
                                             <ComboboxContent>
-                                                <ComboboxEmpty>Nenhum DID encontrado</ComboboxEmpty>
+                                                <ComboboxEmpty>
+                                                    Nenhum DID encontrado
+                                                </ComboboxEmpty>
                                                 <ComboboxList>
                                                     {(d: Did) => (
-                                                        <ComboboxItem key={d.id} value={d}>
+                                                        <ComboboxItem
+                                                            key={d.id}
+                                                            value={d}
+                                                        >
                                                             {d.number}
                                                         </ComboboxItem>
                                                     )}
@@ -190,29 +215,47 @@ export function InboundRouteFormDialog({
                                             </ComboboxContent>
                                         </Combobox>
                                     )}
-                                    {errors.didId && <FieldError>{errors.didId.message}</FieldError>}
+                                    {errors.didId && (
+                                        <FieldError>
+                                            {errors.didId.message}
+                                        </FieldError>
+                                    )}
                                 </Field>
 
                                 <Field>
                                     <FieldLabel>Tronco</FieldLabel>
                                     {isEdit ? (
-                                        <Input disabled value={route.trunk.name} />
+                                        <Input
+                                            disabled
+                                            value={route.trunk.name}
+                                        />
                                     ) : (
                                         <Combobox<Trunk>
                                             items={trunks}
                                             value={selectedTrunk}
                                             itemToStringLabel={(t) => t.name}
-                                            isItemEqualToValue={(a, b) => a.id === b.id}
+                                            isItemEqualToValue={(a, b) =>
+                                                a.id === b.id
+                                            }
                                             onValueChange={(t) =>
-                                                setValue("trunkId", t?.id ?? "", { shouldValidate: true })
+                                                setValue(
+                                                    "trunkId",
+                                                    t?.id ?? "",
+                                                    { shouldValidate: true }
+                                                )
                                             }
                                         >
                                             <ComboboxInput placeholder="Buscar tronco..." />
                                             <ComboboxContent>
-                                                <ComboboxEmpty>Nenhum tronco encontrado</ComboboxEmpty>
+                                                <ComboboxEmpty>
+                                                    Nenhum tronco encontrado
+                                                </ComboboxEmpty>
                                                 <ComboboxList>
                                                     {(t: Trunk) => (
-                                                        <ComboboxItem key={t.id} value={t}>
+                                                        <ComboboxItem
+                                                            key={t.id}
+                                                            value={t}
+                                                        >
                                                             {t.name}
                                                         </ComboboxItem>
                                                     )}
@@ -220,10 +263,15 @@ export function InboundRouteFormDialog({
                                             </ComboboxContent>
                                         </Combobox>
                                     )}
-                                    {errors.trunkId && <FieldError>{errors.trunkId.message}</FieldError>}
+                                    {errors.trunkId && (
+                                        <FieldError>
+                                            {errors.trunkId.message}
+                                        </FieldError>
+                                    )}
                                     {duplicateRouteName && (
                                         <FieldError>
-                                            Já existe uma rota para esse DID + tronco: &quot;
+                                            Já existe uma rota para esse DID +
+                                            tronco: &quot;
                                             {duplicateRouteName}&quot;
                                         </FieldError>
                                     )}
@@ -234,12 +282,17 @@ export function InboundRouteFormDialog({
                                     <RouteDestinationField
                                         value={destination}
                                         onChange={(d) =>
-                                            setValue("destination", d, { shouldValidate: true, shouldDirty: true })
+                                            setValue("destination", d, {
+                                                shouldValidate: true,
+                                                shouldDirty: true,
+                                            })
                                         }
                                         companyId={companyId}
                                     />
                                     <FieldDescription>
-                                        Para onde a chamada é direcionada ao chegar nesse DID pelo tronco selecionado.
+                                        Para onde a chamada é direcionada ao
+                                        chegar nesse DID pelo tronco
+                                        selecionado.
                                     </FieldDescription>
                                 </Field>
                             </FieldGroup>
@@ -247,7 +300,11 @@ export function InboundRouteFormDialog({
                     </form>
 
                     <DialogFooter className="pt-4">
-                        <Button type="button" variant="outline" onClick={() => requestClose(false)}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => requestClose(false)}
+                        >
                             Cancelar
                         </Button>
                         <Button
@@ -267,18 +324,27 @@ export function InboundRouteFormDialog({
                 </DialogContent>
             </Dialog>
 
-            <AlertDialog open={confirmDiscardOpen} onOpenChange={setConfirmDiscardOpen}>
+            <AlertDialog
+                open={confirmDiscardOpen}
+                onOpenChange={setConfirmDiscardOpen}
+            >
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Descartar alterações?</AlertDialogTitle>
+                        <AlertDialogTitle>
+                            Descartar alterações?
+                        </AlertDialogTitle>
                         <AlertDialogDescription>
                             Você tem alterações não salvas
-                            {isEdit ? ` na rota "${route.name}"` : " nesta rota"}. Se sair agora, elas
-                            serão perdidas.
+                            {isEdit
+                                ? ` na rota "${route.name}"`
+                                : " nesta rota"}
+                            . Se sair agora, elas serão perdidas.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel>Continuar editando</AlertDialogCancel>
+                        <AlertDialogCancel>
+                            Continuar editando
+                        </AlertDialogCancel>
                         <AlertDialogAction
                             variant="destructive"
                             onClick={() => {

@@ -21,7 +21,8 @@ export default function AnnouncementsPage() {
     const [companyFilter, setCompanyFilter] = useCompanyFilter()
 
     const [createOpen, setCreateOpen] = useState(false)
-    const [editAnnouncement, setEditAnnouncement] = useState<Announcement | null>(null)
+    const [editAnnouncement, setEditAnnouncement] =
+        useState<Announcement | null>(null)
     const [deleteTarget, setDeleteTarget] = useState<Announcement | null>(null)
 
     // Empresa usada para escopar áudios/opções de destino do formulário (o dialog não deixa
@@ -38,7 +39,10 @@ export default function AnnouncementsPage() {
         deleteAnnouncement,
     } = useAnnouncements(companyFilter)
 
-    const { paginated, page, setPage, totalPages, total } = usePagination(announcements, 15)
+    const { paginated, page, setPage, totalPages, total } = usePagination(
+        announcements,
+        15
+    )
 
     const handleDelete = async () => {
         if (!deleteTarget) return false
@@ -51,7 +55,10 @@ export default function AnnouncementsPage() {
                 title="Anúncios"
                 description="Gerencie mensagens de áudio que podem ser usadas como destino em rotas, filas e URAs"
             >
-                <Button onClick={() => setCreateOpen(true)} disabled={!companyFilter}>
+                <Button
+                    onClick={() => setCreateOpen(true)}
+                    disabled={!companyFilter}
+                >
                     <PlusIcon />
                     Novo anúncio
                 </Button>
@@ -79,7 +86,12 @@ export default function AnnouncementsPage() {
                 onDelete={setDeleteTarget}
             />
 
-            <DataPagination page={page} totalPages={totalPages} total={total} onPageChange={setPage} />
+            <DataPagination
+                page={page}
+                totalPages={totalPages}
+                total={total}
+                onPageChange={setPage}
+            />
 
             {createOpen && companyFilter && (
                 <AnnouncementFormDialog
@@ -97,7 +109,9 @@ export default function AnnouncementsPage() {
                     onOpenChange={(open) => !open && setEditAnnouncement(null)}
                     announcement={editAnnouncement}
                     companyId={formCompanyId!}
-                    onSave={(form) => updateAnnouncement(editAnnouncement.id, form)}
+                    onSave={(form) =>
+                        updateAnnouncement(editAnnouncement.id, form)
+                    }
                 />
             )}
 

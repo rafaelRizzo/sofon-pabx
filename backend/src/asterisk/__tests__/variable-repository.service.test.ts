@@ -20,4 +20,9 @@ describe('buildDialplan', () => {
         const rows = buildDialplan('v2', 'Sem destino', [{ variable: 'X', value: '1' }], null)
         expect(rows.at(-1)).toMatchObject({ app: 'Hangup', appdata: null })
     })
+
+    it('does not materialize unsafe legacy interpolations', () => {
+        const rows = buildDialplan('v3', 'Legado', [{ variable: 'X', value: '${SHELL(id)}' }], null)
+        expect(rows[1]).toMatchObject({ app: 'Set', appdata: 'X=' })
+    })
 })

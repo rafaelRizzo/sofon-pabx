@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { timestamp, cuidParam, ok } from '../../../schemas/responses'
 import { routeDestinationSchema, routeDestinationResponseSchema } from '../../../schemas/route-destination.schema'
+import { usedBySchema } from '../../../schemas/flow-reference-label'
 
 export const idParamSchema = z.object({ id: cuidParam })
 export const companyQuerySchema = z.object({ companyId: z.cuid2() })
@@ -56,6 +57,7 @@ export const RequestTemplateSchema = z.object({
     variableMappings: z.array(variableMappingSchema),
     onSuccess: routeDestinationResponseSchema,
     onError: routeDestinationResponseSchema,
+    usedBy: usedBySchema,
     createdAt: timestamp,
     updatedAt: timestamp,
 })

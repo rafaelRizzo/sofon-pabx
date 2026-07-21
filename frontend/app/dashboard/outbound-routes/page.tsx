@@ -14,7 +14,10 @@ import { Input } from "@/components/ui/input"
 import { useCompanies } from "@/hooks/use-companies"
 import { useCompanyFilter } from "@/hooks/use-company-filter"
 import { useExtensions } from "@/hooks/use-extensions"
-import { useOutboundRoutes, type OutboundRoute } from "@/hooks/use-outbound-routes"
+import {
+    useOutboundRoutes,
+    type OutboundRoute,
+} from "@/hooks/use-outbound-routes"
 import { usePagination } from "@/hooks/use-pagination"
 import { useTrunks } from "@/hooks/use-trunks"
 
@@ -44,7 +47,9 @@ export default function OutboundRoutesPage() {
     } = useOutboundRoutes(companyFilter)
     // allRoutes já vem escopado pelo companyId da própria requisição (fetch por companyFilter) —
     // conflito de padrão de discagem é validado dentro dessa mesma empresa
-    const companyAllRoutes = allRoutes.filter((r) => r.companyId === formCompanyId)
+    const companyAllRoutes = allRoutes.filter(
+        (r) => r.companyId === formCompanyId
+    )
 
     const { paginated, page, setPage, totalPages, total } = usePagination(
         routes,

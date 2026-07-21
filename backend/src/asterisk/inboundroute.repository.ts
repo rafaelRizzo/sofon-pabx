@@ -1,45 +1,13 @@
 import { prisma } from '../lib/prisma'
 import type { InboundDest } from '../modules/inbound-routes/schemas/inbound-route.schema'
-import { queueAppExten } from './queue.repository'
-import {
-    TC_CONTEXT, tcEntry, ANNOUNCEMENT_CONTEXT, announcementExten, IVR_CONTEXT, ivrExten,
-    REQUEST_TEMPLATE_CONTEXT, requestTemplateExten, HOL_CONTEXT, holEntry, ROUTING_TRUNK_VAR,
-    VAR_CONTEXT, varEntry, VARCOND_CONTEXT, varCondEntry,
-} from './dialplan-names'
+import { ROUTING_TRUNK_VAR } from './dialplan-names'
+import { resolveRouteDestinationToDialplan } from './route-destination-resolver'
 
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 
-async function resolveDestination(tx: Tx, dest: InboundDest): Promise<{ app: string; appdata: string | null }> {
-    if (!dest || dest.type === 'hangup') return { app: 'Hangup', appdata: null }
-
-    switch (dest.type) {
-        case 'extension': {
-            const ext = await tx.extension.findUnique({ where: { id: dest.id }, select: { context: true, number: true } })
-            return ext ? { app: 'Goto', appdata: `${ext.context},${ext.number},1` } : { app: 'Hangup', appdata: null }
-        }
-        case 'queue': {
-            const q = await tx.queue.findUnique({ where: { id: dest.id }, select: { number: true, company: { select: { asteriskId: true } } } })
-            return q?.number
-                ? { app: 'Goto', appdata: `queues-app,${queueAppExten(q.company.asteriskId, q.number)},1` }
-                : { app: 'Hangup', appdata: null }
-        }
-        case 'voicemail':
-            return { app: 'Goto', appdata: `vm,${dest.id},1` }
-        case 'timecondition':
-            return { app: 'Goto', appdata: `${TC_CONTEXT},${tcEntry(dest.id)},1` }
-        case 'holiday':
-            return { app: 'Goto', appdata: `${HOL_CONTEXT},${holEntry(dest.id)},1` }
-        case 'announcement':
-            return { app: 'Goto', appdata: `${ANNOUNCEMENT_CONTEXT},${announcementExten(dest.id)},1` }
-        case 'ivr':
-            return { app: 'Goto', appdata: `${IVR_CONTEXT},${ivrExten(dest.id)},1` }
-        case 'request':
-            return { app: 'Goto', appdata: `${REQUEST_TEMPLATE_CONTEXT},${requestTemplateExten(dest.id)},1` }
-        case 'variable-set':
-            return { app: 'Goto', appdata: `${VAR_CONTEXT},${varEntry(dest.id)},1` }
-        case 'variable-condition':
-            return { app: 'Goto', appdata: `${VARCOND_CONTEXT},${varCondEntry(dest.id)},1` }
-    }
+async function resolveDestination(dest: InboundDest): Promise<{ app: string; appdata: string | null }> {
+    const target = await resolveRouteDestinationToDialplan(dest)
+    return target ? { app: 'Goto', appdata: `${target.context},${target.exten},${target.priority}` } : { app: 'Hangup', appdata: null }
 }
 
 // contexto único compartilhado por todas as trunks — ps_endpoints.context de toda trunk inbound
@@ -79,14 +47,14 @@ function buildInboundEntries(
 export const InboundRouteRepository = {
     async create(tx: Tx, trunkId: string, didNumber: string, dest: InboundDest, maxIn?: number | null) {
         const exten = routedExten(trunkId, didNumber)
-        const { app, appdata } = await resolveDestination(tx, dest)
+        const { app, appdata } = await resolveDestination(dest)
         await tx.extensions.createMany({ data: buildInboundEntries(exten, app, appdata, trunkId, maxIn) })
     },
 
     async update(tx: Tx, trunkId: string, didNumber: string, dest: InboundDest, maxIn?: number | null) {
         const exten = routedExten(trunkId, didNumber)
         await tx.extensions.deleteMany({ where: { context: TRUNK_ROUTED_CONTEXT, exten } })
-        const { app, appdata } = await resolveDestination(tx, dest)
+        const { app, appdata } = await resolveDestination(dest)
         await tx.extensions.createMany({ data: buildInboundEntries(exten, app, appdata, trunkId, maxIn) })
     },
 

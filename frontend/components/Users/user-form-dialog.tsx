@@ -137,7 +137,7 @@ export function UserFormDialog({
 
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
-            <DialogContent className="sm:max-w-md max-h-[90vh] flex flex-col">
+            <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle>
                         {isEdit ? "Editar usuário" : "Novo usuário"}
@@ -148,303 +148,321 @@ export function UserFormDialog({
                             : "Preencha os dados para criar o usuário"}
                     </DialogDescription>
                 </DialogHeader>
-                <form onSubmit={onSubmit} className="flex flex-col flex-1 min-h-0">
-                <div className="overflow-y-auto overflow-x-hidden flex-1">
-                    <FieldGroup>
-                        <Field>
-                            <FieldLabel htmlFor="name">Nome</FieldLabel>
-                            <Input
-                                id="name"
-                                placeholder="Nome completo"
-                                {...register("name")}
-                            />
-                            {errors.name && (
-                                <FieldError>{errors.name.message}</FieldError>
-                            )}
-                        </Field>
-                        <Field>
-                            <FieldLabel htmlFor="username">E-mail</FieldLabel>
-                            <Input
-                                id="username"
-                                type="email"
-                                placeholder="usuario@empresa.com.br"
-                                autoComplete="off"
-                                {...register("username")}
-                            />
-                            {errors.username && (
-                                <FieldError>
-                                    {errors.username.message}
-                                </FieldError>
-                            )}
-                        </Field>
-                        <Field>
-                            <FieldLabel htmlFor="password">
-                                {isEdit ? "Nova senha (opcional)" : "Senha"}
-                            </FieldLabel>
-                            <div className="flex gap-2">
-                                <Input
-                                    id="password"
-                                    type={showPassword ? "text" : "password"}
-                                    autoComplete="new-password"
-                                    className="flex-1"
-                                    placeholder={
-                                        isEdit
-                                            ? "Deixe em branco para manter"
-                                            : ""
-                                    }
-                                    {...register("password")}
-                                />
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="icon"
-                                    onClick={() => setShowPassword((v) => !v)}
-                                >
-                                    {showPassword ? (
-                                        <EyeOffIcon />
-                                    ) : (
-                                        <EyeIcon />
-                                    )}
-                                    <span className="sr-only">
-                                        Mostrar senha
-                                    </span>
-                                </Button>
-                                <TooltipProvider delay={100}>
-                                    <Tooltip>
-                                        <TooltipTrigger
-                                            render={
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    size="icon"
-                                                    onClick={generatePassword}
-                                                >
-                                                    <WandSparklesIcon />
-                                                    <span className="sr-only">
-                                                        Gerar senha aleatória
-                                                    </span>
-                                                </Button>
-                                            }
-                                        />
-                                        <TooltipContent>
-                                            Gerar senha aleatória
-                                        </TooltipContent>
-                                    </Tooltip>
-                                </TooltipProvider>
-                            </div>
-                            {errors.password && (
-                                <FieldError>
-                                    {errors.password.message}
-                                </FieldError>
-                            )}
-                        </Field>
-                        <Field>
-                            <FieldLabel>Empresas</FieldLabel>
-                            <Controller
-                                control={control}
-                                name="companyIds"
-                                render={({ field }) => (
-                                    <CompanySelect
-                                        companies={companies}
-                                        value={field.value ?? []}
-                                        onChange={field.onChange}
-                                    />
-                                )}
-                            />
-                            {errors.companyIds && (
-                                <FieldError>
-                                    {errors.companyIds.message}
-                                </FieldError>
-                            )}
-                        </Field>
-                        {!isEdit && (
+                <form
+                    onSubmit={onSubmit}
+                    className="flex min-h-0 flex-1 flex-col"
+                >
+                    <div className="flex-1 overflow-x-hidden overflow-y-auto">
+                        <FieldGroup>
                             <Field>
-                                <FieldLabel>Permissão</FieldLabel>
-                                <Controller
-                                    control={control}
-                                    name="role"
-                                    render={({ field }) => (
-                                        <Select
-                                            items={ROLES}
-                                            value={field.value}
-                                            onValueChange={field.onChange}
-                                        >
-                                            <SelectTrigger className="w-full">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {ROLES.map((role) => (
-                                                    <SelectItem
-                                                        key={role.value}
-                                                        value={role.value}
-                                                    >
-                                                        {role.label}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    )}
+                                <FieldLabel htmlFor="name">Nome</FieldLabel>
+                                <Input
+                                    id="name"
+                                    placeholder="Nome completo"
+                                    {...register("name")}
                                 />
-                                {errors.role && (
+                                {errors.name && (
                                     <FieldError>
-                                        {errors.role.message}
+                                        {errors.name.message}
                                     </FieldError>
                                 )}
                             </Field>
-                        )}
-                        {showPermissions && (
                             <Field>
-                                <FieldLabel>Permissões de acesso</FieldLabel>
+                                <FieldLabel htmlFor="username">
+                                    E-mail
+                                </FieldLabel>
+                                <Input
+                                    id="username"
+                                    type="email"
+                                    placeholder="usuario@empresa.com.br"
+                                    autoComplete="off"
+                                    {...register("username")}
+                                />
+                                {errors.username && (
+                                    <FieldError>
+                                        {errors.username.message}
+                                    </FieldError>
+                                )}
+                            </Field>
+                            <Field>
+                                <FieldLabel htmlFor="password">
+                                    {isEdit ? "Nova senha (opcional)" : "Senha"}
+                                </FieldLabel>
+                                <div className="flex gap-2">
+                                    <Input
+                                        id="password"
+                                        type={
+                                            showPassword ? "text" : "password"
+                                        }
+                                        autoComplete="new-password"
+                                        className="flex-1"
+                                        placeholder={
+                                            isEdit
+                                                ? "Deixe em branco para manter"
+                                                : ""
+                                        }
+                                        {...register("password")}
+                                    />
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="icon"
+                                        onClick={() =>
+                                            setShowPassword((v) => !v)
+                                        }
+                                    >
+                                        {showPassword ? (
+                                            <EyeOffIcon />
+                                        ) : (
+                                            <EyeIcon />
+                                        )}
+                                        <span className="sr-only">
+                                            Mostrar senha
+                                        </span>
+                                    </Button>
+                                    <TooltipProvider delay={100}>
+                                        <Tooltip>
+                                            <TooltipTrigger
+                                                render={
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="icon"
+                                                        onClick={
+                                                            generatePassword
+                                                        }
+                                                    >
+                                                        <WandSparklesIcon />
+                                                        <span className="sr-only">
+                                                            Gerar senha
+                                                            aleatória
+                                                        </span>
+                                                    </Button>
+                                                }
+                                            />
+                                            <TooltipContent>
+                                                Gerar senha aleatória
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </TooltipProvider>
+                                </div>
+                                {errors.password && (
+                                    <FieldError>
+                                        {errors.password.message}
+                                    </FieldError>
+                                )}
+                            </Field>
+                            <Field>
+                                <FieldLabel>Empresas</FieldLabel>
                                 <Controller
                                     control={control}
-                                    name="permissions"
-                                    render={({ field }) => {
-                                        const perms = field.value ?? []
-                                        const has = (key: string) =>
-                                            perms.includes(key)
-                                        const setView = (
-                                            resource: string,
-                                            checked: boolean
-                                        ) => {
-                                            const next = checked
-                                                ? [
-                                                      ...perms,
-                                                      `${resource}:view`,
-                                                  ]
-                                                : perms.filter(
-                                                      (p) =>
-                                                          p !==
-                                                              `${resource}:view` &&
-                                                          p !==
-                                                              `${resource}:manage`
-                                                  )
-                                            field.onChange([
-                                                ...new Set(next),
-                                            ])
-                                        }
-                                        const setManage = (
-                                            resource: string,
-                                            checked: boolean
-                                        ) => {
-                                            const next = checked
-                                                ? [
-                                                      ...perms,
-                                                      `${resource}:view`,
-                                                      `${resource}:manage`,
-                                                  ]
-                                                : perms.filter(
-                                                      (p) =>
-                                                          p !==
-                                                          `${resource}:manage`
-                                                  )
-                                            field.onChange([
-                                                ...new Set(next),
-                                            ])
-                                        }
-                                        return (
-                                            <div className="rounded-md border p-3">
-                                                <div className="grid grid-cols-[1fr_auto_auto] items-center gap-x-3 gap-y-2 text-sm">
-                                                    <span className="text-muted-foreground font-medium">
-                                                        Recurso
-                                                    </span>
-                                                    <span className="text-muted-foreground justify-self-center font-medium">
-                                                        Ver
-                                                    </span>
-                                                    <span className="text-muted-foreground justify-self-center font-medium">
-                                                        Gerenciar
-                                                    </span>
-                                                    <span>CDR</span>
-                                                    <Checkbox
-                                                        className="justify-self-center"
-                                                        checked={has(
-                                                            "cdr:view"
-                                                        )}
-                                                        onCheckedChange={(
-                                                            c
-                                                        ) =>
-                                                            field.onChange(
-                                                                c === true
-                                                                    ? [
-                                                                          ...new Set(
-                                                                              [
-                                                                                  ...perms,
-                                                                                  "cdr:view",
-                                                                              ]
-                                                                          ),
-                                                                      ]
-                                                                    : perms.filter(
-                                                                          (
-                                                                              p
-                                                                          ) =>
-                                                                              p !==
-                                                                              "cdr:view"
-                                                                      )
-                                                            )
-                                                        }
-                                                    />
-                                                    <span />
-                                                    {PERMISSION_RESOURCES.map(
-                                                        (r) => (
-                                                            <Fragment
-                                                                key={r.key}
-                                                            >
-                                                                <span>
-                                                                    {r.label}
-                                                                </span>
-                                                                <Checkbox
-                                                                    className="justify-self-center"
-                                                                    checked={has(
-                                                                        `${r.key}:view`
-                                                                    )}
-                                                                    onCheckedChange={(
-                                                                        c
-                                                                    ) =>
-                                                                        setView(
-                                                                            r.key,
-                                                                            c ===
-                                                                                true
-                                                                        )
-                                                                    }
-                                                                />
-                                                                <Checkbox
-                                                                    className="justify-self-center"
-                                                                    checked={has(
-                                                                        `${r.key}:manage`
-                                                                    )}
-                                                                    onCheckedChange={(
-                                                                        c
-                                                                    ) =>
-                                                                        setManage(
-                                                                            r.key,
-                                                                            c ===
-                                                                                true
-                                                                        )
-                                                                    }
-                                                                />
-                                                            </Fragment>
-                                                        )
-                                                    )}
-                                                </div>
-                                            </div>
-                                        )
-                                    }}
+                                    name="companyIds"
+                                    render={({ field }) => (
+                                        <CompanySelect
+                                            companies={companies}
+                                            value={field.value ?? []}
+                                            onChange={field.onChange}
+                                        />
+                                    )}
                                 />
+                                {errors.companyIds && (
+                                    <FieldError>
+                                        {errors.companyIds.message}
+                                    </FieldError>
+                                )}
                             </Field>
-                        )}
-                    </FieldGroup>
-                </div>
-                <DialogFooter className="pt-4">
-                    <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => handleOpenChange(false)}
-                    >
-                        Cancelar
-                    </Button>
-                    <Button type="submit" disabled={isSubmitting}>
-                        {isSubmitting ? "Salvando..." : "Salvar"}
-                    </Button>
-                </DialogFooter>
+                            {!isEdit && (
+                                <Field>
+                                    <FieldLabel>Permissão</FieldLabel>
+                                    <Controller
+                                        control={control}
+                                        name="role"
+                                        render={({ field }) => (
+                                            <Select
+                                                items={ROLES}
+                                                value={field.value}
+                                                onValueChange={field.onChange}
+                                            >
+                                                <SelectTrigger className="w-full">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {ROLES.map((role) => (
+                                                        <SelectItem
+                                                            key={role.value}
+                                                            value={role.value}
+                                                        >
+                                                            {role.label}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        )}
+                                    />
+                                    {errors.role && (
+                                        <FieldError>
+                                            {errors.role.message}
+                                        </FieldError>
+                                    )}
+                                </Field>
+                            )}
+                            {showPermissions && (
+                                <Field>
+                                    <FieldLabel>
+                                        Permissões de acesso
+                                    </FieldLabel>
+                                    <Controller
+                                        control={control}
+                                        name="permissions"
+                                        render={({ field }) => {
+                                            const perms = field.value ?? []
+                                            const has = (key: string) =>
+                                                perms.includes(key)
+                                            const setView = (
+                                                resource: string,
+                                                checked: boolean
+                                            ) => {
+                                                const next = checked
+                                                    ? [
+                                                          ...perms,
+                                                          `${resource}:view`,
+                                                      ]
+                                                    : perms.filter(
+                                                          (p) =>
+                                                              p !==
+                                                                  `${resource}:view` &&
+                                                              p !==
+                                                                  `${resource}:manage`
+                                                      )
+                                                field.onChange([
+                                                    ...new Set(next),
+                                                ])
+                                            }
+                                            const setManage = (
+                                                resource: string,
+                                                checked: boolean
+                                            ) => {
+                                                const next = checked
+                                                    ? [
+                                                          ...perms,
+                                                          `${resource}:view`,
+                                                          `${resource}:manage`,
+                                                      ]
+                                                    : perms.filter(
+                                                          (p) =>
+                                                              p !==
+                                                              `${resource}:manage`
+                                                      )
+                                                field.onChange([
+                                                    ...new Set(next),
+                                                ])
+                                            }
+                                            return (
+                                                <div className="rounded-md border p-3">
+                                                    <div className="grid grid-cols-[1fr_auto_auto] items-center gap-x-3 gap-y-2 text-sm">
+                                                        <span className="font-medium text-muted-foreground">
+                                                            Recurso
+                                                        </span>
+                                                        <span className="justify-self-center font-medium text-muted-foreground">
+                                                            Ver
+                                                        </span>
+                                                        <span className="justify-self-center font-medium text-muted-foreground">
+                                                            Gerenciar
+                                                        </span>
+                                                        <span>CDR</span>
+                                                        <Checkbox
+                                                            className="justify-self-center"
+                                                            checked={has(
+                                                                "cdr:view"
+                                                            )}
+                                                            onCheckedChange={(
+                                                                c
+                                                            ) =>
+                                                                field.onChange(
+                                                                    c === true
+                                                                        ? [
+                                                                              ...new Set(
+                                                                                  [
+                                                                                      ...perms,
+                                                                                      "cdr:view",
+                                                                                  ]
+                                                                              ),
+                                                                          ]
+                                                                        : perms.filter(
+                                                                              (
+                                                                                  p
+                                                                              ) =>
+                                                                                  p !==
+                                                                                  "cdr:view"
+                                                                          )
+                                                                )
+                                                            }
+                                                        />
+                                                        <span />
+                                                        {PERMISSION_RESOURCES.map(
+                                                            (r) => (
+                                                                <Fragment
+                                                                    key={r.key}
+                                                                >
+                                                                    <span>
+                                                                        {
+                                                                            r.label
+                                                                        }
+                                                                    </span>
+                                                                    <Checkbox
+                                                                        className="justify-self-center"
+                                                                        checked={has(
+                                                                            `${r.key}:view`
+                                                                        )}
+                                                                        onCheckedChange={(
+                                                                            c
+                                                                        ) =>
+                                                                            setView(
+                                                                                r.key,
+                                                                                c ===
+                                                                                    true
+                                                                            )
+                                                                        }
+                                                                    />
+                                                                    <Checkbox
+                                                                        className="justify-self-center"
+                                                                        checked={has(
+                                                                            `${r.key}:manage`
+                                                                        )}
+                                                                        onCheckedChange={(
+                                                                            c
+                                                                        ) =>
+                                                                            setManage(
+                                                                                r.key,
+                                                                                c ===
+                                                                                    true
+                                                                            )
+                                                                        }
+                                                                    />
+                                                                </Fragment>
+                                                            )
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )
+                                        }}
+                                    />
+                                </Field>
+                            )}
+                        </FieldGroup>
+                    </div>
+                    <DialogFooter className="pt-4">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => handleOpenChange(false)}
+                        >
+                            Cancelar
+                        </Button>
+                        <Button type="submit" disabled={isSubmitting}>
+                            {isSubmitting ? "Salvando..." : "Salvar"}
+                        </Button>
+                    </DialogFooter>
                 </form>
             </DialogContent>
         </Dialog>
