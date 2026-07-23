@@ -14,8 +14,31 @@ api.interceptors.request.use((config) => {
     return config
 })
 
-// refresh compartilhado: várias requests 401 simultâneas disparam um único /auth/refresh
+// refresh compartilhado: várias requests 401 simultâneas (incluindo as do lib/sse.ts) disparam um único /auth/refresh
 let refreshing: Promise<string> | null = null
+
+export async function refreshToken(): Promise<string> {
+    refreshing ??= api
+        .post("/auth/refresh")
+        .then(({ data }) => {
+            cookies.set("token", data.token, {
+                path: "/",
+                sameSite: "lax",
+            })
+            return data.token as string
+        })
+        .finally(() => {
+            refreshing = null
+        })
+
+    try {
+        return await refreshing
+    } catch (error) {
+        cookies.remove("token", { path: "/" })
+        if (typeof window !== "undefined") window.location.href = "/login"
+        throw error
+    }
+}
 
 api.interceptors.response.use(
     (res) => res,
@@ -31,26 +54,11 @@ api.interceptors.response.use(
         ) {
             original._retry = true
             try {
-                refreshing ??= api
-                    .post("/auth/refresh")
-                    .then(({ data }) => {
-                        cookies.set("token", data.token, {
-                            path: "/",
-                            sameSite: "lax",
-                        })
-                        return data.token as string
-                    })
-                    .finally(() => {
-                        refreshing = null
-                    })
-
-                const token = await refreshing
+                const token = await refreshToken()
                 original.headers.Authorization = `Bearer ${token}`
                 return api(original)
             } catch {
-                cookies.remove("token", { path: "/" })
-                if (typeof window !== "undefined")
-                    window.location.href = "/login"
+                return Promise.reject(error)
             }
         }
 

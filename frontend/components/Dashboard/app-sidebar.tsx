@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
+    ActivityIcon,
     Building2Icon,
     FileAudioIcon,
     FileClockIcon,
@@ -56,7 +57,7 @@ type NavGroup = {
 // Recursos reutilizáveis são criados e configurados no contexto do Flow, sem poluir a navegação.
 const NAV: NavGroup[] = [
     {
-        label: "Geral",
+        label: "Visão geral",
         items: [
             {
                 title: "Dashboard",
@@ -68,6 +69,74 @@ const NAV: NavGroup[] = [
                 href: "/dashboard/cdr",
                 icon: FileClockIcon,
                 permission: "cdr",
+            },
+        ],
+    },
+    {
+        label: "Monitoramento",
+        items: [
+            {
+                title: "Tempo real",
+                href: "/dashboard/monitoring",
+                icon: ActivityIcon,
+                permission: "extensions",
+            },
+        ],
+    },
+    {
+        label: "Telefonia",
+        items: [
+            {
+                title: "Ramais",
+                href: "/dashboard/extensions",
+                icon: PhoneIcon,
+                permission: "extensions",
+            },
+            {
+                title: "DIDs",
+                href: "/dashboard/dids",
+                icon: HashIcon,
+                permission: "dids",
+            },
+            {
+                title: "Troncos",
+                href: "/dashboard/trunks",
+                icon: NetworkIcon,
+                permission: "trunks",
+            },
+        ],
+    },
+    {
+        label: "Roteamento",
+        items: [
+            {
+                title: "Rotas de entrada",
+                href: "/dashboard/inbound-routes",
+                icon: PhoneIncomingIcon,
+                permission: "inbound-routes",
+            },
+            {
+                title: "Rotas de saída",
+                href: "/dashboard/outbound-routes",
+                icon: PhoneOutgoingIcon,
+                permission: "outbound-routes",
+            },
+        ],
+    },
+    {
+        label: "Automação",
+        items: [
+            {
+                title: "Flows",
+                href: "/dashboard/flows",
+                icon: WorkflowIcon,
+                permission: "flows",
+            },
+            {
+                title: "Áudios",
+                href: "/dashboard/audios",
+                icon: FileAudioIcon,
+                permission: "audios",
             },
         ],
     },
@@ -85,63 +154,6 @@ const NAV: NavGroup[] = [
                 href: "/dashboard/users",
                 icon: UsersIcon,
                 permission: "users",
-            },
-        ],
-    },
-    {
-        label: "Atendimento",
-        items: [
-            {
-                title: "Ramais",
-                href: "/dashboard/extensions",
-                icon: PhoneIcon,
-                permission: "extensions",
-            },
-        ],
-    },
-    {
-        label: "Rotas",
-        items: [
-            {
-                title: "DIDs",
-                href: "/dashboard/dids",
-                icon: HashIcon,
-                permission: "dids",
-            },
-            {
-                title: "Rotas de entrada",
-                href: "/dashboard/inbound-routes",
-                icon: PhoneIncomingIcon,
-                permission: "inbound-routes",
-            },
-            {
-                title: "Rotas de saída",
-                href: "/dashboard/outbound-routes",
-                icon: PhoneOutgoingIcon,
-                permission: "outbound-routes",
-            },
-            {
-                title: "Troncos",
-                href: "/dashboard/trunks",
-                icon: NetworkIcon,
-                permission: "trunks",
-            },
-        ],
-    },
-    {
-        label: "Recursos",
-        items: [
-            {
-                title: "Áudios",
-                href: "/dashboard/audios",
-                icon: FileAudioIcon,
-                permission: "audios",
-            },
-            {
-                title: "Flows",
-                href: "/dashboard/flows",
-                icon: WorkflowIcon,
-                permission: "flows",
             },
         ],
     },

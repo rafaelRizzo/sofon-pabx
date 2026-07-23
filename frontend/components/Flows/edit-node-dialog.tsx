@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { toast } from "sonner"
 
@@ -7,6 +8,7 @@ import { api, apiError } from "@/lib/api"
 import { AnnouncementFormDialog } from "@/components/Announcements/announcement-form-dialog"
 import { useAnnouncements, type Announcement } from "@/hooks/use-announcements"
 import { QueueFormDialog } from "@/components/Queues/queue-form-dialog"
+import { QueueMembersSheet } from "@/components/Queues/queue-members-sheet"
 import { useQueues, type Queue } from "@/hooks/use-queues"
 import { RequestTemplateFormDialog } from "@/components/RequestTemplates/request-template-form-dialog"
 import {
@@ -125,20 +127,29 @@ export function EditNodeDialog({
                 id
             )
             const { updateQueue } = useQueues()
+            const [membersOpen, setMembersOpen] = useState(false)
             return (
-                <QueueFormDialog
-                    open={open}
-                    onOpenChange={onOpenChange}
-                    queue={entity}
-                    loading={loading}
-                    companies={companies}
-                    onDelete={onDeleteResource}
-                    onSave={async (form) => {
-                        const ok = await updateQueue(id, form)
-                        if (ok) onSaved()
-                        return ok
-                    }}
-                />
+                <>
+                    <QueueFormDialog
+                        open={open}
+                        onOpenChange={onOpenChange}
+                        queue={entity}
+                        loading={loading}
+                        companies={companies}
+                        onDelete={onDeleteResource}
+                        onManageMembers={() => setMembersOpen(true)}
+                        onSave={async (form) => {
+                            const ok = await updateQueue(id, form)
+                            if (ok) onSaved()
+                            return ok
+                        }}
+                    />
+                    <QueueMembersSheet
+                        open={membersOpen}
+                        onOpenChange={setMembersOpen}
+                        queue={entity}
+                    />
+                </>
             )
         }
         case "request": {

@@ -38,6 +38,7 @@ import { callcenterAgentsRoutes } from './modules/callcenter/agents/agents.route
 import { routingRulesRoutes } from './modules/callcenter/routing-rules/routing-rules.routes'
 import { callcenterRatingsRoutes } from './modules/callcenter/ratings/ratings.routes'
 import { flowsRoutes } from './modules/flows/flows.routes'
+import { realtimeRoutes } from './modules/realtime/realtime.routes'
 
 const env = validateEnv()
 
@@ -202,6 +203,7 @@ app.register(callcenterAgentsRoutes)
 app.register(routingRulesRoutes)
 app.register(callcenterRatingsRoutes)
 app.register(flowsRoutes)
+app.register(realtimeRoutes)
 
 // Health check
 app.get('/health', async (req, reply) => {

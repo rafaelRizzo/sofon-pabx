@@ -37,6 +37,11 @@ const envSchema = z.object({
     AMI_PORT: z.coerce.number().default(5038),
     AMI_USER: z.string().default('admin'),
     AMI_SECRET: z.string().optional(),
+    // Diagnóstico do ami-events.ts: loga cada bloco cru (Event/Response + todos os campos) via
+    // logger.warn (visível mesmo em produção, onde o nível default é 'warn') — usado pra confirmar
+    // nomes de campo reais contra a versão de Asterisk instalada quando o mapeamento não bate.
+    // Fica bem verboso (DeviceStateChange dispara muito) — ligar só durante uma investigação pontual.
+    AMI_DEBUG: z.coerce.boolean().default(false),
     // Diretório onde dialplan-file.repository.ts materializa os contextos estáticos (timeconditions,
     // announcements, ivrs, holidays, queues-app, request-templates). Default é o caminho real do
     // Asterisk — testes de integração sobrescrevem via .env.test pra um dir gravável sem Asterisk instalado.

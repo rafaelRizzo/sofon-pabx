@@ -13,17 +13,14 @@
     --xy-node-background-color: var(--color-card);
     --xy-node-color: var(--color-foreground);
     --xy-node-border: 1px solid var(--color-border);
-    --xy-node-boxshadow-hover: 0 1px 4px 1px
-        color-mix(in oklch, var(--color-foreground) 8%, transparent);
+    --xy-node-boxshadow-hover: 0 1px 4px 1px color-mix(in oklch, var(--color-foreground) 8%, transparent);
     --xy-node-boxshadow-selected: 0 0 0 2px var(--color-primary);
 
     --xy-handle-background-color: oklch(0.556 0 0);
 
-    --xy-selection-background-color: color-mix(
-        in oklch,
-        var(--color-primary) 8%,
-        transparent
-    );
+    --xy-selection-background-color: color-mix(in oklch,
+            var(--color-primary) 8%,
+            transparent);
     --xy-selection-border: 1px dotted var(--color-primary);
 
     --xy-controls-button-background-color: var(--color-card);
@@ -31,15 +28,12 @@
     --xy-controls-button-color: var(--color-foreground);
     --xy-controls-button-color-hover: var(--color-foreground);
     --xy-controls-button-border-color: var(--color-border);
-    --xy-controls-box-shadow: 0 1px 2px 0
-        color-mix(in oklch, var(--color-foreground) 10%, transparent);
+    --xy-controls-box-shadow: 0 1px 2px 0 color-mix(in oklch, var(--color-foreground) 10%, transparent);
 
     --xy-minimap-background-color: var(--color-card);
-    --xy-minimap-mask-background-color: color-mix(
-        in oklch,
-        var(--color-foreground) 12%,
-        transparent
-    );
+    --xy-minimap-mask-background-color: color-mix(in oklch,
+            var(--color-foreground) 12%,
+            transparent);
     --xy-minimap-mask-stroke-color: var(--color-border);
     --xy-minimap-node-background-color: var(--color-muted-foreground);
     --xy-minimap-node-stroke-color: var(--color-border);
@@ -54,6 +48,9 @@
     --xy-handle-background-color: oklch(0.205 0 0);
     --xy-edge-stroke: oklch(0.371 0 0);
     --xy-connectionline-stroke: oklch(0.371 0 0);
+
+    --flow-branch-positive: oklch(59.6% 0.145 163.225);
+    --flow-branch-negative: oklch(57.7% 0.245 27.325);
 }
 
 .react-flow__node-flowNode,
@@ -85,12 +82,15 @@
 .react-flow__handle-top {
     transform: translate(-50%, -50%) scale(1);
 }
+
 .react-flow__handle-top:hover {
     transform: translate(-50%, -50%) scale(1.25);
 }
+
 .react-flow__handle-bottom {
     transform: translate(-50%, 50%) scale(1);
 }
+
 .react-flow__handle-bottom:hover {
     transform: translate(-50%, 50%) scale(1.25);
 }

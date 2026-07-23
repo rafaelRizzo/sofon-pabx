@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-# INSTALADOR SOFON PBX v6.2 - NATIVO (sem Docker)
+# INSTALADOR SOFON PBX v6.4 - NATIVO (sem Docker)
 # Debian 11+ | Ubuntu 24.04+
 # ============================================================
 
@@ -657,6 +657,19 @@ if systemctl is-active --quiet docker 2>/dev/null; then
     log "Docker reiniciado — regras de MASQUERADE restauradas"
 fi
 
+# systemctl restart/start nftables (não só durante este install — qualquer restart manual depois)
+# aplica um `nft flush ruleset` global antes de recarregar /etc/nftables.conf, que só recria a
+# tabela "inet filter" — as tabelas/regras de NAT que o Docker criou dinamicamente somem e não
+# voltam sozinhas. Esse drop-in faz o Docker se restaurar sozinho toda vez que o nftables reiniciar,
+# não só nesta instalação (try-restart não falha se o Docker não estiver instalado/rodando).
+mkdir -p /etc/systemd/system/nftables.service.d
+cat > /etc/systemd/system/nftables.service.d/docker-restore.conf << 'EOF'
+[Service]
+ExecStartPost=-/usr/bin/systemctl try-restart docker
+EOF
+systemctl daemon-reload >> "$LOG_FILE" 2>&1 || true
+log "Drop-in criado: nftables reiniciado sempre restaura as regras de NAT do Docker"
+
 # ============================================================
 # STEP 12 - SEGURANÇA
 # ============================================================
@@ -771,7 +784,12 @@ cat > /etc/asterisk/manager.conf << EOF
 enabled            = yes
 port               = 5038
 bindaddr           = 127.0.0.1
-allowmultiplelogin = no
+# "no" derruba com SessionLimit qualquer 2ª conexão do mesmo usuário — o backend mantém uma
+# conexão AMI persistente (ami-events.ts, monitoramento em tempo real) o tempo todo logada como
+# "admin", e QUALQUER reload de dialplan (ami-client.ts) abre uma 2ª conexão com o mesmo usuário
+# em paralelo. Sem "yes" aqui, esse reload é rejeitado silenciosamente (best-effort, só loga
+# warning) e o dialplan nunca é recarregado de verdade. bindaddr/permit já restringem a 127.0.0.1.
+allowmultiplelogin = yes
 displayconnects    = no
 
 [admin]
@@ -896,6 +914,22 @@ cmd_remove() {
     echo -e "${GREEN}✓ $ip removido — acesso bloqueado${NC}"
 }
 
+cmd_reload() {
+    rebuild_nft_whitelist
+    reload_fail2ban
+
+    # nft -f só recria a tabela "inet filter" (ver header do nftables.conf) — não deveria derrubar
+    # as regras de NAT do Docker, mas o try-restart aqui cobre o caso de alguém ter rodado um
+    # `systemctl restart nftables` cru antes (esse sim faz flush geral) e só depois lembrar do reload
+    if systemctl is-active --quiet docker 2>/dev/null; then
+        systemctl try-restart docker &>/dev/null || warn "Falha ao reiniciar Docker"
+        log "Docker verificado/restaurado"
+    fi
+
+    echo ""
+    echo -e "${GREEN}✓ nftables + Fail2Ban recarregados${NC}"
+}
+
 cmd_list() {
     echo ""
     echo -e "${CYAN}══════════════════════════════════════════${NC}"
@@ -945,12 +979,16 @@ case "$CMD" in
     list|ls)
         cmd_list
         ;;
+    reload)
+        cmd_reload
+        ;;
     *)
-        echo -e "${BOLD}Uso:${NC} manage-fw {add|remove|list} [IP]"
+        echo -e "${BOLD}Uso:${NC} manage-fw {add|remove|list|reload} [IP]"
         echo ""
         echo "  add    <IP>  — libera IP nas portas SIP/RTP"
         echo "  remove <IP>  — bloqueia IP"
         echo "  list         — whitelist + set nftables + banidos"
+        echo "  reload       — reaplica nftables (só a tabela nossa) + Fail2Ban, restaura Docker se precisar"
         echo ""
         echo "  Suporta CIDR: manage-fw add 10.0.0.0/24"
         exit 1

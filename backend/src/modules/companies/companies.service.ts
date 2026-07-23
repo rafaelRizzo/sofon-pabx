@@ -8,7 +8,7 @@ import { IvrCache } from '../ivr/cache/ivr.cache'
 import { AudiosCache } from '../audios/cache/audios.cache'
 import { PjsipRepository } from '../../asterisk/pjsip.repository'
 import { SipRepository } from '../../asterisk/sip.repository'
-import { AsteriskQueueRepository, QUEUE_APP_CONTEXT } from '../../asterisk/queue.repository'
+import { AsteriskQueueRepository, QUEUE_APP_CONTEXT, toAsteriskQueueName } from '../../asterisk/queue.repository'
 import { InboundRouteRepository } from '../../asterisk/inboundroute.repository'
 import { audioSoundDir } from '../../asterisk/audio.repository'
 import { removeCompanyDialplanFiles } from '../../asterisk/dialplan-file.repository'
@@ -181,7 +181,7 @@ export const deleteCompany = async (id: string) => {
         }),
         prisma.queue.findMany({
             where: { companyId: id },
-            select: { name: true, number: true },
+            select: { id: true, number: true },
         }),
         prisma.trunk.findMany({
             where: { companyId: id },
@@ -200,7 +200,8 @@ export const deleteCompany = async (id: string) => {
     const pjsipNumbers = extensions.filter((e) => e.type === 'pjsip').map((e) => e.number)
     const sipNumbers = extensions.filter((e) => e.type === 'sip').map((e) => e.number)
     const asteriskInterfaces = extensions.map((e) => `${e.type.toUpperCase()}/${e.number}`)
-    const asteriskQueueNames = queues.map((q) => `${existing.asteriskId}-${q.name}`)
+    const queueIds = queues.map((q) => q.id)
+    const asteriskQueueNames = queues.map((q) => toAsteriskQueueName(existing.asteriskId, q.number))
 
     const trunkIds = trunks.map((t) => `${existing.asteriskId}-trunk-${t.name}`)
     const trunkOutboundIds = trunks
@@ -215,7 +216,7 @@ export const deleteCompany = async (id: string) => {
 
     await prisma.$transaction(async (tx) => {
         await AsteriskQueueRepository.removeMembersByInterfaces(tx, asteriskInterfaces)
-        await AsteriskQueueRepository.deleteManyQueues(tx, asteriskQueueNames)
+        await AsteriskQueueRepository.deleteManyQueues(tx, queueIds, asteriskQueueNames)
         await InboundRouteRepository.deleteMany(tx, inboundRoutesForCleanup)
         if (outboundPatternValues.length > 0)
             await tx.extensions.deleteMany({ where: { context: 'ramais', exten: { in: outboundPatternValues } } })

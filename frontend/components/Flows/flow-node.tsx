@@ -106,7 +106,7 @@ function SlotChip({
         const Icon = ROUTE_DEST_ICONS[target.type as RouteDestinationType]
         return (
             <div
-                className={`group/slot relative flex min-h-8 items-center gap-0.5 rounded-md border border-border/70 bg-card pr-0.5 pl-2 shadow-xs ${colorText}`}
+                className={`group/slot relative flex min-h-8 items-stretch gap-0.5 rounded-md border border-border/70 bg-card pr-0.5 pl-2 shadow-xs ${colorText}`}
             >
                 <BranchConnectPopover
                     companyId={companyId}
@@ -126,7 +126,7 @@ function SlotChip({
                 />
                 <button
                     type="button"
-                    className="nodrag shrink-0 rounded p-1 text-muted-foreground opacity-0 transition-opacity group-hover/slot:opacity-100 hover:text-destructive"
+                    className="nodrag flex shrink-0 items-center rounded p-1 text-muted-foreground opacity-0 transition-opacity group-hover/slot:opacity-100 hover:text-destructive"
                     aria-label="Remover conexão"
                     title="Remover conexão"
                     onClick={(event) => {
@@ -150,7 +150,7 @@ function SlotChip({
             trigger={
                 <button
                     type="button"
-                    className={`nodrag flex min-h-8 w-full items-center gap-1 rounded-md border border-dashed border-border/70 bg-transparent px-2 text-[0.6875rem] font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary ${justify}`}
+                    className={`nodrag flex min-h-8 w-full items-center gap-1 rounded-md border border-dashed border-border/70 bg-transparent px-2 text-[0.6875rem] font-medium text-muted-foreground transition-colors hover:border-foreground/40 hover:bg-muted/50 hover:text-foreground ${justify}`}
                 >
                     {DirectionIcon ? (
                         <DirectionIcon className="size-3.5" />
@@ -185,7 +185,7 @@ export function FlowNode({
 
     return (
         <div
-            className={`group relative min-w-56 overflow-visible rounded-xl border bg-card text-card-foreground shadow-sm transition-[box-shadow,border-color] duration-150 hover:shadow-md ${selected ? "border-primary ring-2 ring-primary/25" : "border-border"}`}
+            className={`group relative min-w-56 overflow-visible rounded-xl border bg-card text-card-foreground shadow-sm transition-[box-shadow,border-color] duration-150 outline-none hover:shadow-md focus-visible:ring-5 focus-visible:ring-ring/30 dark:focus-visible:ring-ring/45 ${selected ? "border-violet-950/10 dark:border-violet-500/60 ring-4 ring-violet-500/15 dark:ring-violet-500/25" : "border-border/60 dark:border-neutral-500/25"}`}
             onDoubleClick={() => data.onEdit?.()}
         >
             <Handle
@@ -195,7 +195,7 @@ export function FlowNode({
             />
 
             <div className="flex items-start gap-2.5 px-3 pt-3 pb-2.5">
-                <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 dark:bg-primary/50 text-primary dark:text-indigo-400">
+                <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 dark:bg-primary/20 text-primary dark:text-violet-400">
                     <Icon className="size-4" />
                 </div>
                 <div className="flex min-w-0 flex-col">

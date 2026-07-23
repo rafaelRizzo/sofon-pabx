@@ -76,6 +76,10 @@ type Props = {
     companies: Company[]
     onSave: (form: QueueForm) => Promise<boolean>
     onDelete?: () => void
+    // abre o QueueMembersSheet — só passado por quem tem acesso à fila fora do fluxo normal da
+    // página de filas (ex: EditNodeDialog, que edita a fila a partir do canvas de Flows e não tem
+    // outro jeito de chegar no gerenciador de membros)
+    onManageMembers?: () => void
 }
 
 export function QueueFormDialog({
@@ -86,6 +90,7 @@ export function QueueFormDialog({
     companies,
     onSave,
     onDelete,
+    onManageMembers,
 }: Props) {
     const isEdit = !!queue
     const defaultCompanyId =
@@ -908,6 +913,18 @@ export function QueueFormDialog({
                                         onClick={onDelete}
                                     >
                                         Excluir recurso
+                                    </Button>
+                                )}
+                                {isEdit && onManageMembers && (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        className={
+                                            onDelete ? undefined : "mr-auto"
+                                        }
+                                        onClick={onManageMembers}
+                                    >
+                                        Gerenciar membros
                                     </Button>
                                 )}
                                 <Button

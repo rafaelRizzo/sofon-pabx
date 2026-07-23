@@ -16,7 +16,7 @@ const generatePassword = () => {
     return Array.from(bytes, (b) => CHARSET[b % CHARSET.length]).join('')
 }
 
-const toAsteriskId = (asteriskId: string, name: string) => `${asteriskId}-trunk-${name}`
+export const toAsteriskId = (asteriskId: string, name: string) => `${asteriskId}-trunk-${name}`
 
 const trunkSelect = {
     id: true,

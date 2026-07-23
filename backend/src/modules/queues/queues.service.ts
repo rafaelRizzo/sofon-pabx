@@ -266,6 +266,7 @@ export const createQueue = async (data: CreateQueueInput) => {
         })
         await AsteriskQueueRepository.createQueue(
             tx,
+            q.id,
             asteriskName,
             asteriskData
         )
@@ -423,14 +424,10 @@ export const updateQueue = async (id: string, data: UpdateQueueInput) => {
         data.surveyAudioId !== existing.surveyAudioId
 
     const queue = await prisma.$transaction(async (tx) => {
-        if (numberChanged)
-            await AsteriskQueueRepository.renameQueue(
-                tx,
-                oldAsteriskName,
-                newAsteriskName
-            )
         await AsteriskQueueRepository.updateQueue(
             tx,
+            existing.id,
+            oldAsteriskName,
             newAsteriskName,
             asteriskUpdate
         )
@@ -492,7 +489,7 @@ export const deleteQueue = async (id: string) => {
     )
 
     await prisma.$transaction(async (tx) => {
-        await AsteriskQueueRepository.deleteQueue(tx, asteriskName)
+        await AsteriskQueueRepository.deleteQueue(tx, existing.id, asteriskName)
         await tx.queue.delete({ where: { id } })
         await FlowEdgeRepository.deleteAllForSource(tx, 'queue', id)
     })

@@ -26,6 +26,7 @@ export default function CompaniesPage() {
         createCompany,
         updateCompany,
         deleteCompany,
+        resyncDialplan,
     } = useCompanies()
 
     const { paginated, page, setPage, totalPages, total } = usePagination(
@@ -74,6 +75,7 @@ export default function CompaniesPage() {
                 loading={loading}
                 onEdit={openEdit}
                 onDelete={setDeleting}
+                onResyncDialplan={(company) => resyncDialplan(company.id)}
             />
 
             <DataPagination

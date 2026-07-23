@@ -65,9 +65,10 @@ type AsteriskQueueData = {
 }
 
 export const AsteriskQueueRepository = {
-    async createQueue(tx: Tx, asteriskName: string, data: AsteriskQueueData) {
+    async createQueue(tx: Tx, appQueueId: string, asteriskName: string, data: AsteriskQueueData) {
         await tx.queues.create({
             data: {
+                appQueueId,
                 name: asteriskName,
                 strategy: data.strategy,
                 musiconhold: data.musicOnHold,
@@ -87,37 +88,63 @@ export const AsteriskQueueRepository = {
         })
     },
 
-    // upsert em vez de update: a linha realtime pode ter sido perdida (drift entre `Queue` e
-    // `queues` — ex: reset manual do banco) sem que o registro do app deixe de existir; recriar
-    // com os campos default do Asterisk (ver schema.prisma) é mais seguro que 500 num PUT normal.
-    async updateQueue(tx: Tx, asteriskName: string, update: Record<string, any>) {
-        if (Object.keys(update).length > 0)
-            await tx.queues.upsert({
-                where: { name: asteriskName },
-                update,
-                create: { name: asteriskName, ...update },
-            })
-    },
+    // Chaveia por appQueueId (estável), não por `name` recalculado — o Asterisk só entende `name`
+    // como chave, mas se o app confiasse em recomputar o nome antigo pra achar a linha, qualquer
+    // drift prévio (linha renomeada fora do fluxo normal, criada manualmente, etc.) faria essa
+    // busca ser um no-op silencioso e o upsert seguinte criava uma segunda linha órfã.
+    // oldAsteriskName === newAsteriskName quando não há rename (só update de campos).
+    async updateQueue(tx: Tx, appQueueId: string, oldAsteriskName: string, newAsteriskName: string, update: Record<string, any>) {
+        const existing = await tx.queues.findUnique({ where: { appQueueId } })
+        if (existing) {
+            if (existing.name !== newAsteriskName)
+                await tx.queue_members.updateMany({
+                    where: { queue_name: existing.name },
+                    data: { queue_name: newAsteriskName },
+                })
+            await tx.queues.update({ where: { appQueueId }, data: { ...update, name: newAsteriskName } })
+            return
+        }
 
-    // updateMany não lança se `oldName` já não existir (linha ausente por drift) — segue como
-    // no-op, e o updateQueue() logo em seguida recria a linha já com `newAsteriskName`.
-    async renameQueue(tx: Tx, oldName: string, newName: string) {
-        await tx.queue_members.updateMany({
-            where: { queue_name: oldName },
-            data: { queue_name: newName },
+        // appQueueId ainda não vinculado (linha criada antes dessa coluna existir, ou drift) —
+        // acha pelo nome atual/anterior e autocura anexando o id agora, sem precisar de migration
+        // de dados: a partir daqui essa fila nunca mais depende do nome pra ser localizada.
+        const byName = await tx.queues.findFirst({
+            where: { name: { in: [...new Set([newAsteriskName, oldAsteriskName])] } },
         })
-        await tx.queues.updateMany({ where: { name: oldName }, data: { name: newName } })
+        if (byName) {
+            if (byName.name !== newAsteriskName)
+                await tx.queue_members.updateMany({
+                    where: { queue_name: byName.name },
+                    data: { queue_name: newAsteriskName },
+                })
+            await tx.queues.update({
+                where: { name: byName.name },
+                data: { ...update, name: newAsteriskName, appQueueId },
+            })
+            return
+        }
+
+        // linha realtime nunca existiu (drift total) — recria do zero, mesma rede de segurança do
+        // upsert anterior
+        await tx.queues.create({ data: { name: newAsteriskName, appQueueId, ...update } })
     },
 
-    async deleteQueue(tx: Tx, asteriskName: string) {
-        await tx.queue_members.deleteMany({ where: { queue_name: asteriskName } })
-        await tx.queues.deleteMany({ where: { name: asteriskName } })
+    async deleteQueue(tx: Tx, appQueueId: string, asteriskName: string) {
+        const existing = await tx.queues.findUnique({ where: { appQueueId } })
+        const name = existing?.name ?? asteriskName
+        await tx.queue_members.deleteMany({ where: { queue_name: name } })
+        if (existing) await tx.queues.delete({ where: { appQueueId } })
+        else await tx.queues.deleteMany({ where: { name } })
     },
 
-    async deleteManyQueues(tx: Tx, asteriskNames: string[]) {
-        if (asteriskNames.length > 0) {
-            await tx.queue_members.deleteMany({ where: { queue_name: { in: asteriskNames } } })
-            await tx.queues.deleteMany({ where: { name: { in: asteriskNames } } })
+    async deleteManyQueues(tx: Tx, appQueueIds: string[], asteriskNames: string[]) {
+        const rows = appQueueIds.length > 0
+            ? await tx.queues.findMany({ where: { appQueueId: { in: appQueueIds } } })
+            : []
+        const names = new Set([...rows.map((r) => r.name), ...asteriskNames])
+        if (names.size > 0) {
+            await tx.queue_members.deleteMany({ where: { queue_name: { in: [...names] } } })
+            await tx.queues.deleteMany({ where: { name: { in: [...names] } } })
         }
     },
 
@@ -194,6 +221,10 @@ export const AsteriskQueueRepository = {
                 if (q.announce)
                     entries.push({ context: QUEUE_APP_CONTEXT, exten, priority: priority++, app: 'Playback', appdata: audioSoundPath(asteriskId, q.announce) })
                 entries.push(
+                    // Carimba o CDR com o nome da fila antes do Queue() rodar — ver comentário do
+                    // campo queueName em schema.prisma. Sobrevive mesmo se o lastapp/context do CDR
+                    // mudar depois (pesquisa/postQueueDestination rodam DEPOIS do Queue() retornar).
+                    { context: QUEUE_APP_CONTEXT, exten, priority: priority++, app: 'Set', appdata: `CDR(queue_name)=${asteriskName}` },
                     { context: QUEUE_APP_CONTEXT, exten, priority: priority++, app: 'Queue', appdata: asteriskName },
                     { context: QUEUE_APP_CONTEXT, exten, priority: priority++, app: 'AGI', appdata: buildQueueSurveyAgiUrl(q.id) },
                     nodeExitCheck(QUEUE_APP_CONTEXT, exten, priority++, 'default'),

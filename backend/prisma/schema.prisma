@@ -845,9 +845,18 @@ model cdr {
   amaflags    Int?
   accountcode String?   @db.VarChar(80)
   uniqueid    String?   @db.VarChar(150)
+  // Setado via Set(CDR(queue_name)=<asteriskName>) logo antes do Queue() no dialplan (ver
+  // AsteriskQueueRepository.regenerate) — não é um campo nativo do CDR, é uma var de canal
+  // custom que o cdr_adaptive_odbc grava por já existir uma coluna com esse nome. Permite achar
+  // "quanto tempo essa fila levou pra atender" pelo histórico (duration - billsec = tempo até
+  // atender) sem depender do QueueParams.Holdtime ao vivo do AMI, que zera toda vez que a fila
+  // fica ociosa e o Asterisk destrói/recria o objeto realtime da fila.
+  queueName   String?   @map("queue_name") @db.VarChar(160)
 
   // composto: toda query filtra por accountcode e ordena por startTime desc — cobre WHERE+ORDER BY num único index scan
   @@index([accountcode, startTime(sort: Desc)])
+  // média de hold time hoje por fila: filtra por queueName + intervalo de startTime
+  @@index([queueName, startTime])
 }
 
 // name é o identificador real do peer no Asterisk (chan_sip busca por name, não por id)
@@ -969,8 +978,11 @@ model iax_friends {
 
 // name é a PK — Asterisk identifica filas por nome, não por UUID
 // announceFreq/announcePosition/periodicAnnounce* usam @map pelo mesmo motivo do hífen em sip_peers
+// appQueueId: Queue.id (app) — chave estável usada por AsteriskQueueRepository pra achar/renomear
+// esta linha sem depender do `name` recalculado (que pode ter divergido por drift/legado)
 model queues {
   name                 String  @id @db.VarChar(128)
+  appQueueId           String? @unique @db.VarChar(30)
   strategy             String? @default("ringall") @db.VarChar(40)
   musiconhold          String? @default("default") @db.VarChar(128)
   timeout              Int?    @default(15)

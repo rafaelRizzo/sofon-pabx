@@ -1,6 +1,6 @@
 "use client"
 
-import { PencilIcon, Trash2Icon } from "lucide-react"
+import { PencilIcon, RefreshCwIcon, Trash2Icon } from "lucide-react"
 
 import { StatusBadge } from "@/components/status-badge"
 import { Badge } from "@/components/ui/badge"
@@ -14,6 +14,12 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table"
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { type Company } from "@/hooks/use-companies"
 
 type CompaniesTableProps = {
@@ -21,6 +27,7 @@ type CompaniesTableProps = {
     loading: boolean
     onEdit: (company: Company) => void
     onDelete: (company: Company) => void
+    onResyncDialplan: (company: Company) => void
 }
 
 export function CompaniesTable({
@@ -28,6 +35,7 @@ export function CompaniesTable({
     loading,
     onEdit,
     onDelete,
+    onResyncDialplan,
 }: CompaniesTableProps) {
     return (
         <div className="rounded-md border">
@@ -84,6 +92,34 @@ export function CompaniesTable({
                                 </TableCell>
                                 <TableCell className="text-right">
                                     <div className="flex justify-end gap-2">
+                                        <TooltipProvider delay={200}>
+                                            <Tooltip>
+                                                <TooltipTrigger
+                                                    render={
+                                                        <Button
+                                                            variant="outline"
+                                                            size="icon"
+                                                            onClick={() =>
+                                                                onResyncDialplan(
+                                                                    company
+                                                                )
+                                                            }
+                                                        >
+                                                            <RefreshCwIcon />
+                                                            <span className="sr-only">
+                                                                Resincronizar
+                                                                dialplan
+                                                            </span>
+                                                        </Button>
+                                                    }
+                                                />
+                                                <TooltipContent>
+                                                    Regenera todo o dialplan
+                                                    estático da empresa a
+                                                    partir do banco
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        </TooltipProvider>
                                         <Button
                                             variant="outline"
                                             size="icon"

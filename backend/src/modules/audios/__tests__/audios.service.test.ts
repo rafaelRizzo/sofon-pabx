@@ -195,6 +195,8 @@ describe('AudiosService.deleteAudio', () => {
         await AudiosService.deleteAudio('audio1')
         expect(AsteriskQueueRepository.updateQueue).toHaveBeenCalledWith(
             expect.anything(),
+            'q1',
+            'ast1-suporte',
             'ast1-suporte',
             { periodicAnnounce: null, announce: null }
         )

@@ -2,6 +2,7 @@ import { app } from './app'
 import { validateEnv } from './config/env'
 import { connectRedis, disconnectRedis } from './config/redis'
 import { startAgiServer } from './asterisk/agi-server'
+import { startAmiEvents, stopAmiEvents } from './asterisk/ami-events'
 import { startHolidayResyncJob } from './jobs/holiday-resync.job'
 import { startAgentAffinityRecalcJob } from './jobs/agent-affinity-recalc.job'
 import { logger } from './utils/logger'
@@ -16,6 +17,7 @@ async function start() {
         await connectRedis()
 
         startAgiServer(env.AGI_HOST, env.AGI_PORT)
+        startAmiEvents()
         startHolidayResyncJob()
         startAgentAffinityRecalcJob()
 
@@ -37,12 +39,14 @@ async function start() {
 
 process.on('SIGTERM', async () => {
     logger.info({ event: 'server.shutdown' })
+    await stopAmiEvents()
     await disconnectRedis()
     process.exit(0)
 })
 
 process.on('SIGINT', async () => {
     logger.info({ event: 'server.interrupt' })
+    await stopAmiEvents()
     await disconnectRedis()
     process.exit(0)
 })

@@ -192,14 +192,20 @@ export const SLOT_LABELS: Record<string, string> = {
 export const SLOT_COLORS: Record<string, { text: string; handle: string }> = {
     true: {
         text: "text-emerald-600 dark:text-emerald-400",
-        handle: "bg-emerald-500!",
+        handle: "bg-[var(--flow-branch-positive)]!",
     },
     success: {
         text: "text-emerald-600 dark:text-emerald-400",
-        handle: "bg-emerald-500!",
+        handle: "bg-[var(--flow-branch-positive)]!",
     },
-    false: { text: "text-red-600 dark:text-red-500", handle: "bg-red-500!" },
-    error: { text: "text-red-600 dark:text-red-500", handle: "bg-red-500!" },
+    false: {
+        text: "text-red-600 dark:text-red-500",
+        handle: "bg-[var(--flow-branch-negative)]!",
+    },
+    error: {
+        text: "text-red-600 dark:text-red-500",
+        handle: "bg-[var(--flow-branch-negative)]!",
+    },
 }
 
 // chave composta type:id — única no canvas independente do tipo, usada como id de nó do React Flow.

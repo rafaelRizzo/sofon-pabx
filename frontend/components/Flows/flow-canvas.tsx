@@ -93,7 +93,7 @@ function edgeStyleForSlot(slot: string) {
             false: "var(--flow-branch-negative)",
             error: "var(--flow-branch-negative)",
         }[slot]
-    return stroke ? { stroke, strokeWidth: 2 } : undefined
+    return { strokeWidth: 2, ...(stroke && { stroke }) }
 }
 
 type Props = { flow: Flow; companies: Company[] }

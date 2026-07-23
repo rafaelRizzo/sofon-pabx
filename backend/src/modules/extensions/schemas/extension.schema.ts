@@ -162,7 +162,11 @@ const sipCreateDefaults = {
 // Defaults espelham os @default de ps_endpoints/ps_aors no schema.prisma — só no create; update usa
 // pjsipFields sem default pra não sobrescrever quando o campo é omitido
 const pjsipCreateDefaults = {
-    transport: pjsipFields.transport.default('transport-udp'),
+    // Sem default: `transport` não tem @default em ps_endpoints (schema.prisma) — fixar um valor aqui
+    // trava o endpoint num transport só, quebrando o qualify OPTIONS quando o contato registra por
+    // outro transport (ex: client em TCP com endpoint fixado em transport-udp vira
+    // PJSIP_ETPNOTSUITABLE e o contato cai como Unreachable mesmo online). Deixar unset permite o
+    // Asterisk escolher o transport certo dinamicamente por request.
     disallow: pjsipFields.disallow.default('all'),
     allow: pjsipFields.allow.default('ulaw,alaw'),
     directMedia: pjsipFields.directMedia.default(false),

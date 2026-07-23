@@ -133,8 +133,10 @@ export const deleteAudio = async (id: string) => {
             const update: Record<string, null> = {}
             if (q.periodicAnnounce === id) update.periodicAnnounce = null
             if (q.agentAnnounce === id) update.announce = null
-            if (Object.keys(update).length > 0)
-                await AsteriskQueueRepository.updateQueue(tx, toAsteriskQueueName(q.company.asteriskId, q.number ?? q.name), update)
+            if (Object.keys(update).length > 0) {
+                const name = toAsteriskQueueName(q.company.asteriskId, q.number ?? q.name)
+                await AsteriskQueueRepository.updateQueue(tx, q.id, name, name, update)
+            }
         }
     })
 

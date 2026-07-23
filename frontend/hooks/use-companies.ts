@@ -106,6 +106,21 @@ export function useCompanies() {
         }
     }
 
+    // Regenera todo dialplan estático da empresa a partir do banco — usado quando um arquivo em
+    // /etc/asterisk/dialplan-extra ficou desatualizado (ex: migração/deploy que mudou como o
+    // dialplan é gerado) sem precisar salvar módulo por módulo. Requer role admin (backend).
+    const resyncDialplan = async (companyId: string) => {
+        const id = toast.loading("Resincronizando dialplan...")
+        try {
+            await api.post(`/companies/${companyId}/resync-dialplan`)
+            toast.success("Dialplan resincronizado", { id })
+            return true
+        } catch (err) {
+            toast.error(apiError(err, "Erro ao resincronizar dialplan"), { id })
+            return false
+        }
+    }
+
     const filtered = companies.filter((c) =>
         `${c.name} ${c.doc ?? ""}`.toLowerCase().includes(filter.toLowerCase())
     )
@@ -127,5 +142,6 @@ export function useCompanies() {
         createCompany,
         updateCompany,
         deleteCompany,
+        resyncDialplan,
     }
 }
