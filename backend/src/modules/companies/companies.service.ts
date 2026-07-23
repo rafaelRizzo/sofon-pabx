@@ -44,6 +44,7 @@ const companySelect = {
     asteriskId: true,
     timezone: true,
     metadata: true,
+    elevenLabsApiKey: true,
     createdAt: true,
     updatedAt: true,
 } as const

@@ -1,7 +1,7 @@
 import { extname } from 'path'
 import type { FastifyRequest, FastifyReply } from 'fastify'
 import * as AudiosService from './audios.service'
-import { createAudioFieldsSchema, updateAudioSchema, idParamSchema, companyQuerySchema } from './schemas/audio.schema'
+import { createAudioFieldsSchema, createAudioTtsSchema, updateAudioSchema, idParamSchema, companyQuerySchema } from './schemas/audio.schema'
 import { handleError } from '../../utils/errors/handler.error'
 import { AppError } from '../../utils/errors/app.error'
 import { prisma } from '../../lib/prisma'
@@ -83,6 +83,28 @@ export const createAudio = async (req: FastifyRequest, reply: FastifyReply) => {
 
         const audio = await AudiosService.createAudio(companyId, name, buffer, file.filename)
         return reply.status(201).send({ success: true, message: 'Audio created successfully', audioId: audio.id })
+    } catch (error) {
+        return handleError(reply, error, req)
+    }
+}
+
+export const createAudioTts = async (req: FastifyRequest, reply: FastifyReply) => {
+    try {
+        const { name, companyId, text, voiceId } = createAudioTtsSchema.parse(req.body)
+        req.scope.assertAccess(companyId)
+        const audio = await AudiosService.createAudioFromText(companyId, name, text, voiceId)
+        return reply.status(201).send({ success: true, message: 'Audio generated successfully', audioId: audio.id })
+    } catch (error) {
+        return handleError(reply, error, req)
+    }
+}
+
+export const getVoices = async (req: FastifyRequest, reply: FastifyReply) => {
+    try {
+        const { companyId } = companyQuerySchema.parse(req.query)
+        req.scope.assertAccess(companyId)
+        const voices = await AudiosService.listVoices(companyId)
+        return reply.send({ success: true, message: 'Voices fetched successfully', voices })
     } catch (error) {
         return handleError(reply, error, req)
     }

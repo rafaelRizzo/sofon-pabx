@@ -18,6 +18,9 @@ model Company {
   // padrão de storage é sempre UTC (Timestamptz); este campo só define o fuso de exibição na API
   timezone           String              @default("America/Sao_Paulo") @db.VarChar(64)
   metadata           Json                @default("{}")
+  // key própria da empresa pra TTS (ver providers/elevenlabs.provider.ts) — null = TTS desabilitado
+  // pra essa empresa, sem fallback global (cada empresa usa a própria conta/billing ElevenLabs)
+  elevenLabsApiKey   String?
   createdAt          DateTime            @default(now()) @db.Timestamptz(3)
   updatedAt          DateTime            @updatedAt @db.Timestamptz(3)
   users              UserCompany[]
@@ -427,12 +430,15 @@ model Announcement {
 }
 
 model Audio {
-  id        String   @id @default(cuid())
-  name      String   @db.VarChar(80)
-  companyId String
-  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  id         String      @id @default(cuid())
+  name       String      @db.VarChar(80)
+  companyId  String
+  company    Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  source     AudioSource @default(UPLOAD)
+  ttsText    String?     @db.Text
+  ttsVoiceId String?
+  createdAt  DateTime    @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime    @updatedAt @db.Timestamptz(3)
 
   announcements          Announcement[]
   ivrMenus               IvrMenu[]
@@ -444,6 +450,11 @@ model Audio {
   @@unique([name, companyId])
   @@index([companyId])
   @@map("audios")
+}
+
+enum AudioSource {
+  UPLOAD
+  TTS
 }
 
 model IvrMenu {

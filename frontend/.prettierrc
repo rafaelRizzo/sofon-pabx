@@ -2,10 +2,10 @@
   "endOfLine": "lf",
   "semi": false,
   "singleQuote": false,
-  "tabWidth": 4,
+  "tabWidth": 2,
   "trailingComma": "es5",
   "printWidth": 80,
   "plugins": ["prettier-plugin-tailwindcss"],
-  "tailwindStylesheet": "app/globals.css",
+  "tailwindStylesheet": "src/index.css",
   "tailwindFunctions": ["cn", "cva"]
 }

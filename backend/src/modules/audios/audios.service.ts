@@ -3,7 +3,7 @@ import { tmpdir } from 'os'
 import { join, extname } from 'path'
 import { randomUUID } from 'crypto'
 import { prisma } from '../../lib/prisma'
-import { getCompanyById } from '../companies/companies.service'
+import { getCompanyById, type CompanyDto } from '../companies/companies.service'
 import { AudiosCache } from './cache/audios.cache'
 import { audioSoundDir, audioSoundPath } from '../../asterisk/audio.repository'
 import { AnnouncementRepository } from '../../asterisk/announcement.repository'
@@ -13,6 +13,7 @@ import { AnnouncementsCache } from '../announcements/cache/announcements.cache'
 import { IvrCache } from '../ivr/cache/ivr.cache'
 import { QueuesCache } from '../queues/cache/queues.cache'
 import { convertToAsteriskWav } from '../../utils/audio-convert'
+import * as ElevenLabsProvider from './providers/elevenlabs.provider'
 import type { UpdateAudioInput } from './schemas/audio.schema'
 import { AppError } from '../../utils/errors/app.error'
 
@@ -20,9 +21,31 @@ const select = {
     id: true,
     name: true,
     companyId: true,
+    source: true,
+    ttsText: true,
+    ttsVoiceId: true,
     createdAt: true,
     updatedAt: true,
 } as const
+
+// Escreve o buffer em tmp e converte pro WAV final do Asterisk — usado tanto por upload quanto
+// por TTS. Em caso de falha na conversão, apaga o registro já criado (rollback).
+const persistAudioFile = async (company: Pick<CompanyDto, 'asteriskId'>, audioId: string, buffer: Buffer, ext: string) => {
+    const dir = audioSoundDir(company.asteriskId)
+    const soundPath = audioSoundPath(company.asteriskId, audioId)
+    const tmpPath = join(tmpdir(), `audio-upload-${randomUUID()}${ext}`)
+
+    await mkdir(dir, { recursive: true })
+    await writeFile(tmpPath, buffer)
+    try {
+        await convertToAsteriskWav(tmpPath, `${soundPath}.wav`)
+    } catch (error) {
+        await prisma.audio.delete({ where: { id: audioId } }).catch(() => {})
+        throw error
+    } finally {
+        await rm(tmpPath, { force: true })
+    }
+}
 
 export const getAudiosByCompany = async (companyId: string) => {
     const cached = await AudiosCache.getByCompany(companyId)
@@ -61,24 +84,41 @@ export const createAudio = async (companyId: string, name: string, audio: Buffer
     if (existing) throw new AppError('Audio already exists for this company', 409)
 
     const created = await prisma.audio.create({ data: { name, companyId }, select })
-
-    const dir = audioSoundDir(company.asteriskId)
-    const soundPath = audioSoundPath(company.asteriskId, created.id)
-    const tmpPath = join(tmpdir(), `audio-upload-${randomUUID()}${extname(originalFilename)}`)
-
-    await mkdir(dir, { recursive: true })
-    await writeFile(tmpPath, audio)
-    try {
-        await convertToAsteriskWav(tmpPath, `${soundPath}.wav`)
-    } catch (error) {
-        await prisma.audio.delete({ where: { id: created.id } }).catch(() => {})
-        throw error
-    } finally {
-        await rm(tmpPath, { force: true })
-    }
+    await persistAudioFile(company, created.id, audio, extname(originalFilename))
 
     await AudiosCache.invalidateByCompany(companyId)
     return created
+}
+
+export const createAudioFromText = async (companyId: string, name: string, text: string, voiceId: string) => {
+    const company = await getCompanyById(companyId)
+    if (!company.elevenLabsApiKey) throw new AppError('ElevenLabs is not configured for this company', 400)
+
+    const existing = await prisma.audio.findUnique({ where: { name_companyId: { name, companyId } } })
+    if (existing) throw new AppError('Audio already exists for this company', 409)
+
+    const buffer = await ElevenLabsProvider.textToSpeech(company.elevenLabsApiKey, voiceId, text)
+
+    const created = await prisma.audio.create({
+        data: { name, companyId, source: 'TTS', ttsText: text, ttsVoiceId: voiceId },
+        select,
+    })
+    await persistAudioFile(company, created.id, buffer, '.mp3')
+
+    await AudiosCache.invalidateByCompany(companyId)
+    return created
+}
+
+export const listVoices = async (companyId: string) => {
+    const company = await getCompanyById(companyId)
+    if (!company.elevenLabsApiKey) throw new AppError('ElevenLabs is not configured for this company', 400)
+
+    const cached = await AudiosCache.getVoices(companyId)
+    if (cached) return cached
+
+    const voices = await ElevenLabsProvider.listVoices(company.elevenLabsApiKey)
+    await AudiosCache.setVoices(companyId, voices)
+    return voices
 }
 
 export const updateAudio = async (id: string, data: UpdateAudioInput) => {

@@ -500,7 +500,7 @@ function isSnapshotComplete(block: AmiBlock): boolean {
 }
 
 async function handleBlock(block: AmiBlock): Promise<void> {
-    if (amiDebugEnabled) logger.warn({ event: 'ami.debug.block', block })
+    if (amiDebugEnabled) logger.warn({ event: 'ami.debug.message', message: block })
 
     if (!loggedIn) {
         if (block.Response === 'Success' && /accepted/i.test(block.Message ?? '')) {

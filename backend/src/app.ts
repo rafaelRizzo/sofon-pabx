@@ -8,7 +8,7 @@ import swagger from '@fastify/swagger'
 import scalar from '@scalar/fastify-api-reference'
 import { serializerCompiler, jsonSchemaTransform } from 'fastify-type-provider-zod'
 import { ZodError, type ZodType } from 'zod'
-import { randomUUID } from 'crypto'
+import { randomUUID, createHash } from 'crypto'
 import { logger } from './utils/logger'
 import { formatDatesDeep, collectCompanyIds } from './utils/timezone'
 import { getCompanyById } from './modules/companies/companies.service'
@@ -87,8 +87,27 @@ app.addHook('onRequest', async (request, reply) => {
     })
 })
 
-app.addHook('onSend', async (request, reply) => {
+// ETag pra GETs cacheáveis: revalida sempre (no-cache), mas devolve 304 sem body se o conteúdo
+// não mudou. Exclui /realtime (snapshot + SSE) — muda a todo instante, hash seria desperdício
+const ETAG_EXCLUDED_PREFIXES = ['/docs', '/realtime']
+
+app.addHook('onSend', async (request, reply, payload) => {
     reply.header('x-request-id', request.id)
+
+    if (request.method !== 'GET') return payload
+    if (ETAG_EXCLUDED_PREFIXES.some((prefix) => request.url.startsWith(prefix))) return payload
+    if (reply.statusCode !== 200 || typeof payload !== 'string') return payload
+
+    const etag = `"${createHash('sha1').update(payload).digest('hex')}"`
+    reply.header('cache-control', 'no-cache')
+
+    if (request.headers['if-none-match'] === etag) {
+        reply.code(304)
+        return ''
+    }
+
+    reply.header('etag', etag)
+    return payload
 })
 
 app.addHook('onResponse', async (request, reply) => {
@@ -97,6 +116,7 @@ app.addHook('onResponse', async (request, reply) => {
         method: request.method,
         url: request.url,
         statusCode: reply.statusCode,
+        responseTimeMs: reply.elapsedTime.toFixed(1),
     })
 })
 

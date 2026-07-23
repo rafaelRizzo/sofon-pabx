@@ -160,6 +160,7 @@ Vars: `DATABASE_URL`, `JWT_SECRET`, `REFRESH_SECRET`, `JWT_EXPIRES_IN` (15m), `R
 - `AMI_HOST`/`AMI_PORT`/`AMI_USER`/`AMI_SECRET` (127.0.0.1:5038/admin/—) — AMI (`src/asterisk/ami-client.ts`), usado só pra `dialplan reload` sem depender do binário CLI. `AMI_SECRET` é gerado pelo `install-asterisk.sh` (exibido no resumo final) e precisa ser copiado manualmente pro `.env` — indefinido = reload via AMI é pulado (só loga warning, nunca derruba a request)
 - `DIALPLAN_EXTRA_DIR` (`/etc/asterisk/dialplan-extra`) — onde `dialplan-file.repository.ts` materializa os contextos estáticos; testes de integração sobrescrevem via `.env.test`
 - `ASTERISK_VERSION`/`SIP_LEGACY_ENABLED`/`SIP_PORT`/`PJSIP_PORT` — espelham a escolha feita em `install-asterisk.sh` (passo 13 do script grava esses valores direto no `.env` do backend); expostos via `GET /system/sip-config` pro frontend exibir a configuração correta de provisionamento
+- `ELEVENLABS_API_URL`/`ELEVENLABS_MODEL_ID`/`ELEVENLABS_TIMEOUT_MS` — config **não-secreta** compartilhada do TTS (ver seção Audios); a API key em si é por empresa (`Company.elevenLabsApiKey`), não fica no `.env`
 
 ---
 
@@ -204,9 +205,10 @@ Modelo: Asterisk roda **nativo** na VPS (`setups/install-asterisk.sh` + `setups/
 - Create: `{ name, username, password, permissions?[] }` → `{ userId }`
 - Update: `{ name?, username?, password?, extensionId?, permissions?[] }` (min 1); `permissions` só é aceito se quem chama for admin (ver seção "Permissões granulares" acima)
 
-**Companies** — `{ id, name, doc?, metadata(json), createdAt, updatedAt }`
-- Create: `{ name, doc?, metadata?, userId? }`
-- Update: `{ name?, doc?, metadata? }` (min 1)
+**Companies** — `{ id, name, doc?, metadata(json), elevenLabsApiKey?, createdAt, updatedAt }`
+- Create: `{ name, doc?, metadata?, elevenLabsApiKey?, userId? }`
+- Update: `{ name?, doc?, metadata?, elevenLabsApiKey? }` (min 1)
+- `elevenLabsApiKey`: key da conta ElevenLabs da própria empresa, usada pelo TTS de Audios (ver seção Audios) — sem fallback global, cada empresa usa sua conta/billing. Retornada em texto puro no GET (mesmo padrão de `Trunk.password`, sem criptografia própria no projeto)
 
 **DIDs** — `{ id, number, companyId, company, createdAt, updatedAt }`
 - Create: `{ number(^\d+$), companyId }`; Update: `{ number? }`
@@ -256,8 +258,10 @@ Modelo: Asterisk roda **nativo** na VPS (`setups/install-asterisk.sh` + `setups/
 - Dialplan: contexto fixo `holidays`, exten `hol-<id>`, `GotoIfTime` por datas (month/day, sem hora/weekday)
 - `UNIQUE(name, companyId)`
 
-**Audios** (rotas gateadas por `audios:view`/`audios:manage`, ver "Permissões granulares") — `{ id, name, companyId, createdAt, updatedAt }`
+**Audios** (rotas gateadas por `audios:view`/`audios:manage`, ver "Permissões granulares") — `{ id, name, companyId, source("UPLOAD"|"TTS"), ttsText?, ttsVoiceId?, createdAt, updatedAt }`
 - Create: `POST /audios` — multipart/form-data com campos de texto `name`+`companyId` **antes** do arquivo, até 15MB. Converte pra WAV slin 8kHz mono 16-bit via `sox` → `{ audioId }`
+- Create por TTS: `POST /audios/tts` — `{ name, companyId, text(max 2500), voiceId }` (JSON, mesmo rate limit de upload). Gera o áudio via ElevenLabs (`src/modules/audios/providers/elevenlabs.provider.ts`, endpoint `/v1/text-to-speech/{voiceId}`, `model_id` fixo em `ELEVENLABS_MODEL_ID`), salva `source:"TTS"` + `ttsText`/`ttsVoiceId`, e passa pelo mesmo `sox` de sempre → `{ audioId }`. 400 se a empresa não tiver `elevenLabsApiKey` configurada
+- `GET /audios/tts/voices?companyId=` — proxy cacheado (1h, por empresa) de `GET /v1/voices` da ElevenLabs, usando a key da própria empresa
 - Update: `PATCH /:id` — `{ name }` (só rename)
 - Delete: `DELETE /:id` — remove registro e `.wav`; desvincula (não bloqueia) Announcement/IvrMenu que o referenciem, removendo o dialplan deles
 - `UNIQUE(name, companyId)`

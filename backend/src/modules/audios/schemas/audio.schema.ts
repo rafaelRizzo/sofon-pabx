@@ -17,15 +17,34 @@ export const createAudioFieldsSchema = z.object({
     companyId: z.cuid2(),
 })
 
+export const createAudioTtsSchema = z.object({
+    name: z.string().min(1).max(80),
+    companyId: z.cuid2(),
+    text: z.string().min(1).max(2500),
+    voiceId: z.string().min(1),
+})
+
 export const AudioSchema = z.object({
     id: z.string(),
     name: z.string(),
     companyId: z.string(),
+    source: z.enum(['UPLOAD', 'TTS']),
+    ttsText: z.string().nullable(),
+    ttsVoiceId: z.string().nullable(),
     createdAt: timestamp,
     updatedAt: timestamp,
+})
+
+export const VoiceSchema = z.object({
+    voiceId: z.string(),
+    name: z.string(),
+    previewUrl: z.string().nullable(),
+    languages: z.array(z.string()),
 })
 
 export const ListAudiosResponse = ok({ message: z.string(), audios: z.array(AudioSchema) })
 export const GetAudioResponse = ok({ message: z.string(), audio: AudioSchema })
 export const CreateAudioResponse = ok({ message: z.string(), audioId: z.string() })
+export const CreateAudioTtsResponse = ok({ message: z.string(), audioId: z.string() })
 export const UpdateAudioResponse = ok({ message: z.string() })
+export const ListVoicesResponse = ok({ message: z.string(), voices: z.array(VoiceSchema) })

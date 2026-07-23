@@ -48,4 +48,16 @@ export class AudiosCache {
         await cacheManager.invalidate(NAMESPACE)
         logger.info({ event: 'cache.invalidate', namespace: NAMESPACE, key: 'all' })
     }
+
+    // Vozes da ElevenLabs — cada empresa tem sua própria conta/key, então cacheado por companyId
+    static async getVoices(companyId: string) {
+        const cached = await cacheManager.get(`${NAMESPACE}:voices`, companyId)
+        logger.info({ event: cached ? 'cache.hit' : 'cache.miss', namespace: NAMESPACE, key: `voices:${companyId}` })
+        return cached
+    }
+
+    static async setVoices(companyId: string, data: any, config?: CacheConfig) {
+        await cacheManager.set(`${NAMESPACE}:voices`, companyId, data, config ?? { ttl: 3600 })
+        logger.info({ event: 'cache.set', namespace: NAMESPACE, key: `voices:${companyId}` })
+    }
 }

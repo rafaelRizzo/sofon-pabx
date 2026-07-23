@@ -53,6 +53,11 @@ const envSchema = z.object({
     SIP_LEGACY_ENABLED: z.coerce.boolean().default(false),
     SIP_PORT: z.coerce.number().optional(),
     PJSIP_PORT: z.coerce.number().default(5060),
+    // TTS via ElevenLabs (src/modules/audios/providers/elevenlabs.provider.ts) — a API key é por
+    // empresa (Company.elevenLabsApiKey), não global; aqui só a config não-secreta compartilhada
+    ELEVENLABS_API_URL: z.string().default('https://api.elevenlabs.io'),
+    ELEVENLABS_MODEL_ID: z.string().default('eleven_multilingual_v2'),
+    ELEVENLABS_TIMEOUT_MS: z.coerce.number().int().min(1000).max(60000).default(30000),
 }).superRefine((cfg, ctx) => {
     // Em produção os defaults públicos de JWT_SECRET/REFRESH_SECRET são inaceitáveis (tokens forjáveis
     // por quem lê o repo). Exige segredos próprios, fortes e distintos — só falha em produção pra não

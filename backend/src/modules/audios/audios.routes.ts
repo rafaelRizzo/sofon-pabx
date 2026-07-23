@@ -4,8 +4,9 @@ import * as AudiosController from './audios.controller'
 import { protectedRoute } from '../../middleware/scope.middleware'
 import { requirePermission } from '../../middleware/permission.middleware'
 import {
-    updateAudioSchema, idParamSchema, companyQuerySchema,
+    updateAudioSchema, createAudioTtsSchema, idParamSchema, companyQuerySchema,
     ListAudiosResponse, GetAudioResponse, CreateAudioResponse, UpdateAudioResponse,
+    CreateAudioTtsResponse, ListVoicesResponse,
 } from './schemas/audio.schema'
 import { errors, deleted } from '../../schemas/responses'
 import { validateEnv } from '../../config/env'
@@ -79,6 +80,46 @@ export const audiosRoutes = async (app: FastifyInstance) => {
             },
         },
     }, AudiosController.createAudio as any)
+
+    router.get('/audios/tts/voices', {
+        onRequest: [...protectedRoute, requirePermission('audios', 'view')],
+        schema: {
+            tags: ['Audios'],
+            summary: 'Listar vozes disponíveis na ElevenLabs (da conta configurada na empresa)',
+            security: [{ bearerAuth: [] }],
+            querystring: companyQuerySchema,
+            response: {
+                200: ListVoicesResponse,
+                400: errors[400],
+                401: errors[401],
+                403: errors[403],
+                404: errors[404],
+            },
+        },
+    }, AudiosController.getVoices as any)
+
+    router.post('/audios/tts', {
+        ...uploadRateLimit,
+        onRequest: [...protectedRoute, requirePermission('audios', 'manage')],
+        schema: {
+            tags: ['Audios'],
+            summary: 'Gerar áudio por texto (TTS via ElevenLabs)',
+            description:
+                'Converte o texto em áudio usando a voz escolhida (ElevenLabs) e salva como um Audio ' +
+                'normal, já convertido pra WAV PCM 16-bit mono 8kHz. Retorna o `audioId` pra ser ' +
+                'referenciado em Announcements, IVR Menus etc.',
+            security: [{ bearerAuth: [] }],
+            body: createAudioTtsSchema,
+            response: {
+                201: CreateAudioTtsResponse,
+                400: errors[400],
+                401: errors[401],
+                403: errors[403],
+                404: errors[404],
+                409: errors[409],
+            },
+        },
+    }, AudiosController.createAudioTts as any)
 
     router.patch('/audios/:id', {
         onRequest: [...protectedRoute, requirePermission('audios', 'manage')],
