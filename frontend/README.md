@@ -1,6 +1,16 @@
-# React + TypeScript + Vite + shadcn/ui
+# SOFON PABX Frontend
 
-This is a template for a new Vite project with React, TypeScript, and shadcn/ui.
+## Docker
+
+```bash
+cp .env.example .env
+docker compose build
+docker compose up -d
+```
+
+`VITE_API_URL` é embutida no bundle durante o build. Altere-a no `.env` e execute `docker compose up -d --build` para aplicar a mudança.
+
+O Dockerfile usa cache BuildKit para o store do pnpm. A primeira imagem baixa as dependências, as próximas reutilizam o cache enquanto `pnpm-lock.yaml` não mudar.
 
 ## Adding components
 

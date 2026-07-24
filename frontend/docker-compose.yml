@@ -1,0 +1,17 @@
+services:
+  sofon_frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:3333}
+    container_name: sofon_frontend
+    restart: unless-stopped
+    expose:
+      - "3000"
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    external: true

@@ -109,6 +109,8 @@ function SlotChip({
             >
                 <BranchConnectPopover
                     companyId={companyId}
+                    defaultType={target.type as CanvasNodeType}
+                    currentOption={{ id: target.id, label: target.name }}
                     onSelect={(type, opt) =>
                         onConnectSlot?.(slot, type, opt.id, opt.label)
                     }

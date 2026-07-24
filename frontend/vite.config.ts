@@ -6,17 +6,22 @@ import { defineConfig } from "vite"
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [
-    tanstackRouter({ target: "react", autoCodeSplitting: true }),
-    react(),
-    tailwindcss(),
-  ],
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
+    plugins: [
+        tanstackRouter({ target: "react", autoCodeSplitting: true }),
+        react(),
+        tailwindcss(),
+    ],
+    resolve: {
+        alias: {
+            "@": path.resolve(__dirname, "./src"),
+        },
     },
-  },
-  server: {
-    port: 3001,
-  },
+    server: {
+        port: 3001,
+    },
+    preview: {
+        host: true,
+        port: 3000,
+        allowedHosts: ["seu_domain"],
+    },
 })
