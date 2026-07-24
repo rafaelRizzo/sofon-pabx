@@ -18,7 +18,7 @@ function FlowEditorPage() {
     const loading = flowLoading || flowNodesState.loading
 
     return (
-        <div className="relative h-[calc(100dvh-6rem)] w-full overflow-hidden rounded-md border">
+        <div className="relative h-[calc(100dvh-3rem)] w-full overflow-hidden">
             {loading || !flow ? (
                 <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
                     Carregando...
@@ -31,17 +31,16 @@ function FlowEditorPage() {
                 />
             )}
 
-            <div className="absolute top-3 left-3 z-20 flex items-center gap-1.5 rounded-md border bg-card/95 py-1.5 pr-2.5 pl-1.5 shadow-sm backdrop-blur-sm">
+            <div className="absolute top-3 left-3 z-20 flex items-center gap-1 rounded-md border bg-card/95 py-1 pr-2 pl-1 shadow-sm backdrop-blur-sm">
                 <Button
                     variant="ghost"
-                    size="icon"
-                    className="size-7"
+                    size="icon-sm"
                     onClick={() => navigate({ to: "/dashboard/flows" })}
                 >
-                    <ArrowLeftIcon className="size-4" />
+                    <ArrowLeftIcon className="size-3.5" />
                     <span className="sr-only">Voltar</span>
                 </Button>
-                <h1 className="text-sm font-semibold">
+                <h1 className="text-xs font-semibold">
                     {flow?.name ?? "Carregando..."}
                 </h1>
             </div>

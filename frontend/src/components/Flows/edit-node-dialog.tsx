@@ -48,6 +48,8 @@ import { ExtensionFormDialog } from "@/components/Extensions/extension-form-dial
 import { useExtensions } from "@/hooks/use-extensions"
 import { FlowFormDialog } from "@/components/Flows/flow-form-dialog"
 import { useFlow, useFlows } from "@/hooks/use-flows"
+import { IvrMenuFormDialog } from "@/components/Ivr/ivr-menu-form-dialog"
+import { useIvr, type IvrMenu } from "@/hooks/use-ivr"
 import type { Company } from "@/hooks/use-companies"
 import {
     NODE_TYPE_CONFIG,
@@ -136,6 +138,27 @@ export function EditNodeDialog({
                     }
                     onSave={async (form) => {
                         const ok = await updateAnnouncement(id, form)
+                        if (ok) onSaved()
+                        return ok
+                    }}
+                />
+            )
+        }
+        case "ivr": {
+            const { entity } = useEntityById<IvrMenu>(
+                NODE_TYPE_CONFIG.ivr.apiPath,
+                id
+            )
+            const { updateIvrMenu } = useIvr()
+            return (
+                <IvrMenuFormDialog
+                    open={open}
+                    onOpenChange={onOpenChange}
+                    ivrMenu={entity}
+                    companies={companies}
+                    flowNodeMode
+                    onSave={async (form) => {
+                        const ok = await updateIvrMenu(id, form)
                         if (ok) onSaved()
                         return ok
                     }}

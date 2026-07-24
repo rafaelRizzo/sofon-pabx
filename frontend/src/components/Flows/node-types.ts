@@ -1,18 +1,22 @@
+import {
+    TriangleAlertIcon,
+    TimerIcon,
+    ListChecksIcon,
+    type LucideIcon,
+} from "lucide-react"
 import type { RouteDestinationType } from "@/components/RouteDestination/route-destination-field"
 
-// IVR fica fora do canvas nesta primeira versão — seus destinos de saída (invalid/timeout/long +
-// 1 por dígito configurado) vivem dentro de um array (`options`) substituído por completo no PUT,
-// diferente dos outros tipos (campo nomeado direto: destination/trueRoute/onSuccess/etc) — conectar
-// via drag exigiria buscar+mesclar esse array, tratamento à parte de uma próxima entrega. Voicemail
-// não tem entidade própria (id livre, sem FK) — não faz sentido como nó. Hangup não é um destino
-// navegável, é a ausência de um.
+// Voicemail não tem entidade própria (id livre, sem FK), e Hangup é a ausência de um destino.
+// IVR é um recurso compartilhado: suas teclas são definidas no IvrMenu, enquanto as conexões de
+// cada saída pertencem à instância FlowNode.
 export type CanvasNodeType = Exclude<
     RouteDestinationType,
-    "hangup" | "voicemail" | "ivr"
+    "hangup" | "voicemail"
 >
 
 export const CANVAS_NODE_TYPES: CanvasNodeType[] = [
     "announcement",
+    "ivr",
     "queue",
     "extension",
     "request",
@@ -28,6 +32,7 @@ export const CANVAS_NODE_TYPES: CanvasNodeType[] = [
 export type CanvasNodeAction =
     | "transfer"
     | "announcement"
+    | "ivr"
     | "timecondition"
     | "holiday"
     | "request"
@@ -54,6 +59,12 @@ export const NODE_ACTIONS: NodeActionDefinition[] = [
         label: "Tocar anúncio",
         description: "Reproduz um áudio cadastrado.",
         resourceTypes: ["announcement"],
+    },
+    {
+        id: "ivr",
+        label: "URA",
+        description: "Toca um menu e direciona cada tecla no flow.",
+        resourceTypes: ["ivr"],
     },
     {
         id: "timecondition",
@@ -95,6 +106,7 @@ export const NODE_ACTIONS: NodeActionDefinition[] = [
 
 export const NODE_ACTION_LABELS: Record<CanvasNodeType, string> = {
     announcement: "Tocar anúncio",
+    ivr: "URA",
     queue: "Transferir para fila",
     extension: "Transferir para ramal",
     request: "Executar requisição",
@@ -124,6 +136,14 @@ export const NODE_TYPE_CONFIG: Record<CanvasNodeType, NodeTypeConfig> = {
         apiPath: "announcements",
         staticSlots: ["default"],
         slotField: { default: "destination" },
+        creatable: true,
+    },
+    ivr: {
+        apiPath: "ivr-menus",
+        // As teclas são adicionadas dinamicamente pelo IvrMenu. invalid/timeout
+        // sempre existem; long existe somente no modo collect.
+        staticSlots: ["invalid", "timeout"],
+        slotField: {},
         creatable: true,
     },
     queue: {
@@ -184,7 +204,18 @@ export const SLOT_LABELS: Record<string, string> = {
     false: "Falso",
     success: "Sucesso",
     error: "Erro",
+    invalid: "Inválido",
+    timeout: "Timeout",
+    long: "Dados coletados",
     entry: "",
+}
+
+// Ícone das saídas de exceção da URA (invalid/timeout/long) — mostrado como selo pequeno acima do
+// chip, já que o texto do botão vira o destino conectado assim que existe conexão (ver flow-node.tsx)
+export const SLOT_ICONS: Partial<Record<string, LucideIcon>> = {
+    invalid: TriangleAlertIcon,
+    timeout: TimerIcon,
+    long: ListChecksIcon,
 }
 
 // Separação visual dos slots condicionais (true/false, success/error) — cor do texto + do handle,

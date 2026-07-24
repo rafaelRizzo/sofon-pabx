@@ -15,6 +15,7 @@ function model() {
         upsert: mock(),
         count: mock(() => Promise.resolve(0)),
         groupBy: mock(() => Promise.resolve([])),
+        aggregate: mock(() => Promise.resolve({})),
     }
 }
 
@@ -54,6 +55,7 @@ export function createPrismaMock() {
         flow: model(),
         flowNode: model(),
         flowNodeEdge: model(),
+        queueCall: model(),
         // Asterisk realtime
         ps_endpoints: model(),
         ps_auths: model(),
@@ -67,6 +69,7 @@ export function createPrismaMock() {
         cdr: model(),
         $transaction: mock((fn: (tx: any) => any) => fn(db)),
         $disconnect: mock(() => Promise.resolve()),
+        $queryRaw: mock(() => Promise.resolve([])),
     }
     return db
 }

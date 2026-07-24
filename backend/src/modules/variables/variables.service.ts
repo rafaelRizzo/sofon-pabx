@@ -3,6 +3,7 @@ import { getCompanyById } from '../companies/companies.service'
 import { VariablesCache } from './cache/variables.cache'
 import { VariableRepository } from '../../asterisk/variable.repository'
 import { FlowEdgeRepository } from '../../asterisk/flow-edge.repository'
+import { syncFlowNodeLabel } from '../flows/flow-nodes.service'
 import { validateRouteDestination, assertNotReferenced } from '../../schemas/route-destination.validate'
 import { resolveDestinationLabels, withDestinationLabel } from '../../schemas/route-destination-label'
 import { resolveUsedByLabels, type UsedByRef } from '../../schemas/flow-reference-label'
@@ -167,6 +168,9 @@ export const updateVariableSet = async (id: string, data: UpdateVariableSetInput
         }
         return updated
     })
+
+    if (data.name !== undefined && data.name !== existing.name)
+        await syncFlowNodeLabel('variable-set', id, data.name)
 
     try {
         await VariableRepository.regenerate(existing.companyId)

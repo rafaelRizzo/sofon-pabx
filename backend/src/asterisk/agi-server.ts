@@ -8,11 +8,14 @@ import { FLOW_NODE_ID_VAR } from './flow-node-runtime'
 import { safeFetch } from '../utils/net/safe-url'
 import { resolveActiveRule } from '../modules/callcenter/routing-rules/routing-rules.service'
 import { createRating } from '../modules/callcenter/ratings/ratings.service'
+import { finalizeByQueueStatus } from '../modules/queue-calls/queue-calls.service'
 import type { VariableMapping } from '../modules/request-templates/schemas/request-template.schema'
 
-// Servidor FastAGI — Asterisk conecta via AGI(agi://AGI_HOST:AGI_PORT/<script>,<args>) em 4 pontos:
+// Servidor FastAGI — Asterisk conecta via AGI(agi://AGI_HOST:AGI_PORT/<script>,<args>) em 5 pontos:
 // - /run,<requestTemplateId> — RouteDestination type: "request"
 // - /queue-route,<queueId>   — antes do Queue() nativo, seta QUEUE_PRIO a partir de RoutingRule
+// - /queue-outcome,<queueId> — depois do Queue(), lê QUEUESTATUS pra finalizar queue_calls
+//   (timeout/sem agente/fila cheia — únicos casos sem evento AMI terminal, ver ami-events.ts)
 // - /queue-survey,<queueId> — depois do Queue(), captura MEMBERINTERFACE pra pesquisa de satisfação
 // - /survey-result,<queueId>,<score> — fim da pesquisa (callcenter-surveys), persiste a nota
 // Protocolo AGI é estritamente request/response — nunca disparar dois comandos concorrentes no mesmo
@@ -224,6 +227,17 @@ async function handleQueueRoute(conn: AgiConn, queueId: string) {
     if (rule) await agiSetVariable(conn, 'QUEUE_PRIO', String(rule.priority))
 }
 
+// Roda logo após o Queue() retornar (antes da pesquisa) — QUEUESTATUS só vem preenchido quando
+// o canal do ligante sobrevive e o Queue() segue pra próxima priority (timeout/sem agente/fila
+// cheia); vazio quando a chamada foi de fato atendida (nesse caso AgentComplete via AMI já
+// finalizou queue_calls, ver finalizeByQueueStatus que ignora QUEUESTATUS vazio).
+async function handleQueueOutcome(conn: AgiConn, queueId: string) {
+    const queueStatus = (await agiGetVariable(conn, 'QUEUESTATUS')) ?? ''
+    const callerUniqueid = await agiGetVariable(conn, 'UNIQUEID')
+    if (!callerUniqueid) return
+    await finalizeByQueueStatus({ queueId, callerUniqueid, queueStatus })
+}
+
 // Roda depois do Queue() (só é alcançado quando o AGENTE desliga primeiro — ver comentário em
 // resolvePostQueueDestination de queue.repository.ts; se o cliente desligar primeiro, esse AGI nunca
 // roda, limitação física de qualquer pesquisa por IVR pós-chamada). MEMBERINTERFACE só vem populado
@@ -309,6 +323,7 @@ async function handleConnection(conn: AgiConn) {
     if (!arg1) return
 
     if (script === 'queue-route') await handleQueueRoute(conn, arg1)
+    else if (script === 'queue-outcome') await handleQueueOutcome(conn, arg1)
     else if (script === 'queue-survey') await handleQueueSurvey(conn, arg1)
     else if (script === 'survey-result') await handleSurveyResult(conn, arg1, env['agi_arg_2'] ?? '')
     else await handleRequestTemplate(conn, arg1)

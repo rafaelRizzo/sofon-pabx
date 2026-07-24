@@ -37,7 +37,7 @@ import { useTheme } from "@/components/theme-provider"
 import { useAuth, type PermissionResourceKey } from "@/hooks/use-auth"
 import { useLogout } from "@/hooks/use-logout"
 
-type NavItem = {
+export type NavItem = {
   title: string
   href: string
   icon: LucideIcon
@@ -46,13 +46,15 @@ type NavItem = {
   permission?: PermissionResourceKey | "cdr"
 }
 
-type NavGroup = {
+export type NavGroup = {
   label: string
   items: NavItem[]
 }
 
 // Recursos reutilizáveis são criados e configurados no contexto do Flow, sem poluir a navegação.
-const NAV: NavGroup[] = [
+// Exportado pra alimentar o breadcrumb do header (DashboardBreadcrumb), única fonte de verdade
+// pra rótulos de grupo/página.
+export const NAV: NavGroup[] = [
   {
     label: "Visão geral",
     items: [

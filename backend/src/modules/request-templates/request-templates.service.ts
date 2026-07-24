@@ -4,6 +4,7 @@ import { getCompanyById } from '../companies/companies.service'
 import { RequestTemplatesCache } from './cache/request-templates.cache'
 import { RequestTemplateRepository } from '../../asterisk/request-template.repository'
 import { FlowEdgeRepository } from '../../asterisk/flow-edge.repository'
+import { syncFlowNodeLabel } from '../flows/flow-nodes.service'
 import { validateRouteDestination, assertNotReferenced } from '../../schemas/route-destination.validate'
 import { resolveDestinationLabels, withDestinationLabel } from '../../schemas/route-destination-label'
 import { resolveUsedByLabels, type UsedByRef } from '../../schemas/flow-reference-label'
@@ -201,6 +202,8 @@ export const updateRequestTemplate = async (id: string, data: UpdateRequestTempl
         ])
         return updated
     })
+
+    if (data.name && data.name !== existing.name) await syncFlowNodeLabel('request', id, data.name)
 
     await RequestTemplatesCache.invalidateTemplate(id)
     await RequestTemplatesCache.invalidateByCompany(existing.companyId)

@@ -3,6 +3,7 @@ import { getCompanyById } from '../companies/companies.service'
 import { AnnouncementsCache } from './cache/announcements.cache'
 import { AnnouncementRepository } from '../../asterisk/announcement.repository'
 import { FlowEdgeRepository } from '../../asterisk/flow-edge.repository'
+import { syncFlowNodeLabel } from '../flows/flow-nodes.service'
 import { assertAudioBelongsToCompany } from '../audios/audios.service'
 import { validateRouteDestination, assertNotReferenced } from '../../schemas/route-destination.validate'
 import { resolveDestinationLabels, withDestinationLabel } from '../../schemas/route-destination-label'
@@ -128,6 +129,9 @@ export const updateAnnouncement = async (id: string, data: UpdateAnnouncementInp
         }
         return updated
     })
+
+    if (data.name !== undefined && data.name !== existing.name)
+        await syncFlowNodeLabel('announcement', id, data.name)
 
     try {
         await AnnouncementRepository.regenerate(existing.companyId)

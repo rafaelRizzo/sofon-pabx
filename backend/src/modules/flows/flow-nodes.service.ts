@@ -48,7 +48,9 @@ const portsByType: Record<FlowNodeType, readonly string[]> = {
   timecondition: ["true", "false"],
   holiday: ["true", "false"],
   announcement: ["default"],
-  ivr: ["invalid", "timeout", "long"],
+  // `long` só existe em URA de coleta. As saídas de dígitos são verificadas
+  // contra as opções configuradas no próprio recurso em assertPort().
+  ivr: ["invalid", "timeout"],
   request: ["success", "error"],
   "variable-set": ["default"],
   "variable-condition": ["true", "false"],
@@ -159,15 +161,26 @@ async function assertPort(
   resourceId: string | null,
   port: string,
 ) {
-  if (type === "ivr" && port.startsWith("digit:")) {
-    const digit = port.slice("digit:".length);
-    const option = resourceId
-      ? await prisma.ivrOption.findFirst({
-          where: { ivrMenuId: resourceId, digit },
-          select: { id: true },
-        })
-      : null;
-    if (option) return;
+  if (type === "ivr") {
+    if (port.startsWith("digit:")) {
+      const digit = port.slice("digit:".length);
+      const option = resourceId
+        ? await prisma.ivrOption.findFirst({
+            where: { ivrMenuId: resourceId, digit },
+            select: { id: true },
+          })
+        : null;
+      if (option) return;
+    }
+    if (port === "long") {
+      const menu = resourceId
+        ? await prisma.ivrMenu.findUnique({
+            where: { id: resourceId },
+            select: { type: true },
+          })
+        : null;
+      if (menu?.type === "collect") return;
+    }
   }
   if (!portsByType[type].includes(port))
     throw new AppError(`Port ${port} is not valid for node type ${type}`, 400);
@@ -305,6 +318,21 @@ async function regenerate(flowId: string, companyId: string) {
   await FlowsCache.invalidateFlow(flowId);
   await FlowsCache.invalidateByCompany(companyId);
 }
+
+// Chamado pelo update() de cada módulo de recurso (ivr/queue/announcement/...) quando o nome
+// muda. FlowNode.label é uma cópia congelada capturada na conexão (ver createFlowNode) — sem
+// isso, o rótulo exibido nos conectores de outros nós do canvas (Conectar/Timeout/Inválido/
+// dígitos) nunca acompanha um rename feito fora do próprio nó.
+export const syncFlowNodeLabel = async (
+  type: FlowNodeType,
+  resourceId: string,
+  label: string,
+) => {
+  await prisma.flowNode.updateMany({
+    where: { type, resourceId },
+    data: { label },
+  });
+};
 
 export const getFlowNodes = async (flowId: string) => {
   const flow = await getFlowOrThrow(flowId);

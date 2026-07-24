@@ -332,6 +332,42 @@ describe('IvrService.updateIvrMenu', () => {
         expect(IvrRepository.regenerate).toHaveBeenCalledWith('c1')
     })
 
+    it('removes only obsolete FlowNode ports when replacing menu options', async () => {
+        const withOptions = { ...MENU, options: [{ id: 'old-option', digit: '1' }], _count: { options: 1 } }
+        db.ivrMenu.findUnique.mockResolvedValueOnce(withOptions)
+        db.ivrMenu.update.mockResolvedValue(withOptions)
+        db.ivrMenu.findUniqueOrThrow.mockResolvedValue({ ...withOptions, options: [{ id: 'new-option', digit: '2' }] })
+        db.flowEdge.findMany.mockResolvedValue([])
+
+        await IvrService.updateIvrMenu('ivr1', { options: [{ digit: '2' }] })
+
+        expect(db.flowNodeEdge.deleteMany).toHaveBeenCalledWith({
+            where: {
+                sourceNode: { type: 'ivr', resourceId: 'ivr1' },
+                sourcePort: { notIn: ['invalid', 'timeout', 'digit:2'] },
+            },
+        })
+    })
+
+    it('keeps only the collect port when switching from menu to collect', async () => {
+        const withOptions = { ...MENU, options: [{ id: 'old-option', digit: '1' }], _count: { options: 1 } }
+        db.ivrMenu.findUnique.mockResolvedValueOnce(withOptions)
+        db.ivrMenu.update.mockResolvedValue({ ...MENU, type: 'collect', variableName: 'CPF_CLIENTE', maxDigits: 11 })
+        db.ivrMenu.findUniqueOrThrow.mockResolvedValue({ ...MENU, type: 'collect', variableName: 'CPF_CLIENTE', maxDigits: 11, options: [] })
+        db.flowEdge.findMany.mockResolvedValue([])
+
+        await IvrService.updateIvrMenu('ivr1', {
+            type: 'collect', variableName: 'CPF_CLIENTE', maxDigits: 11, options: [],
+        })
+
+        expect(db.flowNodeEdge.deleteMany).toHaveBeenCalledWith({
+            where: {
+                sourceNode: { type: 'ivr', resourceId: 'ivr1' },
+                sourcePort: { notIn: ['invalid', 'timeout', 'long'] },
+            },
+        })
+    })
+
     it('throws 404 when option destination extension not found', async () => {
         db.ivrMenu.findUnique.mockResolvedValue(MENU)
         db.extension.findUnique.mockResolvedValue(null)

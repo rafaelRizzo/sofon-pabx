@@ -45,6 +45,7 @@ model Company {
   variableConditions VariableCondition[]
   flowEdges          FlowEdge[]
   flows              Flow[]
+  queueCalls         QueueCall[]
 
   @@unique([name, doc])
   @@map("companies")
@@ -118,6 +119,7 @@ model Extension {
   agentCompanyScopes AgentCompanyScope[]
   callRatings        CallRating[]
   agentAffinities    AgentAffinity[]
+  agentQueueCalls    QueueCall[]
 
   @@unique([alias, companyId])
   @@index([companyId])
@@ -174,6 +176,7 @@ model Queue {
   createdAt                 DateTime      @default(now()) @db.Timestamptz(3)
   updatedAt                 DateTime      @updatedAt @db.Timestamptz(3)
   members                   QueueMember[]
+  calls                     QueueCall[]
 
   @@unique([name, companyId])
   @@unique([number, companyId])
@@ -728,6 +731,50 @@ model AgentAffinity {
   @@map("agent_affinities")
 }
 
+// Histórico persistente de entrada em fila, uma linha por chamada×fila — não usa CDR (Queue()
+// atende o canal do ligante na entrada pra tocar MOH, então answer≈start/billsec não reflete
+// o atendimento real pelo agente). Alimentado por eventos AMI (QueueCallerJoin/Abandon,
+// AgentConnect/Complete) + 1 hop AGI (queue-outcome, cobre timeout/sem agente/fila cheia,
+// únicos casos sem evento AMI terminal porque o canal do ligante sobrevive e o Queue() retorna
+// pra próxima priority). Ver QueueCallsService (src/modules/queue-calls/queue-calls.service.ts).
+model QueueCall {
+  id               String     @id @default(cuid())
+  companyId        String
+  company          Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  queueId          String?
+  queue            Queue?     @relation(fields: [queueId], references: [id], onDelete: SetNull)
+  // nome Asterisk (<asteriskId>-<number>) — preserva o histórico mesmo se a Queue for removida depois
+  queueName        String     @db.VarChar(160)
+  callerUniqueid   String     @db.VarChar(150)
+  linkedid         String?    @db.VarChar(150)
+  src              String?    @db.VarChar(80)
+  enteredAt        DateTime   @default(now()) @db.Timestamptz(3)
+  connectedAt      DateTime?  @db.Timestamptz(3)
+  endedAt          DateTime?  @db.Timestamptz(3)
+  // answered | abandoned | timeout | empty | exit_key | transfer | failed
+  outcome          String?    @db.VarChar(20)
+  exitReason       String?    @db.VarChar(40)
+  agentExtensionId String?
+  agentExtension   Extension? @relation(fields: [agentExtensionId], references: [id], onDelete: SetNull)
+  agentInterface   String?    @db.VarChar(80)
+  waitSeconds      Int?
+  ringSeconds      Int?
+  talkSeconds      Int?
+  initialPosition  Int?
+  finalPosition    Int?
+  recordingFile    String?
+  createdAt        DateTime   @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime   @updatedAt @db.Timestamptz(3)
+
+  // idempotência de eventos AMI repetidos/reconexão — 2ª entrada do mesmo uniqueid na mesma fila
+  // faz upsert no lugar de criar linha nova (não cobre requeue manual na mesma fila na mesma chamada)
+  @@unique([callerUniqueid, queueName])
+  @@index([companyId, enteredAt(sort: Desc)])
+  @@index([queueName, enteredAt(sort: Desc)])
+  @@index([outcome, enteredAt(sort: Desc)])
+  @@map("queue_calls")
+}
+
 // ─── Asterisk Realtime Models ─────────────────────────────────────────────────
 
 model extensions {
@@ -863,11 +910,31 @@ model cdr {
   // atender) sem depender do QueueParams.Holdtime ao vivo do AMI, que zera toda vez que a fila
   // fica ociosa e o Asterisk destrói/recria o objeto realtime da fila.
   queueName   String?   @map("queue_name") @db.VarChar(160)
+  // Campos nativos do motor de CDR do Asterisk (mesma categoria de uniqueid) — cdr_adaptive_odbc
+  // é "adaptive": descobre colunas pela estrutura da tabela no startup e popula sozinho, sem
+  // nenhum Set() no dialplan. linkedid agrupa as múltiplas linhas de CDR que uma mesma chamada
+  // pode gerar (ex: perna do ligante + perna discada); sequence ordena essas linhas.
+  linkedid    String?   @db.VarChar(150)
+  sequence    Int?
+  // Campos abaixo são custom, setados via Set(CDR(x)=y) antes de cada Dial() nos 3 fluxos
+  // (outbound-routes.service.ts, dialplan.repository.ts, inboundroute.repository.ts)
+  direction       String? @db.VarChar(10) // inbound | outbound | internal
+  originExtension String? @map("origin_extension") @db.VarChar(40)
+  dialedNumber    String? @map("dialed_number") @db.VarChar(80)
+  // Trunk.id (cuid) da aplicação — não o astId interno do Asterisk (<asteriskId>-trunk-<name>)
+  trunkId         String? @map("trunk_id") @db.VarChar(40)
+  recordingFile   String? @map("recording_file") @db.VarChar(255)
+  // Só capturado logo após um Dial() ser executado (${HANGUPCAUSE}) — chamadas que desligam
+  // antes de qualquer Dial (ex: abandono na URA) não preenchem este campo
+  hangupCause     String? @map("hangup_cause") @db.VarChar(45)
 
   // composto: toda query filtra por accountcode e ordena por startTime desc — cobre WHERE+ORDER BY num único index scan
   @@index([accountcode, startTime(sort: Desc)])
   // média de hold time hoje por fila: filtra por queueName + intervalo de startTime
   @@index([queueName, startTime])
+  @@index([linkedid])
+  @@index([direction, startTime])
+  @@index([trunkId, startTime])
 }
 
 // name é o identificador real do peer no Asterisk (chan_sip busca por name, não por id)

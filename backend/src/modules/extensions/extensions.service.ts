@@ -10,6 +10,7 @@ import { DialplanRepository } from '../../asterisk/dialplan.repository'
 import { AsteriskQueueRepository } from '../../asterisk/queue.repository'
 import { assertNotReferenced } from '../../schemas/route-destination.validate'
 import { resolveUsedByLabels, type UsedByRef } from '../../schemas/flow-reference-label'
+import { syncFlowNodeLabel } from '../flows/flow-nodes.service'
 import { AppError } from '../../utils/errors/app.error'
 import { logger } from '../../utils/logger'
 
@@ -478,6 +479,7 @@ export const updateExtension = async (id: string, data: UpdateExtensionInput) =>
     await ExtensionsCache.invalidateLiveDetails(id)
     await ExtensionsCache.invalidateAllExtensions()
     if (aliasChanged || contextChanged) regenerateFlowNodesSafely(existing.companyId)
+    if (name !== undefined && name !== existing.name) await syncFlowNodeLabel('extension', id, name)
     const updated = await getExtensionById(id)
     return provisionedPassword ? { ...updated, provisioned: true, password: provisionedPassword } : updated
 }

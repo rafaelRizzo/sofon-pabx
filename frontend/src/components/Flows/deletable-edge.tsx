@@ -30,6 +30,7 @@ export function DeletableEdge({
     style,
     markerEnd,
     data,
+    selected,
 }: EdgeProps) {
     const [isHovered, setIsHovered] = useState(false)
     const isNearlyAligned = Math.abs(sourceX - targetX) <= ALIGN_TOLERANCE_PX
@@ -46,12 +47,19 @@ export function DeletableEdge({
           })
     const onDelete = (data as DeletableEdgeData | undefined)?.onDelete
 
+    // Sem isso, clicar numa aresta pra selecioná-la (pré-requisito pro Backspace/Delete apagar,
+    // ver deleteKeyCode em flow-canvas.tsx) não dava nenhum retorno visual — parecia que a seleção
+    // simplesmente não acontecia.
+    const selectedStyle = selected
+        ? { stroke: "var(--color-violet-500)", strokeWidth: 3 }
+        : undefined
+
     return (
         <>
             <BaseEdge
                 id={id}
                 path={edgePath}
-                style={style}
+                style={{ ...style, ...selectedStyle }}
                 markerEnd={markerEnd}
             />
             <path

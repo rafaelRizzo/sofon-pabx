@@ -4,6 +4,7 @@ import { getCompanyById } from '../companies/companies.service'
 import { IvrCache } from './cache/ivr.cache'
 import { IvrRepository } from '../../asterisk/ivr.repository'
 import { FlowEdgeRepository } from '../../asterisk/flow-edge.repository'
+import { syncFlowNodeLabel } from '../flows/flow-nodes.service'
 import { assertAudioBelongsToCompany } from '../audios/audios.service'
 import { validateRouteDestination, assertNotReferenced } from '../../schemas/route-destination.validate'
 import { resolveDestinationLabels, withDestinationLabel } from '../../schemas/route-destination-label'
@@ -59,6 +60,28 @@ const assertTypeConsistency = (
     } else if (variableName) {
         throw new AppError('variableName only applies to collect type', 400)
     }
+}
+
+// As saídas da instância de nó pertencem ao FlowNode, não ao IvrMenu. Ao mudar
+// as teclas ou o tipo da URA, remove somente portas que deixaram de existir;
+// conexões de teclas preservadas continuam apontando para o mesmo nó alvo.
+const removeStaleFlowNodeEdges = async (
+    tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
+    ivrMenuId: string,
+    type: 'menu' | 'collect',
+    options: { digit: string }[],
+) => {
+    const validPorts = [
+        'invalid',
+        'timeout',
+        ...(type === 'collect' ? ['long'] : options.map((option) => `digit:${option.digit}`)),
+    ]
+    await tx.flowNodeEdge.deleteMany({
+        where: {
+            sourceNode: { type: 'ivr', resourceId: ivrMenuId },
+            sourcePort: { notIn: validPorts },
+        },
+    })
 }
 
 // Anexa o nome legível de invalidDestination/timeoutDestination/longDestination/options[].destination
@@ -211,7 +234,7 @@ export const createIvrMenu = async (data: CreateIvrMenuInput) => {
 export const updateIvrMenu = async (id: string, data: UpdateIvrMenuInput) => {
     const existing = await prisma.ivrMenu.findUnique({
         where: { id },
-        include: { _count: { select: { options: true } }, options: { select: { id: true } } },
+        include: { _count: { select: { options: true } }, options: { select: { id: true, digit: true } } },
     })
     if (!existing) throw new AppError('IVR menu not found', 404)
 
@@ -275,9 +298,19 @@ export const updateIvrMenu = async (id: string, data: UpdateIvrMenuInput) => {
                 ))
             }
         }
+        // Usa o estado efetivo depois do update. Isso cobre menu -> collect,
+        // collect -> menu e substituição parcial da lista de teclas.
+        await removeStaleFlowNodeEdges(
+            tx,
+            id,
+            (data.type ?? existing.type) as 'menu' | 'collect',
+            data.options ?? existing.options,
+        )
         if (data.options === undefined) return updated
         return await tx.ivrMenu.findUniqueOrThrow({ where: { id }, select: ivrMenuSelect })
     })
+
+    if (data.name && data.name !== existing.name) await syncFlowNodeLabel('ivr', id, data.name)
 
     try {
         await IvrRepository.regenerate(existing.companyId)

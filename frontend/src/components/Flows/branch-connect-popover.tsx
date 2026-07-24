@@ -66,17 +66,22 @@ export function BranchConnectPopover({
     const [selected, setSelected] = useState<DestinationOption | null>(
         currentOption
     )
+    const [query, setQuery] = useState(currentOption?.label ?? "")
     const [options, setOptions] = useState<DestinationOption[]>([])
     const [loading, setLoading] = useState(false)
 
     // Reidrata tipo + valor selecionado toda vez que o popover abre — sem isso ele sempre
     // reabria em "queue"/vazio, ignorando o destino já conectado no slot (defaultType e
     // currentOption só importam no instante da abertura, por isso o dep array é só [open]).
+    // query também é resetado aqui — sem isso o texto digitado numa abertura anterior (que
+    // não bateu com nenhum item e por isso não chamou onSelect) ficava "grudado" no input,
+    // dando a falsa impressão de que dava pra renomear o destino digitando ali.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     useEffect(() => {
         if (!open) return
         setType(defaultType)
         setSelected(currentOption)
+        setQuery(currentOption?.label ?? "")
     }, [open])
 
     useEffect(() => {
@@ -96,7 +101,10 @@ export function BranchConnectPopover({
                     value={type}
                     onValueChange={(v) => {
                         const newType = v as CanvasNodeType
-                        if (newType !== type) setSelected(null)
+                        if (newType !== type) {
+                            setSelected(null)
+                            setQuery("")
+                        }
                         setType(newType)
                     }}
                 >
@@ -119,11 +127,14 @@ export function BranchConnectPopover({
                     key={type}
                     items={options}
                     value={selected}
+                    inputValue={query}
+                    onInputValueChange={setQuery}
                     itemToStringLabel={(o) => o.label}
                     isItemEqualToValue={(a, b) => a.id === b.id}
                     onValueChange={(opt) => {
                         if (!opt) return
                         setSelected(opt)
+                        setQuery(opt.label)
                         onSelect(type, opt)
                         setOpen(false)
                     }}

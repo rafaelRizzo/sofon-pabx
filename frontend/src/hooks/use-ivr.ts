@@ -202,11 +202,17 @@ async function fetchIvrMenusRequest(companyId: string): Promise<IvrMenu[]> {
     return data.ivrMenus ?? []
 }
 
+// Referência estável enquanto a query ainda não resolveu (undefined) — um array literal `[]`
+// como default do destructuring recria a cada render, o que quebra useMemo/useEffect que
+// dependem de `allIvrMenus` (ver ivrById em flow-canvas.tsx) e causa loop de re-render
+// ("Maximum update depth exceeded") enquanto a query está loading/disabled.
+const EMPTY_IVR_MENUS: IvrMenu[] = []
+
 export function useIvr(companyId?: string) {
     const queryClient = useQueryClient()
     const [filter, setFilter] = useState("")
 
-    const { data: ivrMenus = [], isLoading: loading } = useQuery({
+    const { data: ivrMenus = EMPTY_IVR_MENUS, isLoading: loading } = useQuery({
         queryKey: ["ivr-menus", companyId],
         queryFn: () => fetchIvrMenusRequest(companyId as string),
         enabled: !!companyId,
@@ -231,10 +237,13 @@ export function useIvr(companyId?: string) {
     ) => {
         const id = toast.loading("Criando menu de URA...")
         try {
-            await createMutation.mutateAsync({ form, targetCompanyId })
+            const { data } = await createMutation.mutateAsync({
+                form,
+                targetCompanyId,
+            })
             toast.success("Menu de URA criado", { id })
             await invalidate()
-            return true
+            return data.ivrMenuId as string
         } catch (err) {
             toast.error(apiError(err, "Erro ao criar menu de URA"), { id })
             return false

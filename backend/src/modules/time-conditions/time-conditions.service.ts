@@ -4,6 +4,7 @@ import { TimeConditionsCache } from './cache/time-conditions.cache'
 import type { CreateTimeConditionInput, UpdateTimeConditionInput, RouteDest } from './schemas/time-condition.schema'
 import { TimeConditionRepository } from '../../asterisk/timecondition.repository'
 import { FlowEdgeRepository } from '../../asterisk/flow-edge.repository'
+import { syncFlowNodeLabel } from '../flows/flow-nodes.service'
 import { validateRouteDestination, assertNotReferenced } from '../../schemas/route-destination.validate'
 import { resolveDestinationLabels, withDestinationLabel } from '../../schemas/route-destination-label'
 import { resolveUsedByLabels, type UsedByRef } from '../../schemas/flow-reference-label'
@@ -201,6 +202,8 @@ export const updateTimeCondition = async (id: string, data: UpdateTimeConditionI
         ])
         return updated
     })
+
+    if (data.name && data.name !== existing.name) await syncFlowNodeLabel('timecondition', id, data.name)
 
     try {
         await TimeConditionRepository.regenerate(existing.companyId)

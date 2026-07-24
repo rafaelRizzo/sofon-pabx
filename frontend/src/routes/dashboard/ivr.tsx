@@ -1,6 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router"
 
-
 import { useState } from "react"
 import { PlusIcon } from "lucide-react"
 
@@ -92,7 +91,9 @@ function IvrPage() {
                     onOpenChange={setCreateOpen}
                     ivrMenu={null}
                     companies={companies}
-                    onSave={(form) => createIvrMenu(form, form.companyId)}
+                    onSave={async (form) =>
+                        Boolean(await createIvrMenu(form, form.companyId))
+                    }
                 />
             )}
 
@@ -118,5 +119,5 @@ function IvrPage() {
 }
 
 export const Route = createFileRoute("/dashboard/ivr")({
-  component: IvrPage,
+    component: IvrPage,
 })

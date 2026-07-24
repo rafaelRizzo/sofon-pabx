@@ -9,6 +9,7 @@ import {
 } from '../../asterisk/queue.repository'
 import { CallcenterSurveyRepository } from '../../asterisk/callcenter-survey.repository'
 import { FlowEdgeRepository } from '../../asterisk/flow-edge.repository'
+import { syncFlowNodeLabel } from '../flows/flow-nodes.service'
 import {
     validateRouteDestination,
     assertNotReferenced
@@ -447,6 +448,8 @@ export const updateQueue = async (id: string, data: UpdateQueueInput) => {
             select: queueSelect
         })
     })
+
+    if (nameChanged) await syncFlowNodeLabel('queue', id, data.name!)
 
     if (needsResync)
         await regenerateSafely(

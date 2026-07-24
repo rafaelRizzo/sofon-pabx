@@ -4,6 +4,7 @@ import { HolidayGroupsCache } from './cache/holiday-groups.cache'
 import type { CreateHolidayGroupInput, UpdateHolidayGroupInput, RouteDest } from './schemas/holiday-group.schema'
 import { HolidayGroupRepository } from '../../asterisk/holidaygroup.repository'
 import { FlowEdgeRepository } from '../../asterisk/flow-edge.repository'
+import { syncFlowNodeLabel } from '../flows/flow-nodes.service'
 import { validateRouteDestination, assertNotReferenced } from '../../schemas/route-destination.validate'
 import { resolveDestinationLabels, withDestinationLabel } from '../../schemas/route-destination-label'
 import { resolveUsedByLabels, type UsedByRef } from '../../schemas/flow-reference-label'
@@ -211,6 +212,8 @@ export const updateHolidayGroup = async (id: string, data: UpdateHolidayGroupInp
 
         return updated
     })
+
+    if (data.name && data.name !== existing.name) await syncFlowNodeLabel('holiday', id, data.name)
 
     try {
         await HolidayGroupRepository.regenerate(existing.companyId)

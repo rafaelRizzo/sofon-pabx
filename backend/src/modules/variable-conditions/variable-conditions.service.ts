@@ -3,6 +3,7 @@ import { getCompanyById } from '../companies/companies.service'
 import { VariableConditionsCache } from './cache/variable-conditions.cache'
 import { VariableConditionRepository } from '../../asterisk/variablecondition.repository'
 import { FlowEdgeRepository } from '../../asterisk/flow-edge.repository'
+import { syncFlowNodeLabel } from '../flows/flow-nodes.service'
 import { validateRouteDestination, assertNotReferenced } from '../../schemas/route-destination.validate'
 import { resolveDestinationLabels, withDestinationLabel } from '../../schemas/route-destination-label'
 import { resolveUsedByLabels, type UsedByRef } from '../../schemas/flow-reference-label'
@@ -189,6 +190,9 @@ export const updateVariableCondition = async (id: string, data: UpdateVariableCo
         ])
         return updated
     })
+
+    if (data.name !== undefined && data.name !== existing.name)
+        await syncFlowNodeLabel('variable-condition', id, data.name)
 
     try {
         await VariableConditionRepository.regenerate(existing.companyId)

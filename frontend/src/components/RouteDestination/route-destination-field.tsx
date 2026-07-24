@@ -431,9 +431,11 @@ export function RouteDestinationField({
                                         value={opt}
                                         disabled={!!opt.disabledReason}
                                     >
-                                        {opt.label}
+                                        <span className="min-w-0 flex-1 truncate">
+                                            {opt.label}
+                                        </span>
                                         {opt.disabledReason && (
-                                            <span className="text-xs text-muted-foreground">
+                                            <span className="shrink-0 text-xs text-muted-foreground">
                                                 ({opt.disabledReason})
                                             </span>
                                         )}

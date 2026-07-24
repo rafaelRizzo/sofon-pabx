@@ -24,6 +24,28 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:8.4-alpine
+    container_name: redis_sofon
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Defina REDIS_PASSWORD no .env}
+    command:
+      - sh
+      - -c
+      - exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_sofon_data:/data
+    networks:
+      - proxy
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   backend:
     build:
       context: .
@@ -34,13 +56,13 @@ services:
     env_file:
       - .env
     environment:
-      # Override do .env: com network_mode host, "127.0.0.1" já é o host real — não dá pra usar o
-      # nome do service "postgres" (network_mode host não entra na rede proxy), então aponta pra
-      # porta publicada do container postgres (5433:5432 abaixo). AGI_HOST/AMI_HOST ficam no default
-      # (127.0.0.1) do .env — funcionam direto, já que o container compartilha a rede do host.
+      # Com network_mode host, o backend acessa os serviços pelas portas publicadas no host.
       DATABASE_URL: postgresql://postgres:senha_forte@127.0.0.1:5433/asterisk
+      REDIS_URL: redis://default:${REDIS_PASSWORD:?Defina REDIS_PASSWORD no .env}@127.0.0.1:6379
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     volumes:
       - /etc/asterisk/dialplan-extra:/etc/asterisk/dialplan-extra
@@ -53,3 +75,5 @@ networks:
 volumes:
   postgres_sofon_data:
     name: postgres_sofon_data
+  redis_sofon_data:
+    name: redis_sofon_data

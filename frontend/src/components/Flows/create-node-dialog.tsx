@@ -14,6 +14,8 @@ import { VariableSetFormDialog } from "@/components/Variables/variable-set-form-
 import { useVariables } from "@/hooks/use-variables"
 import { VariableConditionFormDialog } from "@/components/VariableConditions/variable-condition-form-dialog"
 import { useVariableConditions } from "@/hooks/use-variable-conditions"
+import { IvrMenuFormDialog } from "@/components/Ivr/ivr-menu-form-dialog"
+import { useIvr } from "@/hooks/use-ivr"
 import type { Company } from "@/hooks/use-companies"
 import type { CanvasNodeType } from "@/components/Flows/node-types"
 import type { DestinationOption } from "@/components/RouteDestination/route-destination-field"
@@ -27,7 +29,10 @@ type Props = {
     // creationDto é o form validado (sem companyId — recriação sempre usa a empresa do flow) do
     // recurso recém-criado — o histórico de undo/redo do canvas guarda isso pra poder recriar o
     // recurso caso o usuário desfaça essa criação (ver flow-canvas.tsx)
-    onCreated: (option: DestinationOption, creationDto: unknown) => Promise<void>
+    onCreated: (
+        option: DestinationOption,
+        creationDto: unknown
+    ) => Promise<void>
 }
 
 // Cada tipo criável no canvas reaproveita o form dialog + hook já existentes daquele módulo — sem
@@ -63,7 +68,32 @@ export function CreateNodeDialog({
                             true
                         )
                         if (!resourceId) return false
-                        await onCreated({ id: resourceId, label: form.name }, form)
+                        await onCreated(
+                            { id: resourceId, label: form.name },
+                            form
+                        )
+                        return true
+                    }}
+                />
+            )
+        }
+        case "ivr": {
+            const { createIvrMenu } = useIvr()
+            return (
+                <IvrMenuFormDialog
+                    open={open}
+                    onOpenChange={onOpenChange}
+                    ivrMenu={null}
+                    companies={companies}
+                    defaultCompanyId={companyId}
+                    flowNodeMode
+                    onSave={async (form) => {
+                        const resourceId = await createIvrMenu(form, companyId)
+                        if (!resourceId) return false
+                        await onCreated(
+                            { id: resourceId, label: form.name },
+                            null
+                        )
                         return true
                     }}
                 />

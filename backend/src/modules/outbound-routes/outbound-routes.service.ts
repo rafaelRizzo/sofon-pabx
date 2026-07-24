@@ -20,6 +20,7 @@ function trunkAsteriskId(asteriskId: string, trunkName: string): string {
 type CustomHeader = { name: string; value: string }
 
 type TrunkOpt = {
+    id: string
     astId: string
     type: string
     registrationMode: string
@@ -31,15 +32,15 @@ type TrunkOpt = {
 
 // Priority count per trunk block (used to pre-compute offsets for forward references):
 // custom (sem endpoint PJSIP)   = 1 (Goto pro contexto custom, sem failover/headers)
-// with limit + not last = 5 (GotoIf count, Set GROUP, Dial, GotoIf DIALSTATUS, Set GROUP=)
-// with limit + last    = 3 (GotoIf count, Set GROUP, Dial)
-// no limit + not last  = 2 (Dial, GotoIf DIALSTATUS)
-// no limit + last      = 1 (Dial)
+// with limit + not last = 7 (GotoIf count, Set GROUP, Set CDR trunk_id, Dial, Set CDR hangup_cause, GotoIf DIALSTATUS, Set GROUP=)
+// with limit + last    = 5 (GotoIf count, Set GROUP, Set CDR trunk_id, Dial, Set CDR hangup_cause)
+// no limit + not last  = 4 (Set CDR trunk_id, Dial, Set CDR hangup_cause, GotoIf DIALSTATUS)
+// no limit + last      = 3 (Set CDR trunk_id, Dial, Set CDR hangup_cause)
 // + 1 Set(PJSIP_HEADER(add,...)) por header customizado da trunk, sempre antes do Dial
 function trunkBlockSize(trunk: TrunkOpt, isLast: boolean): number {
     if (trunk.registrationMode === 'custom') return 1
     const hasLimit = trunk.maxOut != null
-    const base = hasLimit ? (isLast ? 3 : 5) : isLast ? 1 : 2
+    const base = hasLimit ? (isLast ? 5 : 7) : isLast ? 3 : 4
     return base + (trunk.type === 'pjsip' ? (trunk.customHeaders?.length ?? 0) : 0)
 }
 
@@ -56,8 +57,10 @@ function buildDialplanEntries(
 
     // Pre-compute start priority of each trunk block
     const transformOffset = hasTransform ? 1 : 0
+    const recFileOffset = 1
     const mixmonitorOffset = 1
-    const baseOffset = transformOffset + mixmonitorOffset + 1 // 1-indexed
+    const cdrOffset = 4 // Set(CDR(direction|origin_extension|dialed_number|recording_file))
+    const baseOffset = transformOffset + recFileOffset + mixmonitorOffset + cdrOffset + 1 // 1-indexed
 
     const blockStarts: number[] = []
     let cursor = baseOffset
@@ -79,12 +82,19 @@ function buildDialplanEntries(
     }
 
     entries.push({
-        context, exten, priority: p++, app: 'MixMonitor',
-        appdata: `/var/spool/asterisk/monitor/${asteriskId}/\${STRFTIME(,,%Y/%m/%d)}/\${UNIQUEID}_\${CUT(CALLERID(num),_,1)}_\${EXTEN}.wav,b`,
+        context, exten, priority: p++, app: 'Set',
+        appdata: `REC_FILE=/var/spool/asterisk/monitor/${asteriskId}/\${STRFTIME(,,%Y/%m/%d)}/\${UNIQUEID}_\${CUT(CALLERID(num),_,1)}_\${EXTEN}.wav`,
     })
+    entries.push({ context, exten, priority: p++, app: 'MixMonitor', appdata: '${REC_FILE},b' })
+
+    // Enriquecimento de CDR — uma vez só por chamada (não por tronco tentado)
+    entries.push({ context, exten, priority: p++, app: 'Set', appdata: 'CDR(direction)=outbound' })
+    entries.push({ context, exten, priority: p++, app: 'Set', appdata: 'CDR(origin_extension)=${CALLERID(num)}' })
+    entries.push({ context, exten, priority: p++, app: 'Set', appdata: `CDR(dialed_number)=${destVar}` })
+    entries.push({ context, exten, priority: p++, app: 'Set', appdata: 'CDR(recording_file)=${REC_FILE}' })
 
     for (let i = 0; i < trunks.length; i++) {
-        const { astId, type, registrationMode, context: customContext, maxOut, techPrefix, customHeaders } = trunks[i]!
+        const { id: trunkId, astId, type, registrationMode, context: customContext, maxOut, techPrefix, customHeaders } = trunks[i]!
         const isLast = i === trunks.length - 1
         const nextTrunkStart = isLast ? hangupPriority : blockStarts[i + 1]
         const tech = type === 'iax' ? 'IAX2' : 'PJSIP'
@@ -111,7 +121,9 @@ function buildDialplanEntries(
                 appdata: `$[\${GROUP_COUNT(out-${astId})} >= ${maxOut}]?${nextTrunkStart}`,
             })
             entries.push({ context, exten, priority: p++, app: 'Set', appdata: `GROUP()=out-${astId}` })
+            entries.push({ context, exten, priority: p++, app: 'Set', appdata: `CDR(trunk_id)=${trunkId}` })
             entries.push({ context, exten, priority: p++, app: 'Dial', appdata: dialTarget })
+            entries.push({ context, exten, priority: p++, app: 'Set', appdata: 'CDR(hangup_cause)=${HANGUPCAUSE}' })
             if (!isLast) {
                 entries.push({
                     context, exten, priority: p++, app: 'GotoIf',
@@ -120,7 +132,9 @@ function buildDialplanEntries(
                 entries.push({ context, exten, priority: p++, app: 'Set', appdata: 'GROUP()=' })
             }
         } else {
+            entries.push({ context, exten, priority: p++, app: 'Set', appdata: `CDR(trunk_id)=${trunkId}` })
             entries.push({ context, exten, priority: p++, app: 'Dial', appdata: dialTarget })
+            entries.push({ context, exten, priority: p++, app: 'Set', appdata: 'CDR(hangup_cause)=${HANGUPCAUSE}' })
             if (!isLast) {
                 entries.push({
                     context, exten, priority: p++, app: 'GotoIf',
@@ -204,7 +218,7 @@ async function getRouteContext(tx: Tx, routeId: string) {
             position: true,
             trunk: {
                 select: {
-                    name: true, type: true, maxOutChannels: true, techPrefix: true, customHeaders: true,
+                    id: true, name: true, type: true, maxOutChannels: true, techPrefix: true, customHeaders: true,
                     registrationMode: true, context: true,
                 },
             },
@@ -220,6 +234,7 @@ export async function resyncAllPatterns(tx: Tx, routeId: string) {
     if (!ctx) return
 
     const trunkOpts: TrunkOpt[] = ctx.trunks.map((rt) => ({
+        id: rt.trunk.id,
         astId: trunkAsteriskId(ctx.company.asteriskId, rt.trunk.name),
         type: rt.trunk.type,
         registrationMode: rt.trunk.registrationMode,
@@ -393,6 +408,7 @@ export const createOutboundRoute = async (data: CreateOutboundRouteInput) => {
         }
     })
     const trunkOpts: TrunkOpt[] = orderedTrunks.map((t) => ({
+        id: t.id,
         astId: trunkAsteriskId(company.asteriskId, t.name),
         type: t.type,
         registrationMode: t.registrationMode,

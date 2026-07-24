@@ -30,11 +30,24 @@ export function parseMemberInterface(iface: string): { type: string; number: str
     return { type: iface.slice(0, idx).toLowerCase(), number: iface.slice(idx + 1) }
 }
 
+// Inverso de toAsteriskQueueName: "<asteriskId>-<number>" -> { asteriskId, queueNumber }.
+// Company.asteriskId tem tamanho FIXO (10 chars, substring de UUID sem hífen) — parsing por
+// tamanho fixo em vez de split('-') pra não depender de queueNumber nunca conter '-'.
+export function parseAsteriskQueueName(name: string): { asteriskId: string; queueNumber: string } | null {
+    if (name.length < 12 || name[10] !== '-') return null
+    return { asteriskId: name.slice(0, 10), queueNumber: name.slice(11) }
+}
+
 // AGI de pré-roteamento (seta QUEUE_PRIO a partir de RoutingRule, ver handleQueueRoute em agi-server.ts)
 // e AGI de pós-fila (captura MEMBERINTERFACE pra pesquisa de satisfação, ver handleQueueSurvey) —
 // mesmo padrão de buildAgiUrl de request-template.repository.ts, só variando o script.
 const buildQueueRouteAgiUrl = (queueId: string) => `agi://${env.AGI_HOST}:${env.AGI_PORT}/queue-route,${queueId}`
 const buildQueueSurveyAgiUrl = (queueId: string) => `agi://${env.AGI_HOST}:${env.AGI_PORT}/queue-survey,${queueId}`
+// Roda logo após o Queue() retornar, antes da pesquisa — cobre timeout/sem agente/fila cheia
+// (únicos casos sem evento AMI terminal, porque o canal do ligante sobrevive e o Queue() segue
+// pra próxima priority); abandono/atendimento já são capturados via AMI (ver
+// src/modules/queue-calls/queue-calls.service.ts + ami-events.ts)
+const buildQueueOutcomeAgiUrl = (queueId: string) => `agi://${env.AGI_HOST}:${env.AGI_PORT}/queue-outcome,${queueId}`
 
 // Pra onde o cliente vai quando a fila termina sem ele ter desligado (timeout, sem agente, ou
 // agente desliga primeiro) — mesmo RouteDestination usado por Inbound Routes/Time Conditions
@@ -226,6 +239,7 @@ export const AsteriskQueueRepository = {
                     // mudar depois (pesquisa/postQueueDestination rodam DEPOIS do Queue() retornar).
                     { context: QUEUE_APP_CONTEXT, exten, priority: priority++, app: 'Set', appdata: `CDR(queue_name)=${asteriskName}` },
                     { context: QUEUE_APP_CONTEXT, exten, priority: priority++, app: 'Queue', appdata: asteriskName },
+                    { context: QUEUE_APP_CONTEXT, exten, priority: priority++, app: 'AGI', appdata: buildQueueOutcomeAgiUrl(q.id) },
                     { context: QUEUE_APP_CONTEXT, exten, priority: priority++, app: 'AGI', appdata: buildQueueSurveyAgiUrl(q.id) },
                     nodeExitCheck(QUEUE_APP_CONTEXT, exten, priority++, 'default'),
                     { context: QUEUE_APP_CONTEXT, exten, priority: priority++, app, appdata },

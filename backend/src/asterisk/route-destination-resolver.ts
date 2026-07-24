@@ -21,8 +21,12 @@ export async function resolveRouteDestinationToDialplan(dest: RouteDestination):
 
     switch (dest.type) {
         case 'extension': {
-            const ext = await prisma.extension.findUnique({ where: { id: dest.id }, select: { context: true, number: true } })
-            return ext ? { context: ext.context, exten: ext.number, priority: 1 } : null
+            // exten é o alias puro (ex: "2002"), não o `number` completo (ex: "2002_a9e2463c8f") —
+            // o dialplan genérico de ramal (DialplanRepository.ensureGenericRoutingPattern) só casa
+            // padrões de alias puro (2-6 dígitos); usar `number` aqui nunca bateria com nenhuma
+            // exten real, caindo sempre no fallback (Congestion)
+            const ext = await prisma.extension.findUnique({ where: { id: dest.id }, select: { context: true, alias: true } })
+            return ext ? { context: ext.context, exten: ext.alias, priority: 1 } : null
         }
         case 'queue': {
             const q = await prisma.queue.findUnique({ where: { id: dest.id }, select: { number: true, company: { select: { asteriskId: true } } } })

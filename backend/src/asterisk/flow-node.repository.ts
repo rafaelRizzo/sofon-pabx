@@ -105,10 +105,14 @@ export const FlowNodeRepository = {
                 const ports = new Set([...(staticPorts[node.type] ?? []), ...edges.filter((edge) => edge.sourceNodeId === node.id).map((edge) => edge.sourcePort)])
                 if (node.type === 'ivr') {
                     const menu = node.resourceId
-                        ? await prisma.ivrMenu.findUnique({ where: { id: node.resourceId }, select: { options: { select: { digit: true } } } })
+                        ? await prisma.ivrMenu.findUnique({
+                            where: { id: node.resourceId },
+                            select: { type: true, options: { select: { digit: true } } },
+                        })
                         : null
                     for (const option of menu?.options ?? []) ports.add(`digit:${option.digit}`)
-                    ports.add('invalid'); ports.add('timeout'); ports.add('long')
+                    ports.add('invalid'); ports.add('timeout')
+                    if (menu?.type === 'collect') ports.add('long')
                 }
                 for (const port of ports) {
                     const target = targetFor(bySource.get(`${node.id}:${port}`))

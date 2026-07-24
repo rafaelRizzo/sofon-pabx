@@ -19,7 +19,10 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
         <QueryClientProvider client={queryClient}>
             {children}
             {import.meta.env.DEV && (
-                <ReactQueryDevtools initialIsOpen={false} />
+                <ReactQueryDevtools
+                    initialIsOpen={false}
+                    buttonPosition="bottom-left"
+                />
             )}
         </QueryClientProvider>
     )

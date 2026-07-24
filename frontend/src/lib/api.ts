@@ -68,3 +68,10 @@ api.interceptors.response.use(
 
 export const apiError = (err: unknown, fallback: string): string =>
   (axios.isAxiosError(err) && err.response?.data?.message) || fallback
+
+// 4xx = rejeição definitiva do backend (validação, permissão, recurso inexistente) — nunca vai
+// vingar só de tentar de novo. 5xx/rede seguem sendo tratados como transiente por quem chama.
+export const isValidationError = (err: unknown): boolean => {
+  const status = axios.isAxiosError(err) ? err.response?.status : undefined
+  return status !== undefined && status >= 400 && status < 500
+}

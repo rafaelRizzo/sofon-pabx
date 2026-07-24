@@ -4,6 +4,7 @@ import { logger } from '../utils/logger'
 import { parseMemberInterface } from './queue.repository'
 import { extractAmiBlocks, type AmiBlock } from './ami-events.parser'
 import { emitRealtimeChange } from './realtime-bus'
+import { recordJoin, recordAgentConnect, recordAnswered, recordAbandoned } from '../modules/queue-calls/queue-calls.service'
 import {
     STATUS_TTL_SECONDS, CALL_TTL_SECONDS, HOLDTIME_TTL_SECONDS,
     extKey, extCallsKey, callKey, trunkKey, queueMembersKey, queueWaitingKey, bridgeMembersKey, queueHoldtimeKey,
@@ -260,6 +261,57 @@ async function handleQueueCallerJoin(block: AmiBlock) {
     if (!block.Queue || !block.Uniqueid) return
     await redisClient.zAdd(queueWaitingKey(block.Queue), { score: Date.now(), value: block.Uniqueid })
     emitRealtimeChange('queue')
+
+    const position = block.Position ? Number(block.Position) : null
+    await recordJoin({
+        queueName: block.Queue,
+        callerUniqueid: block.Uniqueid,
+        linkedid: block.Linkedid,
+        src: block.CallerIDNum,
+        position: position != null && Number.isFinite(position) ? position : null,
+    })
+}
+
+// Fila responde quando o cliente desliga esperando (sem ter sido conectado a nenhum agente) —
+// único caso em que não há AGI queue-outcome subsequente (o canal do ligante morre, Queue()
+// nunca retorna pra próxima priority nesse fluxo)
+async function handleQueueCallerAbandon(block: AmiBlock) {
+    if (!block.Queue || !block.Uniqueid) return
+    const holdTime = block.HoldTime ? Number(block.HoldTime) : null
+    const position = block.Position ? Number(block.Position) : null
+    await recordAbandoned({
+        queueName: block.Queue,
+        callerUniqueid: block.Uniqueid,
+        holdTimeSeconds: holdTime != null && Number.isFinite(holdTime) ? holdTime : null,
+        position: position != null && Number.isFinite(position) ? position : null,
+    })
+}
+
+// Dispara quando o bridge com um agente é estabelecido de fato — Uniqueid aqui é o do LIGANTE
+// (mesmo vocabulário de QueueCallerJoin), Interface é quem atendeu
+async function handleAgentConnect(block: AmiBlock) {
+    if (!block.Queue || !block.Uniqueid || !block.Interface) return
+    const holdTime = block.HoldTime ? Number(block.HoldTime) : null
+    await recordAgentConnect({
+        queueName: block.Queue,
+        callerUniqueid: block.Uniqueid,
+        agentInterface: block.Interface,
+        holdTimeSeconds: holdTime != null && Number.isFinite(holdTime) ? holdTime : null,
+    })
+}
+
+// Dispara quando a chamada JÁ CONECTADA a um agente termina, independente de quem desligou
+// primeiro (Reason: "caller"|"agent") — cobre o caso em que o ligante desliga durante o
+// atendimento, quando o Queue() também nunca retorna pra próxima priority
+async function handleAgentComplete(block: AmiBlock) {
+    if (!block.Queue || !block.Uniqueid) return
+    const talkTime = block.TalkTime ? Number(block.TalkTime) : null
+    await recordAnswered({
+        queueName: block.Queue,
+        callerUniqueid: block.Uniqueid,
+        talkTimeSeconds: talkTime != null && Number.isFinite(talkTime) ? talkTime : null,
+        reason: block.Reason,
+    })
 }
 
 // Data local (fuso do env.TZ) usada como partição diária do agregado de holdtime (ver
@@ -306,6 +358,9 @@ async function routeEvent(block: AmiBlock): Promise<void> {
         case 'QueueMemberRemoved': return handleQueueMemberRemoved(block)
         case 'QueueCallerJoin': return handleQueueCallerJoin(block)
         case 'QueueCallerLeave': return handleQueueCallerLeave(block)
+        case 'QueueCallerAbandon': return handleQueueCallerAbandon(block)
+        case 'AgentConnect': return handleAgentConnect(block)
+        case 'AgentComplete': return handleAgentComplete(block)
         default: return
     }
 }

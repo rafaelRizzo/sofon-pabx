@@ -84,6 +84,8 @@ type Props = {
     onOpenChange: (open: boolean) => void
     ivrMenu: IvrMenu | null
     companies: Company[]
+    defaultCompanyId?: string
+    flowNodeMode?: boolean
     onSave: (form: IvrMenuForm) => Promise<boolean>
 }
 
@@ -92,6 +94,8 @@ export function IvrMenuFormDialog({
     onOpenChange,
     ivrMenu,
     companies,
+    defaultCompanyId,
+    flowNodeMode = false,
     onSave,
 }: Props) {
     const isEdit = !!ivrMenu
@@ -108,7 +112,7 @@ export function IvrMenuFormDialog({
         resolver: zodResolver(createIvrMenuFormSchema) as any,
         defaultValues: {
             name: "",
-            companyId: "",
+            companyId: defaultCompanyId ?? "",
             type: "menu",
             variableName: null,
             audioId: null,
@@ -145,7 +149,7 @@ export function IvrMenuFormDialog({
         if (!open) return
         reset({
             name: ivrMenu?.name ?? "",
-            companyId: ivrMenu?.companyId ?? "",
+            companyId: ivrMenu?.companyId ?? defaultCompanyId ?? "",
             type: ivrMenu?.type ?? "menu",
             variableName: ivrMenu?.variableName ?? null,
             audioId: ivrMenu?.audioId ?? null,
@@ -166,7 +170,7 @@ export function IvrMenuFormDialog({
                     destination: o.destination,
                 })) ?? [],
         })
-    }, [open, ivrMenu, reset])
+    }, [open, ivrMenu, defaultCompanyId, reset])
 
     // Ao trocar de empresa na criação, áudio/destinos escolhidos pra empresa anterior não fazem
     // mais sentido (IDs de outra empresa): reseta pra evitar enviar referências inválidas
@@ -255,6 +259,16 @@ export function IvrMenuFormDialog({
                     >
                         <div className="flex-1 overflow-x-hidden overflow-y-auto">
                             <FieldGroup>
+                                {flowNodeMode && (
+                                    <Field>
+                                        <FieldDescription>
+                                            As saídas desta URA são conectadas
+                                            no canvas e podem variar em cada
+                                            Flow.
+                                        </FieldDescription>
+                                    </Field>
+                                )}
+
                                 <Field>
                                     <FieldLabel>Nome</FieldLabel>
                                     <Input
@@ -269,7 +283,7 @@ export function IvrMenuFormDialog({
                                     )}
                                 </Field>
 
-                                {!isEdit && (
+                                {!isEdit && !defaultCompanyId && (
                                     <Field>
                                         <FieldLabel>Empresa</FieldLabel>
                                         <Combobox<Company>
@@ -360,7 +374,9 @@ export function IvrMenuFormDialog({
                                                 setValue(
                                                     "audioId",
                                                     a?.id ?? null,
-                                                    { shouldDirty: true }
+                                                    {
+                                                        shouldDirty: true,
+                                                    }
                                                 )
                                             }
                                         >
@@ -538,69 +554,88 @@ export function IvrMenuFormDialog({
                                     </Field>
                                 </div>
 
-                                <Field>
-                                    <FieldLabel>
-                                        {isCollect
-                                            ? "Destino em entrada incompleta"
-                                            : "Destino em dígito inválido"}
-                                    </FieldLabel>
-                                    <RouteDestinationField
-                                        value={invalidDestination}
-                                        onChange={(d) =>
-                                            setValue("invalidDestination", d, {
-                                                shouldValidate: true,
-                                                shouldDirty: true,
-                                            })
-                                        }
-                                        companyId={companyId}
-                                    />
-                                    <FieldDescription>
-                                        {isCollect
-                                            ? "Para onde a chamada vai após esgotar as tentativas com uma sequência de dígitos que não completa a quantidade esperada."
-                                            : "Para onde a chamada vai após esgotar as tentativas com dígito inválido."}
-                                    </FieldDescription>
-                                </Field>
+                                {!flowNodeMode && (
+                                    <>
+                                        <Field>
+                                            <FieldLabel>
+                                                {isCollect
+                                                    ? "Destino em entrada incompleta"
+                                                    : "Destino em dígito inválido"}
+                                            </FieldLabel>
+                                            <RouteDestinationField
+                                                value={invalidDestination}
+                                                onChange={(d) =>
+                                                    setValue(
+                                                        "invalidDestination",
+                                                        d,
+                                                        {
+                                                            shouldValidate: true,
+                                                            shouldDirty: true,
+                                                        }
+                                                    )
+                                                }
+                                                companyId={companyId}
+                                            />
+                                            <FieldDescription>
+                                                {isCollect
+                                                    ? "Para onde a chamada vai após esgotar as tentativas com uma sequência de dígitos que não completa a quantidade esperada."
+                                                    : "Para onde a chamada vai após esgotar as tentativas com dígito inválido."}
+                                            </FieldDescription>
+                                        </Field>
 
-                                <Field>
-                                    <FieldLabel>Destino em timeout</FieldLabel>
-                                    <RouteDestinationField
-                                        value={timeoutDestination}
-                                        onChange={(d) =>
-                                            setValue("timeoutDestination", d, {
-                                                shouldValidate: true,
-                                                shouldDirty: true,
-                                            })
-                                        }
-                                        companyId={companyId}
-                                    />
-                                    <FieldDescription>
-                                        Para onde a chamada vai após esgotar as
-                                        tentativas sem nenhuma entrada.
-                                    </FieldDescription>
-                                </Field>
+                                        <Field>
+                                            <FieldLabel>
+                                                Destino em timeout
+                                            </FieldLabel>
+                                            <RouteDestinationField
+                                                value={timeoutDestination}
+                                                onChange={(d) =>
+                                                    setValue(
+                                                        "timeoutDestination",
+                                                        d,
+                                                        {
+                                                            shouldValidate: true,
+                                                            shouldDirty: true,
+                                                        }
+                                                    )
+                                                }
+                                                companyId={companyId}
+                                            />
+                                            <FieldDescription>
+                                                Para onde a chamada vai após
+                                                esgotar as tentativas sem
+                                                nenhuma entrada.
+                                            </FieldDescription>
+                                        </Field>
 
-                                <Field>
-                                    <FieldLabel>
-                                        {isCollect
-                                            ? "Destino após coletar os dígitos"
-                                            : "Destino de sequência longa"}
-                                    </FieldLabel>
-                                    <RouteDestinationField
-                                        value={longDestination}
-                                        onChange={(d) =>
-                                            setValue("longDestination", d, {
-                                                shouldValidate: true,
-                                                shouldDirty: true,
-                                            })
-                                        }
-                                        companyId={companyId}
-                                    />
-                                    <FieldDescription>
-                                        {isCollect
-                                            ? "Para onde a chamada segue assim que a quantidade de dígitos configurada acima é coletada."
-                                            : "Para onde vai quando o chamador digita mais de 1 dígito (até o máximo) sem bater com nenhuma opção abaixo, ex: consulta por CPF."}
-                                    </FieldDescription>
-                                </Field>
+                                        <Field>
+                                            <FieldLabel>
+                                                {isCollect
+                                                    ? "Destino após coletar os dígitos"
+                                                    : "Destino de sequência longa"}
+                                            </FieldLabel>
+                                            <RouteDestinationField
+                                                value={longDestination}
+                                                onChange={(d) =>
+                                                    setValue(
+                                                        "longDestination",
+                                                        d,
+                                                        {
+                                                            shouldValidate: true,
+                                                            shouldDirty: true,
+                                                        }
+                                                    )
+                                                }
+                                                companyId={companyId}
+                                            />
+                                            <FieldDescription>
+                                                {isCollect
+                                                    ? "Para onde a chamada segue assim que a quantidade de dígitos configurada acima é coletada."
+                                                    : "Para onde vai quando o chamador digita mais de 1 dígito (até o máximo) sem bater com nenhuma opção abaixo, ex: consulta por CPF."}
+                                            </FieldDescription>
+                                        </Field>
+                                    </>
+                                )}
 
                                 {!isCollect && (
                                     <Field>
@@ -620,7 +655,9 @@ export function IvrMenuFormDialog({
                                                 onClick={() =>
                                                     optionFields.append(
                                                         emptyOption,
-                                                        { shouldFocus: false }
+                                                        {
+                                                            shouldFocus: false,
+                                                        }
                                                     )
                                                 }
                                             >
@@ -637,11 +674,9 @@ export function IvrMenuFormDialog({
                                         ) : (
                                             <>
                                                 <FieldDescription>
-                                                    Para onde a chamada é
-                                                    direcionada quando o
-                                                    chamador digita cada tecla
-                                                    (máximo 10 opções, um dígito
-                                                    por opção).
+                                                    {flowNodeMode
+                                                        ? "Defina as teclas disponíveis. Os destinos são conectados no canvas."
+                                                        : "Para onde a chamada é direcionada quando o chamador digita cada tecla (máximo 10 opções, um dígito por opção)."}
                                                 </FieldDescription>
                                                 {errors.options?.root && (
                                                     <FieldError>
@@ -716,31 +751,33 @@ export function IvrMenuFormDialog({
                                                                             </SelectContent>
                                                                         </Select>
                                                                     </div>
-                                                                    <div className="flex-1">
-                                                                        <RouteDestinationField
-                                                                            value={
-                                                                                options[
-                                                                                    index
-                                                                                ]
-                                                                                    ?.destination
-                                                                            }
-                                                                            onChange={(
-                                                                                d
-                                                                            ) =>
-                                                                                setValue(
-                                                                                    `options.${index}.destination`,
-                                                                                    d,
-                                                                                    {
-                                                                                        shouldValidate: true,
-                                                                                        shouldDirty: true,
-                                                                                    }
-                                                                                )
-                                                                            }
-                                                                            companyId={
-                                                                                companyId
-                                                                            }
-                                                                        />
-                                                                    </div>
+                                                                    {!flowNodeMode && (
+                                                                        <div className="flex-1">
+                                                                            <RouteDestinationField
+                                                                                value={
+                                                                                    options[
+                                                                                        index
+                                                                                    ]
+                                                                                        ?.destination
+                                                                                }
+                                                                                onChange={(
+                                                                                    d
+                                                                                ) =>
+                                                                                    setValue(
+                                                                                        `options.${index}.destination`,
+                                                                                        d,
+                                                                                        {
+                                                                                            shouldValidate: true,
+                                                                                            shouldDirty: true,
+                                                                                        }
+                                                                                    )
+                                                                                }
+                                                                                companyId={
+                                                                                    companyId
+                                                                                }
+                                                                            />
+                                                                        </div>
+                                                                    )}
                                                                     <Button
                                                                         type="button"
                                                                         variant="outline"
