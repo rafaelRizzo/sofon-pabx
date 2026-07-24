@@ -35,6 +35,14 @@ export const updateAnnouncementFormSchema = createAnnouncementFormSchema
 
 export type AnnouncementForm = z.infer<typeof createAnnouncementFormSchema>
 
+// DTO de criação a partir do registro salvo — usado pelo histórico de undo/redo do Flow pra
+// recriar o recurso quando o usuário desfaz uma exclusão (ver flow-canvas.tsx)
+export function toAnnouncementCreationDto(
+    announcement: Announcement
+): AnnouncementForm {
+    return { name: announcement.name, audioId: announcement.audioId }
+}
+
 // companyId opcional — enquanto não informado, a lista não é buscada (filtro de empresa
 // da página exige seleção antes de consultar o backend). Diferente da empresa do formulário
 // de criação (que é passada explicitamente para createAnnouncement, pois pode divergir deste

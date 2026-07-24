@@ -104,6 +104,30 @@ export type RequestTemplateUpdateForm = z.infer<
     typeof updateRequestTemplateFormSchema
 >
 
+// DTO de criação a partir do registro salvo (sem companyId — recriação sempre usa a empresa do
+// flow) — usado pelo histórico de undo/redo do Flow pra recriar o recurso quando o usuário desfaz
+// uma exclusão (ver flow-canvas.tsx). headers/body vêm da entidade como Record/objeto; o form
+// espera array de {key,value} e o body como string JSON crua (mesmo shape que o form de criação já
+// usa antes de passar por toPayload).
+export function toRequestTemplateCreationDto(
+    requestTemplate: RequestTemplate
+): RequestTemplateUpdateForm {
+    return {
+        name: requestTemplate.name,
+        method: requestTemplate.method,
+        url: requestTemplate.url,
+        timeoutMs: requestTemplate.timeoutMs,
+        headers: requestTemplate.headers
+            ? Object.entries(requestTemplate.headers).map(([key, value]) => ({
+                key,
+                value,
+            }))
+            : [],
+        body: requestTemplate.body ? JSON.stringify(requestTemplate.body) : "",
+        variableMappings: requestTemplate.variableMappings,
+    }
+}
+
 // headers/body vazios em edição precisam virar `null` (limpa no backend); no create, omitidos (undefined)
 function toPayload(form: RequestTemplateUpdateForm, isEdit: boolean) {
     return {

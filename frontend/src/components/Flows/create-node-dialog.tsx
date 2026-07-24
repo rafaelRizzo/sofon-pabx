@@ -24,7 +24,10 @@ type Props = {
     onOpenChange: (open: boolean) => void
     companyId: string
     companies: Company[]
-    onCreated: (option: DestinationOption) => Promise<void>
+    // creationDto é o form validado (sem companyId — recriação sempre usa a empresa do flow) do
+    // recurso recém-criado — o histórico de undo/redo do canvas guarda isso pra poder recriar o
+    // recurso caso o usuário desfaça essa criação (ver flow-canvas.tsx)
+    onCreated: (option: DestinationOption, creationDto: unknown) => Promise<void>
 }
 
 // Cada tipo criável no canvas reaproveita o form dialog + hook já existentes daquele módulo — sem
@@ -60,7 +63,7 @@ export function CreateNodeDialog({
                             true
                         )
                         if (!resourceId) return false
-                        await onCreated({ id: resourceId, label: form.name })
+                        await onCreated({ id: resourceId, label: form.name }, form)
                         return true
                     }}
                 />
@@ -77,10 +80,14 @@ export function CreateNodeDialog({
                     onSave={async (form) => {
                         const resourceId = await createQueue(form, true)
                         if (!resourceId) return false
-                        await onCreated({
-                            id: resourceId,
-                            label: `${form.name} (${form.number})`,
-                        })
+                        const { companyId: _companyId, ...creationDto } = form
+                        await onCreated(
+                            {
+                                id: resourceId,
+                                label: `${form.name} (${form.number})`,
+                            },
+                            creationDto
+                        )
                         return true
                     }}
                 />
@@ -101,7 +108,11 @@ export function CreateNodeDialog({
                             true
                         )
                         if (!resourceId) return false
-                        await onCreated({ id: resourceId, label: form.name })
+                        const { companyId: _companyId, ...creationDto } = form
+                        await onCreated(
+                            { id: resourceId, label: form.name },
+                            creationDto
+                        )
                         return true
                     }}
                 />
@@ -118,7 +129,11 @@ export function CreateNodeDialog({
                     onSave={async (form) => {
                         const resourceId = await createTimeCondition(form, true)
                         if (!resourceId) return false
-                        await onCreated({ id: resourceId, label: form.name })
+                        const { companyId: _companyId, ...creationDto } = form
+                        await onCreated(
+                            { id: resourceId, label: form.name },
+                            creationDto
+                        )
                         return true
                     }}
                 />
@@ -135,7 +150,11 @@ export function CreateNodeDialog({
                     onSave={async (form) => {
                         const resourceId = await createHolidayGroup(form, true)
                         if (!resourceId) return false
-                        await onCreated({ id: resourceId, label: form.name })
+                        const { companyId: _companyId, ...creationDto } = form
+                        await onCreated(
+                            { id: resourceId, label: form.name },
+                            creationDto
+                        )
                         return true
                     }}
                 />
@@ -152,7 +171,11 @@ export function CreateNodeDialog({
                     onSave={async (form) => {
                         const resourceId = await createVariableSet(form, true)
                         if (!resourceId) return false
-                        await onCreated({ id: resourceId, label: form.name })
+                        const { companyId: _companyId, ...creationDto } = form
+                        await onCreated(
+                            { id: resourceId, label: form.name },
+                            creationDto
+                        )
                         return true
                     }}
                 />
@@ -172,7 +195,11 @@ export function CreateNodeDialog({
                             true
                         )
                         if (!resourceId) return false
-                        await onCreated({ id: resourceId, label: form.name })
+                        const { companyId: _companyId, ...creationDto } = form
+                        await onCreated(
+                            { id: resourceId, label: form.name },
+                            creationDto
+                        )
                         return true
                     }}
                 />

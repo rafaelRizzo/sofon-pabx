@@ -141,6 +141,33 @@ export const updateQueueFormSchema = z.object(baseQueueFields)
 export type QueueForm = z.infer<typeof createQueueFormSchema>
 export type QueueUpdateForm = z.infer<typeof updateQueueFormSchema>
 
+// DTO de criação a partir do registro salvo (sem companyId — recriação sempre usa a empresa do
+// flow) — usado pelo histórico de undo/redo do Flow pra recriar o recurso quando o usuário desfaz
+// uma exclusão (ver flow-canvas.tsx)
+export function toQueueCreationDto(queue: Queue): QueueUpdateForm {
+    return {
+        name: queue.name,
+        number: queue.number,
+        strategy: queue.strategy,
+        musicOnHold: queue.musicOnHold,
+        timeout: queue.timeout,
+        retry: queue.retry,
+        maxLen: queue.maxLen,
+        wrapupTime: queue.wrapupTime,
+        announce: queue.announce,
+        announceFrequency: queue.announceFrequency,
+        announcePosition: queue.announcePosition,
+        periodicAnnounce: queue.periodicAnnounce,
+        periodicAnnounceFrequency: queue.periodicAnnounceFrequency,
+        agentAnnounce: queue.agentAnnounce,
+        joinEmpty: queue.joinEmpty,
+        leaveWhenEmpty: queue.leaveWhenEmpty,
+        weight: queue.weight,
+        surveyAudioId: queue.surveyAudioId,
+        callcenterEnabled: queue.callcenterEnabled,
+    }
+}
+
 async function fetchQueuesRequest(companyId: string): Promise<Queue[]> {
     const { data } = await api.get("/queues", { params: { companyId } })
     return data.queues ?? []

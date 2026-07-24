@@ -66,6 +66,25 @@ export type HolidayGroupForm = z.infer<typeof createHolidayGroupFormSchema>
 // time-conditions.tsx (page.tsx monta o objeto reduzido na hora de chamar updateX)
 export type HolidayGroupUpdateForm = Omit<HolidayGroupForm, "companyId">
 
+// DTO de criação a partir do registro salvo (sem companyId — recriação sempre usa a empresa do
+// flow) — usado pelo histórico de undo/redo do Flow pra recriar o recurso quando o usuário desfaz
+// uma exclusão (ver flow-canvas.tsx). `dates` da entidade tem `id` (HolidayDate.id); o form de
+// criação não tem esse campo, então é descartado aqui.
+export function toHolidayGroupCreationDto(
+    holidayGroup: HolidayGroup
+): HolidayGroupUpdateForm {
+    return {
+        name: holidayGroup.name,
+        mode: holidayGroup.url ? "url" : "manual",
+        url: holidayGroup.url ?? undefined,
+        dates: holidayGroup.dates.map(({ name, month, day }) => ({
+            name,
+            month,
+            day,
+        })),
+    }
+}
+
 // payload real da API — "mode" nunca é enviado, só decide se url ou dates vai no corpo
 function toApiPayload(form: HolidayGroupUpdateForm) {
     return {

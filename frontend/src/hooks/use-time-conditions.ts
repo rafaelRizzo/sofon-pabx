@@ -44,6 +44,22 @@ export type TimeConditionUpdateForm = z.infer<
     typeof updateTimeConditionFormSchema
 >
 
+// DTO de criação a partir do registro salvo (sem companyId — recriação sempre usa a empresa do
+// flow). Diferente de TimeConditionUpdateForm (só "name", já que o PUT não permite trocar grupos):
+// aqui precisamos de groupIds também, pois recriar o recurso do zero exige os grupos vinculados.
+// Usado pelo histórico de undo/redo do Flow pra recriar o recurso quando o usuário desfaz uma
+// exclusão (ver flow-canvas.tsx).
+export type TimeConditionCreationDto = Omit<TimeConditionForm, "companyId">
+
+export function toTimeConditionCreationDto(
+    timeCondition: TimeCondition
+): TimeConditionCreationDto {
+    return {
+        name: timeCondition.name,
+        groupIds: timeCondition.timeGroups.map((g) => g.timeGroup.id),
+    }
+}
+
 // companyId opcional — enquanto não informado, a lista não é buscada (filtro de
 // empresa da página exige seleção antes de consultar o backend)
 async function fetchTimeConditionsRequest(

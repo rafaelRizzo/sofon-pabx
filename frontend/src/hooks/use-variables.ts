@@ -59,6 +59,15 @@ export const updateVariableSetFormSchema = createVariableSetFormSchema.omit({
 export type VariableSetForm = z.infer<typeof createVariableSetFormSchema>
 export type VariableSetUpdateForm = z.infer<typeof updateVariableSetFormSchema>
 
+// DTO de criação a partir do registro salvo (sem companyId — recriação sempre usa a empresa do
+// flow) — usado pelo histórico de undo/redo do Flow pra recriar o recurso quando o usuário desfaz
+// uma exclusão (ver flow-canvas.tsx)
+export function toVariableSetCreationDto(
+    variableSet: VariableSet
+): VariableSetUpdateForm {
+    return { name: variableSet.name, assignments: variableSet.assignments }
+}
+
 // companyId opcional — enquanto não informado, a lista não é buscada (filtro de
 // empresa da página exige seleção antes de consultar o backend)
 async function fetchVariableSetsRequest(

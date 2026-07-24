@@ -70,6 +70,41 @@ import {
     clearPendingForNode,
     type EdgeOperation,
 } from "@/lib/flow-canvas-db"
+import {
+    useFlowHistory,
+    type HistoryAction,
+    type HistoryDirection,
+} from "@/components/Flows/flow-history"
+import {
+    useAnnouncements,
+    type AnnouncementForm,
+} from "@/hooks/use-announcements"
+import { useQueues, type QueueForm, type QueueUpdateForm } from "@/hooks/use-queues"
+import {
+    useRequestTemplates,
+    type RequestTemplateForm,
+    type RequestTemplateUpdateForm,
+} from "@/hooks/use-request-templates"
+import {
+    useTimeConditions,
+    type TimeConditionForm,
+    type TimeConditionCreationDto,
+} from "@/hooks/use-time-conditions"
+import {
+    useHolidayGroups,
+    type HolidayGroupForm,
+    type HolidayGroupUpdateForm,
+} from "@/hooks/use-holiday-groups"
+import {
+    useVariables,
+    type VariableSetForm,
+    type VariableSetUpdateForm,
+} from "@/hooks/use-variables"
+import {
+    useVariableConditions,
+    type VariableConditionForm,
+    type VariableConditionUpdateForm,
+} from "@/hooks/use-variable-conditions"
 
 const START_KEY = "start"
 const MINI_MAP_IDLE_DELAY = 1200
@@ -95,7 +130,13 @@ function edgeStyleForSlot(slot: string) {
     return { strokeWidth: 2, ...(stroke && { stroke }) }
 }
 
-type Props = { flow: Flow; companies: Company[] }
+type Props = {
+    flow: Flow
+    companies: Company[]
+    // Buscado no componente pai (flows.$id.tsx) em paralelo com o flow, pra tela mostrar um único
+    // loading em vez de "carrega o flow, depois carrega os nós" em sequência.
+    flowNodesState: ReturnType<typeof useFlowNodes>
+}
 
 function applyEdgeOperations(
     edges: FlowNodeEdge[],
@@ -125,7 +166,7 @@ function applyEdgeOperations(
     return [...byPort.values()]
 }
 
-function FlowCanvasInner({ flow, companies }: Props) {
+function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
     const {
         nodes: flowNodes,
         setNodes: setFlowNodes,
@@ -136,7 +177,7 @@ function FlowCanvasInner({ flow, companies }: Props) {
         refreshing,
         refetchNodes,
         setEdges: setFlowEdges,
-    } = useFlowNodes(flow.id)
+    } = flowNodesState
     const [rfNodes, setRfNodes] = useState<Node[]>([])
     const [rfEdges, setRfEdges] = useState<Edge[]>([])
     const [pendingAction, setPendingAction] = useState<CanvasNodeAction | null>(
@@ -157,6 +198,7 @@ function FlowCanvasInner({ flow, companies }: Props) {
         type: CanvasNodeType
         resourceId: string
         name: string
+        creationDto: unknown
     } | null>(null)
     // "Início do flow" é sintético (não é um FlowNode no banco, não tem id real) — a posição dele
     // não cabe no PUT /nodes/:nodeId. Usa o campo Flow.layout (já existia no schema, sem uso até
@@ -183,6 +225,53 @@ function FlowCanvasInner({ flow, companies }: Props) {
     const miniMapTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
     const [isMiniMapVisible, setIsMiniMapVisible] = useState(true)
     const [isSyncingEdges, setIsSyncingEdges] = useState(false)
+    const canvasRootRef = useRef<HTMLDivElement>(null)
+
+    // Histórico undo/redo (ver flow-history.ts) — em memória, zerado ao desmontar (trocar de flow
+    // ou recarregar a página).
+    const history = useFlowHistory()
+
+    // Ids de nó recriados por undo/redo (o backend nunca restaura o id excluído — recriar sempre
+    // gera um id novo). Encadeia ida->novo pra qualquer outra ação da pilha (ex. um move-node ou
+    // connect-edge anterior) resolver pro id vivo atual em vez do id histórico já morto.
+    const nodeIdMapRef = useRef(new Map<string, string>())
+    const resolveNodeId = useCallback((id: string) => {
+        let current = id
+        const seen = new Set<string>()
+        while (nodeIdMapRef.current.has(current) && !seen.has(current)) {
+            seen.add(current)
+            current = nodeIdMapRef.current.get(current)!
+        }
+        return current
+    }, [])
+
+    // Espelhos em ref do estado corrente — usados pelos comandos de mutação (commitNodePosition,
+    // deleteNode, deleteResource, connectNodes) pra ler o valor mais recente sem precisar desses
+    // valores na lista de dependências do useCallback (evita recriar esses comandos, e portanto
+    // onNodesChange/rfNodes, a cada mudança de estado).
+    const flowNodesRef = useRef<FlowNodeInstance[]>([])
+    const flowEdgesRef = useRef<FlowNodeEdge[]>([])
+    const entryNodeIdRef = useRef<string | null>(null)
+    useEffect(() => {
+        flowNodesRef.current = flowNodes
+    }, [flowNodes])
+    useEffect(() => {
+        flowEdgesRef.current = flowEdges
+    }, [flowEdges])
+    useEffect(() => {
+        entryNodeIdRef.current = entryNodeId
+    }, [entryNodeId])
+
+    // Hooks de criação por tipo de recurso — usados só pra recriar um recurso excluído/desfeito
+    // (ver recreateResource abaixo). O form de edição/criação de cada tipo já usa esses mesmos
+    // hooks em edit-node-dialog.tsx/create-node-dialog.tsx.
+    const { createAnnouncement } = useAnnouncements()
+    const { createQueue } = useQueues()
+    const { createRequestTemplate } = useRequestTemplates()
+    const { createTimeCondition } = useTimeConditions()
+    const { createHolidayGroup } = useHolidayGroups()
+    const { createVariableSet } = useVariables()
+    const { createVariableCondition } = useVariableConditions()
 
     const showMiniMap = useCallback(() => {
         if (miniMapTimer.current) clearTimeout(miniMapTimer.current)
@@ -331,14 +420,22 @@ function FlowCanvasInner({ flow, companies }: Props) {
     const deleteEdge = useCallback(
         async (edgeId: string) => {
             try {
-                const edge = flowEdges.find((item) => item.id === edgeId)
+                const edge = flowEdgesRef.current.find(
+                    (item) => item.id === edgeId
+                )
                 if (!edge) return
                 disconnectNodes(edge.sourceNodeId, edge.sourcePort)
+                history.push({
+                    kind: "disconnect-edge",
+                    sourceNodeId: edge.sourceNodeId,
+                    sourcePort: edge.sourcePort,
+                    targetNodeId: edge.targetNodeId,
+                })
             } catch (err) {
                 toast.error(apiError(err, "Erro ao remover conexão"))
             }
         },
-        [disconnectNodes, flowEdges]
+        [disconnectNodes, history]
     )
 
     const reconcileNodes = useCallback(async () => {
@@ -435,35 +532,62 @@ function FlowCanvasInner({ flow, companies }: Props) {
         [flow.id, setEntryNodeId, setFlowEdges, setFlowNodes]
     )
 
-    const deleteNode = useCallback(
-        (nodeId: string) => {
-            removeNodeFromCanvas(nodeId)
-            if (pendingNodeIds.current.has(nodeId)) return
-            void api.delete(`/flows/${flow.id}/nodes/${nodeId}`).then(
-                () => {
-                    toast.success("Nó removido")
-                },
-                async (err) => {
-                    try {
-                        await reconcileNodes()
-                    } catch {
-                        // O próximo carregamento busca o estado autoritativo.
-                    }
-                    toast.error(apiError(err, "Erro ao remover nó"))
+    // Chamada crua de exclusão de nó, sem snapshot/histórico — reaproveitada tanto pela exclusão
+    // interativa (deleteNode abaixo) quanto pelo replay de undo/redo (applyHistoryAction), que já
+    // fez seu próprio removeNodeFromCanvas e só precisa do resultado awaitable da chamada HTTP.
+    const deleteNodeCore = useCallback(
+        async (nodeId: string) => {
+            if (pendingNodeIds.current.has(nodeId)) return true
+            try {
+                await api.delete(`/flows/${flow.id}/nodes/${nodeId}`)
+                toast.success("Nó removido")
+                return true
+            } catch (err) {
+                try {
+                    await reconcileNodes()
+                } catch {
+                    // O próximo carregamento busca o estado autoritativo.
                 }
-            )
+                toast.error(apiError(err, "Erro ao remover nó"))
+                return false
+            }
         },
-        [flow.id, reconcileNodes, removeNodeFromCanvas]
+        [flow.id, reconcileNodes]
     )
 
-    const deleteResource = useCallback(async () => {
-        if (!resourceToDelete) return false
-        const target = resourceToDelete
-        setResourceToDelete(null)
-        setEditingNode(null)
-        removeNodeFromCanvas(target.nodeId)
+    const deleteNode = useCallback(
+        (nodeId: string) => {
+            const node = flowNodesRef.current.find((item) => item.id === nodeId)
+            if (!node) return Promise.resolve(false)
+            const incomingEdges = flowEdgesRef.current.filter(
+                (edge) => edge.targetNodeId === nodeId
+            )
+            const outgoingEdges = flowEdgesRef.current.filter(
+                (edge) => edge.sourceNodeId === nodeId
+            )
+            const wasEntry = entryNodeIdRef.current === nodeId
+            removeNodeFromCanvas(nodeId)
+            history.push({
+                kind: "delete-node",
+                node,
+                incomingEdges,
+                outgoingEdges,
+                wasEntry,
+            })
+            return deleteNodeCore(nodeId)
+        },
+        [removeNodeFromCanvas, history, deleteNodeCore]
+    )
 
-        void (async () => {
+    // Idem deleteNodeCore, mas pros 3 passos de exclusão de recurso (check + delete node + delete
+    // recurso) — reaproveitado pela exclusão interativa (deleteResource) e pelo replay de
+    // undo/redo (redo de delete-resource, undo de create-resource-node).
+    const deleteResourceCore = useCallback(
+        async (target: {
+            nodeId: string
+            type: CanvasNodeType
+            resourceId: string
+        }) => {
             try {
                 await api.post(
                     `/flows/${flow.id}/nodes/${target.nodeId}/resource-deletion-check`
@@ -473,6 +597,7 @@ function FlowCanvasInner({ flow, companies }: Props) {
                     `/${NODE_TYPE_CONFIG[target.type].apiPath}/${target.resourceId}`
                 )
                 toast.success("Recurso e nó excluídos")
+                return true
             } catch (err) {
                 try {
                     await reconcileNodes()
@@ -480,63 +605,218 @@ function FlowCanvasInner({ flow, companies }: Props) {
                     // O próximo carregamento busca o estado autoritativo.
                 }
                 toast.error(apiError(err, "Erro ao excluir recurso"))
+                return false
             }
-        })()
+        },
+        [flow.id, reconcileNodes]
+    )
 
+    const deleteResource = useCallback(async () => {
+        if (!resourceToDelete) return false
+        const target = resourceToDelete
+        setResourceToDelete(null)
+        setEditingNode(null)
+        const node = flowNodesRef.current.find(
+            (item) => item.id === target.nodeId
+        )
+        if (!node) return false
+        const incomingEdges = flowEdgesRef.current.filter(
+            (edge) => edge.targetNodeId === target.nodeId
+        )
+        const outgoingEdges = flowEdgesRef.current.filter(
+            (edge) => edge.sourceNodeId === target.nodeId
+        )
+        const wasEntry = entryNodeIdRef.current === target.nodeId
+        removeNodeFromCanvas(target.nodeId)
+        history.push({
+            kind: "delete-resource",
+            node,
+            resourceType: target.type,
+            creationDto: target.creationDto,
+            incomingEdges,
+            outgoingEdges,
+            wasEntry,
+        })
+        void deleteResourceCore(target)
         return true
-    }, [flow.id, reconcileNodes, removeNodeFromCanvas, resourceToDelete])
+    }, [resourceToDelete, removeNodeFromCanvas, history, deleteResourceCore])
 
     const connectNodes = useCallback(
-        (sourceNodeId: string, sourcePort: string, targetNodeId: string) =>
+        (sourceNodeId: string, sourcePort: string, targetNodeId: string) => {
+            const previous = flowEdgesRef.current.find(
+                (edge) =>
+                    edge.sourceNodeId === sourceNodeId &&
+                    edge.sourcePort === sourcePort
+            )
+            const previousTargetNodeId = previous?.targetNodeId ?? null
             queueEdgeOperation({
                 type: "connect",
                 sourceNodeId,
                 sourcePort,
                 targetNodeId,
-            }),
-        [queueEdgeOperation]
-    )
-
-    const setEntry = useCallback(
-        (nodeId: string) => {
-            setEntryNodeId(nodeId)
-            void api
-                .put(`/flows/${flow.id}/nodes/${nodeId}`, { isEntry: true })
-                .catch(async (err) => {
-                    try {
-                        await reconcileNodes()
-                    } catch {
-                        // O próximo carregamento busca o estado autoritativo.
-                    }
-                    toast.error(apiError(err, "Erro ao definir início do flow"))
+            })
+            if (previousTargetNodeId !== targetNodeId)
+                history.push({
+                    kind: "connect-edge",
+                    sourceNodeId,
+                    sourcePort,
+                    targetNodeId,
+                    previousTargetNodeId,
                 })
         },
-        [flow.id, reconcileNodes, setEntryNodeId]
+        [queueEdgeOperation, history]
+    )
+
+    // Retornam Promise<boolean> (nunca rejeitam) — o replay de undo/redo (applyHistoryAction)
+    // precisa saber se a chamada deu certo pra decidir se a ação volta pra pilha; os chamadores
+    // interativos (onConnect etc.) seguem ignorando o retorno como antes.
+    const setEntry = useCallback(
+        (nodeId: string) => {
+            const from = entryNodeIdRef.current
+            setEntryNodeId(nodeId)
+            history.push({ kind: "change-entry", from, to: nodeId })
+            return api
+                .put(`/flows/${flow.id}/nodes/${nodeId}`, { isEntry: true })
+                .then(
+                    () => true,
+                    async (err) => {
+                        try {
+                            await reconcileNodes()
+                        } catch {
+                            // O próximo carregamento busca o estado autoritativo.
+                        }
+                        toast.error(
+                            apiError(err, "Erro ao definir início do flow")
+                        )
+                        return false
+                    }
+                )
+        },
+        [flow.id, reconcileNodes, setEntryNodeId, history]
     )
 
     const clearEntry = useCallback(
         (nodeId: string) => {
+            const from = entryNodeIdRef.current
             setEntryNodeId((current) => (current === nodeId ? null : current))
-            void api
+            history.push({ kind: "change-entry", from, to: null })
+            return api
                 .put(`/flows/${flow.id}/nodes/${nodeId}`, { isEntry: false })
-                .catch(async (err) => {
-                    try {
-                        await reconcileNodes()
-                    } catch {
-                        // O próximo carregamento busca o estado autoritativo.
+                .then(
+                    () => true,
+                    async (err) => {
+                        try {
+                            await reconcileNodes()
+                        } catch {
+                            // O próximo carregamento busca o estado autoritativo.
+                        }
+                        toast.error(
+                            apiError(err, "Erro ao remover início do flow")
+                        )
+                        return false
                     }
-                    toast.error(apiError(err, "Erro ao remover início do flow"))
-                })
+                )
         },
-        [flow.id, reconcileNodes, setEntryNodeId]
+        [flow.id, reconcileNodes, setEntryNodeId, history]
     )
 
+    // Recria um recurso a partir do DTO de criação capturado antes da exclusão (ver
+    // toXCreationDto nos hooks use-*.ts e onDeleteResource em edit-node-dialog.tsx/create-node-dialog.tsx)
+    // — usado só pelo histórico de undo/redo (recriar recurso excluído, ou recriar recurso cuja
+    // criação foi desfeita). companyId nunca vem do DTO: a recriação sempre cai na empresa do
+    // próprio flow. extension/flow nunca chegam aqui (creatable:false e sem exclusão de recurso,
+    // ver NODE_TYPE_CONFIG/edit-node-dialog.tsx) — cobertos só pra exaustividade do switch.
+    const recreateResource = useCallback(
+        async (
+            type: CanvasNodeType,
+            creationDto: unknown,
+            companyId: string
+        ): Promise<string | null> => {
+            switch (type) {
+                case "announcement":
+                    return createAnnouncement(
+                        creationDto as AnnouncementForm,
+                        companyId,
+                        true
+                    )
+                case "queue":
+                    return createQueue(
+                        {
+                            ...(creationDto as QueueUpdateForm),
+                            companyId,
+                        } as QueueForm,
+                        true
+                    )
+                case "request":
+                    return createRequestTemplate(
+                        {
+                            ...(creationDto as RequestTemplateUpdateForm),
+                            companyId,
+                        } as RequestTemplateForm,
+                        companyId,
+                        true
+                    )
+                case "timecondition":
+                    return createTimeCondition(
+                        {
+                            ...(creationDto as TimeConditionCreationDto),
+                            companyId,
+                        } as TimeConditionForm,
+                        true
+                    )
+                case "holiday":
+                    return createHolidayGroup(
+                        {
+                            ...(creationDto as HolidayGroupUpdateForm),
+                            companyId,
+                        } as HolidayGroupForm,
+                        true
+                    )
+                case "variable-set":
+                    return createVariableSet(
+                        {
+                            ...(creationDto as VariableSetUpdateForm),
+                            companyId,
+                        } as VariableSetForm,
+                        true
+                    )
+                case "variable-condition":
+                    return createVariableCondition(
+                        {
+                            ...(creationDto as VariableConditionUpdateForm),
+                            companyId,
+                        } as VariableConditionForm,
+                        true
+                    )
+                case "extension":
+                case "flow":
+                    return null
+            }
+        },
+        [
+            createAnnouncement,
+            createQueue,
+            createRequestTemplate,
+            createTimeCondition,
+            createHolidayGroup,
+            createVariableSet,
+            createVariableCondition,
+        ]
+    )
+
+    // Retorna o id local otimista imediatamente (contrato síncrono já usado pelos chamadores
+    // interativos, ex. conectar na sequência) e, à parte, `result` — promise que resolve o
+    // sucesso/falha da criação de verdade. `applyHistoryAction` usa `result` pra saber se um
+    // redo/undo de criação deu certo; os chamadores interativos seguem ignorando `result`.
     const createNode = useCallback(
         (
             type: CanvasNodeType,
             option: DestinationOption,
             position: { x: number; y: number }
-        ) => {
+        ): {
+            localId: string
+            result: Promise<{ ok: true; nodeId: string } | { ok: false }>
+        } => {
             const localId = `pending:${crypto.randomUUID()}`
             const now = new Date().toISOString()
             pendingNodeIds.current.add(localId)
@@ -554,7 +834,7 @@ function FlowCanvasInner({ flow, companies }: Props) {
                 } satisfies FlowNodeInstance,
             ])
 
-            void api
+            const result = api
                 .post(`/flows/${flow.id}/nodes`, {
                     type,
                     resourceId: option.id,
@@ -564,6 +844,7 @@ function FlowCanvasInner({ flow, companies }: Props) {
                 .then(({ data }) => {
                     const nodeId = data.nodeId as string
                     pendingNodeIds.current.delete(localId)
+                    nodeIdMapRef.current.set(localId, nodeId)
                     setFlowNodes((current) =>
                         current.map((node) =>
                             node.id === localId ? { ...node, id: nodeId } : node
@@ -628,6 +909,7 @@ function FlowCanvasInner({ flow, companies }: Props) {
                     scheduleEdgeSync(0)
                     if (saveTimer.current) clearTimeout(saveTimer.current)
                     saveTimer.current = setTimeout(() => void persistPositions(), 0)
+                    return { ok: true as const, nodeId }
                 })
                 .catch(async (err) => {
                     pendingNodeIds.current.delete(localId)
@@ -667,9 +949,10 @@ function FlowCanvasInner({ flow, companies }: Props) {
                         )
                     }
                     toast.error(apiError(err, "Erro ao adicionar nó"))
+                    return { ok: false as const }
                 })
 
-            return localId
+            return { localId, result }
         },
         [flow.id, persistPositions, scheduleEdgeSync, setFlowEdges, setFlowNodes]
     )
@@ -723,15 +1006,24 @@ function FlowCanvasInner({ flow, companies }: Props) {
                     onConnectSlot: async (slot, type, resourceId, label) => {
                         const source = nodeById.get(node.id)
                         if (!source) return
-                        const targetId = createNode(
+                        const position = {
+                            x: node.position.x + 280,
+                            y: node.position.y + 70,
+                        }
+                        const { localId } = createNode(
                             type,
                             { id: resourceId, label },
-                            {
-                                x: node.position.x + 280,
-                                y: node.position.y + 70,
-                            }
+                            position
                         )
-                        connectNodes(source.id, slot, targetId)
+                        history.push({
+                            kind: "create-node",
+                            nodeId: localId,
+                            type,
+                            resourceId,
+                            label: label ?? null,
+                            position,
+                        })
+                        connectNodes(source.id, slot, localId)
                     },
                     onDisconnectSlot: async (slot) => {
                         const edge = outgoing.find(
@@ -794,7 +1086,71 @@ function FlowCanvasInner({ flow, companies }: Props) {
         deleteEdge,
         deleteNode,
         clearEntry,
+        history,
     ])
+
+    // Aplica e persiste a posição de um nó comum, com o mesmo debounce/pending-queue de sempre —
+    // reaproveitado tanto pelo settle do arraste interativo (onNodesChange abaixo) quanto pelo
+    // replay de undo/redo (applyHistoryAction), que chama com flushDelay:0 (ação explícita do
+    // usuário, sem motivo pra esperar mais 450ms). Só registra histórico (move-node) quando a
+    // posição de fato muda, e nunca durante o replay (history.push já é no-op nesse caso).
+    const commitNodePosition = useCallback(
+        (nodeId: string, position: { x: number; y: number }, flushDelay = 450) => {
+            const previous = flowNodesRef.current.find(
+                (node) => node.id === nodeId
+            )?.position
+            setFlowNodes((current) =>
+                current.map((node) =>
+                    node.id === nodeId ? { ...node, position } : node
+                )
+            )
+            pendingPositions.current.set(nodeId, position)
+            void savePendingPosition(flow.id, nodeId, position)
+            if (saveTimer.current) clearTimeout(saveTimer.current)
+            saveTimer.current = setTimeout(
+                () => void persistPositions(),
+                flushDelay
+            )
+            if (previous && (previous.x !== position.x || previous.y !== position.y))
+                history.push({ kind: "move-node", nodeId, from: previous, to: position })
+        },
+        [flow.id, persistPositions, setFlowNodes, history]
+    )
+
+    // Idem, pro nó sintético Início (posição guardada à parte, ver comentário de startPosition
+    // acima) — mesmo padrão de flushDelay/push de histórico.
+    const commitStartPosition = useCallback(
+        (position: { x: number; y: number }, flushDelay = 450) => {
+            setStartPosition((previous) => {
+                if (previous.x !== position.x || previous.y !== position.y)
+                    history.push({ kind: "move-start", from: previous, to: position })
+                return position
+            })
+            if (startSaveTimer.current) clearTimeout(startSaveTimer.current)
+            startSaveTimer.current = setTimeout(() => {
+                void api
+                    .put(`/flows/${flow.id}/layout`, {
+                        layout: [
+                            {
+                                nodeType: "start",
+                                nodeId: START_KEY,
+                                x: position.x,
+                                y: position.y,
+                            },
+                        ],
+                    })
+                    .catch((err) => {
+                        toast.error(
+                            apiError(
+                                err,
+                                "Erro ao salvar posição do início do flow"
+                            )
+                        )
+                    })
+            }, flushDelay)
+        },
+        [flow.id, history]
+    )
 
     const onNodesChange = useCallback(
         (changes: NodeChange[]) => {
@@ -809,24 +1165,8 @@ function FlowCanvasInner({ flow, companies }: Props) {
                     change.id !== START_KEY &&
                     change.dragging !== true
             )
-            if (settled.length > 0) {
-                setFlowNodes((current) =>
-                    current.map((node) => {
-                        const change = settled.find(
-                            (item) => item.id === node.id
-                        )
-                        return change
-                            ? { ...node, position: change.position! }
-                            : node
-                    })
-                )
-                for (const change of settled) {
-                    pendingPositions.current.set(change.id, change.position!)
-                    void savePendingPosition(flow.id, change.id, change.position!)
-                }
-                if (saveTimer.current) clearTimeout(saveTimer.current)
-                saveTimer.current = setTimeout(persistPositions, 450)
-            }
+            for (const change of settled)
+                commitNodePosition(change.id, change.position!, 450)
 
             const startChange = changes.find(
                 (change): change is Extract<NodeChange, { type: "position" }> =>
@@ -835,35 +1175,291 @@ function FlowCanvasInner({ flow, companies }: Props) {
                     change.id === START_KEY &&
                     change.dragging !== true
             )
-            if (startChange) {
-                const position = startChange.position!
-                setStartPosition(position)
-                if (startSaveTimer.current) clearTimeout(startSaveTimer.current)
-                startSaveTimer.current = setTimeout(() => {
-                    void api
-                        .put(`/flows/${flow.id}/layout`, {
-                            layout: [
-                                {
-                                    nodeType: "start",
-                                    nodeId: START_KEY,
-                                    x: position.x,
-                                    y: position.y,
-                                },
-                            ],
-                        })
-                        .catch((err) => {
-                            toast.error(
-                                apiError(
-                                    err,
-                                    "Erro ao salvar posição do início do flow"
-                                )
+            if (startChange) commitStartPosition(startChange.position!, 450)
+        },
+        [commitNodePosition, commitStartPosition]
+    )
+
+    // Executor central do histórico — traduz uma HistoryAction em undo/redo replaying os mesmos
+    // comandos usados interativamente (por isso nenhum deles registra histórico de novo: history.push
+    // é no-op enquanto useFlowHistory está processando undo/redo). Rejeita (lança) só quando o
+    // comando de fato falhou no backend — aí useFlowHistory devolve a ação pra pilha de origem, sem
+    // mexer na pilha oposta (ver flow-history.ts). resolveNodeId sempre traduz um id histórico pro
+    // id vivo atual, mesmo depois de vários ciclos de recriação (ver nodeIdMapRef).
+    const applyHistoryAction = useCallback(
+        async (action: HistoryAction, direction: HistoryDirection) => {
+            switch (action.kind) {
+                case "move-node": {
+                    const nodeId = resolveNodeId(action.nodeId)
+                    commitNodePosition(
+                        nodeId,
+                        direction === "undo" ? action.from : action.to,
+                        0
+                    )
+                    return
+                }
+                case "move-start": {
+                    commitStartPosition(
+                        direction === "undo" ? action.from : action.to,
+                        0
+                    )
+                    return
+                }
+                case "connect-edge": {
+                    const sourceNodeId = resolveNodeId(action.sourceNodeId)
+                    const targetNodeId = resolveNodeId(action.targetNodeId)
+                    if (direction === "undo") {
+                        if (action.previousTargetNodeId)
+                            connectNodes(
+                                sourceNodeId,
+                                action.sourcePort,
+                                resolveNodeId(action.previousTargetNodeId)
                             )
+                        else disconnectNodes(sourceNodeId, action.sourcePort)
+                    } else {
+                        connectNodes(sourceNodeId, action.sourcePort, targetNodeId)
+                    }
+                    return
+                }
+                case "disconnect-edge": {
+                    const sourceNodeId = resolveNodeId(action.sourceNodeId)
+                    const targetNodeId = resolveNodeId(action.targetNodeId)
+                    if (direction === "undo")
+                        connectNodes(sourceNodeId, action.sourcePort, targetNodeId)
+                    else disconnectNodes(sourceNodeId, action.sourcePort)
+                    return
+                }
+                case "change-entry": {
+                    const from = action.from ? resolveNodeId(action.from) : null
+                    const to = action.to ? resolveNodeId(action.to) : null
+                    const ok =
+                        direction === "undo"
+                            ? from
+                                ? await setEntry(from)
+                                : await clearEntry(to!)
+                            : to
+                                ? await setEntry(to)
+                                : await clearEntry(from!)
+                    if (!ok) throw new Error("change-entry failed")
+                    return
+                }
+                case "create-node": {
+                    if (direction === "undo") {
+                        const nodeId = resolveNodeId(action.nodeId)
+                        removeNodeFromCanvas(nodeId)
+                        const ok = await deleteNodeCore(nodeId)
+                        if (!ok) throw new Error("undo create-node failed")
+                    } else {
+                        const created = await createNode(
+                            action.type,
+                            { id: action.resourceId, label: action.label },
+                            action.position
+                        ).result
+                        if (!created.ok)
+                            throw new Error("redo create-node failed")
+                        nodeIdMapRef.current.set(action.nodeId, created.nodeId)
+                        action.nodeId = created.nodeId
+                    }
+                    return
+                }
+                case "create-resource-node": {
+                    if (direction === "undo") {
+                        const nodeId = resolveNodeId(action.nodeId)
+                        removeNodeFromCanvas(nodeId)
+                        const ok = await deleteResourceCore({
+                            nodeId,
+                            type: action.resourceType,
+                            resourceId: action.resourceId,
                         })
-                }, 450)
+                        if (!ok)
+                            throw new Error(
+                                "undo create-resource-node failed"
+                            )
+                    } else {
+                        const resourceId = await recreateResource(
+                            action.resourceType,
+                            action.creationDto,
+                            flow.companyId
+                        )
+                        if (!resourceId)
+                            throw new Error(
+                                "redo create-resource-node failed: resource"
+                            )
+                        const created = await createNode(
+                            action.resourceType,
+                            { id: resourceId, label: action.label },
+                            action.position
+                        ).result
+                        if (!created.ok)
+                            throw new Error(
+                                "redo create-resource-node failed: node"
+                            )
+                        nodeIdMapRef.current.set(action.nodeId, created.nodeId)
+                        action.nodeId = created.nodeId
+                        action.resourceId = resourceId
+                    }
+                    return
+                }
+                case "delete-node": {
+                    if (direction === "undo") {
+                        const created = await createNode(
+                            action.node.type as CanvasNodeType,
+                            {
+                                id: action.node.resourceId!,
+                                label: action.node.label,
+                            },
+                            action.node.position
+                        ).result
+                        if (!created.ok)
+                            throw new Error("undo delete-node failed")
+                        nodeIdMapRef.current.set(
+                            action.node.id,
+                            created.nodeId
+                        )
+                        action.node = { ...action.node, id: created.nodeId }
+                        for (const edge of [
+                            ...action.incomingEdges,
+                            ...action.outgoingEdges,
+                        ])
+                            connectNodes(
+                                resolveNodeId(edge.sourceNodeId),
+                                edge.sourcePort,
+                                resolveNodeId(edge.targetNodeId)
+                            )
+                        if (action.wasEntry) {
+                            const ok = await setEntry(created.nodeId)
+                            if (!ok)
+                                throw new Error(
+                                    "undo delete-node entry restore failed"
+                                )
+                        }
+                    } else {
+                        const nodeId = resolveNodeId(action.node.id)
+                        removeNodeFromCanvas(nodeId)
+                        const ok = await deleteNodeCore(nodeId)
+                        if (!ok) throw new Error("redo delete-node failed")
+                    }
+                    return
+                }
+                case "delete-resource": {
+                    if (direction === "undo") {
+                        const resourceId = await recreateResource(
+                            action.resourceType,
+                            action.creationDto,
+                            flow.companyId
+                        )
+                        if (!resourceId)
+                            throw new Error(
+                                "undo delete-resource failed: resource"
+                            )
+                        const created = await createNode(
+                            action.resourceType,
+                            { id: resourceId, label: action.node.label },
+                            action.node.position
+                        ).result
+                        if (!created.ok)
+                            throw new Error(
+                                "undo delete-resource failed: node"
+                            )
+                        nodeIdMapRef.current.set(
+                            action.node.id,
+                            created.nodeId
+                        )
+                        action.node = {
+                            ...action.node,
+                            id: created.nodeId,
+                            resourceId,
+                        }
+                        for (const edge of [
+                            ...action.incomingEdges,
+                            ...action.outgoingEdges,
+                        ])
+                            connectNodes(
+                                resolveNodeId(edge.sourceNodeId),
+                                edge.sourcePort,
+                                resolveNodeId(edge.targetNodeId)
+                            )
+                        if (action.wasEntry) {
+                            const ok = await setEntry(created.nodeId)
+                            if (!ok)
+                                throw new Error(
+                                    "undo delete-resource entry restore failed"
+                                )
+                        }
+                    } else {
+                        const nodeId = resolveNodeId(action.node.id)
+                        removeNodeFromCanvas(nodeId)
+                        const ok = await deleteResourceCore({
+                            nodeId,
+                            type: action.resourceType,
+                            resourceId: action.node.resourceId!,
+                        })
+                        if (!ok)
+                            throw new Error("redo delete-resource failed")
+                    }
+                    return
+                }
             }
         },
-        [flow.id, persistPositions, setFlowNodes]
+        [
+            resolveNodeId,
+            commitNodePosition,
+            commitStartPosition,
+            connectNodes,
+            disconnectNodes,
+            setEntry,
+            clearEntry,
+            removeNodeFromCanvas,
+            deleteNodeCore,
+            deleteResourceCore,
+            createNode,
+            recreateResource,
+            flow.companyId,
+        ]
     )
+
+    useEffect(() => {
+        history.setApplyAction(applyHistoryAction)
+    }, [applyHistoryAction, history])
+
+    // Atalhos de undo/redo — só quando o foco está no canvas (ou em lugar nenhum, caso comum logo
+    // após abrir a página e nunca ter clicado num input). Diálogos (base-ui) fazem portal fora da
+    // subárvore de canvasRootRef, então o teste de containment já basta pra nunca disparar com um
+    // diálogo aberto; o teste de input/textarea/contentEditable é defesa extra caso um campo de
+    // texto passe a existir dentro do canvas no futuro. preventDefault só roda depois dos guards,
+    // então o desfazer nativo de texto (em qualquer lugar fora do canvas) nunca é tocado.
+    useEffect(() => {
+        function isEditableTarget(target: EventTarget | null) {
+            if (!(target instanceof HTMLElement)) return false
+            if (["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))
+                return true
+            return target.isContentEditable
+        }
+        function onKeyDown(event: KeyboardEvent) {
+            const key = event.key.toLowerCase()
+            const isMod = event.ctrlKey || event.metaKey
+            if (!isMod || (key !== "z" && key !== "y")) return
+            const withinCanvas =
+                canvasRootRef.current?.contains(event.target as Node) ?? false
+            const noFocusElsewhere =
+                document.activeElement === document.body ||
+                document.activeElement === null
+            if (!withinCanvas && !noFocusElsewhere) return
+            if (isEditableTarget(event.target)) return
+            if (key === "z" && event.shiftKey) {
+                event.preventDefault()
+                history.redo()
+            } else if (key === "z") {
+                event.preventDefault()
+                history.undo()
+            } else if (key === "y") {
+                event.preventDefault()
+                history.redo()
+            }
+        }
+        window.addEventListener("keydown", onKeyDown)
+        return () => window.removeEventListener("keydown", onKeyDown)
+    }, [history])
 
     useEffect(() => {
         if (!flow.id || loading) return
@@ -965,77 +1561,88 @@ function FlowCanvasInner({ flow, companies }: Props) {
             x: 100 + (flowNodes.length % 4) * 240,
             y: 120 + Math.floor(flowNodes.length / 4) * 150,
         }
-        void createNode(type, option, fallback)
+        const { localId } = createNode(type, option, fallback)
+        history.push({
+            kind: "create-node",
+            nodeId: localId,
+            type,
+            resourceId: option.id,
+            label: option.label ?? null,
+            position: fallback,
+        })
     }
 
     return (
         <>
-            <div className="relative h-full w-full bg-background">
-                <ContextMenu>
-                    <ContextMenuTrigger className="block h-full w-full">
-                        <ReactFlow
-                            nodes={rfNodes}
-                            edges={rfEdges}
-                            nodeTypes={NODE_TYPES}
-                            edgeTypes={EDGE_TYPES}
-                            onNodesChange={onNodesChange}
-                            onConnect={onConnect}
-                            onEdgesDelete={onEdgesDelete}
-                            onMoveStart={showMiniMap}
-                            onMoveEnd={scheduleMiniMapHide}
-                            onNodeDragStart={showMiniMap}
-                            onNodeDragStop={scheduleMiniMapHide}
-                            fitView
-                            fitViewOptions={{ padding: 0.28 }}
-                            minZoom={0.35}
-                            maxZoom={1.6}
-                        >
-                            <Background
-                                gap={28}
-                                size={2}
-                            />
-                            <Controls />
-                            <MiniMap
-                                pannable
-                                zoomable
-                                className={
-                                    isMiniMapVisible
-                                        ? "opacity-100 transition-opacity duration-200"
-                                        : "pointer-events-none opacity-0 transition-opacity duration-200"
-                                }
-                            />
-                        </ReactFlow>
-                    </ContextMenuTrigger>
-                    <ContextMenuContent className="w-56">
-                        <ContextMenuGroup>
-                            <ContextMenuLabel>Adicionar ação</ContextMenuLabel>
-                            <ContextMenuSeparator />
-                            {NODE_ACTIONS.map((action) => {
-                                const Icon =
-                                    ROUTE_DEST_ICONS[action.resourceTypes[0]]
-                                return (
-                                    <ContextMenuItem
-                                        key={action.id}
-                                        onClick={() =>
-                                            setPendingAction(action.id)
-                                        }
-                                    >
-                                        <Icon className="size-3.5" />
-                                        {action.label}
-                                    </ContextMenuItem>
-                                )
-                            })}
-                        </ContextMenuGroup>
-                    </ContextMenuContent>
-                </ContextMenu>
-                {(loading || refreshing || isSyncingEdges) && (
+            <div ref={canvasRootRef} className="relative h-full w-full bg-background">
+                {loading ? (
+                    <div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">
+                        <Loader2Icon className="size-4 animate-spin" />
+                        Carregando...
+                    </div>
+                ) : (
+                    <ContextMenu>
+                        <ContextMenuTrigger className="block h-full w-full">
+                            <ReactFlow
+                                nodes={rfNodes}
+                                edges={rfEdges}
+                                nodeTypes={NODE_TYPES}
+                                edgeTypes={EDGE_TYPES}
+                                onNodesChange={onNodesChange}
+                                onConnect={onConnect}
+                                onEdgesDelete={onEdgesDelete}
+                                onMoveStart={showMiniMap}
+                                onMoveEnd={scheduleMiniMapHide}
+                                onNodeDragStart={showMiniMap}
+                                onNodeDragStop={scheduleMiniMapHide}
+                                fitView
+                                fitViewOptions={{ padding: 0.28 }}
+                                minZoom={0.35}
+                                maxZoom={1.6}
+                            >
+                                <Background
+                                    gap={28}
+                                    size={2}
+                                />
+                                <Controls />
+                                <MiniMap
+                                    pannable
+                                    zoomable
+                                    className={
+                                        isMiniMapVisible
+                                            ? "opacity-100 transition-opacity duration-200"
+                                            : "pointer-events-none opacity-0 transition-opacity duration-200"
+                                    }
+                                />
+                            </ReactFlow>
+                        </ContextMenuTrigger>
+                        <ContextMenuContent className="w-56">
+                            <ContextMenuGroup>
+                                <ContextMenuLabel>Adicionar ação</ContextMenuLabel>
+                                <ContextMenuSeparator />
+                                {NODE_ACTIONS.map((action) => {
+                                    const Icon =
+                                        ROUTE_DEST_ICONS[action.resourceTypes[0]]
+                                    return (
+                                        <ContextMenuItem
+                                            key={action.id}
+                                            onClick={() =>
+                                                setPendingAction(action.id)
+                                            }
+                                        >
+                                            <Icon className="size-3.5" />
+                                            {action.label}
+                                        </ContextMenuItem>
+                                    )
+                                })}
+                            </ContextMenuGroup>
+                        </ContextMenuContent>
+                    </ContextMenu>
+                )}
+                {(refreshing || isSyncingEdges) && (
                     <div className="absolute top-3 right-3 z-20 flex items-center gap-1.5 rounded-md border bg-card px-2 py-1 text-xs text-muted-foreground shadow-sm">
                         <Loader2Icon className="size-3 animate-spin" />
-                        {loading
-                            ? "Carregando..."
-                            : isSyncingEdges
-                                ? "Salvando conexões..."
-                                : "Sincronizando..."}
+                        {isSyncingEdges ? "Salvando conexões..." : "Sincronizando..."}
                     </div>
                 )}
             </div>
@@ -1060,7 +1667,7 @@ function FlowCanvasInner({ flow, companies }: Props) {
                     companies={companies.filter(
                         (company) => company.id === flow.companyId
                     )}
-                    onCreated={async (option) => {
+                    onCreated={async (option, creationDto) => {
                         const source = pendingCreation.source
                             ? nodeById.get(pendingCreation.source.nodeId)
                             : null
@@ -1075,16 +1682,25 @@ function FlowCanvasInner({ flow, companies }: Props) {
                                     120 +
                                     Math.floor(flowNodes.length / 4) * 150,
                             }
-                        const nodeId = await createNode(
+                        const { localId } = createNode(
                             pendingCreation.type,
                             option,
                             position
                         )
-                        if (nodeId && pendingCreation.source)
-                            await connectNodes(
+                        history.push({
+                            kind: "create-resource-node",
+                            nodeId: localId,
+                            resourceType: pendingCreation.type,
+                            resourceId: option.id,
+                            label: option.label ?? null,
+                            position,
+                            creationDto,
+                        })
+                        if (pendingCreation.source)
+                            connectNodes(
                                 pendingCreation.source.nodeId,
                                 pendingCreation.source.port,
-                                nodeId
+                                localId
                             )
                     }}
                 />
@@ -1101,12 +1717,13 @@ function FlowCanvasInner({ flow, companies }: Props) {
                         (company) => company.id === flow.companyId
                     )}
                     onSaved={() => void refetchNodes()}
-                    onDeleteResource={() =>
+                    onDeleteResource={(creationDto) =>
                         setResourceToDelete({
                             nodeId: editingNode.nodeId,
                             type: editingNode.type,
                             resourceId: editingNode.resourceId,
                             name: editingNode.name,
+                            creationDto,
                         })
                     }
                 />

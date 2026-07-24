@@ -4,45 +4,46 @@ import { ArrowLeftIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { FlowCanvas } from "@/components/Flows/flow-canvas"
 import { useCompanies } from "@/hooks/use-companies"
-import { useFlow } from "@/hooks/use-flows"
+import { useFlow, useFlowNodes } from "@/hooks/use-flows"
 
 function FlowEditorPage() {
     const { id } = Route.useParams()
     const navigate = useNavigate()
     const { companies } = useCompanies()
-    const { flow, loading } = useFlow(id)
+    // Flow (metadados) e nós/edges são buscados em paralelo (ambos só dependem do id da rota, não
+    // um do outro) — evita a tela mostrar "carregou o flow" e só depois "carregou os nós" em
+    // sequência, um loading visível de cada vez.
+    const { flow, loading: flowLoading } = useFlow(id)
+    const flowNodesState = useFlowNodes(id)
+    const loading = flowLoading || flowNodesState.loading
 
     return (
-        <div className="flex h-[calc(100dvh-6rem)] min-h-0 flex-col gap-3 overflow-hidden">
-            <div className="flex items-center gap-3">
+        <div className="relative h-[calc(100dvh-6rem)] w-full overflow-hidden rounded-md border">
+            {loading || !flow ? (
+                <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                    Carregando...
+                </div>
+            ) : (
+                <FlowCanvas
+                    flow={flow}
+                    companies={companies}
+                    flowNodesState={flowNodesState}
+                />
+            )}
+
+            <div className="absolute top-3 left-3 z-20 flex items-center gap-1.5 rounded-md border bg-card/95 py-1.5 pr-2.5 pl-1.5 shadow-sm backdrop-blur-sm">
                 <Button
-                    variant="outline"
+                    variant="ghost"
                     size="icon"
+                    className="size-7"
                     onClick={() => navigate({ to: "/dashboard/flows" })}
                 >
-                    <ArrowLeftIcon />
+                    <ArrowLeftIcon className="size-4" />
                     <span className="sr-only">Voltar</span>
                 </Button>
-                <div className="flex flex-col">
-                    <h1 className="text-lg font-semibold">
-                        {flow?.name ?? "Carregando..."}
-                    </h1>
-                    <p className="text-sm text-muted-foreground">
-                        Cada card é uma instância independente; você pode
-                        reutilizar a mesma fila ou aplicação em vários pontos do
-                        fluxo.
-                    </p>
-                </div>
-            </div>
-
-            <div className="min-h-0 flex-1 rounded-md border">
-                {loading || !flow ? (
-                    <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                        Carregando...
-                    </div>
-                ) : (
-                    <FlowCanvas flow={flow} companies={companies} />
-                )}
+                <h1 className="text-sm font-semibold">
+                    {flow?.name ?? "Carregando..."}
+                </h1>
             </div>
         </div>
     )

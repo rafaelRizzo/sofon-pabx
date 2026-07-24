@@ -6,27 +6,42 @@ import { toast } from "sonner"
 
 import { api, apiError } from "@/lib/api"
 import { AnnouncementFormDialog } from "@/components/Announcements/announcement-form-dialog"
-import { useAnnouncements, type Announcement } from "@/hooks/use-announcements"
+import {
+    useAnnouncements,
+    toAnnouncementCreationDto,
+    type Announcement,
+} from "@/hooks/use-announcements"
 import { QueueFormDialog } from "@/components/Queues/queue-form-dialog"
 import { QueueMembersSheet } from "@/components/Queues/queue-members-sheet"
-import { useQueues, type Queue } from "@/hooks/use-queues"
+import { useQueues, toQueueCreationDto, type Queue } from "@/hooks/use-queues"
 import { RequestTemplateFormDialog } from "@/components/RequestTemplates/request-template-form-dialog"
 import {
     useRequestTemplates,
+    toRequestTemplateCreationDto,
     type RequestTemplate,
 } from "@/hooks/use-request-templates"
 import { TimeConditionFormDialog } from "@/components/TimeConditions/time-condition-form-dialog"
 import {
     useTimeConditions,
+    toTimeConditionCreationDto,
     type TimeCondition,
 } from "@/hooks/use-time-conditions"
 import { HolidayGroupFormDialog } from "@/components/HolidayGroups/holiday-group-form-dialog"
-import { useHolidayGroups, type HolidayGroup } from "@/hooks/use-holiday-groups"
+import {
+    useHolidayGroups,
+    toHolidayGroupCreationDto,
+    type HolidayGroup,
+} from "@/hooks/use-holiday-groups"
 import { VariableSetFormDialog } from "@/components/Variables/variable-set-form-dialog"
-import { useVariables, type VariableSet } from "@/hooks/use-variables"
+import {
+    useVariables,
+    toVariableSetCreationDto,
+    type VariableSet,
+} from "@/hooks/use-variables"
 import { VariableConditionFormDialog } from "@/components/VariableConditions/variable-condition-form-dialog"
 import {
     useVariableConditions,
+    toVariableConditionCreationDto,
     type VariableCondition,
 } from "@/hooks/use-variable-conditions"
 import { ExtensionFormDialog } from "@/components/Extensions/extension-form-dialog"
@@ -49,7 +64,10 @@ type Props = {
     // dispara depois de salvar com sucesso — o canvas usa isso pra refazer o grafo (o nome exibido
     // no nó, ou uma conexão feita através do próprio form, pode ter mudado)
     onSaved: () => void
-    onDeleteResource?: () => void
+    // recebe o DTO de criação montado a partir do registro carregado no editor (não do buffer não
+    // salvo do form) — o histórico de undo/redo do canvas usa isso pra poder recriar o recurso caso
+    // o usuário desfaça a exclusão (ver flow-canvas.tsx)
+    onDeleteResource?: (creationDto: unknown) => void
 }
 
 // Busca genérica por id — usada por todo tipo que não tem hook de leitura única própria. A resposta
@@ -112,7 +130,10 @@ export function EditNodeDialog({
                     announcement={entity}
                     loading={loading}
                     companyId={companyId}
-                    onDelete={onDeleteResource}
+                    onDelete={() =>
+                        entity &&
+                        onDeleteResource?.(toAnnouncementCreationDto(entity))
+                    }
                     onSave={async (form) => {
                         const ok = await updateAnnouncement(id, form)
                         if (ok) onSaved()
@@ -136,7 +157,10 @@ export function EditNodeDialog({
                         queue={entity}
                         loading={loading}
                         companies={companies}
-                        onDelete={onDeleteResource}
+                        onDelete={() =>
+                            entity &&
+                            onDeleteResource?.(toQueueCreationDto(entity))
+                        }
                         onManageMembers={() => setMembersOpen(true)}
                         onSave={async (form) => {
                             const ok = await updateQueue(id, form)
@@ -165,7 +189,10 @@ export function EditNodeDialog({
                     requestTemplate={entity}
                     loading={loading}
                     companies={companies}
-                    onDelete={onDeleteResource}
+                    onDelete={() =>
+                        entity &&
+                        onDeleteResource?.(toRequestTemplateCreationDto(entity))
+                    }
                     onSave={async (form) => {
                         const ok = await updateRequestTemplate(id, form)
                         if (ok) onSaved()
@@ -187,7 +214,10 @@ export function EditNodeDialog({
                     timeCondition={entity}
                     loading={loading}
                     companies={companies}
-                    onDelete={onDeleteResource}
+                    onDelete={() =>
+                        entity &&
+                        onDeleteResource?.(toTimeConditionCreationDto(entity))
+                    }
                     onSave={async (form) => {
                         const ok = await updateTimeCondition(id, form)
                         if (ok) onSaved()
@@ -209,7 +239,10 @@ export function EditNodeDialog({
                     holidayGroup={entity}
                     loading={loading}
                     companies={companies}
-                    onDelete={onDeleteResource}
+                    onDelete={() =>
+                        entity &&
+                        onDeleteResource?.(toHolidayGroupCreationDto(entity))
+                    }
                     onSave={async (form) => {
                         const ok = await updateHolidayGroup(id, form)
                         if (ok) onSaved()
@@ -231,7 +264,10 @@ export function EditNodeDialog({
                     variableSet={entity}
                     loading={loading}
                     companies={companies}
-                    onDelete={onDeleteResource}
+                    onDelete={() =>
+                        entity &&
+                        onDeleteResource?.(toVariableSetCreationDto(entity))
+                    }
                     onSave={async (form) => {
                         const ok = await updateVariableSet(id, form)
                         if (ok) onSaved()
@@ -253,7 +289,12 @@ export function EditNodeDialog({
                     variableCondition={entity}
                     loading={loading}
                     companies={companies}
-                    onDelete={onDeleteResource}
+                    onDelete={() =>
+                        entity &&
+                        onDeleteResource?.(
+                            toVariableConditionCreationDto(entity)
+                        )
+                    }
                     onSave={async (form) => {
                         const ok = await updateVariableCondition(id, form)
                         if (ok) onSaved()
