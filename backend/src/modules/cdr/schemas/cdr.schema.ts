@@ -4,18 +4,51 @@ import { ok, timestamp } from '../../../schemas/responses'
 export const DEFAULT_LIMIT = 50
 export const MAX_LIMIT = 200
 
-export const cdrQuerySchema = z.object({
+const cdrQueryShape = {
     companyId: z.cuid2(),
     startDate: z.iso.date().optional(),
     endDate: z.iso.date().optional(),
     src: z.string().max(80).optional(),
     dst: z.string().max(80).optional(),
-    callStatus: z.enum(['ANSWERED', 'NO ANSWER', 'BUSY', 'FAILED', 'CONGESTION']).optional(),
+    callStatus: z
+        .enum(['ANSWERED', 'NO ANSWER', 'BUSY', 'FAILED', 'CONGESTION'])
+        .optional(),
+    direction: z.enum(['inbound', 'outbound', 'internal']).optional(),
+    originExtension: z.string().max(40).optional(),
+    dialedNumber: z.string().max(80).optional(),
+    trunkId: z.cuid2().optional(),
+    queueName: z.string().max(160).optional(),
+    linkedid: z.string().max(150).optional(),
+    uniqueid: z.string().max(150).optional()
+}
+
+const withDateRangeValidation = <T extends z.ZodRawShape>(shape: T) =>
+    z.object(shape).refine(
+        (value) => {
+            const { startDate, endDate } = value as {
+                startDate?: string
+                endDate?: string
+            }
+            return !startDate || !endDate || startDate <= endDate
+        },
+        {
+            message: 'startDate must be before or equal to endDate',
+            path: ['endDate']
+        }
+    )
+
+export const cdrQuerySchema = withDateRangeValidation({
+    ...cdrQueryShape,
     limit: z.coerce.number().int().min(1).max(MAX_LIMIT).default(DEFAULT_LIMIT),
-    order: z.enum(['asc', 'desc']).default('desc'),
+    cursor: z.coerce.bigint().positive().optional(),
+    order: z.enum(['asc', 'desc']).default('desc')
 })
 
 export type CdrQueryInput = z.infer<typeof cdrQuerySchema>
+
+export const cdrMetricsQuerySchema = withDateRangeValidation(cdrQueryShape)
+
+export type CdrMetricsQueryInput = z.infer<typeof cdrMetricsQuerySchema>
 
 export const CdrSchema = z.object({
     id: z.string(),
@@ -34,10 +67,38 @@ export const CdrSchema = z.object({
     billsec: z.number().nullable(),
     callStatus: z.string().nullable(),
     uniqueid: z.string().nullable(),
+    queueName: z.string().nullable(),
+    linkedid: z.string().nullable(),
+    sequence: z.number().nullable(),
+    direction: z.string().nullable(),
+    originExtension: z.string().nullable(),
+    dialedNumber: z.string().nullable(),
+    trunkId: z.string().nullable(),
+    recordingFile: z.string().nullable(),
+    hangupCause: z.string().nullable()
 })
 
 export const ListCdrResponse = ok({
     records: z.array(CdrSchema),
     total: z.number(),
     limit: z.number(),
+    nextCursor: z.string().nullable()
 })
+
+export const CdrMetricsSchema = z.object({
+    total: z.number(),
+    answered: z.number(),
+    answerRate: z.number(),
+    totalDuration: z.number(),
+    totalBillsec: z.number(),
+    avgDuration: z.number().nullable(),
+    avgBillsec: z.number().nullable(),
+    byStatus: z.array(
+        z.object({ callStatus: z.string().nullable(), calls: z.number() })
+    ),
+    byDirection: z.array(
+        z.object({ direction: z.string().nullable(), calls: z.number() })
+    )
+})
+
+export const CdrMetricsResponse = ok({ metrics: CdrMetricsSchema })

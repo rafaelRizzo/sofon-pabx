@@ -158,6 +158,27 @@ export const updateIvrMenuFormSchema = ivrMenuBaseFormSchema
 
 export type IvrMenuForm = z.infer<typeof createIvrMenuFormSchema>
 export type IvrMenuUpdateForm = z.infer<typeof updateIvrMenuFormSchema>
+export type IvrMenuCreationDto = Omit<IvrMenuForm, "companyId">
+
+export function toIvrMenuCreationDto(menu: IvrMenu): IvrMenuCreationDto {
+    return {
+        name: menu.name,
+        type: menu.type,
+        variableName: menu.variableName,
+        audioId: menu.audioId,
+        maxDigits: menu.maxDigits,
+        digitTimeout: menu.digitTimeout,
+        invalidRetries: menu.invalidRetries,
+        invalidDestination: menu.invalidDestination,
+        timeoutRetries: menu.timeoutRetries,
+        timeoutDestination: menu.timeoutDestination,
+        longDestination: menu.longDestination,
+        options: menu.options.map(({ digit, destination }) => ({
+            digit,
+            destination,
+        })),
+    }
+}
 
 // audioId: create do backend não aceita null (só cuid2 ou ausente), update aceita null pra desvincular.
 // variableName: create não aceita null (só string ou ausente); update aceita null pra limpar ao

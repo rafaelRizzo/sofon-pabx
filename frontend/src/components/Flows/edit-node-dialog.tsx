@@ -49,7 +49,11 @@ import { useExtensions } from "@/hooks/use-extensions"
 import { FlowFormDialog } from "@/components/Flows/flow-form-dialog"
 import { useFlow, useFlows } from "@/hooks/use-flows"
 import { IvrMenuFormDialog } from "@/components/Ivr/ivr-menu-form-dialog"
-import { useIvr, type IvrMenu } from "@/hooks/use-ivr"
+import {
+    toIvrMenuCreationDto,
+    useIvr,
+    type IvrMenu,
+} from "@/hooks/use-ivr"
 import type { Company } from "@/hooks/use-companies"
 import {
     NODE_TYPE_CONFIG,
@@ -157,6 +161,10 @@ export function EditNodeDialog({
                     ivrMenu={entity}
                     companies={companies}
                     flowNodeMode
+                    onDelete={() =>
+                        entity &&
+                        onDeleteResource?.(toIvrMenuCreationDto(entity))
+                    }
                     onSave={async (form) => {
                         const ok = await updateIvrMenu(id, form)
                         if (ok) onSaved()

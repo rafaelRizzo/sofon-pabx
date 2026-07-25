@@ -16,6 +16,7 @@ import {
     type Node,
     type NodeChange,
     type NodeTypes,
+    type ReactFlowInstance,
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
 import "@/components/Flows/flow-canvas.css"
@@ -111,7 +112,11 @@ import {
     type VariableConditionForm,
     type VariableConditionUpdateForm,
 } from "@/hooks/use-variable-conditions"
-import { useIvr } from "@/hooks/use-ivr"
+import {
+    useIvr,
+    type IvrMenuCreationDto,
+    type IvrMenuForm,
+} from "@/hooks/use-ivr"
 
 const START_KEY = "start"
 const MINI_MAP_IDLE_DELAY = 1200
@@ -184,7 +189,7 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
         refetchNodes,
         setEdges: setFlowEdges,
     } = flowNodesState
-    const { allIvrMenus } = useIvr(flow.companyId)
+    const { allIvrMenus, createIvrMenu } = useIvr(flow.companyId)
     const ivrById = useMemo(
         () => new Map(allIvrMenus.map((menu) => [menu.id, menu])),
         [allIvrMenus]
@@ -197,6 +202,7 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
     const [pendingCreation, setPendingCreation] = useState<{
         type: CanvasNodeType
         source?: { nodeId: string; port: string }
+        position?: { x: number; y: number }
     } | null>(null)
     const [editingNode, setEditingNode] = useState<{
         nodeId: string
@@ -242,6 +248,8 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
     // indicador assim que a primeira terminasse, mesmo com outras ainda em voo.
     const [deletingNodeCount, setDeletingNodeCount] = useState(0)
     const canvasRootRef = useRef<HTMLDivElement>(null)
+    const flowInstanceRef = useRef<ReactFlowInstance | null>(null)
+    const contextPositionRef = useRef<{ x: number; y: number } | null>(null)
 
     // Histórico undo/redo (ver flow-history.ts) — em memória, zerado ao desmontar (trocar de flow
     // ou recarregar a página).
@@ -827,6 +835,16 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
                         } as VariableConditionForm,
                         true
                     )
+                case "ivr": {
+                    const resourceId = await createIvrMenu(
+                        {
+                            ...(creationDto as IvrMenuCreationDto),
+                            companyId,
+                        } as IvrMenuForm,
+                        companyId
+                    )
+                    return resourceId || null
+                }
                 case "extension":
                 case "flow":
                     return null
@@ -1661,10 +1679,11 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
         type: CanvasNodeType,
         option: DestinationOption
     ) {
-        const fallback = {
+        const fallback = contextPositionRef.current ?? {
             x: 100 + (flowNodes.length % 4) * 240,
             y: 120 + Math.floor(flowNodes.length / 4) * 150,
         }
+        contextPositionRef.current = null
         const { localId } = createNode(type, option, fallback)
         history.push({
             kind: "create-node",
@@ -1689,7 +1708,18 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
                     </div>
                 ) : (
                     <ContextMenu>
-                        <ContextMenuTrigger className="block h-full w-full">
+                        <ContextMenuTrigger
+                            className="block h-full w-full"
+                            onContextMenu={(event) => {
+                                const instance = flowInstanceRef.current
+                                if (!instance) return
+                                contextPositionRef.current =
+                                    instance.screenToFlowPosition({
+                                        x: event.clientX,
+                                        y: event.clientY,
+                                    })
+                            }}
+                        >
                             <ReactFlow
                                 nodes={rfNodes}
                                 edges={rfEdges}
@@ -1705,6 +1735,9 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
                                 onMoveEnd={scheduleMiniMapHide}
                                 onNodeDragStart={showMiniMap}
                                 onNodeDragStop={scheduleMiniMapHide}
+                                onInit={(instance) => {
+                                    flowInstanceRef.current = instance
+                                }}
                                 fitView
                                 fitViewOptions={{ padding: 0.28 }}
                                 minZoom={0.35}
@@ -1769,8 +1802,10 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
                 onOpenChange={(open) => !open && setPendingAction(null)}
                 onSelect={addConfiguredNode}
                 onCreate={(type) => {
+                    const position = contextPositionRef.current ?? undefined
+                    contextPositionRef.current = null
                     setPendingAction(null)
-                    setPendingCreation({ type })
+                    setPendingCreation({ type, position })
                 }}
             />
             {pendingCreation && (
@@ -1792,11 +1827,9 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
                                   x: source.position.x + 280,
                                   y: source.position.y + 70,
                               }
-                            : {
+                            : pendingCreation.position ?? {
                                   x: 100 + (flowNodes.length % 4) * 240,
-                                  y:
-                                      120 +
-                                      Math.floor(flowNodes.length / 4) * 150,
+                                  y: 120 + Math.floor(flowNodes.length / 4) * 150,
                               }
                         const { localId } = createNode(
                             pendingCreation.type,

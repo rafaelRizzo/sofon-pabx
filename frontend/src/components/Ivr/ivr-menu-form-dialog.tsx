@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { PlusIcon, XIcon } from "lucide-react"
+import { XIcon } from "lucide-react"
 import { useFieldArray, useForm } from "react-hook-form"
 
 import {
@@ -49,7 +49,9 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { RouteDestinationField } from "@/components/RouteDestination/route-destination-field"
+import { Toggle } from "@/components/ui/toggle"
 import { type Audio, useAudios } from "@/hooks/use-audios"
 import { type Company } from "@/hooks/use-companies"
 import {
@@ -60,10 +62,7 @@ import {
     type IvrMenuType,
 } from "@/hooks/use-ivr"
 
-const DIGIT_OPTIONS = Array.from({ length: 10 }, (_, i) => ({
-    value: String(i),
-    label: String(i),
-}))
+const DTMF_OPTIONS = Array.from({ length: 10 }, (_, i) => String(i))
 
 const emptyOption = { digit: "0", destination: { type: "hangup" as const } }
 
@@ -87,6 +86,7 @@ type Props = {
     defaultCompanyId?: string
     flowNodeMode?: boolean
     onSave: (form: IvrMenuForm) => Promise<boolean>
+    onDelete?: () => void
 }
 
 export function IvrMenuFormDialog({
@@ -97,6 +97,7 @@ export function IvrMenuFormDialog({
     defaultCompanyId,
     flowNodeMode = false,
     onSave,
+    onDelete,
 }: Props) {
     const isEdit = !!ivrMenu
 
@@ -144,6 +145,19 @@ export function IvrMenuFormDialog({
     // Áudio do menu depende da empresa do próprio form, não do filtro da página
     const { audios } = useAudios(companyId || undefined)
     const selectedAudio = audios.find((a) => a.id === audioId) ?? null
+
+    // Remove estado transitório de versões anteriores que permitiam uma tecla fora do contrato da API.
+    useEffect(() => {
+        const validOptions = options.filter((option) =>
+            DTMF_OPTIONS.includes(option.digit)
+        )
+        if (validOptions.length !== options.length) {
+            setValue("options", validOptions, {
+                shouldValidate: true,
+                shouldDirty: true,
+            })
+        }
+    }, [options, setValue])
 
     useEffect(() => {
         if (!open) return
@@ -222,9 +236,20 @@ export function IvrMenuFormDialog({
     )
     const hasDigitConflict = digitConflicts.some(Boolean)
 
+    function toggleDigit(digit: string, pressed: boolean) {
+        const index = options.findIndex((option) => option.digit === digit)
+        if (pressed && index === -1) {
+            optionFields.append(
+                { ...emptyOption, digit },
+                { shouldFocus: false }
+            )
+        }
+        if (!pressed && index !== -1) optionFields.remove(index)
+    }
+
     const onSubmit = handleSubmit(async (form) => {
         const ok = await onSave(form)
-        if (ok) onOpenChange(false)
+        if (ok) reset(form)
     })
 
     // Fechar (X, Escape, clique fora, botão Cancelar) com alterações não salvas pede confirmação
@@ -240,8 +265,8 @@ export function IvrMenuFormDialog({
     return (
         <>
             <Dialog open={open} onOpenChange={requestClose}>
-                <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-xl">
-                    <DialogHeader>
+                <DialogContent className="sm:max-w-xl">
+                    <DialogHeader className="pr-8">
                         <DialogTitle>
                             {isEdit ? "Editar menu de URA" : "Novo menu de URA"}
                         </DialogTitle>
@@ -255,10 +280,9 @@ export function IvrMenuFormDialog({
                     <form
                         id="ivr-menu-form"
                         onSubmit={onSubmit}
-                        className="flex min-h-0 flex-1 flex-col"
                     >
-                        <div className="flex-1 overflow-x-hidden overflow-y-auto">
-                            <FieldGroup>
+                        <ScrollArea className="h-[65vh] max-h-[calc(100vh-14rem)]">
+                            <FieldGroup className="pr-3">
                                 {flowNodeMode && (
                                     <Field>
                                         <FieldDescription>
@@ -643,27 +667,6 @@ export function IvrMenuFormDialog({
                                             <FieldLabel>
                                                 Opções de dígito
                                             </FieldLabel>
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                size="sm"
-                                                disabled={
-                                                    !companyId ||
-                                                    optionFields.fields
-                                                        .length >= 10
-                                                }
-                                                onClick={() =>
-                                                    optionFields.append(
-                                                        emptyOption,
-                                                        {
-                                                            shouldFocus: false,
-                                                        }
-                                                    )
-                                                }
-                                            >
-                                                <PlusIcon />
-                                                Adicionar
-                                            </Button>
                                         </div>
                                         {!companyId ? (
                                             <FieldDescription>
@@ -676,7 +679,7 @@ export function IvrMenuFormDialog({
                                                 <FieldDescription>
                                                     {flowNodeMode
                                                         ? "Defina as teclas disponíveis. Os destinos são conectados no canvas."
-                                                        : "Para onde a chamada é direcionada quando o chamador digita cada tecla (máximo 10 opções, um dígito por opção)."}
+                                                        : "Selecione as teclas e defina o destino de cada uma."}
                                                 </FieldDescription>
                                                 {errors.options?.root && (
                                                     <FieldError>
@@ -686,7 +689,40 @@ export function IvrMenuFormDialog({
                                                         }
                                                     </FieldError>
                                                 )}
-                                                <div className="space-y-2">
+                                                <div className="flex flex-wrap gap-2">
+                                                    {DTMF_OPTIONS.map(
+                                                        (digit) => (
+                                                            <Toggle
+                                                                key={digit}
+                                                                type="button"
+                                                                variant="outline"
+                                                                className="text-muted-foreground aria-pressed:border-primary aria-pressed:bg-primary aria-pressed:text-primary-foreground hover:aria-pressed:bg-primary/90"
+                                                                pressed={options.some(
+                                                                    (option) =>
+                                                                        option.digit ===
+                                                                        digit
+                                                                )}
+                                                                onPressedChange={(
+                                                                    pressed
+                                                                ) =>
+                                                                    toggleDigit(
+                                                                        digit,
+                                                                        pressed
+                                                                    )
+                                                                }
+                                                            >
+                                                                {digit}
+                                                            </Toggle>
+                                                        )
+                                                    )}
+                                                </div>
+                                                <div
+                                                    className={
+                                                        flowNodeMode
+                                                            ? "hidden"
+                                                            : "space-y-2"
+                                                    }
+                                                >
                                                     {optionFields.fields
                                                         .length === 0 && (
                                                         <p className="text-xs text-muted-foreground">
@@ -701,55 +737,13 @@ export function IvrMenuFormDialog({
                                                                 className="space-y-2 rounded-md border p-2"
                                                             >
                                                                 <div className="flex items-start gap-2">
-                                                                    <div className="w-20 shrink-0">
-                                                                        <Select
-                                                                            items={
-                                                                                DIGIT_OPTIONS
-                                                                            }
-                                                                            value={
-                                                                                options[
-                                                                                    index
-                                                                                ]
-                                                                                    ?.digit
-                                                                            }
-                                                                            onValueChange={(
-                                                                                v
-                                                                            ) =>
-                                                                                setValue(
-                                                                                    `options.${index}.digit`,
-                                                                                    v ??
-                                                                                        "0",
-                                                                                    {
-                                                                                        shouldValidate: true,
-                                                                                        shouldDirty: true,
-                                                                                    }
-                                                                                )
-                                                                            }
-                                                                        >
-                                                                            <SelectTrigger className="w-full">
-                                                                                <SelectValue placeholder="Dígito" />
-                                                                            </SelectTrigger>
-                                                                            <SelectContent>
-                                                                                {DIGIT_OPTIONS.map(
-                                                                                    (
-                                                                                        d
-                                                                                    ) => (
-                                                                                        <SelectItem
-                                                                                            key={
-                                                                                                d.value
-                                                                                            }
-                                                                                            value={
-                                                                                                d.value
-                                                                                            }
-                                                                                        >
-                                                                                            {
-                                                                                                d.label
-                                                                                            }
-                                                                                        </SelectItem>
-                                                                                    )
-                                                                                )}
-                                                                            </SelectContent>
-                                                                        </Select>
+                                                                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border bg-muted text-sm font-medium">
+                                                                        {
+                                                                            options[
+                                                                                index
+                                                                            ]
+                                                                                ?.digit
+                                                                        }
                                                                     </div>
                                                                     {!flowNodeMode && (
                                                                         <div className="flex-1">
@@ -817,10 +811,20 @@ export function IvrMenuFormDialog({
                                     </Field>
                                 )}
                             </FieldGroup>
-                        </div>
+                        </ScrollArea>
                     </form>
 
-                    <DialogFooter className="pt-4">
+                    <DialogFooter className="border-t pt-4">
+                        {isEdit && onDelete && (
+                            <Button
+                                type="button"
+                                variant="destructive"
+                                className="mr-auto"
+                                onClick={onDelete}
+                            >
+                                Excluir recurso
+                            </Button>
+                        )}
                         <Button
                             type="button"
                             variant="outline"

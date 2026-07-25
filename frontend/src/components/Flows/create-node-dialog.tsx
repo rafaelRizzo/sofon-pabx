@@ -90,9 +90,10 @@ export function CreateNodeDialog({
                     onSave={async (form) => {
                         const resourceId = await createIvrMenu(form, companyId)
                         if (!resourceId) return false
+                        const { companyId: _companyId, ...creationDto } = form
                         await onCreated(
                             { id: resourceId, label: form.name },
-                            null
+                            creationDto
                         )
                         return true
                     }}
