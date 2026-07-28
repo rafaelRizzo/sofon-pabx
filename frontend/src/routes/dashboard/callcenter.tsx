@@ -26,7 +26,7 @@ function CallcenterPage() {
                 value={companyId}
                 onValueChange={setCompanyId}
                 placeholder="Selecione uma empresa..."
-                className="w-72"
+                className="w-full md:w-72"
             />
 
             {!companyId ? (

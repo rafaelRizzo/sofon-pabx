@@ -22,6 +22,9 @@ export default defineConfig({
     preview: {
         host: true,
         port: 3000,
-        allowedHosts: ["seu_domain"],
+        // domínio real vem só do .env (gitignored), nunca hardcoded no repo
+        allowedHosts: process.env.VITE_PREVIEW_ALLOWED_HOST
+            ? [process.env.VITE_PREVIEW_ALLOWED_HOST]
+            : undefined,
     },
 })

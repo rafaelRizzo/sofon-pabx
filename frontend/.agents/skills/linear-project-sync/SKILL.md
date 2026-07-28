@@ -1,27 +1,35 @@
 ---
 name: linear-project-sync
-description: Sync a software project's Linear structure with the implemented code and Git history. Use when asked to audit project progress, create or update milestones and issues for existing modules, assign labels and owners, mark verified work Done, or publish a concise Linear status update.
+description: Sync only the Sofon PABX Linear project with the implemented code and Git history. Use when asked to audit its progress, create or update its milestones and issues, assign labels and owners, mark verified work Done, or publish a concise project status update.
 ---
 
 # Linear Project Sync
 
-## Overview
+## Fixed scope
 
-Keep Linear aligned with code evidence. Create one issue per tracked module and link it to its milestone so milestone progress remains meaningful.
+Operate exclusively in this Linear scope:
+
+- Project: `Sofon PABX` (`fd073761-3d48-49c6-8d01-35e8f0691cbd`)
+- Team: `Developer` (`a7246231-d17e-4f73-8ca3-451e5f0a72a5`, key `PHO`)
+- Lead and default assignee: Rafael (`16015efe-8a09-4bc2-985f-cd7ef7253aa8`)
+
+Never create, move, update, label, assign, comment on, or change milestones for another Linear project, team, or initiative. If the request targets a different scope, report that this skill is restricted to Sofon PABX and do not mutate Linear.
+
+Keep Sofon PABX aligned with code evidence. Create one issue per tracked module and link it to its milestone so milestone progress remains meaningful.
 
 ## Workflow
 
 1. Inspect source modules, routes, tests, Git commits, and worktree state. Use `rtk` for shell commands.
-2. Read the Linear project, milestones, issues, team statuses, and labels before mutating anything.
-3. Map each implemented module to one milestone and one issue. Reuse existing milestones and labels whenever possible.
+2. Read the fixed Linear project, its milestones, issues, team statuses, and labels before mutating anything. Confirm the returned project ID matches the fixed scope.
+3. Set the fixed `project` and `team` IDs on every created issue. Map each implemented module to one milestone and one issue. Reuse existing milestones and labels whenever possible.
 4. Set every changed issue explicitly:
-   - `project` and `milestone`
-   - `assignee: "me"`, unless the user specifies someone else
-   - exactly one area label: `backend`, `frontend`, `telephony`, `infra`, or equivalent
-   - type label: `feature`, `refactor`, `bug`, or `chore`
+   - fixed `project`, `team`, and `milestone`
+   - `assignee: Rafael`, unless the user specifies another Sofon PABX team member
+   - exactly one existing `Área` label
+   - exactly one existing `Tipo` label
    - status based only on evidence
 5. Update the project status with completed work, verification results, and blockers.
-6. Re-read the affected issues and milestones. Report created, updated, and unresolved items.
+6. Re-read the affected issues and milestones. Confirm each changed issue remains in Sofon PABX and report created, updated, and unresolved items.
 
 ## Status rules
 
@@ -32,8 +40,7 @@ Keep Linear aligned with code evidence. Create one issue per tracked module and 
 
 ## Linear conventions
 
-- Prefer the workspace labels `backend`, `frontend`, `feature`, `refactor`, `bug`, `chore`, `telephony`, `observability`, `security`, `performance`, and `infra`.
-- Labels in the same Linear group are mutually exclusive. Apply exactly one `Área` label and one `Tipo` label; add `Trabalho` labels only when relevant.
+- Use only existing team labels. Labels in the same Linear group are mutually exclusive. Apply exactly one `Área` label and one `Tipo` label, then one `Tema` label only when relevant.
 - Avoid legacy or duplicate labels when an equivalent canonical label exists.
 - Use a precise title such as `[Backend] Implementar módulo IVR`.
 - Describe the delivered behavior and cite the verification command or commit when available.

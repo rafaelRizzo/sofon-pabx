@@ -8,6 +8,7 @@ import { toast } from "sonner"
 import { CompanyFilter } from "@/components/company-filter"
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog"
 import { DataPagination } from "@/components/data-pagination"
+import { FilterBar } from "@/components/filter-bar"
 import { ExtensionFormDialog } from "@/components/Extensions/extension-form-dialog"
 import { ExtensionsTable } from "@/components/Extensions/extensions-table"
 import { PageHeader } from "@/components/page-header"
@@ -178,12 +179,12 @@ function ExtensionsPage() {
                 </div>
             </PageHeader>
 
-            <div className="flex gap-2">
+            <FilterBar>
                 <Input
                     placeholder="Buscar por ramal, nome..."
                     value={filter}
                     onChange={(e) => setFilter(e.target.value)}
-                    className="max-w-sm"
+                    className="w-full md:max-w-sm"
                 />
                 <CompanyFilter
                     companies={companies}
@@ -197,7 +198,7 @@ function ExtensionsPage() {
                         setTypeFilter(v as ExtensionType | "all")
                     }
                 >
-                    <SelectTrigger className="w-40">
+                    <SelectTrigger className="w-full md:w-40">
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -208,7 +209,7 @@ function ExtensionsPage() {
                         ))}
                     </SelectContent>
                 </Select>
-            </div>
+            </FilterBar>
 
             <ExtensionsTable
                 extensions={paginated}

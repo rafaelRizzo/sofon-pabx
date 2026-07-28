@@ -7,6 +7,7 @@ import { PlusIcon } from "lucide-react"
 import { CompanyFilter } from "@/components/company-filter"
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog"
 import { DataPagination } from "@/components/data-pagination"
+import { FilterBar } from "@/components/filter-bar"
 import { OutboundRouteFormDialog } from "@/components/OutboundRoutes/outbound-route-form-dialog"
 import { OutboundRoutesTable } from "@/components/OutboundRoutes/outbound-routes-table"
 import { PageHeader } from "@/components/page-header"
@@ -77,19 +78,19 @@ function OutboundRoutesPage() {
                 </Button>
             </PageHeader>
 
-            <div className="flex gap-2">
+            <FilterBar>
                 <Input
                     placeholder="Buscar por nome..."
                     value={filter}
                     onChange={(e) => setFilter(e.target.value)}
-                    className="max-w-sm"
+                    className="w-full md:max-w-sm"
                 />
                 <CompanyFilter
                     companies={companies}
                     value={companyFilter}
                     onValueChange={setCompanyFilter}
                 />
-            </div>
+            </FilterBar>
 
             <OutboundRoutesTable
                 routes={paginated}

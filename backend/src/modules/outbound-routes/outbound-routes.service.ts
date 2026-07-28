@@ -1,4 +1,5 @@
 import { prisma } from '../../lib/prisma'
+import { recordingFilenameSuffix } from '../../asterisk/dialplan-names'
 import { getCompanyById } from '../companies/companies.service'
 import { getExtensionDto } from '../extensions/extensions.service'
 import { AppError } from '../../utils/errors/app.error'
@@ -83,7 +84,8 @@ function buildDialplanEntries(
 
     entries.push({
         context, exten, priority: p++, app: 'Set',
-        appdata: `REC_FILE=/var/spool/asterisk/monitor/${asteriskId}/\${STRFTIME(,,%Y/%m/%d)}/\${UNIQUEID}_\${CUT(CALLERID(num),_,1)}_\${EXTEN}.wav`,
+        appdata: `REC_FILE=/var/spool/asterisk/monitor/${asteriskId}/\${STRFTIME(\${EPOCH},,%Y/%m/%d)}/`
+            + recordingFilenameSuffix('${CUT(CALLERID(num),_,1)}', destVar),
     })
     entries.push({ context, exten, priority: p++, app: 'MixMonitor', appdata: '${REC_FILE},b' })
 
@@ -246,6 +248,20 @@ export async function resyncAllPatterns(tx: Tx, routeId: string) {
     for (const p of ctx.patterns) {
         await syncPatternDialplan(tx, 'ramais', p.pattern, trunkOpts, p.prefix, p.prepend, ctx.company.asteriskId)
     }
+}
+
+// Mesmo motivo de InboundRouteRepository.regenerateAll — rotas criadas antes de uma mudança de
+// template (novos campos de CDR, gravação) nunca são regeradas sozinhas, só via update() manual de
+// cada pattern. Usado por resyncDialplan (companies.service.ts).
+export async function regenerateAllPatterns(companyId: string) {
+    const routes = await prisma.outboundRoute.findMany({ where: { companyId }, select: { id: true } })
+    if (routes.length === 0) return
+
+    await prisma.$transaction(async (tx) => {
+        for (const route of routes) {
+            await resyncAllPatterns(tx, route.id)
+        }
+    })
 }
 
 // Sequential: 4 queries (no multi-relation include) — avoids concurrent client.query()

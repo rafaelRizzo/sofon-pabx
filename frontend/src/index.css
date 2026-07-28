@@ -128,3 +128,29 @@
     @apply font-sans;
     }
 }
+
+@keyframes marquee-x {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+}
+
+@keyframes lamp-pulse {
+    0%, 100% { opacity: 1; box-shadow: 0 0 0 0 color-mix(in oklch, var(--lamp-color, oklch(0.72 0.19 145)) 55%, transparent); }
+    50% { opacity: 0.55; box-shadow: 0 0 0 4px color-mix(in oklch, var(--lamp-color, oklch(0.72 0.19 145)) 0%, transparent); }
+}
+
+.animate-marquee {
+    animation: marquee-x var(--marquee-duration, 40s) linear infinite;
+    animation-direction: var(--marquee-direction, normal);
+}
+
+.animate-lamp-pulse {
+    animation: lamp-pulse 2.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .animate-marquee,
+    .animate-lamp-pulse {
+        animation: none;
+    }
+}

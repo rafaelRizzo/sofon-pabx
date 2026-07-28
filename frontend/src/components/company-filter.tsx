@@ -30,7 +30,7 @@ export function CompanyFilter({
     value,
     onValueChange,
     placeholder = "Buscar empresa...",
-    className = "w-56",
+    className = "w-full md:w-56",
     showAllOption = false,
 }: CompanyFilterProps) {
     const items = showAllOption ? [ALL_COMPANIES, ...companies] : companies

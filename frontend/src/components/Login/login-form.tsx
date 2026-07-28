@@ -1,3 +1,7 @@
+import * as React from "react"
+
+import { PhoneIcon } from "lucide-react"
+
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -14,18 +18,36 @@ import {
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { useLogin } from "@/hooks/use-login"
+import { cn } from "@/lib/utils"
 
-export function LoginForm() {
+export function LoginForm({ className }: { className?: string }) {
   const { register, onSubmit, formState } = useLogin()
   const { errors, isSubmitting } = formState
 
   return (
-    <Card className="w-full max-w-sm">
-      <CardHeader>
-        <CardTitle>Sofon PABX</CardTitle>
-        <CardDescription>
-          Entre com sua conta para acessar o painel
-        </CardDescription>
+    <Card className={cn("w-full max-w-sm gap-5 py-6 sm:gap-6 sm:py-8", className)}>
+      <CardHeader className="justify-items-center gap-2 text-center sm:gap-3">
+        <div className="mx-auto flex w-fit items-center gap-2 rounded-full border border-foreground/10 bg-foreground/4 py-1 pr-3 pl-1.5">
+          <span className="flex size-6 items-center justify-center rounded-full bg-primary/15 text-primary">
+            <PhoneIcon className="size-3.5" />
+          </span>
+          <span className="font-mono text-[10px] tracking-widest text-muted-foreground uppercase">
+            Central telefônica
+          </span>
+          <span
+            aria-hidden="true"
+            className="animate-lamp-pulse size-1.5 rounded-full bg-emerald-500"
+            style={{ "--lamp-color": "oklch(0.72 0.19 145)" } as React.CSSProperties}
+          />
+        </div>
+        <div className="space-y-1">
+          <CardTitle className="text-xl font-semibold tracking-tight">
+            Sofon PABX
+          </CardTitle>
+          <CardDescription>
+            Entre com sua conta para acessar o painel
+          </CardDescription>
+        </div>
       </CardHeader>
       <CardContent>
         <form onSubmit={onSubmit}>
@@ -63,7 +85,7 @@ export function LoginForm() {
                 <FieldError>{errors.password.message}</FieldError>
               )}
             </Field>
-            <Button type="submit" disabled={isSubmitting}>
+            <Button type="submit" className="w-full" disabled={isSubmitting}>
               {isSubmitting ? "Entrando..." : "Entrar"}
             </Button>
           </FieldGroup>

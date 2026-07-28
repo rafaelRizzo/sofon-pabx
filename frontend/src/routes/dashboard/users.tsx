@@ -7,6 +7,7 @@ import { PlusIcon } from "lucide-react"
 import { CompanyFilter } from "@/components/company-filter"
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog"
 import { DataPagination } from "@/components/data-pagination"
+import { FilterBar } from "@/components/filter-bar"
 import { PageHeader } from "@/components/page-header"
 import { UserFormDialog } from "@/components/Users/user-form-dialog"
 import { UsersTable } from "@/components/Users/users-table"
@@ -71,12 +72,12 @@ function UsersPage() {
                 </Button>
             </PageHeader>
 
-            <div className="flex gap-2">
+            <FilterBar>
                 <Input
                     placeholder="Filtrar por nome ou e-mail..."
                     value={filter}
                     onChange={(e) => setFilter(e.target.value)}
-                    className="max-w-sm"
+                    className="w-full md:max-w-sm"
                 />
                 <CompanyFilter
                     companies={companies}
@@ -84,7 +85,7 @@ function UsersPage() {
                     onValueChange={setCompanyFilter}
                     showAllOption
                 />
-            </div>
+            </FilterBar>
 
             <UsersTable
                 users={paginated}

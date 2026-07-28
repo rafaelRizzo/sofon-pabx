@@ -62,6 +62,9 @@ describe('CdrService.getCdrByCompany', () => {
         db.company.findUnique.mockResolvedValue(COMPANY)
         db.cdr.findMany.mockResolvedValue([CDR_ROW])
         db.cdr.count.mockResolvedValue(1)
+        db.queue.findMany.mockResolvedValue([])
+        db.queueCall.findMany.mockResolvedValue([])
+        db.extension.findMany.mockResolvedValue([])
 
         const result = (await CdrService.getCdrByCompany(BASE_QUERY)) as any
 
@@ -142,6 +145,39 @@ describe('CdrService.getCdrByCompany', () => {
         )
     })
 
+    it('resolves queueId to the internal Asterisk queue name', async () => {
+        db.company.findUnique.mockResolvedValue(COMPANY)
+        db.queue.findFirst.mockResolvedValue({ number: '600' })
+        db.cdr.findMany.mockResolvedValue([])
+        db.cdr.count.mockResolvedValue(0)
+
+        await CdrService.getCdrByCompany({
+            ...BASE_QUERY,
+            queueId: 'qxxxxxxxxxxxxxxxxxxxxxxxxx'
+        })
+
+        expect(db.queue.findFirst).toHaveBeenCalledWith(
+            expect.objectContaining({ where: { id: 'qxxxxxxxxxxxxxxxxxxxxxxxxx', companyId: 'c1' } })
+        )
+        expect(db.cdr.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({ queueName: 'ast1-600' })
+            })
+        )
+    })
+
+    it('throws 404 when queueId does not belong to the company', async () => {
+        db.company.findUnique.mockResolvedValue(COMPANY)
+        db.queue.findFirst.mockResolvedValue(null)
+
+        await expect(
+            CdrService.getCdrByCompany({
+                ...BASE_QUERY,
+                queueId: 'qxxxxxxxxxxxxxxxxxxxxxxxxx'
+            })
+        ).rejects.toMatchObject({ statusCode: 404 })
+    })
+
     it('returns a cursor when a page has more records', async () => {
         db.company.findUnique.mockResolvedValue(COMPANY)
         db.cdr.findMany.mockResolvedValue([
@@ -149,6 +185,9 @@ describe('CdrService.getCdrByCompany', () => {
             { ...CDR_ROW, id: 2n }
         ])
         db.cdr.count.mockResolvedValue(2)
+        db.queue.findMany.mockResolvedValue([])
+        db.queueCall.findMany.mockResolvedValue([])
+        db.extension.findMany.mockResolvedValue([])
 
         const result = (await CdrService.getCdrByCompany({
             ...BASE_QUERY,
@@ -157,6 +196,72 @@ describe('CdrService.getCdrByCompany', () => {
 
         expect(result.records).toHaveLength(1)
         expect(result.nextCursor).toBe('1')
+    })
+
+    it('enriches records with queue/flow labels and who answered, falling back to dst when queueName is null', async () => {
+        db.company.findUnique.mockResolvedValue(COMPANY)
+        db.cdr.findMany.mockResolvedValue([
+            {
+                ...CDR_ROW,
+                id: 1n,
+                dst: 'abcdefghij-600',
+                queueName: null,
+                uniqueid: '1111.1'
+            },
+            {
+                ...CDR_ROW,
+                id: 2n,
+                dst: 'node-abcdefghijklmnopqrstuvwx',
+                queueName: null,
+                uniqueid: '2222.2'
+            }
+        ])
+        db.cdr.count.mockResolvedValue(2)
+        db.queue.findMany.mockResolvedValue([{ name: 'Suporte', number: '600' }])
+        db.flowNode.findMany.mockResolvedValue([
+            {
+                id: 'abcdefghijklmnopqrstuvwx',
+                label: 'Entrada',
+                type: 'ivr',
+                flow: { name: 'Fluxo Principal' }
+            }
+        ])
+        db.queueCall.findMany.mockResolvedValue([
+            {
+                callerUniqueid: '1111.1',
+                agentExtensionId: 'ext1',
+                agentExtension: { alias: '2002', name: 'João' },
+                waitSeconds: 12,
+                talkSeconds: 25
+            }
+        ])
+        db.extension.findMany.mockResolvedValue([
+            { number: '2001', alias: '2001', name: 'Recepção' }
+        ])
+
+        const result = (await CdrService.getCdrByCompany({
+            ...BASE_QUERY,
+            limit: 2
+        })) as any
+
+        expect(result.records[0]).toMatchObject({
+            queueLabel: 'Suporte (600)',
+            // destinationLabel fica null pra fila — a coluna "Fila" já cobre esse nome, repetir
+            // em "Destino" seria redundante (ver comentário em cdr-enrichment.ts)
+            destinationLabel: null,
+            answeredBy: { extensionId: 'ext1', label: '2002 - João' },
+            originLabel: '2001 - Recepção',
+            queueWaitSeconds: 12,
+            queueTalkSeconds: 25
+        })
+        expect(result.records[1]).toMatchObject({
+            queueLabel: null,
+            destinationLabel: 'Fluxo: Fluxo Principal - Entrada',
+            answeredBy: null,
+            originLabel: '2001 - Recepção',
+            queueWaitSeconds: null,
+            queueTalkSeconds: null
+        })
     })
 })
 
@@ -226,5 +331,52 @@ describe('CdrService.getCdrMetricsByCompany', () => {
             byStatus: [],
             byDirection: []
         })
+    })
+})
+
+describe('CdrService.getCdrRecordingPath', () => {
+    it('returns the recording path when the record belongs to the company', async () => {
+        db.company.findUnique.mockResolvedValue(COMPANY)
+        db.cdr.findUnique.mockResolvedValue({
+            accountcode: 'ast1',
+            recordingFile: '/var/spool/asterisk/monitor/ast1/2026/07/28/call.wav'
+        })
+
+        const path = await CdrService.getCdrRecordingPath(1n, 'c1')
+
+        expect(path).toBe('/var/spool/asterisk/monitor/ast1/2026/07/28/call.wav')
+    })
+
+    it('throws 404 when the cdr record does not exist', async () => {
+        db.company.findUnique.mockResolvedValue(COMPANY)
+        db.cdr.findUnique.mockResolvedValue(null)
+
+        await expect(
+            CdrService.getCdrRecordingPath(1n, 'c1')
+        ).rejects.toMatchObject({ statusCode: 404 })
+    })
+
+    it('throws 404 when the record has no recording', async () => {
+        db.company.findUnique.mockResolvedValue(COMPANY)
+        db.cdr.findUnique.mockResolvedValue({
+            accountcode: 'ast1',
+            recordingFile: null
+        })
+
+        await expect(
+            CdrService.getCdrRecordingPath(1n, 'c1')
+        ).rejects.toMatchObject({ statusCode: 404 })
+    })
+
+    it('throws 404 when the record belongs to a different company (no leak)', async () => {
+        db.company.findUnique.mockResolvedValue(COMPANY)
+        db.cdr.findUnique.mockResolvedValue({
+            accountcode: 'other-ast',
+            recordingFile: '/var/spool/asterisk/monitor/other-ast/call.wav'
+        })
+
+        await expect(
+            CdrService.getCdrRecordingPath(1n, 'c1')
+        ).rejects.toMatchObject({ statusCode: 404 })
     })
 })

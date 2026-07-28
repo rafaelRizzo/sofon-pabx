@@ -9,6 +9,7 @@ import { AudiosTable } from "@/components/Audios/audios-table"
 import { CompanyFilter } from "@/components/company-filter"
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog"
 import { DataPagination } from "@/components/data-pagination"
+import { FilterBar } from "@/components/filter-bar"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -65,19 +66,19 @@ function AudiosPage() {
                 </Button>
             </PageHeader>
 
-            <div className="flex gap-2">
+            <FilterBar>
                 <Input
                     placeholder="Buscar por nome..."
                     value={filter}
                     onChange={(e) => setFilter(e.target.value)}
-                    className="max-w-sm"
+                    className="w-full md:max-w-sm"
                 />
                 <CompanyFilter
                     companies={companies}
                     value={companyFilter}
                     onValueChange={setCompanyFilter}
                 />
-            </div>
+            </FilterBar>
 
             <AudiosTable
                 audios={paginated}

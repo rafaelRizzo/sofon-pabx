@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { z } from "zod"
@@ -268,17 +268,18 @@ export function useExtensions(companyId?: string) {
     const invalidate = () =>
         queryClient.invalidateQueries({ queryKey: ["extensions"] })
 
-    const getExtensionById = async (
-        id: string
-    ): Promise<Extension | null> => {
-        try {
-            const { data } = await api.get(`/extensions/${id}`)
-            return data.extension || data
-        } catch (err) {
-            toast.error(apiError(err, "Erro ao buscar ramal"))
-            return null
-        }
-    }
+    const getExtensionById = useCallback(
+        async (id: string): Promise<Extension | null> => {
+            try {
+                const { data } = await api.get(`/extensions/${id}`)
+                return data.extension || data
+            } catch (err) {
+                toast.error(apiError(err, "Erro ao buscar ramal"))
+                return null
+            }
+        },
+        []
+    )
 
     const createExtension = async (
         form: ExtensionCreateForm

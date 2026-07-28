@@ -18,6 +18,7 @@ const cdrQueryShape = {
     dialedNumber: z.string().max(80).optional(),
     trunkId: z.cuid2().optional(),
     queueName: z.string().max(160).optional(),
+    queueId: z.cuid2().optional(),
     linkedid: z.string().max(150).optional(),
     uniqueid: z.string().max(150).optional()
 }
@@ -75,7 +76,21 @@ export const CdrSchema = z.object({
     dialedNumber: z.string().nullable(),
     trunkId: z.string().nullable(),
     recordingFile: z.string().nullable(),
-    hangupCause: z.string().nullable()
+    hangupCause: z.string().nullable(),
+    // Resolvidos em tempo de leitura (cdr-enrichment.ts) — não vêm de coluna nenhuma do banco.
+    // Cobrem o caso de chamadas roteadas por Flow, onde queueName/direction/trunkId do dialplan
+    // nem sempre sobrevivem até o fim da chamada (ver comentário em cdr.service.ts)
+    queueLabel: z.string().nullable(),
+    destinationLabel: z.string().nullable(),
+    answeredBy: z
+        .object({ extensionId: z.string(), label: z.string() })
+        .nullable(),
+    originLabel: z.string().nullable(),
+    // Tempo de espera (fila até o agente atender) e tempo em ligação após atendida — vem do
+    // QueueCall associado (mesmo uniqueid do canal do chamador), null pra chamadas que não
+    // passaram por fila (ramal->ramal, outbound direto)
+    queueWaitSeconds: z.number().nullable(),
+    queueTalkSeconds: z.number().nullable()
 })
 
 export const ListCdrResponse = ok({
@@ -102,3 +117,7 @@ export const CdrMetricsSchema = z.object({
 })
 
 export const CdrMetricsResponse = ok({ metrics: CdrMetricsSchema })
+
+export const cdrIdParamSchema = z.object({ id: z.coerce.bigint().positive() })
+
+export const cdrRecordingQuerySchema = z.object({ companyId: z.cuid2() })

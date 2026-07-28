@@ -100,9 +100,12 @@ export const companiesRoutes = async (app: FastifyInstance) => {
             description:
                 'Regenera todos os arquivos estáticos de dialplan (/etc/asterisk/dialplan-extra/**) da ' +
                 'empresa a partir do banco (time conditions, announcements, ivrs, queues-app, request ' +
-                'templates, holidays, variables, variable conditions, callcenter surveys). Útil depois de ' +
-                'reinstalar o Asterisk mantendo o banco intacto, sem precisar salvar cada módulo manualmente. ' +
-                'Requer role admin.',
+                'templates, holidays, variables, variable conditions, callcenter surveys), o padrão ' +
+                'genérico de "ramais" (Realtime, compartilhado entre empresas), as inbound routes e os ' +
+                'patterns de outbound routes — garante que o dialplan em produção reflita o template ' +
+                'atual do código mesmo em instalações antigas. Útil depois de reinstalar o Asterisk ' +
+                'mantendo o banco intacto, ou depois de uma mudança no template de dialplan (ex: novos ' +
+                'campos de CDR/gravação), sem precisar recriar cada ramal/rota manualmente. Requer role admin.',
             security: [{ bearerAuth: [] }],
             params: idParamSchema,
             response: {

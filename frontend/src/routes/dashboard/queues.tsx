@@ -7,6 +7,7 @@ import { PlusIcon } from "lucide-react"
 import { CompanyFilter } from "@/components/company-filter"
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog"
 import { DataPagination } from "@/components/data-pagination"
+import { FilterBar } from "@/components/filter-bar"
 import { PageHeader } from "@/components/page-header"
 import { QueueFormDialog } from "@/components/Queues/queue-form-dialog"
 import { QueueMembersSheet } from "@/components/Queues/queue-members-sheet"
@@ -59,19 +60,19 @@ function QueuesPage() {
                 </Button>
             </PageHeader>
 
-            <div className="flex gap-2">
+            <FilterBar>
                 <Input
                     placeholder="Buscar por nome ou número..."
                     value={filter}
                     onChange={(e) => setFilter(e.target.value)}
-                    className="max-w-sm"
+                    className="w-full md:max-w-sm"
                 />
                 <CompanyFilter
                     companies={companies}
                     value={companyFilter}
                     onValueChange={setCompanyFilter}
                 />
-            </div>
+            </FilterBar>
 
             <QueuesTable
                 queues={paginated}

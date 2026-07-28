@@ -7,6 +7,7 @@ import { PlusIcon } from "lucide-react"
 import { CompanyFilter } from "@/components/company-filter"
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog"
 import { DataPagination } from "@/components/data-pagination"
+import { FilterBar } from "@/components/filter-bar"
 import { DidFormDialog } from "@/components/Dids/did-form-dialog"
 import { DidsTable } from "@/components/Dids/dids-table"
 import { PageHeader } from "@/components/page-header"
@@ -57,12 +58,12 @@ function DidsPage() {
                 </Button>
             </PageHeader>
 
-            <div className="flex gap-2">
+            <FilterBar>
                 <Input
                     placeholder="Buscar por número..."
                     value={filter}
                     onChange={(e) => setFilter(e.target.value)}
-                    className="max-w-sm"
+                    className="w-full md:max-w-sm"
                 />
                 <CompanyFilter
                     companies={companies}
@@ -70,7 +71,7 @@ function DidsPage() {
                     onValueChange={setCompanyFilter}
                     showAllOption
                 />
-            </div>
+            </FilterBar>
 
             <DidsTable
                 dids={paginated}

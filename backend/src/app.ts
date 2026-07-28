@@ -161,6 +161,10 @@ app.register(cors, {
     origin: env.CORS_ORIGIN.split(',').map((o) => o.trim()),
     credentials: true,
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    // Content-Disposition: front lê o filename real da gravação (GET /cdr/:id/recording) pra
+    // nomear o download/play em vez de um nome genérico — sem isso o JS não enxerga esse header
+    // em resposta cross-origin, mesmo vindo certo do backend
+    exposedHeaders: ['Content-Disposition'],
 })
 app.register(rateLimit, {
     max: env.RATE_LIMIT_MAX,

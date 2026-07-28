@@ -66,8 +66,73 @@ api.interceptors.response.use(
   }
 )
 
+// mensagens técnicas padrão que vazam em inglês de middlewares (auth/role/scope) — sempre
+// as mesmas strings, então dá pra traduzir com segurança sem mexer em cada controller
+const KNOWN_MESSAGES: Record<string, string> = {
+  Unauthorized: "Sessão expirada. Faça login novamente.",
+  Forbidden: "Você não tem permissão para executar essa ação.",
+  "Token revoked": "Sua sessão foi revogada. Faça login novamente.",
+  "Internal server error": "Erro interno do servidor. Tente novamente mais tarde.",
+  "Validation error": "Dados inválidos. Verifique os campos e tente novamente.",
+  "Not Found": "Recurso não encontrado.",
+  "Bad Request": "Requisição inválida.",
+}
+
+// fallback por status quando o backend não manda message (rede fora do ar, erro não tratado, etc)
+const STATUS_FALLBACK: Record<number, string> = {
+  400: "Requisição inválida. Verifique os dados enviados.",
+  401: "Sessão expirada. Faça login novamente.",
+  403: "Você não tem permissão para executar essa ação.",
+  404: "Recurso não encontrado.",
+  408: "Tempo de resposta esgotado. Tente novamente.",
+  409: "Conflito: esse recurso já existe ou está em uso.",
+  413: "Arquivo ou dados enviados são grandes demais.",
+  422: "Dados inválidos. Verifique os campos e tente novamente.",
+  429: "Muitas requisições. Aguarde um instante e tente novamente.",
+  500: "Erro interno do servidor. Tente novamente mais tarde.",
+  502: "Servidor indisponível no momento. Tente novamente.",
+  503: "Serviço indisponível no momento. Tente novamente.",
+  504: "Tempo de resposta do servidor esgotado. Tente novamente.",
+}
+
+type ApiErrorBody = {
+  message?: string
+  errors?: Array<{ message?: string; path?: Array<string | number> }>
+}
+
+// extrai uma mensagem em pt-br de qualquer erro de request. Prioridade:
+// 1) erros de validação (zod) vindos do backend, 2) mensagem conhecida traduzida,
+// 3) mensagem original do backend (já costuma vir em pt-br dos services), 4) fallback por status,
+// 5) erro de rede/timeout (sem response), 6) undefined pra quem chamar decidir o fallback
+export function getErrorMessage(err: unknown): string | undefined {
+  if (!axios.isAxiosError(err)) return undefined
+
+  if (!err.response) {
+    if (err.code === "ECONNABORTED")
+      return "Tempo de resposta esgotado. Verifique sua conexão e tente novamente."
+    if (err.code === "ERR_NETWORK")
+      return "Não foi possível conectar ao servidor. Verifique sua internet."
+    return "Falha de conexão com o servidor. Tente novamente."
+  }
+
+  const { status, data } = err.response
+  const body = data as ApiErrorBody | undefined
+
+  if (body?.errors?.length) {
+    const messages = body.errors
+      .slice(0, 3)
+      .map((e) => e.message)
+      .filter((m): m is string => Boolean(m))
+    if (messages.length) return messages.join(" | ")
+  }
+
+  if (body?.message) return KNOWN_MESSAGES[body.message] ?? body.message
+
+  return STATUS_FALLBACK[status] ?? "Erro inesperado. Tente novamente."
+}
+
 export const apiError = (err: unknown, fallback: string): string =>
-  (axios.isAxiosError(err) && err.response?.data?.message) || fallback
+  getErrorMessage(err) ?? fallback
 
 // 4xx = rejeição definitiva do backend (validação, permissão, recurso inexistente) — nunca vai
 // vingar só de tentar de novo. 5xx/rede seguem sendo tratados como transiente por quem chama.

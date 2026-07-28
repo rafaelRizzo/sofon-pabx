@@ -39,3 +39,12 @@ export const flowNodeExitExten = (id: string, port: string) => `exit-${id}-${por
 // queue-route (agi-server.ts) pra casar RoutingRule.conditions.trunkId — variável de canal
 // sobrevive a qualquer Goto intermediário (timecondition/holiday/ivr) até chegar na fila
 export const ROUTING_TRUNK_VAR = 'ROUTING_TRUNK_ID'
+
+// Sufixo (nome do arquivo em si, sem a pasta) do MixMonitor — compartilhado entre dialplan.repository.ts
+// (ramal-ramal), inboundroute.repository.ts e outbound-routes.service.ts pra manter o nome do arquivo
+// baixado (GET /cdr/:id/recording, basename de CDR.recordingFile) no mesmo formato nos 3 fluxos.
+// origin/destination são expressões Asterisk (ex: '${CALLERID(num)}') ou valores já literais (ex: um
+// didNumber JS), concatenados como texto puro — nunca interpolados pelo JS.
+export function recordingFilenameSuffix(origin: string, destination: string): string {
+    return `\${STRFTIME(\${EPOCH},,%Y-%m-%d_%H-%M-%S)}_${origin}_to_${destination}_\${UNIQUEID}.wav`
+}

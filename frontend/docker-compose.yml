@@ -7,6 +7,8 @@ services:
         VITE_API_URL: ${VITE_API_URL:-http://localhost:3333}
     container_name: sofon_frontend
     restart: unless-stopped
+    environment:
+      VITE_PREVIEW_ALLOWED_HOST: ${VITE_PREVIEW_ALLOWED_HOST:-}
     expose:
       - "3000"
     networks:

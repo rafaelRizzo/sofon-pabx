@@ -7,6 +7,7 @@ import { PlusIcon } from "lucide-react"
 import { CompanyFilter } from "@/components/company-filter"
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog"
 import { DataPagination } from "@/components/data-pagination"
+import { FilterBar } from "@/components/filter-bar"
 import { PageHeader } from "@/components/page-header"
 import { RequestTemplateFormDialog } from "@/components/RequestTemplates/request-template-form-dialog"
 import { RequestTemplatesTable } from "@/components/RequestTemplates/request-templates-table"
@@ -63,19 +64,19 @@ function RequestTemplatesPage() {
                 </Button>
             </PageHeader>
 
-            <div className="flex gap-2">
+            <FilterBar>
                 <Input
                     placeholder="Buscar por nome ou URL..."
                     value={filter}
                     onChange={(e) => setFilter(e.target.value)}
-                    className="max-w-sm"
+                    className="w-full md:max-w-sm"
                 />
                 <CompanyFilter
                     companies={companies}
                     value={companyFilter}
                     onValueChange={setCompanyFilter}
                 />
-            </div>
+            </FilterBar>
 
             <RequestTemplatesTable
                 requestTemplates={paginated}

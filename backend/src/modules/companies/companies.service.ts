@@ -10,6 +10,7 @@ import { PjsipRepository } from '../../asterisk/pjsip.repository'
 import { SipRepository } from '../../asterisk/sip.repository'
 import { AsteriskQueueRepository, QUEUE_APP_CONTEXT, toAsteriskQueueName } from '../../asterisk/queue.repository'
 import { InboundRouteRepository } from '../../asterisk/inboundroute.repository'
+import { regenerateAllPatterns as regenerateAllOutboundPatterns } from '../outbound-routes/outbound-routes.service'
 import { audioSoundDir } from '../../asterisk/audio.repository'
 import { removeCompanyDialplanFiles } from '../../asterisk/dialplan-file.repository'
 import { HolidayGroupRepository } from '../../asterisk/holidaygroup.repository'
@@ -21,6 +22,7 @@ import { VariableRepository } from '../../asterisk/variable.repository'
 import { VariableConditionRepository } from '../../asterisk/variablecondition.repository'
 import { CallcenterSurveyRepository } from '../../asterisk/callcenter-survey.repository'
 import { FlowNodeRepository } from '../../asterisk/flow-node.repository'
+import { DialplanRepository } from '../../asterisk/dialplan.repository'
 import { TC_CONTEXT, HOL_CONTEXT, ANNOUNCEMENT_CONTEXT, IVR_CONTEXT, REQUEST_TEMPLATE_CONTEXT, VAR_CONTEXT, VARCOND_CONTEXT, SURVEY_CONTEXT, FLOW_NODE_CONTEXT } from '../../asterisk/dialplan-names'
 import { RequestTemplatesCache } from '../request-templates/cache/request-templates.cache'
 import { HolidayGroupsCache } from '../holiday-groups/cache/holiday-groups.cache'
@@ -164,6 +166,30 @@ export const resyncDialplan = async (id: string) => {
     await VariableConditionRepository.regenerate(company.id)
     await FlowNodeRepository.regenerate(company.id)
     await CallcenterSurveyRepository.regenerate(company.id)
+
+    // Padrão genérico de "ramais" (Realtime, não é arquivo estático) — compartilhado entre TODAS
+    // as empresas por contexto, não só a desta. Refeito aqui (delete+recreate, ver
+    // dialplan.repository.ts) pra garantir que instalações antigas peguem mudanças de template
+    // (novas prioridades de CDR, formato de gravação) sem precisar recriar cada ramal manualmente.
+    const contexts = await prisma.extension.findMany({
+        where: { companyId: id },
+        select: { context: true },
+        distinct: ['context']
+    })
+    await prisma.$transaction(async (tx) => {
+        for (const { context } of contexts) {
+            await DialplanRepository.ensureGenericRoutingPattern(tx, context)
+            await DialplanRepository.ensureFallback(tx, context)
+        }
+    })
+
+    // Mesma lógica: inbound routes criadas antes de uma mudança de template (novos campos de CDR,
+    // gravação) nunca são regeradas sozinhas — só via update() manual de cada rota. Isso força.
+    await InboundRouteRepository.regenerateAll(company.id)
+
+    // Mesma lógica: outbound route patterns criados antes de uma mudança de template (novos campos
+    // de CDR, gravação) nunca são regerados sozinhos — só via update() manual de cada pattern.
+    await regenerateAllOutboundPatterns(company.id)
 }
 
 export const deleteCompany = async (id: string) => {

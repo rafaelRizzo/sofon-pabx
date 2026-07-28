@@ -6,7 +6,10 @@ import {
     ReactFlowProvider,
     Background,
     Controls,
+    ControlButton,
     MiniMap,
+    useStore,
+    useStoreApi,
     applyNodeChanges,
     applyEdgeChanges,
     type Connection,
@@ -20,10 +23,21 @@ import {
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
 import "@/components/Flows/flow-canvas.css"
-import { Loader2Icon } from "lucide-react"
+import {
+    Loader2Icon,
+    LockIcon,
+    MinusIcon,
+    PanelRightCloseIcon,
+    PanelRightOpenIcon,
+    PlusIcon,
+    UnlockIcon,
+    WandSparklesIcon,
+} from "lucide-react"
 import { toast } from "sonner"
 
 import { api, apiError, isValidationError } from "@/lib/api"
+import { Button } from "@/components/ui/button"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog"
 import {
     ROUTE_DEST_ICONS,
@@ -122,6 +136,32 @@ const START_KEY = "start"
 const MINI_MAP_IDLE_DELAY = 1200
 const EDGE_SYNC_DEBOUNCE_MS = 350
 const EDGE_SYNC_MAX_DELAY_MS = 30000
+const NODE_PANEL_STORAGE_KEY = "flow-canvas:node-panel-open"
+const NODE_ACTION_DRAG_TYPE = "application/flow-node-action"
+
+// Handles dos nós são Top (target) / Bottom (source) — o flow lê de cima pra baixo, então o
+// auto-layout roda na mesma direção pra não gerar setas em ziguezague ou de baixo pra cima.
+// elkjs é pesado (~500kB) e só serve pro botão "Auto Layout" — import dinâmico evita que ele
+// entre no bundle inicial da rota, só carrega quando alguém de fato clica no botão.
+type ElkInstance = InstanceType<
+    (typeof import("elkjs/lib/elk.bundled.js"))["default"]
+>
+let elkInstance: Promise<ElkInstance> | null = null
+function getElk(): Promise<ElkInstance> {
+    elkInstance ??= import("elkjs/lib/elk.bundled.js").then(
+        (m) => new m.default()
+    )
+    return elkInstance
+}
+const AUTO_LAYOUT_OPTIONS = {
+    "elk.algorithm": "layered",
+    "elk.direction": "DOWN",
+    "elk.layered.spacing.nodeNodeBetweenLayers": "96",
+    "elk.spacing.nodeNode": "64",
+    "elk.layered.nodePlacement.strategy": "NETWORK_SIMPLEX",
+    "elk.layered.crossingMinimization.strategy": "LAYER_SWEEP",
+}
+const AUTO_LAYOUT_DEFAULT_SIZE = { width: 224, height: 96 }
 const POSITION_RETRY_BASE_DELAY_MS = 1500
 const POSITION_RETRY_MAX_DELAY_MS = 30000
 
@@ -196,6 +236,15 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
     )
     const [rfNodes, setRfNodes] = useState<Node[]>([])
     const [rfEdges, setRfEdges] = useState<Edge[]>([])
+    const [isNodePanelOpen, setIsNodePanelOpen] = useState(
+        () => localStorage.getItem(NODE_PANEL_STORAGE_KEY) !== "closed"
+    )
+    useEffect(() => {
+        localStorage.setItem(
+            NODE_PANEL_STORAGE_KEY,
+            isNodePanelOpen ? "open" : "closed"
+        )
+    }, [isNodePanelOpen])
     const [pendingAction, setPendingAction] = useState<CanvasNodeAction | null>(
         null
     )
@@ -317,6 +366,27 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
         }
     }, [scheduleMiniMapHide])
 
+    const isInteractive = useStore(
+        (state) =>
+            state.nodesDraggable ||
+            state.nodesConnectable ||
+            state.elementsSelectable
+    )
+    const isMaxZoomReached = useStore(
+        (state) => state.transform[2] >= state.maxZoom
+    )
+    const isMinZoomReached = useStore(
+        (state) => state.transform[2] <= state.minZoom
+    )
+    const storeApi = useStoreApi()
+    const toggleInteractive = useCallback(() => {
+        storeApi.setState({
+            nodesDraggable: !isInteractive,
+            nodesConnectable: !isInteractive,
+            elementsSelectable: !isInteractive,
+        })
+    }, [storeApi, isInteractive])
+
     const nodeById = useMemo(
         () => new Map(flowNodes.map((node) => [node.id, node])),
         [flowNodes]
@@ -409,7 +479,9 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
                 await refetchNodes()
             }
             if (permanent) {
-                toast.warning(apiError(err, "Não é possível criar essa conexão"))
+                toast.warning(
+                    apiError(err, "Não é possível criar essa conexão")
+                )
             } else if (!edgeSyncErrorNotified.current) {
                 edgeSyncErrorNotified.current = true
                 toast.error(apiError(err, "Erro ao sincronizar conexões"))
@@ -1181,7 +1253,8 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
         (
             nodeId: string,
             position: { x: number; y: number },
-            flushDelay = 450
+            flushDelay = 450,
+            recordHistory = true
         ) => {
             const previous = flowNodesRef.current.find(
                 (node) => node.id === nodeId
@@ -1199,6 +1272,7 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
                 flushDelay
             )
             if (
+                recordHistory &&
                 previous &&
                 (previous.x !== position.x || previous.y !== position.y)
             )
@@ -1215,9 +1289,16 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
     // Idem, pro nó sintético Início (posição guardada à parte, ver comentário de startPosition
     // acima) — mesmo padrão de flushDelay/push de histórico.
     const commitStartPosition = useCallback(
-        (position: { x: number; y: number }, flushDelay = 450) => {
+        (
+            position: { x: number; y: number },
+            flushDelay = 450,
+            recordHistory = true
+        ) => {
             setStartPosition((previous) => {
-                if (previous.x !== position.x || previous.y !== position.y)
+                if (
+                    recordHistory &&
+                    (previous.x !== position.x || previous.y !== position.y)
+                )
                     history.push({
                         kind: "move-start",
                         from: previous,
@@ -1250,6 +1331,59 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
         },
         [flow.id, history]
     )
+
+    // Auto-layout (ELK, algoritmo "layered"): recalcula a posição de todos os nós a partir das
+    // conexões, sem mexer em quem-liga-com-quem. Usa as dimensões já medidas pelo React Flow
+    // (node.measured) — nó recém-criado ainda sem medição cai no tamanho padrão do card. Persiste
+    // como um replay (flushDelay:0) e sem gerar histórico por nó (senão um layout de 20 nós vira
+    // 20 undos); o fitView só roda depois de dois rAF pra garantir que o novo rfNodes já pintou.
+    const handleAutoLayout = useCallback(async () => {
+        const instance = flowInstanceRef.current
+        if (!instance) return
+        const nodes = instance.getNodes()
+        const edges = instance.getEdges()
+        if (nodes.length === 0) return
+
+        let graph
+        try {
+            const elk = await getElk()
+            graph = await elk.layout({
+                id: "root",
+                layoutOptions: AUTO_LAYOUT_OPTIONS,
+                children: nodes.map((node) => ({
+                    id: node.id,
+                    width:
+                        node.measured?.width ?? AUTO_LAYOUT_DEFAULT_SIZE.width,
+                    height:
+                        node.measured?.height ??
+                        AUTO_LAYOUT_DEFAULT_SIZE.height,
+                })),
+                edges: edges.map((edge) => ({
+                    id: edge.id,
+                    sources: [edge.source],
+                    targets: [edge.target],
+                })),
+            })
+        } catch {
+            toast.error("Erro ao calcular o reposicionamento automático")
+            return
+        }
+
+        for (const child of graph.children ?? []) {
+            const position = { x: child.x ?? 0, y: child.y ?? 0 }
+            if (child.id === START_KEY) commitStartPosition(position, 0, false)
+            else commitNodePosition(child.id, position, 0, false)
+        }
+
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                flowInstanceRef.current?.fitView({
+                    padding: 0.2,
+                    duration: 400,
+                })
+            })
+        })
+    }, [commitNodePosition, commitStartPosition])
 
     const onNodesChange = useCallback(
         (changes: NodeChange[]) => {
@@ -1368,7 +1502,10 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
                     } else {
                         const created = await createNode(
                             action.type,
-                            { id: action.resourceId, label: action.label },
+                            {
+                                id: action.resourceId,
+                                label: action.label ?? action.resourceId,
+                            },
                             action.position
                         ).result
                         if (!created.ok)
@@ -1401,7 +1538,10 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
                             )
                         const created = await createNode(
                             action.resourceType,
-                            { id: resourceId, label: action.label },
+                            {
+                                id: resourceId,
+                                label: action.label ?? resourceId,
+                            },
                             action.position
                         ).result
                         if (!created.ok)
@@ -1420,7 +1560,10 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
                             action.node.type as CanvasNodeType,
                             {
                                 id: action.node.resourceId!,
-                                label: action.node.label,
+                                label:
+                                    action.node.label ??
+                                    action.node.resourceId ??
+                                    "Nó",
                             },
                             action.node.position
                         ).result
@@ -1465,7 +1608,13 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
                             )
                         const created = await createNode(
                             action.resourceType,
-                            { id: resourceId, label: action.node.label },
+                            {
+                                id: resourceId,
+                                label:
+                                    action.node.label ??
+                                    action.node.resourceId ??
+                                    "Nó",
+                            },
                             action.node.position
                         ).result
                         if (!created.ok)
@@ -1545,7 +1694,9 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
             const isMod = event.ctrlKey || event.metaKey
             if (!isMod || (key !== "z" && key !== "y")) return
             const withinCanvas =
-                canvasRootRef.current?.contains(event.target as Node) ?? false
+                canvasRootRef.current?.contains(
+                    event.target as globalThis.Node
+                ) ?? false
             const noFocusElsewhere =
                 document.activeElement === document.body ||
                 document.activeElement === null
@@ -1719,6 +1870,31 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
                                         y: event.clientY,
                                     })
                             }}
+                            onDragOver={(event) => {
+                                if (
+                                    !event.dataTransfer.types.includes(
+                                        NODE_ACTION_DRAG_TYPE
+                                    )
+                                )
+                                    return
+                                event.preventDefault()
+                                event.dataTransfer.dropEffect = "move"
+                            }}
+                            onDrop={(event) => {
+                                const actionId = event.dataTransfer.getData(
+                                    NODE_ACTION_DRAG_TYPE
+                                ) as CanvasNodeAction | ""
+                                if (!actionId) return
+                                event.preventDefault()
+                                const instance = flowInstanceRef.current
+                                if (!instance) return
+                                contextPositionRef.current =
+                                    instance.screenToFlowPosition({
+                                        x: event.clientX,
+                                        y: event.clientY,
+                                    })
+                                setPendingAction(actionId)
+                            }}
                         >
                             <ReactFlow
                                 nodes={rfNodes}
@@ -1745,10 +1921,63 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
                                 proOptions={{ hideAttribution: true }}
                             >
                                 <Background gap={28} size={2} />
-                                <Controls />
+                                <Controls
+                                    showZoom={false}
+                                    showFitView={false}
+                                    showInteractive={false}
+                                >
+                                    <ControlButton
+                                        onClick={handleAutoLayout}
+                                        title="Organizar automaticamente"
+                                        aria-label="Organizar automaticamente"
+                                    >
+                                        <WandSparklesIcon />
+                                    </ControlButton>
+                                    <ControlButton
+                                        onClick={() =>
+                                            flowInstanceRef.current?.zoomIn()
+                                        }
+                                        title="Aumentar zoom"
+                                        aria-label="Aumentar zoom"
+                                        disabled={isMaxZoomReached}
+                                    >
+                                        <PlusIcon />
+                                    </ControlButton>
+                                    <ControlButton
+                                        onClick={() =>
+                                            flowInstanceRef.current?.zoomOut()
+                                        }
+                                        title="Diminuir zoom"
+                                        aria-label="Diminuir zoom"
+                                        disabled={isMinZoomReached}
+                                    >
+                                        <MinusIcon />
+                                    </ControlButton>
+                                    <ControlButton
+                                        onClick={toggleInteractive}
+                                        title={
+                                            isInteractive
+                                                ? "Bloquear edição"
+                                                : "Desbloquear edição"
+                                        }
+                                        aria-label={
+                                            isInteractive
+                                                ? "Bloquear edição"
+                                                : "Desbloquear edição"
+                                        }
+                                    >
+                                        {isInteractive ? (
+                                            <UnlockIcon />
+                                        ) : (
+                                            <LockIcon />
+                                        )}
+                                    </ControlButton>
+                                </Controls>
                                 <MiniMap
                                     pannable
                                     zoomable
+                                    position="top-left"
+                                    style={{ marginTop: 56 }}
                                     className={
                                         isMiniMapVisible
                                             ? "opacity-100 transition-opacity duration-200"
@@ -1785,7 +2014,7 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
                     </ContextMenu>
                 )}
                 {(refreshing || isSyncingEdges || deletingNodeCount > 0) && (
-                    <div className="absolute top-3 right-3 z-20 flex items-center gap-1.5 rounded-md border bg-card px-2 py-1 text-xs text-muted-foreground shadow-sm">
+                    <div className="absolute top-3 left-3 z-20 flex items-center gap-1.5 rounded-md border bg-card px-2 py-1 text-xs text-muted-foreground shadow-sm">
                         <Loader2Icon className="size-3 animate-spin" />
                         {isSyncingEdges
                             ? "Salvando conexões..."
@@ -1793,6 +2022,82 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
                               ? "Removendo nó..."
                               : "Sincronizando..."}
                     </div>
+                )}
+                {isNodePanelOpen ? (
+                    <div className="absolute top-3 right-3 bottom-3 z-20 flex w-72 flex-col rounded-md border bg-card shadow-sm">
+                        <div className="flex items-center justify-between border-b px-3 py-2">
+                            <span className="text-xs font-semibold">
+                                Adicionar nó
+                            </span>
+                            <Button
+                                variant="ghost"
+                                size="icon-xs"
+                                onClick={() => setIsNodePanelOpen(false)}
+                                title="Ocultar painel"
+                                aria-label="Ocultar painel"
+                            >
+                                <PanelRightCloseIcon />
+                            </Button>
+                        </div>
+                        <ScrollArea className="min-h-0 flex-1 bg-muted/20">
+                            <div className="flex flex-col gap-2 p-2.5">
+                                {NODE_ACTIONS.map((action) => {
+                                    const Icon =
+                                        ROUTE_DEST_ICONS[
+                                            action.resourceTypes[0]
+                                        ]
+                                    return (
+                                        <button
+                                            key={action.id}
+                                            type="button"
+                                            draggable
+                                            onDragStart={(event) => {
+                                                event.dataTransfer.setData(
+                                                    NODE_ACTION_DRAG_TYPE,
+                                                    action.id
+                                                )
+                                                event.dataTransfer.effectAllowed =
+                                                    "move"
+                                            }}
+                                            onClick={() => {
+                                                // painel fixo não passa por onContextMenu, então
+                                                // limpa uma posição de clique-direito que possa
+                                                // ter sobrado — senão o nó nasce lá em vez do
+                                                // fallback em grade
+                                                contextPositionRef.current =
+                                                    null
+                                                setPendingAction(action.id)
+                                            }}
+                                            className="flex items-start gap-2.5 rounded-md border border-border/70 bg-card p-2.5 text-left shadow-sm transition-colors hover:border-primary/40 hover:bg-accent active:cursor-grabbing"
+                                        >
+                                            <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                                                <Icon className="size-3.5" />
+                                            </span>
+                                            <span className="flex flex-col gap-0.5">
+                                                <span className="text-xs font-medium">
+                                                    {action.label}
+                                                </span>
+                                                <span className="text-[0.6875rem] leading-snug text-muted-foreground">
+                                                    {action.description}
+                                                </span>
+                                            </span>
+                                        </button>
+                                    )
+                                })}
+                            </div>
+                        </ScrollArea>
+                    </div>
+                ) : (
+                    <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => setIsNodePanelOpen(true)}
+                        className="absolute top-3 right-3 z-20 bg-card"
+                        title="Mostrar painel de nós"
+                        aria-label="Mostrar painel de nós"
+                    >
+                        <PanelRightOpenIcon />
+                    </Button>
                 )}
             </div>
             <NodeActionDialog
@@ -1827,10 +2132,12 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
                                   x: source.position.x + 280,
                                   y: source.position.y + 70,
                               }
-                            : pendingCreation.position ?? {
+                            : (pendingCreation.position ?? {
                                   x: 100 + (flowNodes.length % 4) * 240,
-                                  y: 120 + Math.floor(flowNodes.length / 4) * 150,
-                              }
+                                  y:
+                                      120 +
+                                      Math.floor(flowNodes.length / 4) * 150,
+                              })
                         const { localId } = createNode(
                             pendingCreation.type,
                             option,

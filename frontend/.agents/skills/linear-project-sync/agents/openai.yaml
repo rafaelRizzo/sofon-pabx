@@ -1,4 +1,4 @@
 interface:
   display_name: "Linear Project Sync"
-  short_description: "Sincroniza módulos e progresso no Linear"
-  default_prompt: "Use $linear-project-sync para sincronizar o estado do SOFON PABX no Linear."
+  short_description: "Sincroniza somente o projeto Sofon PABX"
+  default_prompt: "Use $linear-project-sync para sincronizar somente o projeto Sofon PABX no Linear."

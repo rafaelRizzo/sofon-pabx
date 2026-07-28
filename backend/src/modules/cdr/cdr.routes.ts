@@ -4,8 +4,10 @@ import * as Controller from './cdr.controller'
 import { protectedRoute } from '../../middleware/scope.middleware'
 import { requirePermission } from '../../middleware/permission.middleware'
 import {
+    cdrIdParamSchema,
     cdrMetricsQuerySchema,
     cdrQuerySchema,
+    cdrRecordingQuerySchema,
     CdrMetricsResponse,
     ListCdrResponse
 } from './schemas/cdr.schema'
@@ -56,5 +58,27 @@ export const cdrRoutes = async (app: FastifyInstance) => {
             }
         },
         Controller.getCdrMetrics as any
+    )
+
+    router.get(
+        '/cdr/:id/recording',
+        {
+            onRequest: [...protectedRoute, requirePermission('cdr', 'view')],
+            schema: {
+                tags: ['CDR'],
+                summary: 'Baixar gravação de uma chamada',
+                description:
+                    'Query obrigatória: ?companyId. Faz streaming do arquivo .wav gravado pelo Asterisk (MixMonitor). 404 se a chamada não tiver gravação ou não pertencer à empresa.',
+                security: [{ bearerAuth: [] }],
+                params: cdrIdParamSchema,
+                querystring: cdrRecordingQuerySchema,
+                response: {
+                    401: errors[401],
+                    403: errors[403],
+                    404: errors[404]
+                }
+            }
+        },
+        Controller.getCdrRecording as any
     )
 }

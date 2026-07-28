@@ -10,7 +10,6 @@ import { RealtimeExtensionCards } from "@/components/Monitoring/realtime-extensi
 import { RealtimeTrunkCards } from "@/components/Monitoring/realtime-trunk-cards"
 import { RealtimeQueuesPanel } from "@/components/Monitoring/realtime-queues-panel"
 import { RealtimeStats } from "@/components/Monitoring/realtime-stats"
-import { LiveBadge } from "@/components/Monitoring/live-indicator"
 import {
     ExtensionSortToggle,
     type ExtensionSortBy,
@@ -74,16 +73,14 @@ function MonitoringPage() {
             <PageHeader
                 title="Monitoramento em tempo real"
                 description="Presença de ramais/troncos e estado das filas, atualizado via eventos AMI"
-            >
-                {companyId && <LiveBadge />}
-            </PageHeader>
+            />
 
             <CompanyFilter
                 companies={companies}
                 value={companyId}
                 onValueChange={setCompanyId}
                 placeholder="Selecione uma empresa..."
-                className="w-72"
+                className="w-full md:w-72"
             />
 
             {!companyId ? (

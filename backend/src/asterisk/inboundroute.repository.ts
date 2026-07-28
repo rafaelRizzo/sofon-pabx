@@ -1,7 +1,8 @@
 import { prisma } from '../lib/prisma'
 import type { InboundDest } from '../modules/inbound-routes/schemas/inbound-route.schema'
-import { ROUTING_TRUNK_VAR } from './dialplan-names'
+import { ROUTING_TRUNK_VAR, recordingFilenameSuffix } from './dialplan-names'
 import { resolveRouteDestinationToDialplan } from './route-destination-resolver'
+import { FlowEdgeRepository } from './flow-edge.repository'
 
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 
@@ -20,6 +21,8 @@ function routedExten(trunkId: string, didNumber: string) {
     return `${didNumber}_${trunkId}`
 }
 
+type Entry = { context: string; exten: string; priority: number; app: string; appdata: string | null }
+
 function buildInboundEntries(
     exten: string,
     app: string,
@@ -27,31 +30,48 @@ function buildInboundEntries(
     trunkId: string,
     didNumber: string,
     maxIn: number | null | undefined,
-): Array<{ context: string; exten: string; priority: number; app: string; appdata: string | null }> {
+): Entry[] {
+    // didNumber vem de Did.number, validado por regex ^\d+$ (ver did.schema.ts) — seguro
+    // interpolar direto no appdata, sem risco de injeção no dialplan
+    const mixmonitorFilename =
+        '/var/spool/asterisk/monitor/${CHANNEL(accountcode)}/${STRFTIME(${EPOCH},,%Y/%m/%d)}/' +
+        recordingFilenameSuffix('${CALLERID(num)}', didNumber)
+
+    const entries: Entry[] = []
+    let priority = 1
+    const push = (stepApp: string, stepAppdata: string | null) => {
+        entries.push({ context: TRUNK_ROUTED_CONTEXT, exten, priority: priority++, app: stepApp, appdata: stepAppdata })
+    }
+
+    push('Set', `${ROUTING_TRUNK_VAR}=${trunkId}`)
     // Enriquecimento de CDR — persiste no canal do ligante e sobrevive a qualquer Goto
     // intermediário (timecondition/holiday/ivr/queue/extension) até o Dial final
-    const cdrEntries = [
-        { context: TRUNK_ROUTED_CONTEXT, exten, priority: 2, app: 'Set', appdata: 'CDR(direction)=inbound' },
-        { context: TRUNK_ROUTED_CONTEXT, exten, priority: 3, app: 'Set', appdata: `CDR(trunk_id)=${trunkId}` },
-        { context: TRUNK_ROUTED_CONTEXT, exten, priority: 4, app: 'Set', appdata: `CDR(dialed_number)=${didNumber}` },
-    ]
+    push('Set', 'CDR(direction)=inbound')
+    push('Set', `CDR(trunk_id)=${trunkId}`)
+    push('Set', `CDR(dialed_number)=${didNumber}`)
+
+    let gotoIfIndex = -1
     if (maxIn != null) {
-        return [
-            { context: TRUNK_ROUTED_CONTEXT, exten, priority: 1, app: 'Set', appdata: `${ROUTING_TRUNK_VAR}=${trunkId}` },
-            ...cdrEntries,
-            { context: TRUNK_ROUTED_CONTEXT, exten, priority: 5, app: 'Set', appdata: `GROUP()=in-${trunkId}` },
-            { context: TRUNK_ROUTED_CONTEXT, exten, priority: 6, app: 'GotoIf', appdata: `$[\${GROUP_COUNT(in-${trunkId})} > ${maxIn}]?9` },
-            { context: TRUNK_ROUTED_CONTEXT, exten, priority: 7, app: 'Answer', appdata: null },
-            { context: TRUNK_ROUTED_CONTEXT, exten, priority: 8, app, appdata },
-            { context: TRUNK_ROUTED_CONTEXT, exten, priority: 9, app: 'Congestion', appdata: null },
-        ]
+        push('Set', `GROUP()=in-${trunkId}`)
+        gotoIfIndex = entries.length
+        push('GotoIf', '') // appdata corrigido depois, quando sabemos a priority do Congestion
     }
-    return [
-        { context: TRUNK_ROUTED_CONTEXT, exten, priority: 1, app: 'Set', appdata: `${ROUTING_TRUNK_VAR}=${trunkId}` },
-        ...cdrEntries,
-        { context: TRUNK_ROUTED_CONTEXT, exten, priority: 5, app: 'Answer', appdata: null },
-        { context: TRUNK_ROUTED_CONTEXT, exten, priority: 6, app, appdata },
-    ]
+
+    push('Answer', null)
+    // Grava desde a entrada — mesmo padrão de dialplan.repository.ts (ramais/internal), só que
+    // sem alias de ramal: usa o número do DID discado como identificador no nome do arquivo
+    push('Set', `MIXMONITOR_FILENAME=${mixmonitorFilename}`)
+    push('MixMonitor', '${MIXMONITOR_FILENAME},b')
+    push('Set', 'CDR(recording_file)=${MIXMONITOR_FILENAME}')
+    push(app, appdata)
+
+    if (maxIn != null) {
+        const congestionPriority = priority
+        entries[gotoIfIndex]!.appdata = `$[\${GROUP_COUNT(in-${trunkId})} > ${maxIn}]?${congestionPriority}`
+        push('Congestion', null)
+    }
+
+    return entries
 }
 
 export const InboundRouteRepository = {
@@ -78,6 +98,26 @@ export const InboundRouteRepository = {
         if (routes.length === 0) return
         await tx.extensions.deleteMany({
             where: { context: TRUNK_ROUTED_CONTEXT, exten: { in: routes.map((r) => routedExten(r.trunkId, r.didNumber)) } },
+        })
+    },
+
+    // Regera o dialplan de TODAS as inbound routes da empresa a partir do template atual — cobre
+    // rotas criadas antes de uma mudança de template (ex: novos campos de CDR, gravação) que nunca
+    // foram salvas de novo via update() desde então. Usado por resyncDialplan (companies.service.ts).
+    async regenerateAll(companyId: string) {
+        const routes = await prisma.inboundRoute.findMany({
+            where: { companyId },
+            select: { id: true, trunkId: true, did: { select: { number: true } }, trunk: { select: { maxInChannels: true } } },
+        })
+        if (routes.length === 0) return
+
+        const edges = await FlowEdgeRepository.getBySource(companyId, 'inboundroute')
+
+        await prisma.$transaction(async (tx) => {
+            for (const route of routes) {
+                const dest = edges.get(route.id)?.default ?? null
+                await this.update(tx, route.trunkId, route.did.number, dest, route.trunk.maxInChannels)
+            }
         })
     },
 }

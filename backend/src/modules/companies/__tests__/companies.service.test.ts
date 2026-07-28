@@ -26,7 +26,10 @@ mock.module('../../../asterisk/queue.repository', () => ({
     },
 }))
 mock.module('../../../asterisk/inboundroute.repository', () => ({
-    InboundRouteRepository: { deleteMany: mock(() => Promise.resolve()) },
+    InboundRouteRepository: {
+        deleteMany: mock(() => Promise.resolve()),
+        regenerateAll: mock(() => Promise.resolve()),
+    },
 }))
 mock.module('../../../asterisk/dialplan-file.repository', () => ({
     removeCompanyDialplanFiles: mock(() => Promise.resolve()),
