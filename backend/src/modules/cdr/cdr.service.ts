@@ -96,18 +96,15 @@ export const getCdrByCompany = async (query: CdrQueryInput) => {
         prisma.cdr.findMany({
             where,
             orderBy: [{ startTime: query.order }, { id: query.order }],
-            take: query.limit + 1,
-            ...(query.cursor && { cursor: { id: query.cursor }, skip: 1 }),
+            take: query.limit,
+            skip: (query.page - 1) * query.limit,
             select
         }),
         prisma.cdr.count({ where })
     ])
 
-    const hasMore = rows.length > query.limit
-    const page = hasMore ? rows.slice(0, query.limit) : rows
-
     const records = await enrichCdrRecords(
-        page.map(({ disposition, ...r }) => ({
+        rows.map(({ disposition, ...r }) => ({
             ...r,
             id: r.id.toString(),
             callStatus: disposition,
@@ -124,7 +121,7 @@ export const getCdrByCompany = async (query: CdrQueryInput) => {
         records,
         total,
         limit: query.limit,
-        nextCursor: hasMore ? page.at(-1)!.id.toString() : null
+        page: query.page
     }
 }
 

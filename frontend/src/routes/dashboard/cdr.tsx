@@ -104,8 +104,7 @@ function CdrPage() {
         loading,
         page,
         totalPages,
-        goNext,
-        goPrev,
+        goToPage,
     } = useCdrRecords(companyId, filters)
     const { metrics, loading: metricsLoading } = useCdrMetrics(companyId, filters)
 
@@ -292,9 +291,7 @@ function CdrPage() {
                         page={page}
                         totalPages={totalPages}
                         total={total}
-                        onPageChange={(newPage) =>
-                            newPage > page ? goNext() : goPrev()
-                        }
+                        onPageChange={goToPage}
                     />
                 </>
             )}

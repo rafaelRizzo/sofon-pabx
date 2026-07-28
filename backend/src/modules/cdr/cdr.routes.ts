@@ -24,7 +24,7 @@ export const cdrRoutes = async (app: FastifyInstance) => {
                 tags: ['CDR'],
                 summary: 'Listar registros de chamadas (CDR)',
                 description:
-                    'Query obrigatória: ?companyId. Filtros opcionais: startDate, endDate (YYYY-MM-DD, cobrem o dia inteiro), src, dst, callStatus, direction, originExtension, dialedNumber, trunkId, queueName, linkedid, uniqueid, limit (max 200), cursor e order (asc|desc, default desc).',
+                    'Query obrigatória: ?companyId. Filtros opcionais: startDate, endDate (YYYY-MM-DD, cobrem o dia inteiro), src, dst, callStatus, direction, originExtension, dialedNumber, trunkId, queueName, linkedid, uniqueid, limit (max 200), page (default 1) e order (asc|desc, default desc).',
                 security: [{ bearerAuth: [] }],
                 querystring: cdrQuerySchema,
                 response: {

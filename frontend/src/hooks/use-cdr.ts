@@ -97,8 +97,7 @@ export function useCdrRecords(
 ) {
     const [records, setRecords] = useState<CdrRecord[]>([])
     const [total, setTotal] = useState(0)
-    const [nextCursor, setNextCursor] = useState<string | null>(null)
-    const [cursorStack, setCursorStack] = useState<(string | undefined)[]>([])
+    const [page, setPage] = useState(1)
     const [loading, setLoading] = useState(true)
 
     const {
@@ -115,22 +114,20 @@ export function useCdrRecords(
     } = filters
 
     const fetchPage = useCallback(
-        async (cursor: string | undefined) => {
+        async (targetPage: number) => {
             if (!companyId) {
                 setRecords([])
                 setTotal(0)
-                setNextCursor(null)
                 setLoading(false)
                 return
             }
             setLoading(true)
             try {
                 const { data } = await api.get("/cdr", {
-                    params: filterParams(companyId, filters, { cursor, limit }),
+                    params: filterParams(companyId, filters, { page: targetPage, limit }),
                 })
                 setRecords(data.records ?? [])
                 setTotal(data.total ?? 0)
-                setNextCursor(data.nextCursor ?? null)
             } catch (err) {
                 toast.error(apiError(err, "Erro ao buscar registros de CDR"))
             } finally {
@@ -157,24 +154,14 @@ export function useCdrRecords(
 
     // qualquer mudança de filtro/empresa reseta a navegação para a 1ª página
     useEffect(() => {
-        setCursorStack([])
-        fetchPage(undefined)
+        setPage(1)
+        fetchPage(1)
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [fetchPage])
 
-    const currentCursor = cursorStack.at(-1)
-
-    const goNext = () => {
-        if (!nextCursor) return
-        setCursorStack((stack) => [...stack, currentCursor])
-        fetchPage(nextCursor)
-    }
-
-    const goPrev = () => {
-        if (cursorStack.length === 0) return
-        const prevCursor = cursorStack.at(-2)
-        setCursorStack((stack) => stack.slice(0, -1))
-        fetchPage(prevCursor)
+    const goToPage = (targetPage: number) => {
+        setPage(targetPage)
+        fetchPage(targetPage)
     }
 
     return {
@@ -182,12 +169,9 @@ export function useCdrRecords(
         total,
         limit,
         loading,
-        page: cursorStack.length + 1,
+        page,
         totalPages: Math.max(1, Math.ceil(total / limit)),
-        hasNext: !!nextCursor,
-        hasPrev: cursorStack.length > 0,
-        goNext,
-        goPrev,
+        goToPage,
     }
 }
 

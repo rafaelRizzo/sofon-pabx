@@ -42,7 +42,7 @@ const CDR_ROW = {
     hangupCause: '16'
 }
 
-const BASE_QUERY = { companyId: 'c1', limit: 50, order: 'desc' } as any
+const BASE_QUERY = { companyId: 'c1', limit: 50, page: 1, order: 'desc' } as any
 
 beforeEach(() => clearPrismaMock(db))
 
@@ -72,7 +72,8 @@ describe('CdrService.getCdrByCompany', () => {
             expect.objectContaining({
                 where: expect.objectContaining({ accountcode: 'ast1' }),
                 orderBy: [{ startTime: 'desc' }, { id: 'desc' }],
-                take: 51
+                take: 50,
+                skip: 0
             })
         )
         expect(db.cdr.count).toHaveBeenCalledWith({
@@ -90,7 +91,7 @@ describe('CdrService.getCdrByCompany', () => {
             recordingFile: 'call.wav',
             hangupCause: '16'
         })
-        expect(result.nextCursor).toBeNull()
+        expect(result.page).toBe(1)
         expect(result.total).toBe(1)
         expect(result.limit).toBe(50)
     })
@@ -115,7 +116,7 @@ describe('CdrService.getCdrByCompany', () => {
             queueName: 'ast1-queue-100',
             linkedid: '1234.1',
             uniqueid: '1234.5',
-            cursor: 99n
+            page: 3
         })
 
         expect(db.cdr.findMany).toHaveBeenCalledWith(
@@ -139,8 +140,8 @@ describe('CdrService.getCdrByCompany', () => {
                     }
                 }),
                 orderBy: [{ startTime: 'asc' }, { id: 'asc' }],
-                cursor: { id: 99n },
-                skip: 1
+                take: 50,
+                skip: 100
             })
         )
     })
@@ -178,12 +179,9 @@ describe('CdrService.getCdrByCompany', () => {
         ).rejects.toMatchObject({ statusCode: 404 })
     })
 
-    it('returns a cursor when a page has more records', async () => {
+    it('applies skip based on page/limit and echoes the requested page', async () => {
         db.company.findUnique.mockResolvedValue(COMPANY)
-        db.cdr.findMany.mockResolvedValue([
-            { ...CDR_ROW, id: 1n },
-            { ...CDR_ROW, id: 2n }
-        ])
+        db.cdr.findMany.mockResolvedValue([{ ...CDR_ROW, id: 2n }])
         db.cdr.count.mockResolvedValue(2)
         db.queue.findMany.mockResolvedValue([])
         db.queueCall.findMany.mockResolvedValue([])
@@ -191,11 +189,15 @@ describe('CdrService.getCdrByCompany', () => {
 
         const result = (await CdrService.getCdrByCompany({
             ...BASE_QUERY,
-            limit: 1
+            limit: 1,
+            page: 2
         })) as any
 
+        expect(db.cdr.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({ take: 1, skip: 1 })
+        )
         expect(result.records).toHaveLength(1)
-        expect(result.nextCursor).toBe('1')
+        expect(result.page).toBe(2)
     })
 
     it('enriches records with queue/flow labels and who answered, falling back to dst when queueName is null', async () => {

@@ -310,9 +310,9 @@ Modelo: Asterisk roda **nativo** na VPS (`setups/install-asterisk.sh` + `setups/
 - `UNIQUE(name, companyId)`
 - Delete Company → cascade Variable Conditions (dialplan)
 
-**CDR** — `GET /cdr` — `{ records[], total, limit }`
-- Query obrigatória: `companyId`; opcionais: `startDate`/`endDate` (`YYYY-MM-DD`, cobrem o dia inteiro 00:00:00–23:59:59.999, sem offset/hora), `src`, `dst`, `callStatus` (enum disposition), `limit`(max 200), `order`(asc|desc, default desc — aplica em startTime+id)
-- Sem paginação por cursor — só `limit`/`order`, sem navegação por página
+**CDR** — `GET /cdr` — `{ records[], total, limit, page }`
+- Query obrigatória: `companyId`; opcionais: `startDate`/`endDate` (`YYYY-MM-DD`, cobrem o dia inteiro 00:00:00–23:59:59.999, sem offset/hora), `src`, `dst`, `callStatus` (enum disposition), `limit`(max 200), `page`(default 1), `order`(asc|desc, default desc — aplica em startTime+id)
+- Paginação por offset (`skip`/`take` do Prisma) — sem cursor; `page` permite navegação/salto direto
 - Isolamento por empresa via `accountcode = Company.asteriskId` (não por FK)
 - `callStatus` na query mapeia pra coluna `disposition` no banco; na resposta o campo também sai como `callStatus` (não `disposition`) — nome escolhido por ser mais intuitivo pro consumidor da API
 - `startTime`/`answerTime`/`endTime`: ver seção Timezone — são hora local naive do CDR nativo do Asterisk, formatados na saída via `formatNaiveLocalISOString`, nunca como UTC direto. Filtro por data não precisa de conversão de tz: os dígitos de `startDate`/`endDate` já batem 1:1 com o storage naive local

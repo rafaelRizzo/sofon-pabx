@@ -41,7 +41,7 @@ const withDateRangeValidation = <T extends z.ZodRawShape>(shape: T) =>
 export const cdrQuerySchema = withDateRangeValidation({
     ...cdrQueryShape,
     limit: z.coerce.number().int().min(1).max(MAX_LIMIT).default(DEFAULT_LIMIT),
-    cursor: z.coerce.bigint().positive().optional(),
+    page: z.coerce.number().int().min(1).default(1),
     order: z.enum(['asc', 'desc']).default('desc')
 })
 
@@ -97,7 +97,7 @@ export const ListCdrResponse = ok({
     records: z.array(CdrSchema),
     total: z.number(),
     limit: z.number(),
-    nextCursor: z.string().nullable()
+    page: z.number()
 })
 
 export const CdrMetricsSchema = z.object({
