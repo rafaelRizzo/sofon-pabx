@@ -40,12 +40,22 @@ exten => *60,1,Answer()
 ; via AGI pro ramal OU fila da MESMA empresa (CHANNEL(accountcode)), sem precisar saber de antemão
 ; se o dígito discado na transferência é um ramal ou um número de fila. O AGI já faz "EXEC Goto"
 ; pro destino certo quando encontra (ver handleTransferRoute em agi-server.ts) — o Congestion()
-; abaixo só roda quando ele NÃO encontra nada (AGI retorna sem ter dado Goto).
+; abaixo só roda quando ele NÃO encontra nada (AGI retorna sem ter dado Goto). Nesse ponto o
+; \`t\`/\`T\` do Dial/Queue já dropou a outra perna (agente) nativamente antes do redirect — não
+; tem bridge original pra restaurar, então o melhor possível é encerrar a chamada do cliente de
+; forma previsível, em vez de Congestion() sem argumento (que toca o tom indefinidamente até o
+; cliente desligar manualmente).
 [transfer]
 exten => _X.,1,NoOp(Transferencia solicitada: \${EXTEN})
  same => n,Set(TRANSFERRED=1)
+; Tagueia direction=transfer JÁ nesse ponto (antes do AGI) — esse fork de CDR acontece pro
+; canal do CLIENTE assim que o \`t\`/\`T\` do Dial/Queue dispara o redirect nativo, então mesmo
+; quando o AGI abaixo não encontra destino (ramal offline/inexistente) e cai no Congestion(),
+; esse segmento não fica marcado como "inbound" — sem isso ele aparecia na tabela de CDR como
+; uma 2ª chamada de entrada "duplicada" (mesmo linkedid/uniqueid da chamada original)
+ same => n,Set(CDR(direction)=transfer)
  same => n,AGI(agi://127.0.0.1:4573/transfer-route)
- same => n,Congestion()
+ same => n,Congestion(3)
 
 [default]
 exten => s,1,Hangup()

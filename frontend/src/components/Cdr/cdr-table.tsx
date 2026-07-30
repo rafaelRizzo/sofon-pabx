@@ -98,7 +98,10 @@ export function CdrTable({ records, trunks, loading, companyId }: Props) {
 
     return (
         <div className="rounded-md border">
-            <Table>
+            {/* w-max + min-w-full: cresce alem do container quando as 11 colunas (todas
+            whitespace-nowrap) nao cabem, acionando o overflow-x-auto do wrapper da Table em vez
+            de forcar w-full e espremer as colunas sem scroll */}
+            <Table className="w-max min-w-full">
                 <TableHeader>
                     <TableRow>
                         <TableHead className="text-center">Data/Hora</TableHead>

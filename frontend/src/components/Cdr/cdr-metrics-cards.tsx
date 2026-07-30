@@ -47,8 +47,12 @@ function StatTile({
 }) {
     const style = TONE[tone]
 
+    // border-input no dark mode é translúcido (oklch(1 0 0/15%)) — sobre o bg-card (mais claro
+    // que o fundo da página) essa transparência renderiza diferente da mesma borda num input,
+    // que fica sobre o fundo da página. dark:border-[#383838] força a cor final real do input
+    // (medida via eyedropper), sem depender do que está atrás.
     return (
-        <Card size="sm">
+        <Card size="sm" className="border border-input ring-0 dark:border-[#383838]">
             <CardContent className="flex items-center gap-3">
                 <div
                     className={cn(

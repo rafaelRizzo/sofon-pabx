@@ -1,5 +1,7 @@
 import { prisma } from '../../lib/prisma'
+import { redisClient } from '../../config/redis'
 import { logger } from '../../utils/logger'
+import { extKey } from './realtime-keys'
 import { resolveRouteDestinationToDialplan } from '../dialplan/route-destination-resolver'
 import { FlowEdgeRepository } from '../flows/flow-edge.repository'
 import { parseMemberInterface, QUEUE_APP_CONTEXT, queueAppExten } from '../destinations/queue.repository'
@@ -291,6 +293,23 @@ async function handleSurveyResult(conn: AgiConn, queueId: string, scoreRaw: stri
     }
 }
 
+// Lê o mesmo cache de presença do módulo realtime (rt:ext:<number>, ver ami-events.ts) — falha aberta
+// (retorna 'unknown') se o Redis estiver fora do ar ou a chave ainda não existir, pra nunca bloquear
+// uma transferência válida por causa de infraestrutura de monitoramento indisponível.
+async function getExtensionPresence(number: string): Promise<'online' | 'offline' | 'unknown'> {
+    try {
+        const presence = await redisClient.hGet(extKey(number), 'presence')
+        return presence === 'online' || presence === 'offline' ? presence : 'unknown'
+    } catch (error) {
+        logger.warn({
+            event: 'agi.transfer_route.presence_read_failed',
+            number,
+            message: error instanceof Error ? error.message : String(error),
+        })
+        return 'unknown'
+    }
+}
+
 // Chamado pelo contexto estático [transfer] (extensions.conf) quando um agente/cliente dispara uma
 // transferência DTMF atendida (*2, ver features.conf) — TRANSFER_CONTEXT=transfer é setado desde a entrada
 // da chamada (ver inboundroute.repository.ts). EXTEN é o número discado pela parte que transferiu
@@ -311,9 +330,14 @@ async function handleTransferRoute(conn: AgiConn) {
 
     const extension = await prisma.extension.findUnique({
         where: { alias_companyId: { alias: exten, companyId: company.id } },
-        select: { context: true, alias: true },
+        select: { context: true, alias: true, number: true },
     })
     if (extension) {
+        const presence = await getExtensionPresence(extension.number)
+        if (presence === 'offline') {
+            logger.info({ event: 'agi.transfer_route.target_offline', exten, companyId: company.id })
+            return
+        }
         await agiExecGoto(conn, { context: extension.context, exten: extension.alias, priority: 1 })
         return
     }

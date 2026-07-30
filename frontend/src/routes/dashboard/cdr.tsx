@@ -54,6 +54,7 @@ const DIRECTION_OPTIONS = [
     { value: "inbound", label: "Entrada" },
     { value: "outbound", label: "Saída" },
     { value: "internal", label: "Interna" },
+    { value: "transfer", label: "Transferência" },
 ] as const
 
 const STATUS_OPTIONS = [
@@ -261,7 +262,7 @@ function CdrPage() {
                                 render={
                                     <Button
                                         variant="outline"
-                                        className="w-full justify-start border-input! font-normal lg:col-span-2"
+                                        className="w-full justify-start border-input! font-normal lg:col-span-2 dark:border-[#383838]!"
                                     >
                                         <CalendarIcon />
                                         {dateRangeLabel}

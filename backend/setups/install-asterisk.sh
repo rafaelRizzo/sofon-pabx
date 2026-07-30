@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-# INSTALADOR SOFON PBX v7.1 - PJSIP + IAX2 (sem Docker, sem chan_sip)
+# INSTALADOR SOFON PBX v7.3 - PJSIP + IAX2 (sem Docker, sem chan_sip)
 # Debian 11+ | Ubuntu 24.04+ | Asterisk 22.7.0 LTS
 # ============================================================
 
@@ -421,8 +421,9 @@ exten => *60,1,Answer()
 [transfer]
 exten => _X.,1,NoOp(Transferencia solicitada: ${EXTEN})
  same => n,Set(TRANSFERRED=1)
+ same => n,Set(CDR(direction)=transfer)
  same => n,AGI(agi://127.0.0.1:4573/transfer-route)
- same => n,Congestion()
+ same => n,Congestion(3)
 
 [default]
 exten => s,1,Hangup()
@@ -533,6 +534,20 @@ atxfer => *2
 parkcall => #72
 
 [applicationmap]
+EOF
+
+# cdr.conf — o sample padrão do Asterisk (make samples) vem com unanswered/congestion=yes,
+# o que faz o motor de CDR logar uma linha A MAIS por chamada sempre que um Dial() termina em
+# BUSY/CONGESTION/NOANSWER (a tentativa em si vira 1 registro, e a continuação do dialplan depois
+# do Dial() — Set/NoOp/Hangup — vira um 2º registro "fantasma" com o mesmo linkedid/uniqueid,
+# sem dstchannel). Aqui só existe UM Dial() por extensão (sem retry pra outro destino), então não
+# há cenário legítimo pra esses 2 registros — unanswered/congestion=no elimina a duplicata.
+cat > /etc/asterisk/cdr.conf << 'EOF'
+[general]
+enable=yes
+unanswered=no
+congestion=no
+endbeforehexten=no
 EOF
 
 # modules.conf — garante chan_sip nunca carregado, chan_iax2 sempre carregado
