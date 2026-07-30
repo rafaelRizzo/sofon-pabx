@@ -56,7 +56,7 @@ export const ResyncDialplanResponse = ok({
     message: z.string(),
     baseDialplanRewritten: z.boolean(),
     blindTransferRemoved: z.boolean(),
-    featuresReloadApplied: z.boolean(),
+    blindTransferReloadApplied: z.boolean(),
     staticContexts: z.array(z.string()),
     realtimeContexts: z.array(z.string()),
     inboundRoutes: z.number(),
