@@ -1,6 +1,6 @@
-import { prisma } from '../lib/prisma'
-import type { RouteDestination } from '../schemas/route-destination.schema'
-import { QUEUE_APP_CONTEXT, queueAppExten } from './queue.repository'
+import { prisma } from '../../lib/prisma'
+import type { RouteDestination } from '../../schemas/route-destination.schema'
+import { QUEUE_APP_CONTEXT, queueAppExten } from '../destinations/queue.repository'
 import {
     TC_CONTEXT, tcEntry, ANNOUNCEMENT_CONTEXT, announcementExten, IVR_CONTEXT, ivrExten,
     REQUEST_TEMPLATE_CONTEXT, requestTemplateExten, HOL_CONTEXT, holEntry,

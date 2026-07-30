@@ -261,7 +261,7 @@ function CdrPage() {
                                 render={
                                     <Button
                                         variant="outline"
-                                        className="w-full justify-start font-normal"
+                                        className="w-full justify-start border-input! font-normal lg:col-span-2"
                                     >
                                         <CalendarIcon />
                                         {dateRangeLabel}

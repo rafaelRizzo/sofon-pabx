@@ -1,7 +1,7 @@
 #!/bin/bash
 # ============================================================
-# INSTALADOR SOFON PBX v6.4 - NATIVO (sem Docker)
-# Debian 11+ | Ubuntu 24.04+
+# INSTALADOR SOFON PBX v7.1 - PJSIP + IAX2 (sem Docker, sem chan_sip)
+# Debian 11+ | Ubuntu 24.04+ | Asterisk 22.7.0 LTS
 # ============================================================
 
 set -euo pipefail
@@ -13,15 +13,14 @@ readonly RED='\033[0;31m'
 readonly BOLD='\033[1m'
 readonly NC='\033[0m'
 
-ASTERISK_VERSION=""
-USE_LEGACY_SIP=false
+readonly ASTERISK_VERSION="22.10.1"
+readonly PJSIP_PORT=5060
+readonly IAX_PORT=4569
 PUBLIC_ADDRESS=""
 LOCAL_NET=""
 OS_NAME=""
 OS_VERSION=""
 LOG_FILE="/var/log/sofon-install.log"
-PJSIP_PORT=5060
-SIP_PORT=5062
 SYSTEM_USER_AGENT="Sofon"
 
 # ============================================================
@@ -36,7 +35,7 @@ show_header() {
     clear
     echo ""
     echo -e "${CYAN}════════════════════════════════════════════════════════${NC}"
-    echo -e "  ${BOLD}INSTALADOR SOFON PBX v6.2${NC}"
+    echo -e "  ${BOLD}INSTALADOR SOFON PBX v6.3 - PJSIP + IAX2${NC}"
     echo -e "${CYAN}════════════════════════════════════════════════════════${NC}"
     echo ""
 }
@@ -109,28 +108,8 @@ available_mb=$(df /usr/src | tail -1 | awk '{print int($4/1024)}')
 [[ $available_mb -ge 2048 ]] || err "Espaço insuficiente: ${available_mb}MB (necessário 2GB)"
 echo -e "  ${GREEN}✓${NC} Sistema compatível (${available_mb}MB livres)"
 echo ""
-sleep 1
-
-# ============================================================
-# ESCOLHA DE VERSÃO
-# ============================================================
-show_header
-echo -e "${BOLD}Escolha a versão do Asterisk:${NC}"
+echo -e "  ${GREEN}✓${NC} Asterisk ${ASTERISK_VERSION} (LTS) - PJSIP (porta ${PJSIP_PORT}) + IAX2 (porta ${IAX_PORT})"
 echo ""
-echo -e "  ${YELLOW}1)${NC} Asterisk 22.7.0 ${GREEN}(LTS)${NC} - PJSIP Only    (porta 5060)"
-echo -e "  ${YELLOW}2)${NC} Asterisk 20.17.0 ${GREEN}(LTS)${NC} - SIP + PJSIP  (SIP:5062 | PJSIP:5063)"
-echo ""
-echo -ne "${CYAN}→${NC} Opção [1-2]: "
-read -r OPCAO
-echo ""
-
-case $OPCAO in
-    1) ASTERISK_VERSION="22.7.0"; USE_LEGACY_SIP=false; PJSIP_PORT=5060
-       echo -e "  ${GREEN}✓${NC} Asterisk $ASTERISK_VERSION selecionado (PJSIP Only)" ;;
-    2) ASTERISK_VERSION="20.17.0"; USE_LEGACY_SIP=true; PJSIP_PORT=5063
-       echo -e "  ${GREEN}✓${NC} Asterisk $ASTERISK_VERSION selecionado (SIP + PJSIP)" ;;
-    *) err "Opção inválida" ;;
-esac
 sleep 1
 
 # ============================================================
@@ -169,15 +148,11 @@ sleep 1
 show_header
 echo -e "${BOLD}RESUMO DA INSTALAÇÃO${NC}"
 echo ""
-echo -e "  Versão     : ${GREEN}${ASTERISK_VERSION}${NC}"
+echo -e "  Versão     : ${GREEN}${ASTERISK_VERSION}${NC} (PJSIP + IAX2)"
 echo -e "  IP Público : ${CYAN}${PUBLIC_ADDRESS}${NC}"
 echo -e "  Rede Local : ${CYAN}${LOCAL_NET}${NC}"
 echo -e "  User-Agent : ${CYAN}${SYSTEM_USER_AGENT}${NC}"
-if [[ "$USE_LEGACY_SIP" == true ]]; then
-    echo -e "  Portas     : SIP ${CYAN}${SIP_PORT}${NC} | PJSIP ${CYAN}${PJSIP_PORT}${NC} | RTP ${CYAN}10000-20000${NC}"
-else
-    echo -e "  Portas     : PJSIP ${CYAN}${PJSIP_PORT}${NC} | RTP ${CYAN}10000-20000${NC}"
-fi
+echo -e "  Portas     : PJSIP ${CYAN}${PJSIP_PORT}${NC} | IAX2 ${CYAN}${IAX_PORT}${NC} | RTP ${CYAN}10000-20000${NC}"
 echo ""
 echo -ne "Confirma instalação? [s/N]: "
 read -r REPLY
@@ -207,7 +182,6 @@ DEPS=(
     libiksemel-dev libgmime-3.0-dev libradcli-dev
     libcurl4-openssl-dev libpopt-dev sox mpg123 libsox-fmt-all
 )
-[[ "$USE_LEGACY_SIP" == true ]] && DEPS+=(python3 python3-dev libsrtp2-dev)
 
 DEBIAN_FRONTEND=noninteractive apt-get install -y "${DEPS[@]}" >> "$LOG_FILE" 2>&1 || err "Falha nas dependências"
 log "Dependências instaladas"
@@ -237,20 +211,18 @@ sleep 1
 show_header
 show_progress 4 13 "Instalando pré-requisitos do Asterisk"
 contrib/scripts/install_prereq install >> "$LOG_FILE" 2>&1 || warn "Alguns pré-requisitos falharam (pode ser normal)"
-[[ "$USE_LEGACY_SIP" == true ]] && contrib/scripts/get_mp3_source.sh >> "$LOG_FILE" 2>&1 || true
 log "Pré-requisitos concluídos"
 sleep 1
 
 # ============================================================
 # STEP 5 - CONFIGURE
+# FIX: sem chan_sip, não precisa de --with-pjproject-bundled nem python
+# (res_pjsip já vem embutido no core do Asterisk 22)
 # ============================================================
 show_header
 show_progress 5 13 "Configurando compilação"
 
-CONF_OPTS="--with-jansson-bundled"
-[[ "$USE_LEGACY_SIP" == true ]] && CONF_OPTS="$CONF_OPTS --with-pjproject-bundled"
-
-./configure $CONF_OPTS >> "$LOG_FILE" 2>&1 || err "Falha no ./configure"
+./configure --with-jansson-bundled >> "$LOG_FILE" 2>&1 || err "Falha no ./configure"
 
 make menuselect.makeopts >> "$LOG_FILE" 2>&1
 
@@ -262,18 +234,14 @@ menuselect/menuselect \
     --enable codec_g722 \
     --enable codec_ilbc \
     --enable res_srtp \
+    --enable res_pjsip \
+    --enable res_pjsip_session \
+    --enable chan_pjsip \
+    --enable chan_iax2 \
+    --disable chan_sip \
     menuselect.makeopts >> "$LOG_FILE" 2>&1 || true
 # G.729 NÃO entra aqui: codec proprietário (Digium), sem build open-source.
 # Precisa comprar o módulo binário e instalar manualmente em /usr/lib/asterisk/modules.
-
-if [[ "$USE_LEGACY_SIP" == true ]]; then
-    menuselect/menuselect \
-        --enable chan_sip \
-        --enable res_pjsip \
-        --enable res_pjsip_session \
-        --enable chan_pjsip \
-        menuselect.makeopts >> "$LOG_FILE" 2>&1 || true
-fi
 
 log "Configuração concluída"
 sleep 1
@@ -295,7 +263,7 @@ show_header
 show_progress 7 13 "Instalando binários"
 
 # Backup com timestamp completo para proteger re-execuções
-for f in sip.conf pjsip.conf extensions.conf rtp.conf modules.conf manager.conf; do
+for f in pjsip.conf iax.conf extensions.conf rtp.conf modules.conf manager.conf; do
     [[ -f /etc/asterisk/$f ]] && \
         cp /etc/asterisk/$f "/etc/asterisk/${f}.bak-$(date +%Y%m%d%H%M%S)"
 done
@@ -373,39 +341,6 @@ strictrtp=yes
 probation=4
 EOF
 
-# sip.conf (só se USE_LEGACY_SIP)
-if [[ "$USE_LEGACY_SIP" == true ]]; then
-    cat > /etc/asterisk/sip.conf << EOF
-[general]
-bindport=$SIP_PORT
-bindaddr=0.0.0.0
-useragent=$SYSTEM_USER_AGENT
-transport=udp,tcp
-tcpenable=yes
-context=default
-allowguest=no
-disallow=all
-allow=opus
-allow=ulaw
-allow=alaw
-nat=force_rport,comedia
-externip=$PUBLIC_ADDRESS
-localnet=$LOCAL_NET
-rtpstart=10000
-rtpend=20000
-language=pt_BR
-dtmfmode=rfc2833
-directmedia=no
-alwaysauthreject=yes
-qualify=yes
-qualifyfreq=60
-rtcachefriends=yes
-rtautoclear=60
-registertrying=yes
-
-EOF
-fi
-
 # pjsip.conf
 cat > /etc/asterisk/pjsip.conf << EOF
 [transport-udp]
@@ -442,19 +377,30 @@ direct_media=no
 dtmf_mode=rfc4733
 EOF
 
+# iax.conf — só troncos (ver backend Trunk.type="iax"), sem ramal IAX2 (dispositivo raro no
+# mercado, ramais continuam 100% PJSIP). requirecalltoken=yes mitiga o DoS de amplificação/spoofing
+# conhecido do protocolo IAX2 (call token) — obrigatório dado o objetivo de segurança da migração.
+cat > /etc/asterisk/iax.conf << EOF
+[general]
+bindport=$IAX_PORT
+bindaddr=0.0.0.0
+disallow=all
+allow=opus
+allow=ulaw
+allow=alaw
+requirecalltoken=yes
+EOF
+
 # extensions.conf
 # FIX: contexto [ramais] usa switch => Realtime/ para suportar
 # ramais com nomes arbitrários (ex: 2002_16824d1144) via tabela no PostgreSQL.
 # O padrão _1XXX foi removido — o Asterisk consulta a tabela extensions
 # (mapeada no extconfig.conf) para resolver cada exten dinamicamente.
-cat > /etc/asterisk/extensions.conf << 'EOF'
-[general]
-static=yes
-writeprotect=no
-
-[globals]
-LANGUAGE=pt_BR
-
+# Esqueleto global do dialplan em arquivo separado (não em extensions.conf direto) — permite ao
+# backend se auto-curar via ensureBaseDialplan() (src/asterisk/base-dialplan.repository.ts) se esse
+# arquivo for perdido numa reinstalação parcial, sem precisar reaplicar este script inteiro na mão.
+# Precisa ficar em sincronia manual com o conteúdo espelhado em base-dialplan.repository.ts.
+cat > /etc/asterisk/sofon-managed.conf << 'EOF'
 [ramais]
 ; Delega lookup de ramais para Realtime (tabela extensions no PostgreSQL)
 ; Suporta qualquer formato de exten: 1001, 2002_16824d1144, etc.
@@ -466,6 +412,17 @@ exten => *43,1,Answer()
  same => n,Echo()
 exten => *60,1,Answer()
  same => n,MusicOnHold()
+
+; TRANSFER_CONTEXT das chamadas inbound (ver inboundroute.repository.ts) — resolvido em tempo real
+; via AGI pro ramal OU fila da MESMA empresa (CHANNEL(accountcode)), sem precisar saber de antemão
+; se o dígito discado na transferência é um ramal ou um número de fila. O AGI já faz "EXEC Goto"
+; pro destino certo quando encontra (ver handleTransferRoute em agi-server.ts) — o Congestion()
+; abaixo só roda quando ele NÃO encontra nada (AGI retorna sem ter dado Goto).
+[transfer]
+exten => _X.,1,NoOp(Transferencia solicitada: ${EXTEN})
+ same => n,Set(TRANSFERRED=1)
+ same => n,AGI(agi://127.0.0.1:4573/transfer-route)
+ same => n,Congestion()
 
 [default]
 exten => s,1,Hangup()
@@ -490,14 +447,16 @@ exten => i,1,Noop(DID sem rota: ${EXTEN})
  same => n,Hangup(1)
 
 ; queues-app, timeconditions, announcements, ivrs, holidays, request-templates, variables,
-; variable-conditions e callcenter-surveys são contextos
-; compartilhados de BAIXA escrita (só mudam por CRUD via API, nunca por ligação) — em vez de
-; Realtime (query no Postgres a cada Goto, pbx_realtime não tem cache), o dialplan é materializado
-; em arquivo estático por empresa em /etc/asterisk/dialplan-extra/<contexto>/<asteriskId>.conf,
-; regenerado + reload (`dialplan reload`) a cada CRUD (ver src/asterisk/dialplan-file.repository.ts).
-; `ramais`/`from-trunk-routed` continuam via Realtime (alta escrita, fora desse escopo).
+; variable-conditions, callcenter-surveys e flows/flow-nodes são contextos compartilhados de BAIXA
+; escrita (só mudam por CRUD via API, nunca por ligação) — em vez de Realtime (query no Postgres a
+; cada Goto, pbx_realtime não tem cache), o dialplan é materializado em arquivo estático por empresa
+; em /etc/asterisk/dialplan-extra/<contexto>/<asteriskId>.conf, regenerado + reload (`dialplan reload`)
+; a cada CRUD (ver src/asterisk/dialplan-file.repository.ts). `ramais`/`from-trunk-routed` continuam
+; via Realtime (alta escrita, fora desse escopo).
 ; #tryinclude (não #include) — não erra quando a empresa ainda não gerou nenhum .conf pra esse
-; contexto (glob sem match); #include exige que exista pelo menos 1 arquivo.
+; contexto (glob sem match); #include exige que exista pelo menos 1 arquivo. Caminho relativo é
+; resolvido a partir de /etc/asterisk (astetcdir), não deste arquivo — funciona igual incluído
+; a partir de extensions.conf ou direto.
 [queues-app]
 #tryinclude "dialplan-extra/queues-app/*.conf"
 
@@ -532,13 +491,54 @@ exten => i,1,Noop(DID sem rota: ${EXTEN})
 #tryinclude "dialplan-extra/flow-nodes/*.conf"
 EOF
 
-# modules.conf — garante chan_sip carregado se necessário
-if [[ "$USE_LEGACY_SIP" == true ]]; then
-    sed -i '/noload.*chan_sip/d'    /etc/asterisk/modules.conf 2>/dev/null || true
-    sed -i '/noload.*res_pjsip/d'  /etc/asterisk/modules.conf 2>/dev/null || true
-    grep -q "chan_sip.so" /etc/asterisk/modules.conf 2>/dev/null || \
-        printf '\nload => chan_sip.so\nload => res_pjsip.so\nload => res_pjsip_session.so\nload => chan_pjsip.so\n' >> /etc/asterisk/modules.conf
-fi
+cat > /etc/asterisk/extensions.conf << 'EOF'
+[general]
+static=yes
+writeprotect=no
+
+[globals]
+LANGUAGE=pt_BR
+
+; Esqueleto global (ramais/transfer/from-trunk/from-trunk-routed + tryinclude dos contextos
+; estáticos por empresa) mora em arquivo próprio — ver sofon-managed.conf acima. Mantém este
+; arquivo estável e livre pra edição manual do cliente sem risco de sobrescrita pelo backend.
+#include sofon-managed.conf
+EOF
+
+# features.conf — transferência DTMF atendida durante a chamada. Códigos: *2 atendida, *1 grava,
+# parkcall #72. Quem pode
+# de fato disparar (opção t/T no Dial()/Queue()) é controlado no dialplan. Chamadas inbound usam
+# "t" para só o ramal transferir, chamadas outbound usam "T" para o ramal chamador transferir.
+cat > /etc/asterisk/features.conf << 'EOF'
+[general]
+; tempo entre dígitos ao discar o destino da transferência DTMF (depois do #1/*2) — 3s
+; original estourava com discagem manual normal (ramal de 4-6 dígitos), tratando cada
+; dígito isolado como tentativa própria (ex: discar "1002" virava "1@transfer" +
+; "0@transfer" etc, cada um "does not exist")
+transferdigittimeout = 8
+atxfernoanswertimeout = 15
+atxferdropcall = no
+atxferloopdelay = 10
+xfersound = beep
+xferfailsound = beeperr
+atxferabort = *1
+atxfercomplete = *2
+atxferthreeway = *3
+atxferswap = *4
+
+[featuremap]
+disconnect => *
+automixmon => *5
+atxfer => *2
+parkcall => #72
+
+[applicationmap]
+EOF
+
+# modules.conf — garante chan_sip nunca carregado, chan_iax2 sempre carregado
+sed -i '/noload.*res_pjsip/d' /etc/asterisk/modules.conf 2>/dev/null || true
+grep -q "noload => chan_sip.so" /etc/asterisk/modules.conf 2>/dev/null || \
+    printf '\nnoload => chan_sip.so\nload => res_pjsip.so\nload => res_pjsip_session.so\nload => chan_pjsip.so\nload => chan_iax2.so\n' >> /etc/asterisk/modules.conf
 
 chown asterisk:asterisk /etc/asterisk/*.conf
 log "Configurações criadas"
@@ -584,11 +584,7 @@ mkdir -p /etc/fail2ban
 INITIAL_ELEMENTS=$(grep -v '^[[:space:]]*#\|^[[:space:]]*$' /etc/fail2ban/ip.whitelist 2>/dev/null \
     | tr '\n' ',' | sed 's/,$//' | sed 's/,/, /g' || true)
 
-if [[ "$USE_LEGACY_SIP" == true ]]; then
-    JAIL_PORTS="$SIP_PORT,5061,$PJSIP_PORT"
-else
-    JAIL_PORTS="$PJSIP_PORT"
-fi
+JAIL_PORTS="$PJSIP_PORT,$IAX_PORT"
 
 {
     echo '#!/usr/sbin/nft -f'
@@ -620,13 +616,9 @@ fi
     echo '        # Nginx Proxy Manager (host) — 80/443 público (HTTP/HTTPS + ACME), 81 painel admin'
     echo '        tcp dport { 80, 443, 81 } accept'
     echo ''
-    if [[ "$USE_LEGACY_SIP" == true ]]; then
-        echo "        ip saddr @whitelist tcp dport { ${SIP_PORT}, 5061, ${PJSIP_PORT} } accept"
-        echo "        ip saddr @whitelist udp dport { ${SIP_PORT}, 5061, ${PJSIP_PORT} } accept"
-    else
-        echo "        ip saddr @whitelist tcp dport ${PJSIP_PORT} accept"
-        echo "        ip saddr @whitelist udp dport ${PJSIP_PORT} accept"
-    fi
+    echo "        ip saddr @whitelist tcp dport ${PJSIP_PORT} accept"
+    echo "        ip saddr @whitelist udp dport ${PJSIP_PORT} accept"
+    echo "        ip saddr @whitelist udp dport ${IAX_PORT} accept"
     echo ''
     echo '        ip saddr @whitelist udp dport 10000-20000 accept'
     echo ''
@@ -648,7 +640,7 @@ fi
 
 nft -f /etc/nftables.conf >> "$LOG_FILE" 2>&1 || err "Falha ao aplicar regras nftables"
 systemctl enable nftables >> "$LOG_FILE" 2>&1 || true
-log "Firewall nftables configurado (SSH 22+21122, SIP/RTP whitelist-only, AMI localhost-only)"
+log "Firewall nftables configurado (SSH 22+21122, PJSIP/RTP whitelist-only, AMI localhost-only)"
 
 # Docker perde as regras de MASQUERADE quando nftables é recarregado
 if systemctl is-active --quiet docker 2>/dev/null; then
@@ -722,10 +714,15 @@ log "Logger configurado → /var/log/asterisk/messages"
 DEBIAN_FRONTEND=noninteractive apt-get install -y fail2ban >> "$LOG_FILE" 2>&1 || warn "Fail2Ban não instalado"
 mkdir -p /etc/fail2ban/filter.d /etc/fail2ban/jail.d /etc/fail2ban/action.d
 
+# FIX: padrões de falha de auth IAX2 (chan_iax2) têm formato de log próprio, diferente de
+# pjsip/chan_sip — não testado contra Asterisk real ainda, validar contra /var/log/asterisk/messages
+# depois do primeiro deploy e ajustar o regex se o wording da versão instalada divergir.
 cat > /etc/fail2ban/filter.d/asterisk.conf << 'EOF'
 [Definition]
 failregex = NOTICE\[\d+\].*failed for '?<HOST>:\d+'?.*(No matching endpoint|Failed to authenticate|Wrong password)
             NOTICE\[\d+\].*Registration from.*failed for '?<HOST>:\d+'?
+            NOTICE\[\d+\].*Rejected connect attempt from <HOST>
+            NOTICE\[\d+\].*[Aa]uth(entication)? failure.*<HOST>
 
 ignoreregex =
 EOF
@@ -1001,8 +998,9 @@ log "manage-fw instalado em /usr/local/sbin/manage-fw"
 
 # ============================================================
 # STEP 13 - SINCRONIZAR .ENV DO BACKEND
-# Versão do Asterisk define as portas SIP/PJSIP (ver ASTERISK_VERSION/PJSIP_PORT/SIP_PORT
-# em src/config/env.ts) — o backend expõe isso pro frontend via GET /system/sip-config.
+# Sem chan_sip: SIP_LEGACY_ENABLED sempre false, sem SIP_PORT
+# (ver ASTERISK_VERSION/PJSIP_PORT em src/config/env.ts) — o backend
+# expõe isso pro frontend via GET /system/sip-config.
 # ============================================================
 show_header
 show_progress 13 13 "Sincronizando configuração com o backend"
@@ -1021,16 +1019,14 @@ read -r BACKEND_ENV_FILE
 
 if [[ -n "$BACKEND_ENV_FILE" && -f "$BACKEND_ENV_FILE" ]]; then
     set_env_var "$BACKEND_ENV_FILE" "ASTERISK_VERSION" "$ASTERISK_VERSION"
-    set_env_var "$BACKEND_ENV_FILE" "SIP_LEGACY_ENABLED" "$USE_LEGACY_SIP"
+    set_env_var "$BACKEND_ENV_FILE" "SIP_LEGACY_ENABLED" "false"
     set_env_var "$BACKEND_ENV_FILE" "PJSIP_PORT" "$PJSIP_PORT"
-    [[ "$USE_LEGACY_SIP" == true ]] && set_env_var "$BACKEND_ENV_FILE" "SIP_PORT" "$SIP_PORT"
     log "Backend .env atualizado (${BACKEND_ENV_FILE}) — reinicie o serviço do backend para aplicar"
 else
     warn "Backend .env não localizado — adicione manualmente:"
     echo "    ASTERISK_VERSION=${ASTERISK_VERSION}"
-    echo "    SIP_LEGACY_ENABLED=${USE_LEGACY_SIP}"
+    echo "    SIP_LEGACY_ENABLED=false"
     echo "    PJSIP_PORT=${PJSIP_PORT}"
-    [[ "$USE_LEGACY_SIP" == true ]] && echo "    SIP_PORT=${SIP_PORT}"
 fi
 sleep 1
 
@@ -1047,12 +1043,8 @@ echo ""
 echo -e "  Sistema    : ${CYAN}${OS_NAME} ${OS_VERSION}${NC}"
 echo -e "  IP Público : ${CYAN}${PUBLIC_ADDRESS}${NC}"
 echo -e "  Rede Local : ${CYAN}${LOCAL_NET}${NC}"
-if [[ "$USE_LEGACY_SIP" == true ]]; then
-    echo -e "  SIP        : ${CYAN}${SIP_PORT}${NC} (UDP/TCP)"
-    echo -e "  PJSIP      : ${CYAN}${PJSIP_PORT}${NC} (UDP/TCP)"
-else
-    echo -e "  PJSIP      : ${CYAN}${PJSIP_PORT}${NC} (UDP/TCP)"
-fi
+echo -e "  PJSIP      : ${CYAN}${PJSIP_PORT}${NC} (UDP/TCP) — chan_sip ausente do build"
+echo -e "  IAX2       : ${CYAN}${IAX_PORT}${NC} (UDP, troncos)"
 echo -e "  RTP        : ${CYAN}10000-20000${NC} (UDP)"
 echo -e "  Proxy Web  : ${CYAN}80, 443${NC} (HTTP/HTTPS) + ${CYAN}81${NC} (painel Nginx Proxy Manager)"
 echo -e "  AMI Secret : ${YELLOW}${AMI_SECRET}${NC}"
@@ -1060,7 +1052,7 @@ echo -e "  Fail2Ban   : ${GREEN}ativo${NC}"
 echo -e "  manage-fw  : ${GREEN}/usr/local/sbin/manage-fw${NC}"
 echo -e "  Log        : ${CYAN}${LOG_FILE}${NC}"
 echo ""
-echo -e "  Liberar acesso às portas SIP/RTP:"
+echo -e "  Liberar acesso às portas PJSIP/RTP:"
 echo -e "    ${YELLOW}manage-fw add 1.2.3.4${NC}       → libera IP (nftables + Fail2Ban)"
 echo -e "    ${YELLOW}manage-fw add 10.0.0.0/24${NC}   → libera bloco CIDR"
 echo -e "    ${YELLOW}manage-fw remove 1.2.3.4${NC}    → bloqueia IP"

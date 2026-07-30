@@ -60,7 +60,7 @@ function buildDialplanEntries(
     const transformOffset = hasTransform ? 1 : 0
     const recFileOffset = 1
     const mixmonitorOffset = 1
-    const cdrOffset = 4 // Set(CDR(direction|origin_extension|dialed_number|recording_file))
+    const cdrOffset = 5 // Set(CDR(direction|origin_extension|dialed_number|recording_file), TRANSFER_CONTEXT)
     const baseOffset = transformOffset + recFileOffset + mixmonitorOffset + cdrOffset + 1 // 1-indexed
 
     const blockStarts: number[] = []
@@ -94,13 +94,15 @@ function buildDialplanEntries(
     entries.push({ context, exten, priority: p++, app: 'Set', appdata: 'CDR(origin_extension)=${CALLERID(num)}' })
     entries.push({ context, exten, priority: p++, app: 'Set', appdata: `CDR(dialed_number)=${destVar}` })
     entries.push({ context, exten, priority: p++, app: 'Set', appdata: 'CDR(recording_file)=${REC_FILE}' })
+    entries.push({ context, exten, priority: p++, app: 'Set', appdata: '__TRANSFER_CONTEXT=transfer' })
 
     for (let i = 0; i < trunks.length; i++) {
         const { id: trunkId, astId, type, registrationMode, context: customContext, maxOut, techPrefix, customHeaders } = trunks[i]!
         const isLast = i === trunks.length - 1
         const nextTrunkStart = isLast ? hangupPriority : blockStarts[i + 1]
         const tech = type === 'iax' ? 'IAX2' : 'PJSIP'
-        const dialTarget = `${tech}/${techPrefix ?? ''}${destVar}@${astId},60`
+        // A chamada parte do ramal, portanto ele é a parte chamadora e requer "T" para transferir.
+        const dialTarget = `${tech}/${techPrefix ?? ''}${destVar}@${astId},60,T`
 
         if (registrationMode === 'custom') {
             entries.push({ context, exten, priority: p++, app: 'Goto', appdata: `${customContext},${destVar},1` })
@@ -255,13 +257,14 @@ export async function resyncAllPatterns(tx: Tx, routeId: string) {
 // cada pattern. Usado por resyncDialplan (companies.service.ts).
 export async function regenerateAllPatterns(companyId: string) {
     const routes = await prisma.outboundRoute.findMany({ where: { companyId }, select: { id: true } })
-    if (routes.length === 0) return
+    if (routes.length === 0) return 0
 
     await prisma.$transaction(async (tx) => {
         for (const route of routes) {
             await resyncAllPatterns(tx, route.id)
         }
     })
+    return routes.length
 }
 
 // Sequential: 4 queries (no multi-relation include) — avoids concurrent client.query()

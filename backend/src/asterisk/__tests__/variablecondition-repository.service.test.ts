@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'bun:test'
-import { buildExpr, buildDialplan } from '../variablecondition.repository'
+import { buildExpr, buildDialplan } from '../destinations/variablecondition.repository'
 
 describe('buildExpr', () => {
     it('filled/empty check quoted equality against empty string', () => {

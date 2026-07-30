@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'bun:test'
-import { extractAmiBlocks, parseAmiBlock } from '../ami-events.parser'
+import { extractAmiBlocks, parseAmiBlock } from '../transport/ami-events.parser'
 
 describe('parseAmiBlock', () => {
     it('parses key/value lines into an object', () => {

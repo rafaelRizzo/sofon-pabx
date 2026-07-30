@@ -70,10 +70,11 @@ export const resyncDialplan = async (req: FastifyRequest, reply: FastifyReply) =
     try {
         const { id } = idParamSchema.parse(req.params)
         req.scope.assertAccess(id)
-        await CompaniesService.resyncDialplan(id)
+        const summary = await CompaniesService.resyncDialplan(id)
         return reply.send({
             success: true,
             message: 'Dialplan resynced successfully',
+            ...summary,
         })
     } catch (error) {
         return handleError(reply, error, req)

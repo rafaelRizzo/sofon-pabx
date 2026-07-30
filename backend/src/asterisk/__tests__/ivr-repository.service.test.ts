@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'bun:test'
-import { buildDialplan } from '../ivr.repository'
+import { buildDialplan } from '../destinations/ivr.repository'
 
 const baseCfg = {
     name: 'Menu Principal',

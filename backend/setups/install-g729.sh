@@ -1,7 +1,7 @@
 #!/bin/bash
 # ============================================================
 # ADD-ON SOFON PBX v1.0 - CODEC G.729 (bcg729, open-source)
-# Requer: Asterisk já instalado via install-asterisk-pjsip.sh
+# Requer: Asterisk já instalado via install-asterisk.sh
 # (fonte extraída ainda presente em /usr/src/asterisk-<versao>)
 # ============================================================
 #
@@ -39,13 +39,13 @@ echo ""
 # ============================================================
 # STEP 1 - LOCALIZAR SOURCE DO ASTERISK (headers)
 # ============================================================
-command -v asterisk >/dev/null 2>&1 || err "Asterisk não encontrado. Rode install-asterisk-pjsip.sh primeiro."
+command -v asterisk >/dev/null 2>&1 || err "Asterisk não encontrado. Rode install-asterisk.sh primeiro."
 
 ASTERISK_FULL_VERSION=$(asterisk -V 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
 [[ -z "$ASTERISK_FULL_VERSION" ]] && err "Não consegui detectar a versão do Asterisk rodando."
 
 ASTERISK_SRC="/usr/src/asterisk-${ASTERISK_FULL_VERSION}"
-[[ -d "$ASTERISK_SRC/include/asterisk" ]] || err "Headers não encontrados em ${ASTERISK_SRC}/include — a source do Asterisk foi apagada. Recompile o Asterisk (install-asterisk-pjsip.sh) sem limpar /usr/src depois."
+[[ -d "$ASTERISK_SRC/include/asterisk" ]] || err "Headers não encontrados em ${ASTERISK_SRC}/include — a source do Asterisk foi apagada. Recompile o Asterisk (install-asterisk.sh) sem limpar /usr/src depois."
 
 log "Asterisk ${ASTERISK_FULL_VERSION} detectado, headers em ${ASTERISK_SRC}/include"
 

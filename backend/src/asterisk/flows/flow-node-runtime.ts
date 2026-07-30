@@ -1,5 +1,5 @@
-import { FLOW_NODE_CONTEXT, flowNodeExitExten } from './dialplan-names'
-import type { DialplanRow } from './dialplan-file.repository'
+import { FLOW_NODE_CONTEXT, flowNodeExitExten } from '../dialplan/dialplan-names'
+import type { DialplanRow } from '../dialplan/dialplan-file.repository'
 
 export const FLOW_NODE_ID_VAR = 'FLOW_NODE_ID'
 

@@ -918,7 +918,7 @@ model cdr {
   sequence    Int?
   // Campos abaixo são custom, setados via Set(CDR(x)=y) antes de cada Dial() nos 3 fluxos
   // (outbound-routes.service.ts, dialplan.repository.ts, inboundroute.repository.ts)
-  direction       String? @db.VarChar(10) // inbound | outbound | internal
+  direction       String? @db.VarChar(10) // inbound | outbound | internal | transfer
   originExtension String? @map("origin_extension") @db.VarChar(40)
   dialedNumber    String? @map("dialed_number") @db.VarChar(80)
   // Trunk.id (cuid) da aplicação — não o astId interno do Asterisk (<asteriskId>-trunk-<name>)

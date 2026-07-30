@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'bun:test'
-import { parseMemberInterface, toAsteriskInterface, parseAsteriskQueueName } from '../queue.repository'
+import { parseMemberInterface, toAsteriskInterface, parseAsteriskQueueName } from '../destinations/queue.repository'
 
 describe('parseMemberInterface', () => {
     it('parses MEMBERINTERFACE into type/number', () => {

@@ -46,6 +46,10 @@ const envSchema = z.object({
     // announcements, ivrs, holidays, queues-app, request-templates). Default é o caminho real do
     // Asterisk — testes de integração sobrescrevem via .env.test pra um dir gravável sem Asterisk instalado.
     DIALPLAN_EXTRA_DIR: z.string().default('/etc/asterisk/dialplan-extra'),
+    // Diretório de config do Asterisk onde base-dialplan.repository.ts materializa sofon-managed.conf
+    // (esqueleto global: ramais/transfer/from-trunk/from-trunk-routed + #tryinclude, ver instalador) —
+    // testes de integração sobrescrevem via .env.test pro mesmo dir gravável do DIALPLAN_EXTRA_DIR.
+    ASTERISK_CONF_DIR: z.string().default('/etc/asterisk'),
     // Espelham a escolha feita em setups/install-asterisk.sh (versão do Asterisk define as portas
     // SIP/PJSIP) — o instalador grava esses valores no .env do backend. Expostos via GET /system/sip-config
     // pro frontend exibir a configuração correta (ex: instruções de provisionamento de ramal).

@@ -13,6 +13,7 @@ import { logger } from './utils/logger'
 import { formatDatesDeep, collectCompanyIds } from './utils/timezone'
 import { getCompanyById } from './modules/companies/companies.service'
 import { validateEnv } from './config/env'
+import { redisClient } from './config/redis'
 import { protectedRoute } from './middleware/scope.middleware'
 import { usersRoutes } from './modules/users/users.routes'
 import { authRoutes } from './modules/auth/auth.routes'
@@ -233,7 +234,16 @@ app.register(realtimeRoutes)
 
 // Health check
 app.get('/health', async (req, reply) => {
-    return reply.send({ status: 'ok' })
+    try {
+        await redisClient.ping()
+        return reply.send({ status: 'ok', redis: 'ok' })
+    } catch (error) {
+        logger.error({
+            event: 'health.redis.error',
+            error: error instanceof Error ? error.message : String(error)
+        })
+        return reply.status(503).send({ status: 'error', redis: 'down' })
+    }
 })
 
 // Config SIP/PJSIP da instância (versão do Asterisk define as portas — ver setups/install-asterisk.sh)

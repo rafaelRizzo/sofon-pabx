@@ -2,7 +2,7 @@ import { describe, it, expect } from 'bun:test'
 import {
     isTrunkId, extensionNumberFrom, extensionNumberFromChannel,
     mapPeerPresence, mapDeviceState, mapQueueMemberStatus, memberInterfaceOf,
-} from '../ami-events'
+} from '../transport/ami-events'
 
 // Valores confirmados via AMI_DEBUG contra Asterisk real (ver conversa) — trava regressão contra
 // os nomes/formatos de campo reais, não só o que a doc sugere.

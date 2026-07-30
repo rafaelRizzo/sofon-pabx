@@ -100,12 +100,21 @@ export const companiesRoutes = async (app: FastifyInstance) => {
             description:
                 'Regenera todos os arquivos estáticos de dialplan (/etc/asterisk/dialplan-extra/**) da ' +
                 'empresa a partir do banco (time conditions, announcements, ivrs, queues-app, request ' +
-                'templates, holidays, variables, variable conditions, callcenter surveys), o padrão ' +
+                'templates, holidays, variables, variable conditions, callcenter surveys, flows), o padrão ' +
                 'genérico de "ramais" (Realtime, compartilhado entre empresas), as inbound routes e os ' +
                 'patterns de outbound routes — garante que o dialplan em produção reflita o template ' +
-                'atual do código mesmo em instalações antigas. Útil depois de reinstalar o Asterisk ' +
+                'atual do código mesmo em instalações antigas, e remove linhas Realtime órfãs de ' +
+                'inbound routes deletadas fora do fluxo normal. Útil depois de reinstalar o Asterisk ' +
                 'mantendo o banco intacto, ou depois de uma mudança no template de dialplan (ex: novos ' +
-                'campos de CDR/gravação), sem precisar recriar cada ramal/rota manualmente. Requer role admin.',
+                'campos de CDR/gravação), sem precisar recriar cada ramal/rota manualmente. Também recria ' +
+                '/etc/asterisk/sofon-managed.conf (esqueleto global: ramais/transfer/from-trunk/' +
+                'from-trunk-routed) se ele tiver sido perdido e remove o atalho legado de transferência ' +
+                'cega #1 de /etc/asterisk/features.conf, recarregando res_features via AMI — não precisa ' +
+                'mais reaplicar o instalador ' +
+                'inteiro pra isso. Serializado por empresa (chamadas concorrentes pra mesma empresa ' +
+                'enfileiram). Ao final aguarda o "dialplan reload" via AMI e retorna erro real (502) se o ' +
+                'reload não puder ser confirmado — arquivos/banco já ficam corretos mesmo nesse caso, mas o ' +
+                'Asterisk só aplica após um reload bem-sucedido. Requer role admin.',
             security: [{ bearerAuth: [] }],
             params: idParamSchema,
             response: {

@@ -12,7 +12,7 @@ import { AsteriskQueueRepository, QUEUE_APP_CONTEXT, toAsteriskQueueName } from 
 import { InboundRouteRepository } from '../../asterisk/inboundroute.repository'
 import { regenerateAllPatterns as regenerateAllOutboundPatterns } from '../outbound-routes/outbound-routes.service'
 import { audioSoundDir } from '../../asterisk/audio.repository'
-import { removeCompanyDialplanFiles } from '../../asterisk/dialplan-file.repository'
+import { removeCompanyDialplanFiles, withDialplanLock, reloadDialplanNow } from '../../asterisk/dialplan-file.repository'
 import { HolidayGroupRepository } from '../../asterisk/holidaygroup.repository'
 import { TimeConditionRepository } from '../../asterisk/timecondition.repository'
 import { AnnouncementRepository } from '../../asterisk/announcement.repository'
@@ -22,8 +22,12 @@ import { VariableRepository } from '../../asterisk/variable.repository'
 import { VariableConditionRepository } from '../../asterisk/variablecondition.repository'
 import { CallcenterSurveyRepository } from '../../asterisk/callcenter-survey.repository'
 import { FlowNodeRepository } from '../../asterisk/flow-node.repository'
+import { FlowRepository } from '../../asterisk/flow.repository'
 import { DialplanRepository } from '../../asterisk/dialplan.repository'
-import { TC_CONTEXT, HOL_CONTEXT, ANNOUNCEMENT_CONTEXT, IVR_CONTEXT, REQUEST_TEMPLATE_CONTEXT, VAR_CONTEXT, VARCOND_CONTEXT, SURVEY_CONTEXT, FLOW_NODE_CONTEXT } from '../../asterisk/dialplan-names'
+import { ensureStaticAsteriskConfig } from '../../asterisk/ensure-static-config'
+import { removeBlindTransferFeature } from '../../asterisk/features.repository'
+import { runAmiCommand } from '../../asterisk/ami-client'
+import { TC_CONTEXT, HOL_CONTEXT, ANNOUNCEMENT_CONTEXT, IVR_CONTEXT, REQUEST_TEMPLATE_CONTEXT, VAR_CONTEXT, VARCOND_CONTEXT, SURVEY_CONTEXT, FLOW_CONTEXT, FLOW_NODE_CONTEXT } from '../../asterisk/dialplan-names'
 import { RequestTemplatesCache } from '../request-templates/cache/request-templates.cache'
 import { HolidayGroupsCache } from '../holiday-groups/cache/holiday-groups.cache'
 import { VariablesCache } from '../variables/cache/variables.cache'
@@ -33,7 +37,7 @@ import { invalidateUserCompanyIds } from '../../utils/auth/access'
 
 const DIALPLAN_FILE_CONTEXTS = [
     TC_CONTEXT, HOL_CONTEXT, ANNOUNCEMENT_CONTEXT, IVR_CONTEXT, REQUEST_TEMPLATE_CONTEXT, QUEUE_APP_CONTEXT,
-    VAR_CONTEXT, VARCOND_CONTEXT, SURVEY_CONTEXT, FLOW_NODE_CONTEXT,
+    VAR_CONTEXT, VARCOND_CONTEXT, SURVEY_CONTEXT, FLOW_CONTEXT, FLOW_NODE_CONTEXT,
 ]
 import type { CreateCompanyInput, UpdateCompanyInput } from './schemas/company.schema'
 import { AppError } from '../../utils/errors/app.error'
@@ -154,42 +158,110 @@ export const updateCompany = async (id: string, data: UpdateCompanyInput) => {
 // regenera todo dialplan estático (/etc/asterisk/dialplan-extra/**) da empresa a partir do banco —
 // mesma lista de contextos de DIALPLAN_FILE_CONTEXTS acima, usado quando os arquivos em disco somem
 // (ex: reinstalação do Asterisk que manteve o banco intacto) sem precisar salvar módulo por módulo
+//
+// Lock por empresa: é uma ação explícita de admin (não um CRUD de rotina), então duas chamadas
+// concorrentes pra mesma empresa devem serializar em vez de intercalar delete+recreate do padrão
+// genérico de "ramais" (ponto sem lock próprio, ver dialplan.repository.ts).
 export const resyncDialplan = async (id: string) => {
     const company = await getCompanyById(id)
-    await HolidayGroupRepository.regenerate(company.id)
-    await TimeConditionRepository.regenerate(company.id)
-    await AnnouncementRepository.regenerate(company.id)
-    await IvrRepository.regenerate(company.id)
-    await AsteriskQueueRepository.regenerate(company.id)
-    await RequestTemplateRepository.regenerate(company.id)
-    await VariableRepository.regenerate(company.id)
-    await VariableConditionRepository.regenerate(company.id)
-    await FlowNodeRepository.regenerate(company.id)
-    await CallcenterSurveyRepository.regenerate(company.id)
 
-    // Padrão genérico de "ramais" (Realtime, não é arquivo estático) — compartilhado entre TODAS
-    // as empresas por contexto, não só a desta. Refeito aqui (delete+recreate, ver
-    // dialplan.repository.ts) pra garantir que instalações antigas peguem mudanças de template
-    // (novas prioridades de CDR, formato de gravação) sem precisar recriar cada ramal manualmente.
-    const contexts = await prisma.extension.findMany({
-        where: { companyId: id },
-        select: { context: true },
-        distinct: ['context']
-    })
-    await prisma.$transaction(async (tx) => {
-        for (const { context } of contexts) {
-            await DialplanRepository.ensureGenericRoutingPattern(tx, context)
-            await DialplanRepository.ensureFallback(tx, context)
+    return withDialplanLock(`resync:${company.id}`, async () => {
+        // Esqueleto global (ramais/transfer/from-trunk/from-trunk-routed) + tunáveis globais de
+        // features.conf (ver ensure-static-config.ts) — mesma rotina chamada no boot do backend,
+        // reusada aqui pra um admin conseguir forçar a correção sem esperar o próximo restart.
+        const staticConfig = await ensureStaticAsteriskConfig()
+        if (staticConfig.baseDialplanRewritten && !staticConfig.dialplanReloadApplied) {
+            throw new AppError(
+                'sofon-managed.conf regenerado, mas o reload via AMI falhou ou não foi confirmado — verifique AMI_HOST/AMI_SECRET e rode "dialplan reload" manualmente no Asterisk',
+                502,
+            )
+        }
+        if (staticConfig.restartRequired) {
+            throw new AppError(
+                'transferdigittimeout ajustado em features.conf, mas essa config não recarrega a quente nessa versão do Asterisk — rode "systemctl restart asterisk" manualmente pra aplicar (derruba chamadas ativas)',
+                502,
+            )
+        }
+
+        // Migração global idempotente: remove o atalho cego legado #1 sem tocar nas outras
+        // configurações de features.conf. Só recarrega o módulo quando o arquivo mudou.
+        const blindTransferRemoved = await removeBlindTransferFeature()
+        const blindTransferReloadApplied = blindTransferRemoved
+            ? await runAmiCommand('module reload res_features.so')
+            : false
+        if (blindTransferRemoved && !blindTransferReloadApplied) {
+            throw new AppError(
+                'Transferência cega #1 removida de features.conf, mas o reload de res_features via AMI falhou ou não foi confirmado — reinicie/recarregue o Asterisk manualmente',
+                502,
+            )
+        }
+
+        await HolidayGroupRepository.regenerate(company.id)
+        await TimeConditionRepository.regenerate(company.id)
+        await AnnouncementRepository.regenerate(company.id)
+        await IvrRepository.regenerate(company.id)
+        await AsteriskQueueRepository.regenerate(company.id)
+        await RequestTemplateRepository.regenerate(company.id)
+        await VariableRepository.regenerate(company.id)
+        await VariableConditionRepository.regenerate(company.id)
+        await FlowNodeRepository.regenerate(company.id)
+        await FlowRepository.regenerate(company.id)
+        await CallcenterSurveyRepository.regenerate(company.id)
+
+        // Padrão genérico de "ramais" (Realtime, não é arquivo estático) — compartilhado entre TODAS
+        // as empresas por contexto, não só a desta. Refeito aqui (delete+recreate, ver
+        // dialplan.repository.ts) pra garantir que instalações antigas peguem mudanças de template
+        // (novas prioridades de CDR, formato de gravação) sem precisar recriar cada ramal manualmente.
+        const contexts = await prisma.extension.findMany({
+            where: { companyId: id },
+            select: { context: true },
+            distinct: ['context']
+        })
+        await prisma.$transaction(async (tx) => {
+            for (const { context } of contexts) {
+                await DialplanRepository.ensureGenericRoutingPattern(tx, context)
+                await DialplanRepository.ensureFallback(tx, context)
+            }
+        })
+
+        // Mesma lógica: inbound routes criadas antes de uma mudança de template (novos campos de
+        // CDR, gravação) nunca são regeradas sozinhas — só via update() manual de cada rota. Isso força.
+        const inboundRoutes = await InboundRouteRepository.regenerateAll(company.id) ?? 0
+
+        // Drift: InboundRoute apagada por fora do fluxo normal (tamper manual, bug, restore parcial)
+        // deixa linha Realtime órfã que regenerateAll nunca toca (só recria o que existe hoje no
+        // banco). Reconcilia removendo o que sobrou sem InboundRoute correspondente.
+        const orphansPruned = await InboundRouteRepository.pruneOrphans(company.id)
+
+        // Mesma lógica: outbound route patterns criados antes de uma mudança de template (novos
+        // campos de CDR, gravação) nunca são regerados sozinhos — só via update() manual de cada pattern.
+        const outboundRoutes = await regenerateAllOutboundPatterns(company.id) ?? 0
+
+        // Ação explícita de admin, diferente do reload debounced/fire-and-forget usado pelos CRUDs
+        // individuais (reloadDialplan() em dialplan-file.repository.ts): aqui o chamador precisa do
+        // resultado real. Arquivos/Realtime já estão corretos em disco/banco neste ponto, mas sem
+        // reload confirmado o Asterisk continua rodando o dialplan antigo em memória — o admin
+        // precisa saber disso, não receber sucesso falso (200) com o reload nunca confirmado.
+        const reloadApplied = await reloadDialplanNow()
+        if (!reloadApplied) {
+            throw new AppError(
+                'Dialplan regenerado no banco/disco, mas o reload via AMI falhou ou não foi confirmado — verifique AMI_HOST/AMI_SECRET e rode "dialplan reload" manualmente no Asterisk',
+                502,
+            )
+        }
+
+        return {
+            ...staticConfig,
+            blindTransferRemoved,
+            blindTransferReloadApplied,
+            staticContexts: DIALPLAN_FILE_CONTEXTS,
+            realtimeContexts: contexts.map((c) => c.context),
+            inboundRoutes,
+            outboundRoutes,
+            orphansPruned,
+            reloadApplied,
         }
     })
-
-    // Mesma lógica: inbound routes criadas antes de uma mudança de template (novos campos de CDR,
-    // gravação) nunca são regeradas sozinhas — só via update() manual de cada rota. Isso força.
-    await InboundRouteRepository.regenerateAll(company.id)
-
-    // Mesma lógica: outbound route patterns criados antes de uma mudança de template (novos campos
-    // de CDR, gravação) nunca são regerados sozinhos — só via update() manual de cada pattern.
-    await regenerateAllOutboundPatterns(company.id)
 }
 
 export const deleteCompany = async (id: string) => {

@@ -4,7 +4,7 @@ import { createPrismaMock, clearPrismaMock } from '../../test/mocks/prisma.mock'
 const db = createPrismaMock()
 
 mock.module('../../lib/prisma', () => ({ prisma: db }))
-mock.module('../route-destination-resolver', () => ({
+mock.module('../dialplan/route-destination-resolver', () => ({
     resolveRouteDestinationToDialplan: mock(() =>
         Promise.resolve({ context: 'ivrs', exten: 'ivr-1', priority: 1 })
     ),
@@ -12,7 +12,7 @@ mock.module('../route-destination-resolver', () => ({
 // Não mockar FlowEdgeRepository (compartilhado por muitos módulos, ver route-destination-label.ts
 // e afins) — mock.module vaza entre arquivos de teste no bun, quebrando quem não mocka esse módulo
 // e espera o real. Em vez disso, dirige o comportamento via prisma.flowEdge.findMany (já mockado).
-import { InboundRouteRepository } from '../inboundroute.repository'
+import { InboundRouteRepository } from '../destinations/inboundroute.repository'
 
 function fakeTx() {
     return {
@@ -33,8 +33,11 @@ describe('InboundRouteRepository dialplan shape', () => {
 
         const { data } = tx.extensions.createMany.mock.calls[0][0]
         expect(data.map((d: any) => d.app)).toEqual([
-            'Set', 'Set', 'Set', 'Set', 'Answer', 'Set', 'MixMonitor', 'Set', 'Goto',
+            'Set', 'Set', 'Set', 'Set', 'Set', 'Answer', 'Set', 'MixMonitor', 'Set', 'Goto',
         ])
+        expect(data).toContainEqual(
+            expect.objectContaining({ app: 'Set', appdata: '__TRANSFER_CONTEXT=transfer' })
+        )
         expect(data).toContainEqual(
             expect.objectContaining({
                 app: 'Set',

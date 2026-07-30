@@ -13,7 +13,7 @@ const cdrQueryShape = {
     callStatus: z
         .enum(['ANSWERED', 'NO ANSWER', 'BUSY', 'FAILED', 'CONGESTION'])
         .optional(),
-    direction: z.enum(['inbound', 'outbound', 'internal']).optional(),
+    direction: z.enum(['inbound', 'outbound', 'internal', 'transfer']).optional(),
     originExtension: z.string().max(40).optional(),
     dialedNumber: z.string().max(80).optional(),
     trunkId: z.cuid2().optional(),

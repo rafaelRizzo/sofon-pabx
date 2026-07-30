@@ -1,7 +1,13 @@
 "use client"
 
 import { useState } from "react"
-import { DownloadIcon, PlayIcon } from "lucide-react"
+import {
+    ArrowLeftRightIcon,
+    DownloadIcon,
+    PhoneIncomingIcon,
+    PhoneOutgoingIcon,
+    PlayIcon,
+} from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -23,6 +29,25 @@ const DIRECTION_LABEL: Record<string, string> = {
     inbound: "Entrada",
     outbound: "Saída",
     internal: "Interna",
+    transfer: "Transferência",
+}
+
+const DIRECTION_ICON: Record<string, typeof PhoneIncomingIcon> = {
+    inbound: PhoneIncomingIcon,
+    outbound: PhoneOutgoingIcon,
+    internal: ArrowLeftRightIcon,
+    transfer: ArrowLeftRightIcon,
+}
+
+const DIRECTION_TONE: Record<string, string> = {
+    inbound:
+        "border-transparent bg-blue-500/15 text-blue-600 dark:bg-blue-400/20 dark:text-blue-300",
+    outbound:
+        "border-transparent bg-violet-500/15 text-violet-600 dark:bg-violet-400/20 dark:text-violet-300",
+    internal:
+        "border-transparent bg-cyan-500/15 text-cyan-600 dark:bg-cyan-400/20 dark:text-cyan-300",
+    transfer:
+        "border-transparent bg-amber-500/15 text-amber-600 dark:bg-amber-400/20 dark:text-amber-300",
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -76,17 +101,17 @@ export function CdrTable({ records, trunks, loading, companyId }: Props) {
             <Table>
                 <TableHeader>
                     <TableRow>
-                        <TableHead>Data/Hora</TableHead>
-                        <TableHead>Tipo</TableHead>
-                        <TableHead>Origem</TableHead>
-                        <TableHead>Destino</TableHead>
-                        <TableHead>Fila</TableHead>
-                        <TableHead>Espera</TableHead>
-                        <TableHead>Atendido por</TableHead>
-                        <TableHead>Tronco</TableHead>
-                        <TableHead>Duração</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Gravação</TableHead>
+                        <TableHead className="text-center">Data/Hora</TableHead>
+                        <TableHead className="text-center">Tipo</TableHead>
+                        <TableHead className="text-center">Origem</TableHead>
+                        <TableHead className="text-center">Destino</TableHead>
+                        <TableHead className="text-center">Fila</TableHead>
+                        <TableHead className="text-center">Espera</TableHead>
+                        <TableHead className="text-center">Atendido por</TableHead>
+                        <TableHead className="text-center">Tronco</TableHead>
+                        <TableHead className="text-center">Duração</TableHead>
+                        <TableHead className="text-center">Status</TableHead>
+                        <TableHead className="text-center">Gravação</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -95,7 +120,7 @@ export function CdrTable({ records, trunks, loading, companyId }: Props) {
                             <TableRow key={i}>
                                 {Array.from({ length: 11 }).map((_, j) => (
                                     <TableCell key={j}>
-                                        <Skeleton className="h-4 w-full" />
+                                        <Skeleton className="mx-auto h-4 w-full" />
                                     </TableCell>
                                 ))}
                             </TableRow>
@@ -112,47 +137,64 @@ export function CdrTable({ records, trunks, loading, companyId }: Props) {
                     ) : (
                         records.map((record) => (
                             <TableRow key={record.id}>
-                                <TableCell className="text-muted-foreground">
+                                <TableCell className="text-center text-muted-foreground">
                                     {formatDateTime(record.startTime)}
                                 </TableCell>
-                                <TableCell>
+                                <TableCell className="text-center">
                                     {record.direction ? (
-                                        <Badge variant="outline">
-                                            {DIRECTION_LABEL[record.direction] ??
-                                                record.direction}
-                                        </Badge>
+                                        (() => {
+                                            const DirectionIcon =
+                                                DIRECTION_ICON[record.direction]
+                                            return (
+                                                <Badge
+                                                    variant="outline"
+                                                    className={
+                                                        DIRECTION_TONE[
+                                                            record.direction
+                                                        ]
+                                                    }
+                                                >
+                                                    {DirectionIcon && (
+                                                        <DirectionIcon />
+                                                    )}
+                                                    {DIRECTION_LABEL[
+                                                        record.direction
+                                                    ] ?? record.direction}
+                                                </Badge>
+                                            )
+                                        })()
                                     ) : (
                                         "-"
                                     )}
                                 </TableCell>
-                                <TableCell className="font-medium">
+                                <TableCell className="text-center font-medium">
                                     {record.originLabel ||
                                         record.originExtension ||
                                         record.src ||
                                         "-"}
                                 </TableCell>
-                                <TableCell>
+                                <TableCell className="text-center">
                                     {record.destinationLabel ||
                                         record.dialedNumber ||
                                         record.dst ||
                                         "-"}
                                 </TableCell>
-                                <TableCell className="text-muted-foreground">
+                                <TableCell className="text-center text-muted-foreground">
                                     {record.queueLabel ?? "-"}
                                 </TableCell>
-                                <TableCell className="font-mono tabular-nums text-muted-foreground">
+                                <TableCell className="text-center font-mono tabular-nums text-muted-foreground">
                                     {formatDuration(record.queueWaitSeconds)}
                                 </TableCell>
-                                <TableCell className="text-muted-foreground">
+                                <TableCell className="text-center text-muted-foreground">
                                     {record.answeredBy?.label ?? "-"}
                                 </TableCell>
-                                <TableCell className="text-muted-foreground">
+                                <TableCell className="text-center text-muted-foreground">
                                     {trunkName(record.trunkId)}
                                 </TableCell>
-                                <TableCell className="font-mono tabular-nums">
+                                <TableCell className="text-center font-mono tabular-nums">
                                     {formatDuration(record.billsec)}
                                 </TableCell>
-                                <TableCell>
+                                <TableCell className="text-center">
                                     {record.callStatus ? (
                                         <Badge
                                             variant="outline"
@@ -167,9 +209,10 @@ export function CdrTable({ records, trunks, loading, companyId }: Props) {
                                         "-"
                                     )}
                                 </TableCell>
-                                <TableCell>
-                                    {record.recordingFile ? (
-                                        <div className="flex items-center gap-1">
+                                <TableCell className="text-center">
+                                    {record.recordingFile &&
+                                    record.callStatus === "ANSWERED" ? (
+                                        <div className="flex items-center justify-center gap-1">
                                             <Button
                                                 variant="ghost"
                                                 size="icon-sm"

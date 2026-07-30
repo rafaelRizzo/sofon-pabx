@@ -167,7 +167,7 @@ cd backend/setups
 sudo ./install-asterisk.sh
 ```
 
-Compila e instala o Asterisk, configura PJSIP (+ `chan_sip` legado se você escolher), aplica o firewall (`nftables`) e o Fail2Ban, gera as credenciais do AMI (**anote o `AMI_SECRET`** exibido no resumo final) e cria os diretórios que o backend vai montar como volume (`/etc/asterisk/dialplan-extra`, `/var/lib/asterisk/sounds`).
+Compila e instala o Asterisk, configura PJSIP + IAX2 (sem `chan_sip`), aplica o firewall (`nftables`) e o Fail2Ban, gera as credenciais do AMI (**anote o `AMI_SECRET`** exibido no resumo final) e cria os diretórios que o backend vai montar como volume (`/etc/asterisk/dialplan-extra`, `/var/lib/asterisk/sounds`).
 
 ### 3. Nginx Proxy Manager
 

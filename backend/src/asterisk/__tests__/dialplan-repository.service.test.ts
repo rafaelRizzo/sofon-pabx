@@ -1,5 +1,5 @@
 import { describe, it, expect, mock } from 'bun:test'
-import { DialplanRepository } from '../dialplan.repository'
+import { DialplanRepository } from '../dialplan/dialplan.repository'
 
 function fakeTx() {
     return {

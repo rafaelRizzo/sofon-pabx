@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'bun:test'
-import { buildDialplan } from '../variable.repository'
+import { buildDialplan } from '../destinations/variable.repository'
 
 describe('buildDialplan', () => {
     it('emits one Set per assignment, then Goto to the destination', () => {
