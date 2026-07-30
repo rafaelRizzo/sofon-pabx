@@ -2014,7 +2014,7 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
                     </ContextMenu>
                 )}
                 {(refreshing || isSyncingEdges || deletingNodeCount > 0) && (
-                    <div className="absolute top-3 left-3 z-20 flex items-center gap-1.5 rounded-md border bg-card px-2 py-1 text-xs text-muted-foreground shadow-sm">
+                    <div className="absolute top-3 left-1/2 z-20 flex -translate-x-1/2 items-center gap-1.5 rounded-md border bg-card px-2 py-1 text-xs text-muted-foreground shadow-sm">
                         <Loader2Icon className="size-3 animate-spin" />
                         {isSyncingEdges
                             ? "Salvando conexões..."
