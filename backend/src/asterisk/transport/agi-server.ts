@@ -12,9 +12,12 @@ import { resolveActiveRule } from '../../modules/callcenter/routing-rules/routin
 import { createRating } from '../../modules/callcenter/ratings/ratings.service'
 import { finalizeByQueueStatus } from '../../modules/queue-calls/queue-calls.service'
 import type { VariableMapping } from '../../modules/request-templates/schemas/request-template.schema'
+import { decryptForCompany } from '../../lib/crypto'
+import { runIxcAction, type IxcAction } from '../../integrations/ixc/client'
 
 // Servidor FastAGI — Asterisk conecta via AGI(agi://AGI_HOST:AGI_PORT/<script>,<args>) em 5 pontos:
 // - /run,<requestTemplateId> — RouteDestination type: "request"
+// - /ixc,<ixcNodeId>         — RouteDestination type: "ixc"
 // - /queue-route,<queueId>   — antes do Queue() nativo, seta QUEUE_PRIO a partir de RoutingRule
 // - /queue-outcome,<queueId> — depois do Queue(), lê QUEUESTATUS pra finalizar queue_calls
 //   (timeout/sem agente/fila cheia — únicos casos sem evento AMI terminal, ver ami-events.ts)
@@ -216,6 +219,76 @@ async function handleRequestTemplate(conn: AgiConn, templateId: string) {
     if (target) await agiExecGoto(conn, target)
 }
 
+// Mesma estrutura de handleRequestTemplate (AGI síncrono, onSuccess/onError por FlowEdge), mas sem
+// url/headers manuais: credencial (base URL + token, descriptografado só neste momento) + params
+// resolvidos por placeholder viram uma chamada fixa do catálogo IXC_ACTIONS (ver integrations/ixc/client.ts).
+async function handleIxcNode(conn: AgiConn, nodeId: string) {
+    const node = await prisma.ixcNode.findUnique({ where: { id: nodeId } })
+    if (!node) {
+        logger.warn({ event: 'agi.ixc_node.not_found', nodeId })
+        return
+    }
+    const credential = await prisma.integrationCredential.findUnique({ where: { id: node.credentialId } })
+    if (!credential) {
+        logger.warn({ event: 'agi.ixc_node.credential_not_found', nodeId, credentialId: node.credentialId })
+        return
+    }
+
+    const paramsRaw = (node.params as Record<string, string> | null) ?? {}
+    const params: Record<string, string> = {}
+    for (const [k, v] of Object.entries(paramsRaw)) params[k] = await resolvePlaceholders(conn, v)
+
+    let success = false
+    let parsed: unknown = null
+
+    try {
+        const token = decryptForCompany(node.companyId, {
+            ciphertext: credential.tokenCiphertext,
+            iv: credential.tokenIv,
+            tag: credential.tokenTag,
+        })
+        const controller = new AbortController()
+        const timeout = setTimeout(() => controller.abort(), node.timeoutMs)
+        try {
+            parsed = await runIxcAction({ baseUrl: credential.baseUrl, token }, node.action as IxcAction, params)
+            success = true
+        } finally {
+            clearTimeout(timeout)
+        }
+    } catch (error) {
+        logger.warn({
+            event: 'agi.ixc_node.failed',
+            nodeId,
+            message: error instanceof Error ? error.message : String(error),
+        })
+        success = false
+    }
+
+    const mappings = (node.variableMappings as VariableMapping[] | null) ?? []
+    const unresolved: Array<{ variable: string; path: string }> = []
+    for (const mapping of mappings) {
+        const value = evalResponsePath(parsed, mapping.path)
+        if (value !== undefined) {
+            await agiSetVariable(conn, mapping.variable, typeof value === 'string' ? value : JSON.stringify(value))
+        } else {
+            unresolved.push({ variable: mapping.variable, path: mapping.path })
+        }
+    }
+    if (unresolved.length > 0) {
+        logger.warn({ event: 'agi.ixc_node.unresolved_mapping', nodeId, action: node.action, unresolved })
+    }
+
+    logger.info({ event: 'agi.ixc_node.done', nodeId, action: node.action, success, mappings: mappings.length })
+    const flowNodeId = await agiGetVariable(conn, FLOW_NODE_ID_VAR)
+    if (flowNodeId) {
+        await agiExecGoto(conn, { context: FLOW_NODE_CONTEXT, exten: flowNodeExitExten(flowNodeId, success ? 'success' : 'error'), priority: 1 })
+        return
+    }
+    const dest = await FlowEdgeRepository.getOne('ixcnode', nodeId, success ? 'success' : 'error')
+    const target = await resolveRouteDestinationToDialplan(dest)
+    if (target) await agiExecGoto(conn, target)
+}
+
 // Seta QUEUE_PRIO (lido nativamente pelo Queue() nativo pra furar a fila) a partir da RoutingRule
 // ativa de maior priority cujas conditions batem (trunk/callerId/weekday/horário) — ver
 // RoutingRulesService.resolveActiveRule. Sem regra ativa/nenhuma bate, não seta nada (comportamento
@@ -394,5 +467,6 @@ async function handleConnection(conn: AgiConn) {
     else if (script === 'queue-outcome') await handleQueueOutcome(conn, arg1)
     else if (script === 'queue-survey') await handleQueueSurvey(conn, arg1)
     else if (script === 'survey-result') await handleSurveyResult(conn, arg1, env['agi_arg_2'] ?? '')
+    else if (script === 'ixc') await handleIxcNode(conn, arg1)
     else await handleRequestTemplate(conn, arg1)
 }

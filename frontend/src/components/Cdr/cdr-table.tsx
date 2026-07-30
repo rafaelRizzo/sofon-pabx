@@ -25,7 +25,7 @@ import { downloadCdrRecording, type CdrRecord } from "@/hooks/use-cdr"
 import type { Trunk } from "@/hooks/use-trunks"
 import { CdrRecordingDialog } from "./cdr-recording-dialog"
 
-const DIRECTION_LABEL: Record<string, string> = {
+export const DIRECTION_LABEL: Record<string, string> = {
     inbound: "Entrada",
     outbound: "Saída",
     internal: "Interna",
@@ -50,7 +50,7 @@ const DIRECTION_TONE: Record<string, string> = {
         "border-transparent bg-amber-500/15 text-amber-600 dark:bg-amber-400/20 dark:text-amber-300",
 }
 
-const STATUS_LABEL: Record<string, string> = {
+export const STATUS_LABEL: Record<string, string> = {
     ANSWERED: "Atendida",
     "NO ANSWER": "Não atendida",
     BUSY: "Ocupado",
@@ -71,14 +71,14 @@ const STATUS_TONE: Record<string, string> = {
         "border-transparent bg-red-500/15 text-red-600 dark:bg-red-400/20 dark:text-red-300",
 }
 
-function formatDuration(seconds: number | null): string {
+export function formatDuration(seconds: number | null): string {
     if (!seconds || seconds <= 0) return "-"
     const mins = Math.floor(seconds / 60)
     const secs = Math.round(seconds % 60)
     return `${mins}:${secs.toString().padStart(2, "0")}`
 }
 
-function formatDateTime(value: string | null): string {
+export function formatDateTime(value: string | null): string {
     if (!value) return "-"
     return new Date(value).toLocaleString("pt-BR")
 }

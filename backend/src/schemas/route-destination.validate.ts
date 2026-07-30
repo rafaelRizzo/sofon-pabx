@@ -15,6 +15,7 @@ const SOURCE_LABELS: Record<string, string> = {
     ivrmenu: 'IVR menu',
     ivroption: 'IVR option',
     requesttemplate: 'Request template',
+    ixcnode: 'IXC node',
     variableset: 'Variable set',
     variablecondition: 'Variable condition',
     queue: 'Queue',
@@ -128,6 +129,19 @@ export async function validateRouteDestination(
             if (tpl.companyId !== companyId)
                 throw new AppError(
                     `${prefix}Request template belongs to different company`,
+                    403
+                )
+            break
+        }
+        case 'ixc': {
+            const node = await prisma.ixcNode.findUnique({
+                where: { id: dest.id },
+                select: { companyId: true }
+            })
+            if (!node) throw new AppError(`${prefix}IXC node not found`, 404)
+            if (node.companyId !== companyId)
+                throw new AppError(
+                    `${prefix}IXC node belongs to different company`,
                     403
                 )
             break

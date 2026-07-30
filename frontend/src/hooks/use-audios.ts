@@ -22,6 +22,50 @@ async function fetchAudiosRequest(companyId: string): Promise<Audio[]> {
     return data.audios ?? []
 }
 
+function extractFilename(disposition: unknown, fallback: string): string {
+    if (typeof disposition !== "string") return fallback
+    const match = disposition.match(/filename="?([^"]+)"?/)
+    return match?.[1] ?? fallback
+}
+
+// Precisa ser via api.get (axios injeta o Bearer token no interceptor) e não <a href>/<audio src>
+// direto: o backend autentica por header, não cookie de sessão (mesmo padrão de use-cdr.ts)
+async function fetchAudioFileBlob(id: string) {
+    const res = await api.get(`/audios/${id}/file`, { responseType: "blob" })
+    const filename = extractFilename(
+        res.headers["content-disposition"],
+        `audio-${id}.wav`
+    )
+    return { url: URL.createObjectURL(res.data as Blob), filename }
+}
+
+export async function downloadAudioFile(id: string, name?: string) {
+    const toastId = toast.loading("Baixando áudio...")
+    try {
+        const { url, filename } = await fetchAudioFileBlob(id)
+        const a = document.createElement("a")
+        a.href = url
+        a.download = name ? `${name}.wav` : filename
+        a.click()
+        URL.revokeObjectURL(url)
+        toast.success("Áudio baixado", { id: toastId })
+    } catch (err) {
+        toast.error(apiError(err, "Erro ao baixar áudio"), { id: toastId })
+    }
+}
+
+// Retorna a blob URL pra tocar inline (<audio>): chamador é responsável por revogar via
+// URL.revokeObjectURL quando parar de usar
+export async function loadAudioFile(id: string): Promise<string | null> {
+    try {
+        const { url } = await fetchAudioFileBlob(id)
+        return url
+    } catch (err) {
+        toast.error(apiError(err, "Erro ao carregar áudio"))
+        return null
+    }
+}
+
 // companyId opcional — enquanto não informado, a lista não é buscada (filtro de empresa
 // da página exige seleção antes de consultar o backend). Diferente da empresa do upload
 // (que é passada explicitamente para createAudio, pois pode divergir deste filtro)

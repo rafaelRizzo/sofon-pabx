@@ -5,6 +5,7 @@ import {
     TC_CONTEXT, tcEntry, ANNOUNCEMENT_CONTEXT, announcementExten, IVR_CONTEXT, ivrExten,
     REQUEST_TEMPLATE_CONTEXT, requestTemplateExten, HOL_CONTEXT, holEntry,
     VAR_CONTEXT, varEntry, VARCOND_CONTEXT, varCondEntry, FLOW_CONTEXT, flowExten,
+    IXC_NODE_CONTEXT, ixcNodeExten,
 } from './dialplan-names'
 
 export type DialplanTarget = { context: string; exten: string; priority: number }
@@ -44,6 +45,8 @@ export async function resolveRouteDestinationToDialplan(dest: RouteDestination):
             return { context: IVR_CONTEXT, exten: ivrExten(dest.id), priority: 1 }
         case 'request':
             return { context: REQUEST_TEMPLATE_CONTEXT, exten: requestTemplateExten(dest.id), priority: 1 }
+        case 'ixc':
+            return { context: IXC_NODE_CONTEXT, exten: ixcNodeExten(dest.id), priority: 1 }
         case 'variable-set':
             return { context: VAR_CONTEXT, exten: varEntry(dest.id), priority: 1 }
         case 'variable-condition':

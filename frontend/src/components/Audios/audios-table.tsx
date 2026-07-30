@@ -1,6 +1,6 @@
 "use client"
 
-import { PencilIcon, Trash2Icon } from "lucide-react"
+import { PencilIcon, PlayIcon, Trash2Icon } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -25,6 +25,7 @@ type Props = {
     audios: Audio[]
     loading: boolean
     companySelected: boolean
+    onPlay: (audio: Audio) => void
     onEdit: (audio: Audio) => void
     onDelete: (audio: Audio) => void
 }
@@ -33,6 +34,7 @@ export function AudiosTable({
     audios,
     loading,
     companySelected,
+    onPlay,
     onEdit,
     onDelete,
 }: Props) {
@@ -93,6 +95,27 @@ export function AudiosTable({
                                 <TableCell>
                                     <TooltipProvider delay={100}>
                                         <div className="flex justify-end gap-1">
+                                            <Tooltip>
+                                                <TooltipTrigger
+                                                    render={
+                                                        <Button
+                                                            variant="outline"
+                                                            size="icon"
+                                                            onClick={() =>
+                                                                onPlay(audio)
+                                                            }
+                                                        >
+                                                            <PlayIcon />
+                                                            <span className="sr-only">
+                                                                Ouvir
+                                                            </span>
+                                                        </Button>
+                                                    }
+                                                />
+                                                <TooltipContent>
+                                                    Ouvir áudio
+                                                </TooltipContent>
+                                            </Tooltip>
                                             <Tooltip>
                                                 <TooltipTrigger
                                                     render={

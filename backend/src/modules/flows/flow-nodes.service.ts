@@ -22,6 +22,7 @@ export const FLOW_NODE_TYPES = [
   "announcement",
   "ivr",
   "request",
+  "ixc",
   "variable-set",
   "variable-condition",
   "flow",
@@ -37,6 +38,7 @@ const DELETABLE_RESOURCE_TYPES = new Set<FlowNodeType>([
   "timecondition",
   "holiday",
   "request",
+  "ixc",
   "variable-set",
   "variable-condition",
 ]);
@@ -52,6 +54,7 @@ const portsByType: Record<FlowNodeType, readonly string[]> = {
   // contra as opções configuradas no próprio recurso em assertPort().
   ivr: ["invalid", "timeout"],
   request: ["success", "error"],
+  ixc: ["success", "error"],
   "variable-set": ["default"],
   "variable-condition": ["true", "false"],
   flow: [],
@@ -123,6 +126,12 @@ async function assertResource(
       break;
     case "request":
       found = await prisma.requestTemplate.findUnique({
+        where: { id: resourceId },
+        select: companySelect,
+      });
+      break;
+    case "ixc":
+      found = await prisma.ixcNode.findUnique({
         where: { id: resourceId },
         select: companySelect,
       });

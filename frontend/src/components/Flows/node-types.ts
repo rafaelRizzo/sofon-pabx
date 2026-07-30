@@ -20,6 +20,7 @@ export const CANVAS_NODE_TYPES: CanvasNodeType[] = [
     "queue",
     "extension",
     "request",
+    "ixc",
     "timecondition",
     "holiday",
     "variable-set",
@@ -36,6 +37,7 @@ export type CanvasNodeAction =
     | "timecondition"
     | "holiday"
     | "request"
+    | "ixc"
     | "variable-set"
     | "variable-condition"
     | "flow"
@@ -85,6 +87,12 @@ export const NODE_ACTIONS: NodeActionDefinition[] = [
         resourceTypes: ["request"],
     },
     {
+        id: "ixc",
+        label: "IXCsoft",
+        description: "Consulta cliente ou boleto no IXCsoft.",
+        resourceTypes: ["ixc"],
+    },
+    {
         id: "variable-set",
         label: "Definir variável",
         description: "Executa um conjunto de variáveis.",
@@ -110,6 +118,7 @@ export const NODE_ACTION_LABELS: Record<CanvasNodeType, string> = {
     queue: "Transferir para fila",
     extension: "Transferir para ramal",
     request: "Executar requisição",
+    ixc: "IXCsoft",
     timecondition: "Verificar horário",
     holiday: "Verificar feriado",
     "variable-set": "Definir variável",
@@ -160,6 +169,12 @@ export const NODE_TYPE_CONFIG: Record<CanvasNodeType, NodeTypeConfig> = {
     },
     request: {
         apiPath: "request-templates",
+        staticSlots: ["success", "error"],
+        slotField: { success: "onSuccess", error: "onError" },
+        creatable: true,
+    },
+    ixc: {
+        apiPath: "ixc-nodes",
         staticSlots: ["success", "error"],
         slotField: { success: "onSuccess", error: "onError" },
         creatable: true,

@@ -32,6 +32,8 @@ import { cdrRoutes } from './modules/cdr/cdr.routes'
 import { announcementsRoutes } from './modules/announcements/announcements.routes'
 import { ivrRoutes } from './modules/ivr/ivr.routes'
 import { requestTemplatesRoutes } from './modules/request-templates/request-templates.routes'
+import { integrationCredentialsRoutes } from './modules/integration-credentials/integration-credentials.routes'
+import { ixcNodesRoutes } from './modules/ixc-nodes/ixc-nodes.routes'
 import { audiosRoutes } from './modules/audios/audios.routes'
 import { variablesRoutes } from './modules/variables/variables.routes'
 import { variableConditionsRoutes } from './modules/variable-conditions/variable-conditions.routes'
@@ -222,6 +224,8 @@ app.register(cdrRoutes)
 app.register(announcementsRoutes)
 app.register(ivrRoutes)
 app.register(requestTemplatesRoutes)
+app.register(integrationCredentialsRoutes)
+app.register(ixcNodesRoutes)
 app.register(audiosRoutes)
 app.register(variablesRoutes)
 app.register(variableConditionsRoutes)

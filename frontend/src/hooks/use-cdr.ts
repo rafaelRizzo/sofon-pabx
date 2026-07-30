@@ -175,6 +175,31 @@ export function useCdrRecords(
     }
 }
 
+const EXPORT_PAGE_LIMIT = 200
+
+// backend limita `limit` a MAX_LIMIT (200, ver cdr.schema.ts): pagina até completar `total`
+export async function fetchAllCdrRecords(
+    companyId: string,
+    filters: CdrFilters = {}
+): Promise<CdrRecord[]> {
+    const all: CdrRecord[] = []
+    let page = 1
+    for (;;) {
+        const { data } = await api.get("/cdr", {
+            params: filterParams(companyId, filters, {
+                page,
+                limit: EXPORT_PAGE_LIMIT,
+            }),
+        })
+        const records: CdrRecord[] = data.records ?? []
+        all.push(...records)
+        const total: number = data.total ?? 0
+        if (records.length === 0 || all.length >= total) break
+        page++
+    }
+    return all
+}
+
 export type CdrMetrics = {
     total: number
     answered: number

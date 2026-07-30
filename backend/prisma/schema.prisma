@@ -10,42 +10,44 @@ datasource db {
 // ─── Application Models ───────────────────────────────────────────────────────
 
 model Company {
-  id                 String              @id @default(cuid())
-  asteriskId         String              @unique @default(dbgenerated("substring(replace(gen_random_uuid()::text, '-', ''), 1, 10)")) @db.VarChar(10)
-  name               String
-  doc                String?
-  status             String              @default("active") // active | inactive | blocked
+  id                     String                  @id @default(cuid())
+  asteriskId             String                  @unique @default(dbgenerated("substring(replace(gen_random_uuid()::text, '-', ''), 1, 10)")) @db.VarChar(10)
+  name                   String
+  doc                    String?
+  status                 String                  @default("active") // active | inactive | blocked
   // padrão de storage é sempre UTC (Timestamptz); este campo só define o fuso de exibição na API
-  timezone           String              @default("America/Sao_Paulo") @db.VarChar(64)
-  metadata           Json                @default("{}")
+  timezone               String                  @default("America/Sao_Paulo") @db.VarChar(64)
+  metadata               Json                    @default("{}")
   // key própria da empresa pra TTS (ver providers/elevenlabs.provider.ts) — null = TTS desabilitado
   // pra essa empresa, sem fallback global (cada empresa usa a própria conta/billing ElevenLabs)
-  elevenLabsApiKey   String?
-  createdAt          DateTime            @default(now()) @db.Timestamptz(3)
-  updatedAt          DateTime            @updatedAt @db.Timestamptz(3)
-  users              UserCompany[]
-  dids               Did[]
-  extensions         Extension[]
-  queues             Queue[]
-  trunks             Trunk[]
-  outboundRoutes     OutboundRoute[]
-  timeGroups         TimeGroup[]
-  timeConditions     TimeCondition[]
-  inboundRoutes      InboundRoute[]
-  announcements      Announcement[]
-  ivrMenus           IvrMenu[]
-  requestTemplates   RequestTemplate[]
-  audios             Audio[]
-  holidayGroups      HolidayGroup[]
-  agentCompanyScopes AgentCompanyScope[]
-  routingRules       RoutingRule[]
-  callRatings        CallRating[]
-  agentAffinities    AgentAffinity[]
-  variableSets       VariableSet[]
-  variableConditions VariableCondition[]
-  flowEdges          FlowEdge[]
-  flows              Flow[]
-  queueCalls         QueueCall[]
+  elevenLabsApiKey       String?
+  createdAt              DateTime                @default(now()) @db.Timestamptz(3)
+  updatedAt              DateTime                @updatedAt @db.Timestamptz(3)
+  users                  UserCompany[]
+  dids                   Did[]
+  extensions             Extension[]
+  queues                 Queue[]
+  trunks                 Trunk[]
+  outboundRoutes         OutboundRoute[]
+  timeGroups             TimeGroup[]
+  timeConditions         TimeCondition[]
+  inboundRoutes          InboundRoute[]
+  announcements          Announcement[]
+  ivrMenus               IvrMenu[]
+  requestTemplates       RequestTemplate[]
+  audios                 Audio[]
+  holidayGroups          HolidayGroup[]
+  agentCompanyScopes     AgentCompanyScope[]
+  routingRules           RoutingRule[]
+  callRatings            CallRating[]
+  agentAffinities        AgentAffinity[]
+  variableSets           VariableSet[]
+  variableConditions     VariableCondition[]
+  flowEdges              FlowEdge[]
+  flows                  Flow[]
+  queueCalls             QueueCall[]
+  integrationCredentials IntegrationCredential[]
+  ixcNodes               IxcNode[]
 
   @@unique([name, doc])
   @@map("companies")
@@ -564,6 +566,58 @@ model VariableCondition {
   @@map("variable_conditions")
 }
 
+// Credencial de acesso a uma API de terceiro (`provider` identifica qual — hoje só "ixc", desenhado
+// pra crescer com novas integrações sem precisar de um model por provedor) — token/base URL próprios
+// por empresa, reaproveitados por N nós sem precisar recadastrar em cada um. `token` nunca é
+// armazenado em texto puro (ver src/lib/crypto.ts, AES-256-GCM com chave derivada por empresa via
+// HKDF a partir de ENCRYPTION_MASTER_KEY) e nunca retorna em GET — troca de token é sempre um reenvio
+// completo do campo, sem endpoint de "revelar".
+model IntegrationCredential {
+  id              String    @id @default(cuid())
+  provider        String    @db.VarChar(40) // "ixc"
+  name            String    @db.VarChar(80)
+  companyId       String
+  company         Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  baseUrl         String
+  tokenCiphertext String
+  tokenIv         String
+  tokenTag        String
+  createdAt       DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime  @updatedAt @db.Timestamptz(3)
+  ixcNodes        IxcNode[]
+
+  @@unique([provider, name, companyId])
+  @@index([companyId])
+  @@index([provider, companyId])
+  @@map("integration_credentials")
+}
+
+// Nó pré-configurado de integração com o IXCsoft — mesmo mecanismo de RequestTemplate (AGI síncrono,
+// usado como RouteDestination type: "ixc"), mas sem url/headers manuais: aponta pra uma
+// IntegrationCredential (provider "ixc") e uma ação fixa do catálogo (ver src/integrations/ixc/client.ts),
+// com só os parâmetros daquela ação.
+model IxcNode {
+  id               String                @id @default(cuid())
+  name             String                @db.VarChar(80)
+  companyId        String
+  company          Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  credentialId     String
+  credential       IntegrationCredential @relation(fields: [credentialId], references: [id], onDelete: Restrict)
+  action           String                @db.VarChar(40) // "listar_cliente" | "listar_boleto"
+  // chave/valor com placeholders {{VAR}} resolvidos via AGI GET VARIABLE — mesmo padrão de
+  // RequestTemplate.body, mas os campos aceitos variam por action (ver IXC_ACTIONS)
+  params           Json                  @default("{}")
+  timeoutMs        Int                   @default(5000)
+  variableMappings Json                  @default("[]")
+  createdAt        DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime              @updatedAt @db.Timestamptz(3)
+
+  @@unique([name, companyId])
+  @@index([companyId])
+  @@index([credentialId])
+  @@map("ixc_nodes")
+}
+
 // Edge normalizado de RouteDestination — única fonte de roteamento pra todos os nós (InboundRoute/
 // TimeCondition/HolidayGroup/Announcement/IvrMenu/IvrOption/RequestTemplate/VariableSet/
 // VariableCondition/Queue); nenhum desses models tem mais campo Json inline de destino.
@@ -596,20 +650,20 @@ model FlowEdge {
 // entryDestination, ver GET /flows/:id/graph). Um mesmo nó (ex: Announcement X) pode aparecer em
 // mais de um Flow com posições diferentes — por isso a posição pertence ao Flow, não ao nó.
 model Flow {
-  id          String    @id @default(cuid())
-  name        String    @db.VarChar(80)
+  id          String         @id @default(cuid())
+  name        String         @db.VarChar(80)
   companyId   String
-  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company     Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
   // O entry point é uma INSTÂNCIA de nó, nunca o recurso Asterisk diretamente. Isso permite a
   // mesma Queue/URA aparecer em fluxos distintos com saídas independentes.
-  entryNodeId String?   @unique
-  entryNode   FlowNode? @relation("FlowEntry", fields: [entryNodeId], references: [id], onDelete: SetNull)
-  nodes       FlowNode[] @relation("FlowNodes")
+  entryNodeId String?        @unique
+  entryNode   FlowNode?      @relation("FlowEntry", fields: [entryNodeId], references: [id], onDelete: SetNull)
+  nodes       FlowNode[]     @relation("FlowNodes")
   nodeEdges   FlowNodeEdge[]
   // [{ nodeType: "announcement", nodeId: "...", name?: "...", x: 120, y: 80 }]
-  layout    Json     @default("[]")
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  layout      Json           @default("[]")
+  createdAt   DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime       @updatedAt @db.Timestamptz(3)
 
   @@unique([name, companyId])
   @@index([companyId])
@@ -620,16 +674,16 @@ model Flow {
 // recurso da biblioteca da empresa (Queue, IvrMenu, Announcement etc.), sem duplicar a configuração
 // nem o provisionamento no Asterisk. A integridade tipo→recurso e empresa é validada no service.
 model FlowNode {
-  id         String         @id @default(cuid())
-  flowId     String
-  flow       Flow           @relation("FlowNodes", fields: [flowId], references: [id], onDelete: Cascade)
-  entryFor   Flow?          @relation("FlowEntry")
-  type       String         @db.VarChar(40)
-  resourceId String?
-  label      String?        @db.VarChar(80)
-  position   Json           @default("{\"x\":0,\"y\":0}")
-  createdAt  DateTime       @default(now()) @db.Timestamptz(3)
-  updatedAt  DateTime       @updatedAt @db.Timestamptz(3)
+  id          String         @id @default(cuid())
+  flowId      String
+  flow        Flow           @relation("FlowNodes", fields: [flowId], references: [id], onDelete: Cascade)
+  entryFor    Flow?          @relation("FlowEntry")
+  type        String         @db.VarChar(40)
+  resourceId  String?
+  label       String?        @db.VarChar(80)
+  position    Json           @default("{\"x\":0,\"y\":0}")
+  createdAt   DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime       @updatedAt @db.Timestamptz(3)
   sourceEdges FlowNodeEdge[] @relation("FlowNodeSourceEdges")
   targetEdges FlowNodeEdge[] @relation("FlowNodeTargetEdges")
 
@@ -880,53 +934,53 @@ model ps_endpoints {
 
 // CDR nativo do Asterisk (cdr_adaptive_odbc) — account_code = Company.asteriskId, setado em todo ps_endpoints/sip_peers
 model cdr {
-  id          BigInt    @id @default(autoincrement())
-  src         String?   @db.VarChar(80)
-  dst         String?   @db.VarChar(80)
-  context     String?   @map("dcontext") @db.VarChar(80)
-  callerid    String?   @map("clid") @db.VarChar(80)
-  srcChannel  String?   @map("channel") @db.VarChar(80)
-  dstChannel  String?   @map("dstchannel") @db.VarChar(80)
-  lastApp     String?   @map("lastapp") @db.VarChar(80)
-  lastData    String?   @map("lastdata") @db.VarChar(200)
+  id              BigInt    @id @default(autoincrement())
+  src             String?   @db.VarChar(80)
+  dst             String?   @db.VarChar(80)
+  context         String?   @map("dcontext") @db.VarChar(80)
+  callerid        String?   @map("clid") @db.VarChar(80)
+  srcChannel      String?   @map("channel") @db.VarChar(80)
+  dstChannel      String?   @map("dstchannel") @db.VarChar(80)
+  lastApp         String?   @map("lastapp") @db.VarChar(80)
+  lastData        String?   @map("lastdata") @db.VarChar(200)
   // sem @db.Timestamptz de propósito: o Asterisk grava esses campos com a hora LOCAL do SO (America/Sao_Paulo,
   // ver setups/install-asterisk.sh), não UTC. O driver pg lê os dígitos como se fossem UTC — qualquer código que
   // ler/filtrar por esses campos precisa compensar isso via parseNaiveLocalDate/formatNaiveLocalISOString
   // (src/utils/timezone.ts), nunca tratar como instante UTC real como os outros DateTime deste schema.
-  startTime   DateTime? @map("start")
-  answerTime  DateTime? @map("answer")
+  startTime       DateTime? @map("start")
+  answerTime      DateTime? @map("answer")
   // "end" é palavra reservada no Postgres (CASE...END) — INSERT sem aspas quebra a sintaxe, por isso o @map difere do nome real do CDR
-  endTime     DateTime? @map("endtime")
-  duration    Int?
-  billsec     Int?
-  disposition String?   @db.VarChar(45)
-  amaflags    Int?
-  accountcode String?   @db.VarChar(80)
-  uniqueid    String?   @db.VarChar(150)
+  endTime         DateTime? @map("endtime")
+  duration        Int?
+  billsec         Int?
+  disposition     String?   @db.VarChar(45)
+  amaflags        Int?
+  accountcode     String?   @db.VarChar(80)
+  uniqueid        String?   @db.VarChar(150)
   // Setado via Set(CDR(queue_name)=<asteriskName>) logo antes do Queue() no dialplan (ver
   // AsteriskQueueRepository.regenerate) — não é um campo nativo do CDR, é uma var de canal
   // custom que o cdr_adaptive_odbc grava por já existir uma coluna com esse nome. Permite achar
   // "quanto tempo essa fila levou pra atender" pelo histórico (duration - billsec = tempo até
   // atender) sem depender do QueueParams.Holdtime ao vivo do AMI, que zera toda vez que a fila
   // fica ociosa e o Asterisk destrói/recria o objeto realtime da fila.
-  queueName   String?   @map("queue_name") @db.VarChar(160)
+  queueName       String?   @map("queue_name") @db.VarChar(160)
   // Campos nativos do motor de CDR do Asterisk (mesma categoria de uniqueid) — cdr_adaptive_odbc
   // é "adaptive": descobre colunas pela estrutura da tabela no startup e popula sozinho, sem
   // nenhum Set() no dialplan. linkedid agrupa as múltiplas linhas de CDR que uma mesma chamada
   // pode gerar (ex: perna do ligante + perna discada); sequence ordena essas linhas.
-  linkedid    String?   @db.VarChar(150)
-  sequence    Int?
+  linkedid        String?   @db.VarChar(150)
+  sequence        Int?
   // Campos abaixo são custom, setados via Set(CDR(x)=y) antes de cada Dial() nos 3 fluxos
   // (outbound-routes.service.ts, dialplan.repository.ts, inboundroute.repository.ts)
-  direction       String? @db.VarChar(10) // inbound | outbound | internal | transfer
-  originExtension String? @map("origin_extension") @db.VarChar(40)
-  dialedNumber    String? @map("dialed_number") @db.VarChar(80)
+  direction       String?   @db.VarChar(10) // inbound | outbound | internal | transfer
+  originExtension String?   @map("origin_extension") @db.VarChar(40)
+  dialedNumber    String?   @map("dialed_number") @db.VarChar(80)
   // Trunk.id (cuid) da aplicação — não o astId interno do Asterisk (<asteriskId>-trunk-<name>)
-  trunkId         String? @map("trunk_id") @db.VarChar(40)
-  recordingFile   String? @map("recording_file") @db.VarChar(255)
+  trunkId         String?   @map("trunk_id") @db.VarChar(40)
+  recordingFile   String?   @map("recording_file") @db.VarChar(255)
   // Só capturado logo após um Dial() ser executado (${HANGUPCAUSE}) — chamadas que desligam
   // antes de qualquer Dial (ex: abandono na URA) não preenchem este campo
-  hangupCause     String? @map("hangup_cause") @db.VarChar(45)
+  hangupCause     String?   @map("hangup_cause") @db.VarChar(45)
 
   // composto: toda query filtra por accountcode e ordena por startTime desc — cobre WHERE+ORDER BY num único index scan
   @@index([accountcode, startTime(sort: Desc)])

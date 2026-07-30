@@ -6,6 +6,7 @@ import { PlusIcon } from "lucide-react"
 
 import { AudioFormDialog } from "@/components/Audios/audio-form-dialog"
 import { AudiosTable } from "@/components/Audios/audios-table"
+import { AudioPlayerDialog } from "@/components/audio-player-dialog"
 import { CompanyFilter } from "@/components/company-filter"
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog"
 import { DataPagination } from "@/components/data-pagination"
@@ -25,6 +26,7 @@ function AudiosPage() {
     const [createOpen, setCreateOpen] = useState(false)
     const [editAudio, setEditAudio] = useState<Audio | null>(null)
     const [deleteTarget, setDeleteTarget] = useState<Audio | null>(null)
+    const [playAudio, setPlayAudio] = useState<Audio | null>(null)
 
     // Empresa usada no dialog (não deixa escolher empresa lá dentro): a do áudio em edição, ou
     // o filtro da tabela — mesmo padrão de Announcements/InboundRoutes
@@ -84,6 +86,7 @@ function AudiosPage() {
                 audios={paginated}
                 loading={loading}
                 companySelected={!!companyFilter}
+                onPlay={setPlayAudio}
                 onEdit={setEditAudio}
                 onDelete={setDeleteTarget}
             />
@@ -130,6 +133,12 @@ function AudiosPage() {
                 title="Deletar áudio"
                 itemName={deleteTarget?.name}
                 onConfirm={handleDelete}
+            />
+
+            <AudioPlayerDialog
+                audioId={playAudio?.id ?? null}
+                name={playAudio?.name}
+                onOpenChange={(open) => !open && setPlayAudio(null)}
             />
         </div>
     )

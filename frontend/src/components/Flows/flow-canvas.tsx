@@ -30,6 +30,7 @@ import {
     PanelRightCloseIcon,
     PanelRightOpenIcon,
     PlusIcon,
+    SearchIcon,
     UnlockIcon,
     WandSparklesIcon,
 } from "lucide-react"
@@ -37,6 +38,7 @@ import { toast } from "sonner"
 
 import { api, apiError, isValidationError } from "@/lib/api"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog"
 import {
@@ -107,6 +109,11 @@ import {
     type RequestTemplateUpdateForm,
 } from "@/hooks/use-request-templates"
 import {
+    useIxcNodes,
+    type IxcNodeForm,
+    type IxcNodeUpdateForm,
+} from "@/hooks/use-ixc-nodes"
+import {
     useTimeConditions,
     type TimeConditionForm,
     type TimeConditionCreationDto,
@@ -164,6 +171,13 @@ const AUTO_LAYOUT_OPTIONS = {
 const AUTO_LAYOUT_DEFAULT_SIZE = { width: 224, height: 96 }
 const POSITION_RETRY_BASE_DELAY_MS = 1500
 const POSITION_RETRY_MAX_DELAY_MS = 30000
+
+function normalizeSearchText(text: string) {
+    return text
+        .normalize("NFD")
+        .replace(/[̀-ͯ]/g, "")
+        .toLowerCase()
+}
 
 const NODE_TYPES: NodeTypes = {
     flowNode: FlowNode as any,
@@ -239,6 +253,7 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
     const [isNodePanelOpen, setIsNodePanelOpen] = useState(
         () => localStorage.getItem(NODE_PANEL_STORAGE_KEY) !== "closed"
     )
+    const [nodeActionSearch, setNodeActionSearch] = useState("")
     useEffect(() => {
         localStorage.setItem(
             NODE_PANEL_STORAGE_KEY,
@@ -341,6 +356,7 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
     const { createAnnouncement } = useAnnouncements()
     const { createQueue } = useQueues()
     const { createRequestTemplate } = useRequestTemplates()
+    const { createIxcNode } = useIxcNodes()
     const { createTimeCondition } = useTimeConditions()
     const { createHolidayGroup } = useHolidayGroups()
     const { createVariableSet } = useVariables()
@@ -391,6 +407,16 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
         () => new Map(flowNodes.map((node) => [node.id, node])),
         [flowNodes]
     )
+
+    const filteredNodeActions = useMemo(() => {
+        const query = normalizeSearchText(nodeActionSearch)
+        if (!query) return NODE_ACTIONS
+        return NODE_ACTIONS.filter((action) =>
+            normalizeSearchText(`${action.label} ${action.description}`).includes(
+                query
+            )
+        )
+    }, [nodeActionSearch])
 
     // referência sempre atual dos ids de nó válidos — usada dentro de callbacks memoizados
     // (persistPositions) pra não reenfileirar posição de um nó já deletado numa race entre o PUT
@@ -875,6 +901,15 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
                         companyId,
                         true
                     )
+                case "ixc":
+                    return createIxcNode(
+                        {
+                            ...(creationDto as IxcNodeUpdateForm),
+                            companyId,
+                        } as IxcNodeForm,
+                        companyId,
+                        true
+                    )
                 case "timecondition":
                     return createTimeCondition(
                         {
@@ -926,6 +961,7 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
             createAnnouncement,
             createQueue,
             createRequestTemplate,
+            createIxcNode,
             createTimeCondition,
             createHolidayGroup,
             createVariableSet,
@@ -2039,9 +2075,29 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
                                 <PanelRightCloseIcon />
                             </Button>
                         </div>
+                        <div className="border-b p-2">
+                            <div className="relative">
+                                <SearchIcon className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                                <Input
+                                    value={nodeActionSearch}
+                                    onChange={(event) =>
+                                        setNodeActionSearch(
+                                            event.target.value
+                                        )
+                                    }
+                                    placeholder="Buscar nó..."
+                                    className="pl-7"
+                                />
+                            </div>
+                        </div>
                         <ScrollArea className="min-h-0 flex-1 bg-muted/20">
                             <div className="flex flex-col gap-2 p-2.5">
-                                {NODE_ACTIONS.map((action) => {
+                                {filteredNodeActions.length === 0 && (
+                                    <p className="p-2 text-center text-xs text-muted-foreground">
+                                        Nenhum nó encontrado.
+                                    </p>
+                                )}
+                                {filteredNodeActions.map((action) => {
                                     const Icon =
                                         ROUTE_DEST_ICONS[
                                             action.resourceTypes[0]

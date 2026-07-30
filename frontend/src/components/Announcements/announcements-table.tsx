@@ -1,6 +1,6 @@
 "use client"
 
-import { PencilIcon, Trash2Icon } from "lucide-react"
+import { PencilIcon, PlayIcon, Trash2Icon } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -27,6 +27,7 @@ type Props = {
     announcements: Announcement[]
     loading: boolean
     companySelected: boolean
+    onPlay: (announcement: Announcement) => void
     onEdit: (announcement: Announcement) => void
     onDelete: (announcement: Announcement) => void
 }
@@ -35,6 +36,7 @@ export function AnnouncementsTable({
     announcements,
     loading,
     companySelected,
+    onPlay,
     onEdit,
     onDelete,
 }: Props) {
@@ -106,6 +108,31 @@ export function AnnouncementsTable({
                                 <TableCell>
                                     <TooltipProvider delay={100}>
                                         <div className="flex justify-end gap-1">
+                                            {announcement.hasAudio && (
+                                                <Tooltip>
+                                                    <TooltipTrigger
+                                                        render={
+                                                            <Button
+                                                                variant="outline"
+                                                                size="icon"
+                                                                onClick={() =>
+                                                                    onPlay(
+                                                                        announcement
+                                                                    )
+                                                                }
+                                                            >
+                                                                <PlayIcon />
+                                                                <span className="sr-only">
+                                                                    Ouvir
+                                                                </span>
+                                                            </Button>
+                                                        }
+                                                    />
+                                                    <TooltipContent>
+                                                        Ouvir áudio
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            )}
                                             <Tooltip>
                                                 <TooltipTrigger
                                                     render={

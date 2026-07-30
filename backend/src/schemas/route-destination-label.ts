@@ -7,6 +7,7 @@ import { HolidayGroupsCache } from '../modules/holiday-groups/cache/holiday-grou
 import { AnnouncementsCache } from '../modules/announcements/cache/announcements.cache'
 import { IvrCache } from '../modules/ivr/cache/ivr.cache'
 import { RequestTemplatesCache } from '../modules/request-templates/cache/request-templates.cache'
+import { IxcNodesCache } from '../modules/ixc-nodes/cache/ixc-nodes.cache'
 import { VariablesCache } from '../modules/variables/cache/variables.cache'
 import { VariableConditionsCache } from '../modules/variable-conditions/cache/variable-conditions.cache'
 
@@ -77,6 +78,12 @@ const requestTemplateLabels: LabelFetcher = async (companyId) => {
     return new Map(list.map((r) => [r.id, r.name]))
 }
 
+const ixcNodeLabels: LabelFetcher = async (companyId) => {
+    const cached = (await safeGetByCompany(IxcNodesCache, companyId)) as { id: string; name: string }[] | null
+    const list = cached ?? (await prisma.ixcNode.findMany({ where: { companyId }, select: { id: true, name: true } }))
+    return new Map(list.map((n) => [n.id, n.name]))
+}
+
 const variableSetLabels: LabelFetcher = async (companyId) => {
     const cached = (await safeGetByCompany(VariablesCache, companyId)) as { id: string; name: string }[] | null
     const list = cached ?? (await prisma.variableSet.findMany({ where: { companyId }, select: { id: true, name: true } }))
@@ -99,6 +106,7 @@ const LABEL_FETCHERS: Partial<Record<string, LabelFetcher>> = {
     announcement: announcementLabels,
     ivr: ivrLabels,
     request: requestTemplateLabels,
+    ixc: ixcNodeLabels,
     'variable-set': variableSetLabels,
     'variable-condition': variableConditionLabels,
 }

@@ -6,6 +6,7 @@ import { PlusIcon } from "lucide-react"
 
 import { AnnouncementFormDialog } from "@/components/Announcements/announcement-form-dialog"
 import { AnnouncementsTable } from "@/components/Announcements/announcements-table"
+import { AudioPlayerDialog } from "@/components/audio-player-dialog"
 import { CompanyFilter } from "@/components/company-filter"
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog"
 import { DataPagination } from "@/components/data-pagination"
@@ -26,6 +27,8 @@ function AnnouncementsPage() {
     const [editAnnouncement, setEditAnnouncement] =
         useState<Announcement | null>(null)
     const [deleteTarget, setDeleteTarget] = useState<Announcement | null>(null)
+    const [playAnnouncement, setPlayAnnouncement] =
+        useState<Announcement | null>(null)
 
     // Empresa usada para escopar áudios/opções de destino do formulário (o dialog não deixa
     // escolher empresa): a do anúncio em edição, ou o filtro da tabela
@@ -84,6 +87,7 @@ function AnnouncementsPage() {
                 announcements={paginated}
                 loading={loading}
                 companySelected={!!companyFilter}
+                onPlay={setPlayAnnouncement}
                 onEdit={setEditAnnouncement}
                 onDelete={setDeleteTarget}
             />
@@ -123,6 +127,12 @@ function AnnouncementsPage() {
                 title="Deletar anúncio"
                 itemName={deleteTarget?.name}
                 onConfirm={handleDelete}
+            />
+
+            <AudioPlayerDialog
+                audioId={playAnnouncement?.audioId ?? null}
+                name={playAnnouncement?.name}
+                onOpenChange={(open) => !open && setPlayAnnouncement(null)}
             />
         </div>
     )

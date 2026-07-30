@@ -65,6 +65,12 @@ const requestTemplateNames: NameFetcher = (companyId, ids) =>
         companyId, ids, (r) => r.name,
     )
 
+const ixcNodeNames: NameFetcher = (companyId, ids) =>
+    bySelect(
+        (where) => prisma.ixcNode.findMany({ where, select: { id: true, name: true } }),
+        companyId, ids, (r) => r.name,
+    )
+
 const variableSetNames: NameFetcher = (companyId, ids) =>
     bySelect(
         (where) => prisma.variableSet.findMany({ where, select: { id: true, name: true } }),
@@ -106,6 +112,7 @@ const NAME_FETCHERS: Record<FlowSourceType, NameFetcher> = {
     ivrmenu: ivrMenuNames,
     ivroption: ivrOptionNames,
     requesttemplate: requestTemplateNames,
+    ixcnode: ixcNodeNames,
     variableset: variableSetNames,
     variablecondition: variableConditionNames,
     queue: queueNames,
@@ -120,6 +127,7 @@ const TYPE_LABELS: Record<FlowSourceType, string> = {
     ivrmenu: 'Menu IVR',
     ivroption: 'Opção de IVR',
     requesttemplate: 'Requisição HTTP',
+    ixcnode: 'IXCsoft',
     variableset: 'Variáveis',
     variablecondition: 'Condição de variável',
     queue: 'Fila',

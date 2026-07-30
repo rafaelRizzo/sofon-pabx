@@ -1,3 +1,5 @@
+import { createReadStream } from 'fs'
+import { stat } from 'fs/promises'
 import { extname } from 'path'
 import type { FastifyRequest, FastifyReply } from 'fastify'
 import * as AudiosService from './audios.service'
@@ -5,6 +7,7 @@ import { createAudioFieldsSchema, createAudioTtsSchema, updateAudioSchema, idPar
 import { handleError } from '../../utils/errors/handler.error'
 import { AppError } from '../../utils/errors/app.error'
 import { prisma } from '../../lib/prisma'
+import { audioSoundPath } from '../../asterisk/audio.repository'
 
 // extensão e mimetype vêm do cliente e são facilmente forjáveis: a extensão só decide o
 // que TENTAMOS validar, quem decide se o upload é aceito é isValidAudioContent() abaixo,
@@ -52,6 +55,31 @@ export const getAudioById = async (req: FastifyRequest, reply: FastifyReply) => 
         req.scope.assertAccess(owner.companyId)
         const audio = await AudiosService.getAudioById(id)
         return reply.send({ success: true, message: 'Audio fetched successfully', audio })
+    } catch (error) {
+        return handleError(reply, error, req)
+    }
+}
+
+export const getAudioFile = async (req: FastifyRequest, reply: FastifyReply) => {
+    try {
+        const { id } = idParamSchema.parse(req.params)
+        const existing = await prisma.audio.findUnique({
+            where: { id },
+            select: { companyId: true, company: { select: { asteriskId: true } } },
+        })
+        if (!existing) throw new AppError('Audio not found', 404)
+        req.scope.assertAccess(existing.companyId)
+
+        const filePath = `${audioSoundPath(existing.company.asteriskId, id)}.wav`
+        try {
+            await stat(filePath)
+        } catch {
+            throw new AppError('Audio file not found', 404)
+        }
+
+        reply.header('Content-Disposition', `inline; filename="${id}.wav"`)
+        reply.type('audio/wav')
+        return reply.send(createReadStream(filePath))
     } catch (error) {
         return handleError(reply, error, req)
     }

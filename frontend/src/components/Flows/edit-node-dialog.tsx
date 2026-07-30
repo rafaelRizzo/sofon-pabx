@@ -20,6 +20,12 @@ import {
     toRequestTemplateCreationDto,
     type RequestTemplate,
 } from "@/hooks/use-request-templates"
+import { IxcNodeFormDialog } from "@/components/Ixc/ixc-node-form-dialog"
+import {
+    useIxcNodes,
+    toIxcNodeCreationDto,
+    type IxcNode,
+} from "@/hooks/use-ixc-nodes"
 import { TimeConditionFormDialog } from "@/components/TimeConditions/time-condition-form-dialog"
 import {
     useTimeConditions,
@@ -226,6 +232,30 @@ export function EditNodeDialog({
                     }
                     onSave={async (form) => {
                         const ok = await updateRequestTemplate(id, form)
+                        if (ok) onSaved()
+                        return ok
+                    }}
+                />
+            )
+        }
+        case "ixc": {
+            const { entity, loading } = useEntityById<IxcNode>(
+                NODE_TYPE_CONFIG.ixc.apiPath,
+                id
+            )
+            const { updateIxcNode } = useIxcNodes()
+            return (
+                <IxcNodeFormDialog
+                    open={open}
+                    onOpenChange={onOpenChange}
+                    ixcNode={entity}
+                    loading={loading}
+                    companies={companies}
+                    onDelete={() =>
+                        entity && onDeleteResource?.(toIxcNodeCreationDto(entity))
+                    }
+                    onSave={async (form) => {
+                        const ok = await updateIxcNode(id, form)
                         if (ok) onSaved()
                         return ok
                     }}

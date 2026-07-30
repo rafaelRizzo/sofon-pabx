@@ -7,7 +7,7 @@ type FlowEdgeRow = { sourceId: string; slot: string; targetType: string | null; 
 // Identifica o model dono do slot — mesma nomenclatura em minúsculo do model Prisma.
 export type FlowSourceType =
     | 'inboundroute' | 'timecondition' | 'holidaygroup' | 'announcement' | 'ivrmenu'
-    | 'ivroption' | 'requesttemplate' | 'variableset' | 'variablecondition' | 'queue' | 'flow'
+    | 'ivroption' | 'requesttemplate' | 'ixcnode' | 'variableset' | 'variablecondition' | 'queue' | 'flow'
 
 function groupBySourceId(rows: FlowEdgeRow[]): Map<string, Record<string, RouteDestination>> {
     const map = new Map<string, Record<string, RouteDestination>>()

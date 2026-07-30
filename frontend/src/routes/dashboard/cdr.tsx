@@ -3,12 +3,19 @@ import { createFileRoute } from "@tanstack/react-router"
 import { useState } from "react"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
-import { CalendarIcon } from "lucide-react"
+import { CalendarIcon, DownloadIcon } from "lucide-react"
 import type { DateRange } from "react-day-picker"
+import { toast } from "sonner"
 
 import { CompanyFilter } from "@/components/company-filter"
 import { CdrMetricsCards } from "@/components/Cdr/cdr-metrics-cards"
-import { CdrTable } from "@/components/Cdr/cdr-table"
+import {
+    CdrTable,
+    DIRECTION_LABEL,
+    formatDateTime,
+    formatDuration,
+    STATUS_LABEL,
+} from "@/components/Cdr/cdr-table"
 import { DataPagination } from "@/components/data-pagination"
 import { FilterBar } from "@/components/filter-bar"
 import { PageHeader } from "@/components/page-header"
@@ -35,12 +42,18 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
-import { useCdrMetrics, useCdrRecords, type CdrFilters } from "@/hooks/use-cdr"
+import {
+    fetchAllCdrRecords,
+    useCdrMetrics,
+    useCdrRecords,
+    type CdrFilters,
+} from "@/hooks/use-cdr"
 import { useCompanies } from "@/hooks/use-companies"
 import { useCompanyFilter } from "@/hooks/use-company-filter"
 import { useExtensions, type Extension } from "@/hooks/use-extensions"
 import { useQueues, type Queue } from "@/hooks/use-queues"
 import { useTrunks, type Trunk } from "@/hooks/use-trunks"
+import { apiError } from "@/lib/api"
 
 // "YYYY-MM-DD" -> Date local (evita o shift de fuso de "new Date(string)", que interpreta como UTC)
 function parseDateOnly(value: string): Date | undefined {
@@ -86,6 +99,7 @@ function CdrPage() {
     const [queueId, setQueueId] = useState("all")
     const [startDate, setStartDate] = useState("")
     const [endDate, setEndDate] = useState("")
+    const [exporting, setExporting] = useState(false)
 
     const filters: CdrFilters = {
         originExtension: extensionAlias || undefined,
@@ -127,12 +141,84 @@ function CdrPage() {
         setEndDate(range?.to ? format(range.to, "yyyy-MM-dd") : "")
     }
 
+    const csvCell = (value: string) => `"${value.replace(/"/g, '""')}"`
+
+    const trunkName = (trunkId: string | null) =>
+        trunkId ? (trunks.find((t) => t.id === trunkId)?.name ?? trunkId) : "-"
+
+    const handleExport = async () => {
+        if (!companyId) return
+        setExporting(true)
+        const id = toast.loading("Gerando export...")
+        try {
+            const exported = await fetchAllCdrRecords(companyId, filters)
+            if (exported.length === 0) {
+                toast.info("Nenhum registro para exportar", { id })
+                return
+            }
+
+            const header = [
+                "Data/Hora",
+                "Tipo",
+                "Origem",
+                "Destino",
+                "Fila",
+                "Espera",
+                "Atendido por",
+                "Tronco",
+                "Duração",
+                "Status",
+            ]
+            const rows = exported.map((r) => [
+                formatDateTime(r.startTime),
+                r.direction ? (DIRECTION_LABEL[r.direction] ?? r.direction) : "-",
+                r.originLabel || r.originExtension || r.src || "-",
+                r.destinationLabel || r.dialedNumber || r.dst || "-",
+                r.queueLabel ?? "-",
+                formatDuration(r.queueWaitSeconds),
+                r.answeredBy?.label ?? "-",
+                trunkName(r.trunkId),
+                formatDuration(r.billsec),
+                r.callStatus ? (STATUS_LABEL[r.callStatus] ?? r.callStatus) : "-",
+            ])
+            const csv = [header, ...rows]
+                .map((row) => row.map(csvCell).join(","))
+                .join("\n")
+
+            const blob = new Blob([`﻿${csv}`], {
+                type: "text/csv;charset=utf-8;",
+            })
+            const url = URL.createObjectURL(blob)
+            const link = document.createElement("a")
+            link.href = url
+            link.download = "cdr.csv"
+            link.click()
+            URL.revokeObjectURL(url)
+            toast.success("Export gerado", { id })
+        } catch (err) {
+            toast.error(apiError(err, "Erro ao exportar CDR"), { id })
+        } finally {
+            setExporting(false)
+        }
+    }
+
     return (
         <div className="flex flex-col gap-4">
             <PageHeader
                 title="CDR"
                 description="Histórico de chamadas (Call Detail Records)"
-            />
+            >
+                {companyId && (
+                    <Button
+                        variant="outline"
+                        onClick={handleExport}
+                        disabled={exporting}
+                    >
+                        <DownloadIcon />
+                        Exportar
+                    </Button>
+                )}
+            </PageHeader>
 
             <FilterBar>
                 <CompanyFilter

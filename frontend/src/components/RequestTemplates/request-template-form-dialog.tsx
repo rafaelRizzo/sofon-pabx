@@ -42,6 +42,7 @@ import {
 import { EntityFormDialogSkeletonContent } from "@/components/entity-form-dialog-skeleton"
 import { Input } from "@/components/ui/input"
 import { NumberInput } from "@/components/ui/number-input"
+import { VariableInsertField } from "@/components/variable-insert-field"
 import {
     Select,
     SelectContent,
@@ -50,7 +51,6 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Textarea } from "@/components/ui/textarea"
 import { type Company } from "@/hooks/use-companies"
 import {
     createRequestTemplateFormSchema,
@@ -96,6 +96,7 @@ export function RequestTemplateFormDialog({
         control,
         watch,
         setValue,
+        getValues,
         reset,
         formState: { errors, isSubmitting, isDirty },
     } = useForm<RequestTemplateForm>({
@@ -335,11 +336,18 @@ export function RequestTemplateFormDialog({
                                                             <FieldLabel>
                                                                 URL
                                                             </FieldLabel>
-                                                            <Input
-                                                                placeholder="https://api.exemplo.com/clientes/{{CALLERID}}"
-                                                                {...register(
-                                                                    "url"
-                                                                )}
+                                                            <VariableInsertField
+                                                                name="url"
+                                                                register={
+                                                                    register
+                                                                }
+                                                                setValue={
+                                                                    setValue
+                                                                }
+                                                                getValues={
+                                                                    getValues
+                                                                }
+                                                                placeholder="https://api.exemplo.com/clientes/{{CALLERID(num)}}"
                                                             />
                                                             {errors.url && (
                                                                 <FieldError>
@@ -449,11 +457,19 @@ export function RequestTemplateFormDialog({
                                                                                 )}
                                                                             </div>
                                                                             <div>
-                                                                                <Input
+                                                                                <VariableInsertField
+                                                                                    name={`headers.${index}.value`}
+                                                                                    register={
+                                                                                        register
+                                                                                    }
+                                                                                    setValue={
+                                                                                        setValue
+                                                                                    }
+                                                                                    getValues={
+                                                                                        getValues
+                                                                                    }
                                                                                     placeholder="Bearer {{TOKEN}}"
-                                                                                    {...register(
-                                                                                        `headers.${index}.value`
-                                                                                    )}
+                                                                                    className="min-w-0"
                                                                                 />
                                                                                 {errors
                                                                                     .headers?.[
@@ -500,15 +516,23 @@ export function RequestTemplateFormDialog({
                                                             Corpo da requisição
                                                             (JSON)
                                                         </FieldLabel>
-                                                        <Textarea
+                                                        <VariableInsertField
+                                                            name="body"
+                                                            register={
+                                                                register
+                                                            }
+                                                            setValue={
+                                                                setValue
+                                                            }
+                                                            getValues={
+                                                                getValues
+                                                            }
+                                                            multiline
                                                             rows={5}
                                                             placeholder={
                                                                 '{\n  "campo": "{{VAR}}"\n}'
                                                             }
                                                             className="font-mono"
-                                                            {...register(
-                                                                "body"
-                                                            )}
                                                         />
                                                         <FieldDescription>
                                                             Opcional. Precisa

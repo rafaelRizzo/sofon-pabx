@@ -18,6 +18,8 @@ export const PERMISSION_RESOURCES = [
     'time-conditions',
     'holiday-groups',
     'request-templates',
+    'integrations',
+    'ixc',
     'variables',
     'variable-conditions',
     'flows',

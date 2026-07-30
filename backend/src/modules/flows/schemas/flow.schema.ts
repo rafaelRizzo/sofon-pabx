@@ -26,6 +26,7 @@ export const flowNodeTypeSchema = z.enum([
   "announcement",
   "ivr",
   "request",
+  "ixc",
   "variable-set",
   "variable-condition",
   "flow",

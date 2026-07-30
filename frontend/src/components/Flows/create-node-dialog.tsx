@@ -6,6 +6,8 @@ import { QueueFormDialog } from "@/components/Queues/queue-form-dialog"
 import { useQueues } from "@/hooks/use-queues"
 import { RequestTemplateFormDialog } from "@/components/RequestTemplates/request-template-form-dialog"
 import { useRequestTemplates } from "@/hooks/use-request-templates"
+import { IxcNodeFormDialog } from "@/components/Ixc/ixc-node-form-dialog"
+import { useIxcNodes } from "@/hooks/use-ixc-nodes"
 import { TimeConditionFormDialog } from "@/components/TimeConditions/time-condition-form-dialog"
 import { useTimeConditions } from "@/hooks/use-time-conditions"
 import { HolidayGroupFormDialog } from "@/components/HolidayGroups/holiday-group-form-dialog"
@@ -134,6 +136,31 @@ export function CreateNodeDialog({
                     companies={companies}
                     onSave={async (form) => {
                         const resourceId = await createRequestTemplate(
+                            form,
+                            companyId,
+                            true
+                        )
+                        if (!resourceId) return false
+                        const { companyId: _companyId, ...creationDto } = form
+                        await onCreated(
+                            { id: resourceId, label: form.name },
+                            creationDto
+                        )
+                        return true
+                    }}
+                />
+            )
+        }
+        case "ixc": {
+            const { createIxcNode } = useIxcNodes()
+            return (
+                <IxcNodeFormDialog
+                    open={open}
+                    onOpenChange={onOpenChange}
+                    ixcNode={null}
+                    companies={companies}
+                    onSave={async (form) => {
+                        const resourceId = await createIxcNode(
                             form,
                             companyId,
                             true

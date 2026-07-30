@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router"
 
 
 import { useState } from "react"
-import { PlusIcon } from "lucide-react"
+import { DownloadIcon, PlusIcon } from "lucide-react"
 
 import { CompanyFilter } from "@/components/company-filter"
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog"
@@ -17,6 +17,12 @@ import { useCompanies } from "@/hooks/use-companies"
 import { useCompanyFilter } from "@/hooks/use-company-filter"
 import { useDids, type Did } from "@/hooks/use-dids"
 import { usePagination } from "@/hooks/use-pagination"
+
+const DID_STATUS_LABELS: Record<Did["status"], string> = {
+    active: "Ativo",
+    inactive: "Inativo",
+    blocked: "Bloqueado",
+}
 
 function DidsPage() {
     const { companies } = useCompanies()
@@ -46,16 +52,51 @@ function DidsPage() {
         return deleteDid(deleteTarget.id)
     }
 
+    const csvCell = (value: string) => `"${value.replace(/"/g, '""')}"`
+
+    const companyName = (companyId: string) =>
+        companies.find((c) => c.id === companyId)?.name ?? companyId
+
+    const handleExport = () => {
+        if (dids.length === 0) return
+
+        const header = ["Número", "Empresa", "Status"]
+        const rows = dids.map((d) => [
+            d.number,
+            companyName(d.companyId),
+            DID_STATUS_LABELS[d.status],
+        ])
+        const csv = [header, ...rows]
+            .map((row) => row.map(csvCell).join(","))
+            .join("\n")
+
+        const blob = new Blob([`﻿${csv}`], {
+            type: "text/csv;charset=utf-8;",
+        })
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement("a")
+        link.href = url
+        link.download = "dids.csv"
+        link.click()
+        URL.revokeObjectURL(url)
+    }
+
     return (
         <div className="flex flex-col gap-4">
             <PageHeader
                 title="DIDs"
                 description="Gerencie os números DID das empresas"
             >
-                <Button onClick={() => setCreateOpen(true)}>
-                    <PlusIcon />
-                    Novo DID
-                </Button>
+                <div className="flex gap-2">
+                    <Button variant="outline" onClick={handleExport}>
+                        <DownloadIcon />
+                        Exportar
+                    </Button>
+                    <Button onClick={() => setCreateOpen(true)}>
+                        <PlusIcon />
+                        Novo DID
+                    </Button>
+                </div>
             </PageHeader>
 
             <FilterBar>

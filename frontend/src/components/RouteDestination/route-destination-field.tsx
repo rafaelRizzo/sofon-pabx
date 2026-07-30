@@ -13,6 +13,7 @@ import {
     ClockIcon,
     UsersIcon,
     WorkflowIcon,
+    NetworkIcon,
     type LucideIcon,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -47,6 +48,7 @@ export const ROUTE_DEST_TYPES = [
     "announcement",
     "ivr",
     "request",
+    "ixc",
     "variable-set",
     "variable-condition",
     "flow",
@@ -63,6 +65,7 @@ export const ROUTE_DEST_LABELS: Record<RouteDestinationType, string> = {
     announcement: "Anúncio",
     ivr: "URA",
     request: "Request Template",
+    ixc: "IXCsoft",
     "variable-set": "Setar variável",
     "variable-condition": "Validar variável",
     flow: "Flow",
@@ -84,6 +87,7 @@ export const ROUTE_DEST_ICONS: Record<RouteDestinationType, LucideIcon> = {
     announcement: MegaphoneIcon,
     ivr: ListTreeIcon,
     request: GlobeIcon,
+    ixc: NetworkIcon,
     "variable-set": BracesIcon,
     "variable-condition": FilterIcon,
     flow: WorkflowIcon,
@@ -129,6 +133,11 @@ export const routeDestinationSchema = z
             label: labelSchema,
         }),
         z.object({
+            type: z.literal("ixc"),
+            id: idSchema,
+            label: labelSchema,
+        }),
+        z.object({
             type: z.literal("variable-set"),
             id: idSchema,
             label: labelSchema,
@@ -167,6 +176,7 @@ export const ROUTE_DEST_EMPTY_MESSAGES: Record<
     announcement: "Nenhum anúncio cadastrado ainda",
     ivr: "Nenhuma URA cadastrada ainda",
     request: "Nenhum request template cadastrado ainda",
+    ixc: "Nenhum nó IXCsoft cadastrado ainda",
     "variable-set": "Nenhuma variável cadastrada ainda",
     "variable-condition": "Nenhuma condição de variável cadastrada ainda",
     flow: "Nenhum flow cadastrado ainda",
@@ -268,6 +278,16 @@ export async function fetchDestinationOptions(
                 name: string
             }[]
             return requestTemplates.map((r) => ({ id: r.id, label: r.name }))
+        }
+        case "ixc": {
+            const { data } = await api.get("/ixc-nodes", {
+                params: { companyId },
+            })
+            const ixcNodes = (data.ixcNodes ?? []) as {
+                id: string
+                name: string
+            }[]
+            return ixcNodes.map((n) => ({ id: n.id, label: n.name }))
         }
         case "variable-set": {
             const { data } = await api.get("/variables", {

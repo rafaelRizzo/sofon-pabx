@@ -27,6 +27,8 @@ export const PERMISSION_RESOURCES = [
   { key: "time-conditions", label: "Condições de horário" },
   { key: "holiday-groups", label: "Feriados" },
   { key: "request-templates", label: "Templates de requisição" },
+  { key: "integrations", label: "Credenciais de integração" },
+  { key: "ixc", label: "Nós IXCsoft" },
   { key: "variables", label: "Variáveis" },
   { key: "variable-conditions", label: "Condições de variável" },
   { key: "flows", label: "Flows" },

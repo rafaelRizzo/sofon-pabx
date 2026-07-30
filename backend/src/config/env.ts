@@ -62,6 +62,9 @@ const envSchema = z.object({
     ELEVENLABS_API_URL: z.string().default('https://api.elevenlabs.io'),
     ELEVENLABS_MODEL_ID: z.string().default('eleven_multilingual_v2'),
     ELEVENLABS_TIMEOUT_MS: z.coerce.number().int().min(1000).max(60000).default(30000),
+    // Master key pra derivar (HKDF, por companyId) a chave AES-256-GCM de segredos de terceiro
+    // cifrados em repouso — ver src/lib/crypto.ts. Hoje só usada por IxcCredential.token.
+    ENCRYPTION_MASTER_KEY: z.string().default('your-encryption-master-key-change-in-production'),
 }).superRefine((cfg, ctx) => {
     // Em produção os defaults públicos de JWT_SECRET/REFRESH_SECRET são inaceitáveis (tokens forjáveis
     // por quem lê o repo). Exige segredos próprios, fortes e distintos — só falha em produção pra não
@@ -77,6 +80,9 @@ const envSchema = z.object({
     check('REFRESH_SECRET')
     if (cfg.JWT_SECRET === cfg.REFRESH_SECRET) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['REFRESH_SECRET'], message: 'REFRESH_SECRET must differ from JWT_SECRET' })
+    }
+    if (!cfg.ENCRYPTION_MASTER_KEY || cfg.ENCRYPTION_MASTER_KEY.length < 32 || cfg.ENCRYPTION_MASTER_KEY.startsWith('your-')) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['ENCRYPTION_MASTER_KEY'], message: 'ENCRYPTION_MASTER_KEY must be a strong custom secret (>= 32 chars) in production' })
     }
 })
 

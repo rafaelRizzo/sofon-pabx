@@ -55,6 +55,22 @@ export const audiosRoutes = async (app: FastifyInstance) => {
         },
     }, AudiosController.getAudioById as any)
 
+    router.get('/audios/:id/file', {
+        onRequest: [...protectedRoute, requirePermission('audios', 'view')],
+        schema: {
+            tags: ['Audios'],
+            summary: 'Baixar/ouvir o arquivo de áudio',
+            description: 'Faz streaming do .wav convertido. 404 se o áudio ou o arquivo em disco não existir.',
+            security: [{ bearerAuth: [] }],
+            params: idParamSchema,
+            response: {
+                401: errors[401],
+                403: errors[403],
+                404: errors[404],
+            },
+        },
+    }, AudiosController.getAudioFile as any)
+
     router.post('/audios', {
         ...uploadRateLimit,
         onRequest: [...protectedRoute, requirePermission('audios', 'manage')],
