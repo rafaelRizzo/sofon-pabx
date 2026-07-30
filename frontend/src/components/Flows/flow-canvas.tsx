@@ -2068,9 +2068,9 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
                                                     null
                                                 setPendingAction(action.id)
                                             }}
-                                            className="flex items-start gap-2.5 rounded-md border border-border/70 bg-card p-2.5 text-left shadow-sm transition-colors hover:border-primary/40 hover:bg-accent active:cursor-grabbing"
+                                            className="flex items-start gap-2.5 rounded-md border border-border/70 bg-card p-2.5 text-left shadow-sm transition-all duration-150 hover:border-foreground/20 hover:bg-accent/40 hover:shadow-md active:cursor-grabbing"
                                         >
-                                            <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                                            <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary dark:bg-primary/20 dark:text-violet-400">
                                                 <Icon className="size-3.5" />
                                             </span>
                                             <span className="flex flex-col gap-0.5">
