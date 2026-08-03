@@ -16,6 +16,7 @@ readonly NC='\033[0m'
 readonly ASTERISK_VERSION="22.10.1"
 readonly PJSIP_PORT=5060
 readonly IAX_PORT=4569
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PUBLIC_ADDRESS=""
 LOCAL_NET=""
 OS_NAME=""
@@ -578,104 +579,31 @@ log "Asterisk iniciado"
 sleep 1
 
 # ============================================================
-# STEP 11 - FIREWALL (nftables)
+# STEP 11 - FIREWALL (nftables + Fail2Ban + manage-fw)
+# Delega pro firewall.sh do manage-fw (vendorizado neste diretório) — em vez de
+# duplicar aqui a lógica de nftables/Fail2Ban/manage-fw, reusa o script genérico
+# (backup+diff automático do nftables.conf, --update, --reload, restore do Docker).
 # ============================================================
 show_header
 show_progress 11 13 "Configurando firewall"
 
-# Desativa UFW — conflita com nftables
-if command -v ufw &>/dev/null; then
-    ufw disable >> "$LOG_FILE" 2>&1 || true
-    systemctl disable ufw >> "$LOG_FILE" 2>&1 || true
-    log "UFW desativado"
-fi
+"$SCRIPT_DIR/firewall.sh" \
+    --log "$LOG_FILE" \
+    --extra-ssh 21122 \
+    --tcp-public 81 \
+    --tcp "$PJSIP_PORT" \
+    --udp "$PJSIP_PORT,$IAX_PORT" \
+    --udp-range 10000-20000 \
+    --local-tcp 5038 \
+    --private-tcp 3333 \
+    --fail2ban \
+    --jail-name asterisk \
+    --jail-ports "$PJSIP_PORT,$IAX_PORT" \
+    --jail-logpath /var/log/asterisk/messages \
+    --jail-filter "$SCRIPT_DIR/asterisk-fail2ban.filter" \
+    || err "Falha ao configurar firewall (nftables/Fail2Ban/manage-fw)"
 
-DEBIAN_FRONTEND=noninteractive apt-get install -y nftables conntrack >> "$LOG_FILE" 2>&1 || err "Falha ao instalar nftables"
-
-mkdir -p /etc/fail2ban
-[[ -f /etc/fail2ban/ip.whitelist ]] || touch /etc/fail2ban/ip.whitelist
-
-# Lê whitelist existente para popular o set inicial
-INITIAL_ELEMENTS=$(grep -v '^[[:space:]]*#\|^[[:space:]]*$' /etc/fail2ban/ip.whitelist 2>/dev/null \
-    | tr '\n' ',' | sed 's/,$//' | sed 's/,/, /g' || true)
-
-JAIL_PORTS="$PJSIP_PORT,$IAX_PORT"
-
-{
-    echo '#!/usr/sbin/nft -f'
-    echo ''
-    echo '# Recria apenas nossa tabela — preserva tabelas do Docker'
-    echo 'add table inet filter'
-    echo 'flush table inet filter'
-    echo ''
-    echo 'table inet filter {'
-    echo ''
-    echo '    set whitelist {'
-    echo '        type ipv4_addr'
-    echo '        flags interval'
-    if [[ -n "$INITIAL_ELEMENTS" ]]; then
-        echo "        elements = { ${INITIAL_ELEMENTS} }"
-    fi
-    echo '    }'
-    echo ''
-    echo '    chain input {'
-    echo '        type filter hook input priority 0; policy drop;'
-    echo ''
-    echo '        iif "lo" accept'
-    echo '        ct state established,related accept'
-    echo '        ip protocol icmp accept'
-    echo '        ip6 nexthdr ipv6-icmp accept'
-    echo ''
-    echo '        tcp dport { 22, 21122 } accept'
-    echo ''
-    echo '        # Nginx Proxy Manager (host) — 80/443 público (HTTP/HTTPS + ACME), 81 painel admin'
-    echo '        tcp dport { 80, 443, 81 } accept'
-    echo ''
-    echo "        ip saddr @whitelist tcp dport ${PJSIP_PORT} accept"
-    echo "        ip saddr @whitelist udp dport ${PJSIP_PORT} accept"
-    echo "        ip saddr @whitelist udp dport ${IAX_PORT} accept"
-    echo ''
-    echo '        ip saddr @whitelist udp dport 10000-20000 accept'
-    echo ''
-    echo '        ip saddr 127.0.0.1 tcp dport 5038 accept'
-    echo ''
-    echo '        # Backend (3333, network_mode host) — só redes privadas/Docker, nunca exposto à internet'
-    echo '        ip saddr { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } tcp dport 3333 accept'
-    echo '    }'
-    echo ''
-    echo '    chain forward {'
-    echo '        type filter hook forward priority 0; policy accept;'
-    echo '    }'
-    echo ''
-    echo '    chain output {'
-    echo '        type filter hook output priority 0; policy accept;'
-    echo '    }'
-    echo '}'
-} > /etc/nftables.conf
-
-nft -f /etc/nftables.conf >> "$LOG_FILE" 2>&1 || err "Falha ao aplicar regras nftables"
-systemctl enable nftables >> "$LOG_FILE" 2>&1 || true
-log "Firewall nftables configurado (SSH 22+21122, PJSIP/RTP whitelist-only, AMI localhost-only)"
-
-# Docker perde as regras de MASQUERADE quando nftables é recarregado
-if systemctl is-active --quiet docker 2>/dev/null; then
-    warn "Docker detectado — reiniciando para restaurar regras de NAT (MASQUERADE)..."
-    systemctl restart docker >> "$LOG_FILE" 2>&1 || warn "Falha ao reiniciar Docker"
-    log "Docker reiniciado — regras de MASQUERADE restauradas"
-fi
-
-# systemctl restart/start nftables (não só durante este install — qualquer restart manual depois)
-# aplica um `nft flush ruleset` global antes de recarregar /etc/nftables.conf, que só recria a
-# tabela "inet filter" — as tabelas/regras de NAT que o Docker criou dinamicamente somem e não
-# voltam sozinhas. Esse drop-in faz o Docker se restaurar sozinho toda vez que o nftables reiniciar,
-# não só nesta instalação (try-restart não falha se o Docker não estiver instalado/rodando).
-mkdir -p /etc/systemd/system/nftables.service.d
-cat > /etc/systemd/system/nftables.service.d/docker-restore.conf << 'EOF'
-[Service]
-ExecStartPost=-/usr/bin/systemctl try-restart docker
-EOF
-systemctl daemon-reload >> "$LOG_FILE" 2>&1 || true
-log "Drop-in criado: nftables reiniciado sempre restaura as regras de NAT do Docker"
+log "Firewall configurado (SSH 22+21122, PJSIP/IAX2/RTP whitelist-only, AMI localhost-only, Fail2Ban ativo, manage-fw instalado)"
 
 # ============================================================
 # STEP 12 - SEGURANÇA
@@ -725,70 +653,7 @@ asterisk -rx "logger reload" >> "$LOG_FILE" 2>&1 || true
 sleep 2
 log "Logger configurado → /var/log/asterisk/messages"
 
-# --- Fail2Ban ---
-DEBIAN_FRONTEND=noninteractive apt-get install -y fail2ban >> "$LOG_FILE" 2>&1 || warn "Fail2Ban não instalado"
-mkdir -p /etc/fail2ban/filter.d /etc/fail2ban/jail.d /etc/fail2ban/action.d
-
-# FIX: padrões de falha de auth IAX2 (chan_iax2) têm formato de log próprio, diferente de
-# pjsip/chan_sip — não testado contra Asterisk real ainda, validar contra /var/log/asterisk/messages
-# depois do primeiro deploy e ajustar o regex se o wording da versão instalada divergir.
-cat > /etc/fail2ban/filter.d/asterisk.conf << 'EOF'
-[Definition]
-failregex = NOTICE\[\d+\].*failed for '?<HOST>:\d+'?.*(No matching endpoint|Failed to authenticate|Wrong password)
-            NOTICE\[\d+\].*Registration from.*failed for '?<HOST>:\d+'?
-            NOTICE\[\d+\].*Rejected connect attempt from <HOST>
-            NOTICE\[\d+\].*[Aa]uth(entication)? failure.*<HOST>
-
-ignoreregex =
-EOF
-
-# FIX: a action nftables-allports de fábrica só bloqueia TCP (meta l4proto tcp),
-# ignorando UDP mesmo com protocol=udp,tcp no jail — SIP é majoritariamente UDP.
-# Action própria: bloqueia por IP sem restrição de protocolo.
-cat > /etc/fail2ban/action.d/nftables-asterisk.conf << 'EOF'
-[Definition]
-actionstart = nft add table inet f2b-<name>
-              nft add set inet f2b-<name> addr-set-<name> { type ipv4_addr\; }
-              nft add chain inet f2b-<name> f2b-chain { type filter hook input priority filter - 1\; }
-              nft add rule inet f2b-<name> f2b-chain ip saddr @addr-set-<name> drop
-
-actionstop = nft delete table inet f2b-<name>
-
-actioncheck = nft list table inet f2b-<name> >/dev/null 2>&1
-
-actionban = nft add element inet f2b-<name> addr-set-<name> { <ip> }
-
-actionunban = nft delete element inet f2b-<name> addr-set-<name> { <ip> }
-
-[Init]
-name = default
-EOF
-
-WHITELIST_F2B=$(grep -v '^#\|^$' /etc/fail2ban/ip.whitelist 2>/dev/null | tr '\n' ' ' || true)
-
-cat > /etc/fail2ban/jail.d/asterisk.conf << EOF
-[asterisk]
-enabled   = true
-port      = ${JAIL_PORTS}
-protocol  = udp,tcp
-filter    = asterisk
-logpath   = /var/log/asterisk/messages
-maxretry  = 3
-findtime  = 300
-bantime   = 86400
-ignoreip  = 127.0.0.1/8 ::1 ${WHITELIST_F2B}
-action    = nftables-asterisk[name=asterisk]
-EOF
-
-systemctl enable fail2ban >> "$LOG_FILE" 2>&1 || true
-systemctl restart fail2ban >> "$LOG_FILE" 2>&1 || warn "Fail2Ban não reiniciou"
-
-sleep 2
-while IFS= read -r ip; do
-    [[ "$ip" =~ ^#|^$ ]] && continue
-    fail2ban-client set asterisk unbanip "$ip" >> "$LOG_FILE" 2>&1 || true
-done < /etc/fail2ban/ip.whitelist
-log "Fail2Ban configurado"
+# Fail2Ban, filtro, jail e manage-fw já configurados pelo firewall.sh no STEP 11.
 
 AMI_SECRET="$(openssl rand -base64 24)"
 cat > /etc/asterisk/manager.conf << EOF
@@ -820,196 +685,7 @@ chown -R asterisk:asterisk /etc/asterisk
 asterisk -rx "manager reload" >> "$LOG_FILE" 2>&1 || true
 log "Hardening aplicado"
 
-# --- manage-fw (helper global — whitelist nftables + Fail2Ban) ---
-cat > /usr/local/sbin/manage-fw << 'MANAGE_FW_EOF'
-#!/bin/bash
-# manage-fw — gerencia whitelist de IPs no nftables + Fail2Ban (Asterisk)
-# Uso: manage-fw {add|remove|list} [IP[/CIDR]]
-
-set -euo pipefail
-
-readonly GREEN='\033[0;32m'
-readonly RED='\033[0;31m'
-readonly YELLOW='\033[1;33m'
-readonly CYAN='\033[0;36m'
-readonly BOLD='\033[1m'
-readonly NC='\033[0m'
-
-WHITELIST="/etc/fail2ban/ip.whitelist"
-NFT_CONF="/etc/nftables.conf"
-JAIL_CONF="/etc/fail2ban/jail.d/asterisk.conf"
-JAIL_NAME="asterisk"
-
-log()  { echo -e "${GREEN}[+]${NC} $1"; }
-warn() { echo -e "${YELLOW}[!]${NC} $1"; }
-err()  { echo -e "${RED}[x]${NC} $1" >&2; exit 1; }
-
-[[ $EUID -eq 0 ]] || err "Execute como root: sudo manage-fw $*"
-
-validate_ip() {
-    local ip=$1
-    [[ $ip =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}(/([0-9]|[1-2][0-9]|3[0-2]))?$ ]] || return 1
-    local base; base=$(cut -d/ -f1 <<< "$ip")
-    IFS='.' read -ra A <<< "$base"
-    for i in "${A[@]}"; do [[ $i -le 255 ]] || return 1; done
-    return 0
-}
-
-# Atualiza elements = { ... } no nftables.conf e recarrega
-rebuild_nft_whitelist() {
-    local elements
-    elements=$(grep -v '^[[:space:]]*#\|^[[:space:]]*$' "$WHITELIST" 2>/dev/null \
-        | tr '\n' ',' | sed 's/,$//' | sed 's/,/, /g' || true)
-
-    sed -i '/set whitelist {/,/^    }/{/elements = {/d}' "$NFT_CONF"
-
-    if [[ -n "$elements" ]]; then
-        sed -i "/flags interval/a\\        elements = { ${elements} }" "$NFT_CONF"
-    fi
-
-    nft -f "$NFT_CONF" 2>/dev/null && log "nftables recarregado" || warn "Falha ao recarregar nftables"
-}
-
-reload_fail2ban() {
-    if [[ -f "$JAIL_CONF" ]]; then
-        local wl; wl=$(grep -v '^[[:space:]]*#\|^[[:space:]]*$' "$WHITELIST" 2>/dev/null | tr '\n' ' ' || true)
-        sed -i "s|^ignoreip.*|ignoreip  = 127.0.0.1/8 ::1 ${wl}|" "$JAIL_CONF"
-        fail2ban-client reload &>/dev/null && log "Fail2Ban recarregado" || warn "Fail2Ban não recarregou"
-    fi
-}
-
-cmd_add() {
-    local ip=$1
-    validate_ip "$ip" || err "IP inválido: $ip  (ex: 1.2.3.4 ou 10.0.0.0/24)"
-
-    if grep -qxF "$ip" "$WHITELIST" 2>/dev/null; then
-        warn "$ip já está na whitelist"
-    else
-        echo "$ip" >> "$WHITELIST"
-        log "$ip adicionado"
-    fi
-
-    nft add element inet filter whitelist { $ip } 2>/dev/null || true
-    rebuild_nft_whitelist
-    reload_fail2ban
-    fail2ban-client set "$JAIL_NAME" unbanip "$ip" &>/dev/null || true
-
-    echo ""
-    echo -e "${GREEN}✓ $ip liberado — acesso às portas SIP/RTP permitido${NC}"
-}
-
-cmd_remove() {
-    local ip=$1
-    validate_ip "$ip" || err "IP inválido: $ip"
-
-    if grep -qxF "$ip" "$WHITELIST" 2>/dev/null; then
-        sed -i "\|^${ip}$|d" "$WHITELIST"
-        log "$ip removido"
-    else
-        warn "$ip não está na whitelist"
-        return 0
-    fi
-
-    nft delete element inet filter whitelist { $ip } 2>/dev/null || true
-    rebuild_nft_whitelist
-    reload_fail2ban
-
-    # Sem isso, conexões UDP já estabelecidas (conntrack ASSURED) continuam passando
-    # pela regra "ct state established,related accept" mesmo depois do IP sair da whitelist
-    if command -v conntrack &>/dev/null; then
-        conntrack -D -s "$ip" &>/dev/null || true
-        conntrack -D -d "$ip" &>/dev/null || true
-        log "Conntrack limpo para $ip"
-    fi
-
-    echo ""
-    echo -e "${GREEN}✓ $ip removido — acesso bloqueado${NC}"
-}
-
-cmd_reload() {
-    rebuild_nft_whitelist
-    reload_fail2ban
-
-    # nft -f só recria a tabela "inet filter" (ver header do nftables.conf) — não deveria derrubar
-    # as regras de NAT do Docker, mas o try-restart aqui cobre o caso de alguém ter rodado um
-    # `systemctl restart nftables` cru antes (esse sim faz flush geral) e só depois lembrar do reload
-    if systemctl is-active --quiet docker 2>/dev/null; then
-        systemctl try-restart docker &>/dev/null || warn "Falha ao reiniciar Docker"
-        log "Docker verificado/restaurado"
-    fi
-
-    echo ""
-    echo -e "${GREEN}✓ nftables + Fail2Ban recarregados${NC}"
-}
-
-cmd_list() {
-    echo ""
-    echo -e "${CYAN}══════════════════════════════════════════${NC}"
-    echo -e "  ${BOLD}Whitelist — IPs com acesso liberado${NC}"
-    echo -e "${CYAN}══════════════════════════════════════════${NC}"
-
-    if [[ ! -f "$WHITELIST" ]] || ! grep -qv '^[[:space:]]*#\|^[[:space:]]*$' "$WHITELIST" 2>/dev/null; then
-        echo -e "  ${YELLOW}(vazia — portas SIP/RTP bloqueadas para todos)${NC}"
-    else
-        grep -v '^[[:space:]]*#\|^[[:space:]]*$' "$WHITELIST" | while read -r ip; do
-            echo -e "  ${GREEN}●${NC} $ip"
-        done
-    fi
-
-    echo ""
-    echo -e "${CYAN}  Set nftables atual:${NC}"
-    nft list set inet filter whitelist 2>/dev/null \
-        | grep -E 'elements|^}' \
-        | sed 's/^/    /' \
-        || echo -e "    ${YELLOW}(set não encontrado)${NC}"
-
-    echo ""
-    echo -e "${CYAN}  Banidos atualmente (Fail2Ban):${NC}"
-    banned=$(fail2ban-client status asterisk 2>/dev/null | grep "Banned IP" | cut -d: -f2 | tr ' ' '\n' | grep -v '^$' || true)
-    if [[ -z "$banned" ]]; then
-        echo -e "    ${GREEN}(nenhum)${NC}"
-    else
-        echo "$banned" | while read -r ip; do
-            echo -e "    ${RED}✗${NC} $ip"
-        done
-    fi
-    echo ""
-}
-
-CMD="${1:-}"
-IP="${2:-}"
-
-case "$CMD" in
-    add)
-        [[ -n "$IP" ]] || err "Uso: manage-fw add <IP[/CIDR]>"
-        cmd_add "$IP"
-        ;;
-    remove|rm)
-        [[ -n "$IP" ]] || err "Uso: manage-fw remove <IP[/CIDR]>"
-        cmd_remove "$IP"
-        ;;
-    list|ls)
-        cmd_list
-        ;;
-    reload)
-        cmd_reload
-        ;;
-    *)
-        echo -e "${BOLD}Uso:${NC} manage-fw {add|remove|list|reload} [IP]"
-        echo ""
-        echo "  add    <IP>  — libera IP nas portas SIP/RTP"
-        echo "  remove <IP>  — bloqueia IP"
-        echo "  list         — whitelist + set nftables + banidos"
-        echo "  reload       — reaplica nftables (só a tabela nossa) + Fail2Ban, restaura Docker se precisar"
-        echo ""
-        echo "  Suporta CIDR: manage-fw add 10.0.0.0/24"
-        exit 1
-        ;;
-esac
-MANAGE_FW_EOF
-
-chmod +x /usr/local/sbin/manage-fw
-log "manage-fw instalado em /usr/local/sbin/manage-fw"
+# manage-fw já instalado em /usr/local/sbin/manage-fw pelo firewall.sh no STEP 11.
 
 # ============================================================
 # STEP 13 - SINCRONIZAR .ENV DO BACKEND

@@ -1,0 +1,12 @@
+# Filtro Fail2Ban p/ falhas de autenticação PJSIP/IAX2 — usado via
+# firewall.sh --jail-filter (ver STEP 11 de install-asterisk.sh).
+# FIX: padrões de falha de auth IAX2 (chan_iax2) têm formato de log próprio, diferente de
+# pjsip/chan_sip — não testado contra Asterisk real ainda, validar contra /var/log/asterisk/messages
+# depois do primeiro deploy e ajustar o regex se o wording da versão instalada divergir.
+[Definition]
+failregex = NOTICE\[\d+\].*failed for '?<HOST>:\d+'?.*(No matching endpoint|Failed to authenticate|Wrong password)
+            NOTICE\[\d+\].*Registration from.*failed for '?<HOST>:\d+'?
+            NOTICE\[\d+\].*Rejected connect attempt from <HOST>
+            NOTICE\[\d+\].*[Aa]uth(entication)? failure.*<HOST>
+
+ignoreregex =

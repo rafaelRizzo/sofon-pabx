@@ -169,6 +169,12 @@ sudo ./install-asterisk.sh
 
 Compila e instala o Asterisk, configura PJSIP + IAX2 (sem `chan_sip`), aplica o firewall (`nftables`) e o Fail2Ban, gera as credenciais do AMI (**anote o `AMI_SECRET`** exibido no resumo final) e cria os diretórios que o backend vai montar como volume (`/etc/asterisk/dialplan-extra`, `/var/lib/asterisk/sounds`).
 
+O firewall/Fail2Ban/`manage-fw` são delegados pro `backend/setups/firewall.sh`, uma cópia vendorizada de [`manage-fw`](https://github.com/rafaelRizzo/manage-fw) — não é submodule nem clonado no install, então uma mudança no repo `manage-fw` não propaga sozinha. Pra atualizar a cópia depois de um fix lá:
+
+```bash
+cp ../../../manage-fw/firewall.sh backend/setups/firewall.sh
+```
+
 ### 3. Nginx Proxy Manager
 
 ```yaml
