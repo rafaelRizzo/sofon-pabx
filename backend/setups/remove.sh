@@ -165,6 +165,8 @@ if [[ $REMOVE_FW =~ ^[SsYy]$ ]]; then
 
     rm -rf /etc/manage-fw 2>/dev/null && log "  Removido: /etc/manage-fw (config + backups do firewall.sh)" || true
 
+    rm -rf /opt/manage-fw 2>/dev/null && log "  Removido: /opt/manage-fw (clone do repo)" || true
+
     log "Removendo configurações Fail2Ban do Asterisk..."
     for f in \
         /etc/fail2ban/jail.d/asterisk.conf \

@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-# INSTALADOR SOFON PBX v7.3 - PJSIP + IAX2 (sem Docker, sem chan_sip)
+# INSTALADOR SOFON PBX v7.4 - PJSIP + IAX2 (sem Docker, sem chan_sip)
 # Debian 11+ | Ubuntu 24.04+ | Asterisk 22.7.0 LTS
 # ============================================================
 
@@ -36,7 +36,7 @@ show_header() {
     clear
     echo ""
     echo -e "${CYAN}════════════════════════════════════════════════════════${NC}"
-    echo -e "  ${BOLD}INSTALADOR SOFON PBX v6.3 - PJSIP + IAX2${NC}"
+    echo -e "  ${BOLD}INSTALADOR SOFON PBX v7.4 - PJSIP + IAX2${NC}"
     echo -e "${CYAN}════════════════════════════════════════════════════════${NC}"
     echo ""
 }
@@ -580,14 +580,24 @@ sleep 1
 
 # ============================================================
 # STEP 11 - FIREWALL (nftables + Fail2Ban + manage-fw)
-# Delega pro firewall.sh do manage-fw (vendorizado neste diretório) — em vez de
-# duplicar aqui a lógica de nftables/Fail2Ban/manage-fw, reusa o script genérico
-# (backup+diff automático do nftables.conf, --update, --reload, restore do Docker).
+# Clona o manage-fw (https://github.com/rafaelRizzo/manage-fw) e delega pro
+# firewall.sh dele — em vez de duplicar aqui a lógica de nftables/Fail2Ban/
+# manage-fw, reusa o script genérico (backup+diff automático do nftables.conf,
+# --update, --reload, restore do Docker).
 # ============================================================
 show_header
 show_progress 11 13 "Configurando firewall"
 
-"$SCRIPT_DIR/firewall.sh" \
+MANAGE_FW_DIR="/opt/manage-fw"
+if [[ -d "$MANAGE_FW_DIR/.git" ]]; then
+    git -C "$MANAGE_FW_DIR" pull --ff-only >> "$LOG_FILE" 2>&1 || warn "Falha ao atualizar manage-fw, usando cópia local existente"
+else
+    rm -rf "$MANAGE_FW_DIR"
+    git clone --depth 1 https://github.com/rafaelRizzo/manage-fw.git "$MANAGE_FW_DIR" >> "$LOG_FILE" 2>&1 \
+        || err "Falha ao clonar manage-fw"
+fi
+
+bash "$MANAGE_FW_DIR/firewall.sh" \
     --log "$LOG_FILE" \
     --extra-ssh 21122 \
     --tcp-public 81 \
