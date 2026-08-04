@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-# INSTALADOR SOFON PBX v7.5 - PJSIP + IAX2 (sem Docker, sem chan_sip)
+# INSTALADOR SOFON PBX v7.6 - PJSIP + IAX2 (sem Docker, sem chan_sip)
 # Debian 11+ | Ubuntu 24.04+ | Asterisk 22.7.0 LTS
 # ============================================================
 
@@ -36,7 +36,7 @@ show_header() {
     clear
     echo ""
     echo -e "${CYAN}════════════════════════════════════════════════════════${NC}"
-    echo -e "  ${BOLD}INSTALADOR SOFON PBX v7.5 - PJSIP + IAX2${NC}"
+    echo -e "  ${BOLD}INSTALADOR SOFON PBX v7.6 - PJSIP + IAX2${NC}"
     echo -e "${CYAN}════════════════════════════════════════════════════════${NC}"
     echo ""
 }
@@ -722,16 +722,17 @@ set_env_var() {
     fi
 }
 
-echo -ne "${CYAN}→${NC} Caminho do .env do backend [/opt/sofon-pabx/backend/.env] (Enter p/ pular): "
-read -r BACKEND_ENV_FILE
+# SCRIPT_DIR é backend/setups — o .env do backend está sempre um nível acima,
+# independente do diretório de onde o installer foi chamado.
+BACKEND_ENV_FILE="$SCRIPT_DIR/../.env"
 
-if [[ -n "$BACKEND_ENV_FILE" && -f "$BACKEND_ENV_FILE" ]]; then
+if [[ -f "$BACKEND_ENV_FILE" ]]; then
     set_env_var "$BACKEND_ENV_FILE" "ASTERISK_VERSION" "$ASTERISK_VERSION"
     set_env_var "$BACKEND_ENV_FILE" "SIP_LEGACY_ENABLED" "false"
     set_env_var "$BACKEND_ENV_FILE" "PJSIP_PORT" "$PJSIP_PORT"
     log "Backend .env atualizado (${BACKEND_ENV_FILE}) — reinicie o serviço do backend para aplicar"
 else
-    warn "Backend .env não localizado — adicione manualmente:"
+    warn "Backend .env não encontrado em ${BACKEND_ENV_FILE} — adicione manualmente:"
     echo "    ASTERISK_VERSION=${ASTERISK_VERSION}"
     echo "    SIP_LEGACY_ENABLED=false"
     echo "    PJSIP_PORT=${PJSIP_PORT}"

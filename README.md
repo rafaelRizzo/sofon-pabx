@@ -243,7 +243,11 @@ Sobe na rede `proxy`, porta `3000` interna (não publicada no host — só alcan
 
 ### 7. Nginx Proxy Manager — Proxy Hosts
 
-No painel (`:81`), criar 2 Proxy Hosts com SSL (Let's Encrypt):
+Diferente do dev local (passo 4 da seção anterior, que usa `host.docker.internal` porque backend/frontend rodam nativos fora do Docker), em prod frontend e NPM estão na **mesma rede Docker `proxy`** — o forward do `app` usa o nome do service (`frontend`), não IP. O backend continua fora da rede (`network_mode: host`), então o forward do `api` aponta pro gateway da rede `proxy` em vez de um service name.
+
+Antes de criar os Proxy Hosts, aponte o DNS (A record) de `app.seudominio.com` e `api.seudominio.com` pro IP público da VPS — o Let's Encrypt (ACME) só emite certificado se o domínio já resolver pra cá.
+
+No painel (`:81`), criar 2 Proxy Hosts com SSL (Let's Encrypt) — em cada um, aba **SSL** → escolher "Request a new SSL Certificate" → habilitar "Force SSL":
 
 | Domínio | Forward Hostname/IP | Porta | Observação |
 |---|---|---|---|
