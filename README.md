@@ -264,6 +264,54 @@ curl -X POST https://api.seudominio.com/auth/register \
 
 Só funciona uma vez (enquanto `COUNT(users) === 0`) e sempre cria o primeiro usuário como `admin`. A partir daí, login pelo frontend (`app.seudominio.com`) e provisionar na ordem: Company → Extensions/Trunks/DIDs → Inbound/Outbound Routes → Queues. Docs interativas da API em `https://api.seudominio.com/docs`.
 
+### 9. Escalar backend em réplicas (opcional)
+
+Por padrão o passo 4 sobe **1 container** com `PROCESS_ROLE=all` (API HTTP + AGI + AMI events + jobs de cron, tudo no mesmo processo) — suficiente pra maioria dos casos. Se o backend virar gargalo de CPU sob carga real (não teste sintético — ver seção de troubleshooting de performance no histórico do projeto), dá pra separar em réplicas:
+
+- **`backend-worker`** (sempre **1 instância só**): AGI (porta fixa `4573`) + AMI events (listener único) + jobs de cron (`holiday-resync`, `agent-affinity-recalc`). Nunca escalar — duplicaria efeito colateral (job rodando 2x em paralelo) e conflitaria porta.
+- **`backend-web-N`** (escalável): só a API HTTP (Fastify), stateless. Cada réplica precisa de porta própria porque o backend roda em `network_mode: host` (não dá pra bindar a mesma porta 2x no host) — ex. `3333`, `3334`, `3335`.
+
+**1. `docker-compose.yml`** — trocar o service único `backend` por 1 `backend-worker` + N `backend-web-N`, cada um com `PROCESS_ROLE` e `PORT` (só web) via `environment:`. Ver exemplo completo em `backend/docker-compose.yml` (usa YAML anchor `x-backend-common` pra não duplicar `volumes`/`depends_on`/`build` entre os services).
+
+**2. Firewall** — cada porta nova de réplica web precisa ser liberada pro NPM alcançar (mesma faixa privada da porta `3333` original). Editar `backend/setups/install-asterisk.sh`, repetindo a flag `--private-tcp` (ela não aceita lista separada por vírgula, cada porta é uma flag):
+
+```bash
+--private-tcp 3333 \
+--private-tcp 3334 \
+--private-tcp 3335 \
+```
+
+Numa VPS já instalada, sem rodar o instalador inteiro de novo: pegar as flags salvas em `/etc/manage-fw/config.args` (root-only) e re-executar `bash /opt/manage-fw/firewall.sh --update` com o mesmo conjunto + as portas novas. **Atenção:** `--update` restarta o Docker inteiro pra ressincronizar as chains nftables — todo container da VPS reinicia junto (não só os do backend).
+
+**3. Nginx Proxy Manager** — o Proxy Host (passo 7) usa `proxy_pass` com variável (`$server:$port`), e nginx **não reaproveita conexão com o backend** nesse modo (limitação do nginx, não do NPM) — cada request abre TCP novo. Pra ter keepalive real de verdade entre nginx e as réplicas, dois arquivos:
+
+`~/nginx-proxy/data/nginx/custom/http_top.conf` (editar direto no filesystem do host — não é gerenciado pela UI do NPM, nunca é sobrescrito):
+```nginx
+upstream sofon_backend {
+    server 10.0.4.1:3333;
+    server 10.0.4.1:3334;
+    server 10.0.4.1:3335;
+    keepalive 64;
+}
+```
+(`10.0.4.1` = gateway da rede `proxy`, ver passo 7; ajustar pro IP real da sua VPS)
+
+No painel NPM → editar o Proxy Host da API → aba **Advanced** → "Custom Nginx Configuration" (esse campo sim é da UI, persiste no banco do NPM):
+```nginx
+location ~ ^/ {
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_pass http://sofon_backend;
+}
+```
+(`location ~ ^/` é regex e tem prioridade sobre o `location /` padrão gerado pelo NPM — não precisa remover nada, só evita conflito/duplicação.) Depois de criar o `http_top.conf`, `docker restart npm` (senão o `upstream` não existe ainda e o NPM recusa aplicar o Advanced por falha no `nginx -t`).
+
+**Ordem recomendada pra não derrubar produção sem perceber:** 1) firewall primeiro (senão as réplicas novas ficam inalcançáveis, parecendo "quebrado"), 2) `http_top.conf` + restart do NPM, 3) só then subir o `docker-compose.yml` com as réplicas.
+
 ### Liberar IPs de troncos/ramais remotos
 
 ```bash

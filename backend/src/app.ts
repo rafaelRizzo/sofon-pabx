@@ -48,6 +48,9 @@ const env = validateEnv()
 
 const app = Fastify({
     logger: false,
+    // 1 hop confiável (nginx/NPM) — sem isso, X-Forwarded-For é ignorado e request.ip vira sempre
+    // o IP do proxy, fazendo rate-limit por-IP e logs de IP virarem um limite/valor global disfarçado
+    trustProxy: 1,
     logController: new LogController({ requestIdLogLabel: 'reqId' }),
     requestIdHeader: 'x-request-id',
     genReqId: () => randomUUID(),

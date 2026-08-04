@@ -1,3 +1,26 @@
+x-backend-common: &backend-common
+  build:
+    context: .
+    dockerfile: Dockerfile
+  restart: unless-stopped
+  network_mode: host
+  env_file:
+    - .env
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  volumes:
+    # Diretório inteiro (não só dialplan-extra) — ensureBaseDialplan()/features.repository.ts
+    # (src/asterisk/) escrevem sofon-managed.conf/features.conf direto em /etc/asterisk pra
+    # autocurar drift sem reinstalar; sem montar o pai, esses caminhos só existiam dentro da
+    # imagem do container, nunca alcançando o Asterisk real do host. Web também escreve aqui
+    # (dialplan-file.repository.ts é chamado pelas rotas HTTP), não é exclusivo do worker.
+    - /etc/asterisk:/etc/asterisk
+    - /var/lib/asterisk/sounds:/var/lib/asterisk/sounds
+    - /var/spool/asterisk/monitor:/var/spool/asterisk/monitor:ro
+
 services:
   postgres:
     image: postgres:18.3-alpine3.23
@@ -46,35 +69,61 @@ services:
       timeout: 5s
       retries: 5
 
-  backend:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: sofon_backend
-    restart: unless-stopped
-    network_mode: host
-    env_file:
-      - .env
+  # Singleton — AGI (porta fixa 4573) + AMI events (listener único) + jobs de cron (holiday
+  # resync, recálculo de afinidade). Rodar mais de 1 réplica duplica efeito colateral (job
+  # recalculando penalty 2x em paralelo) e conflita porta no AGI — nunca escalar este serviço.
+  backend-worker:
+    <<: *backend-common
+    container_name: sofon_backend_worker
     environment:
-      # Com network_mode host, o backend acessa os serviços pelas portas publicadas no host.
+      PROCESS_ROLE: worker
       DATABASE_URL: postgresql://postgres:senha_forte@127.0.0.1:5433/asterisk
       REDIS_URL: redis://default:${REDIS_PASSWORD:?Defina REDIS_PASSWORD no .env}@127.0.0.1:6379
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    volumes:
-      # Diretório inteiro (não só dialplan-extra) — ensureBaseDialplan()/features.repository.ts
-      # (src/asterisk/) escrevem sofon-managed.conf/features.conf direto em /etc/asterisk pra
-      # autocurar drift sem reinstalar; sem montar o pai, esses caminhos só existiam dentro da
-      # imagem do container, nunca alcançando o Asterisk real do host.
-      - /etc/asterisk:/etc/asterisk
-      - /var/lib/asterisk/sounds:/var/lib/asterisk/sounds
-      - /var/spool/asterisk/monitor:/var/spool/asterisk/monitor:ro
+
+  # Réplicas web — API HTTP stateless, escalável. network_mode host exige porta própria por
+  # réplica (não dá pra bindar a mesma porta 2x no host); nginx (upstream sofon_backend) faz
+  # o load balancing entre as 3. Pra adicionar réplica: copiar bloco, trocar PORT/container_name,
+  # e adicionar a mesma porta no upstream do NPM.
+  backend-web-1:
+    <<: *backend-common
+    container_name: sofon_backend_web_1
+    environment:
+      PROCESS_ROLE: web
+      PORT: 3333
+      DATABASE_URL: postgresql://postgres:senha_forte@127.0.0.1:5433/asterisk
+      REDIS_URL: redis://default:${REDIS_PASSWORD:?Defina REDIS_PASSWORD no .env}@127.0.0.1:6379
     healthcheck:
-      # Sem curl/wget na imagem oven/bun — usa o próprio bun (sempre presente) pra checar GET /health
-      test: ["CMD-SHELL", "bun -e \"fetch('http://127.0.0.1:${PORT:-3333}/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      test: ["CMD-SHELL", "bun -e \"fetch('http://127.0.0.1:3333/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  backend-web-2:
+    <<: *backend-common
+    container_name: sofon_backend_web_2
+    environment:
+      PROCESS_ROLE: web
+      PORT: 3334
+      DATABASE_URL: postgresql://postgres:senha_forte@127.0.0.1:5433/asterisk
+      REDIS_URL: redis://default:${REDIS_PASSWORD:?Defina REDIS_PASSWORD no .env}@127.0.0.1:6379
+    healthcheck:
+      test: ["CMD-SHELL", "bun -e \"fetch('http://127.0.0.1:3334/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  backend-web-3:
+    <<: *backend-common
+    container_name: sofon_backend_web_3
+    environment:
+      PROCESS_ROLE: web
+      PORT: 3335
+      DATABASE_URL: postgresql://postgres:senha_forte@127.0.0.1:5433/asterisk
+      REDIS_URL: redis://default:${REDIS_PASSWORD:?Defina REDIS_PASSWORD no .env}@127.0.0.1:6379
+    healthcheck:
+      test: ["CMD-SHELL", "bun -e \"fetch('http://127.0.0.1:3335/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
       interval: 10s
       timeout: 5s
       retries: 5

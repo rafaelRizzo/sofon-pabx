@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-# INSTALADOR SOFON PBX v7.6 - PJSIP + IAX2 (sem Docker, sem chan_sip)
+# INSTALADOR SOFON PBX v7.7 - PJSIP + IAX2 (sem Docker, sem chan_sip)
 # Debian 11+ | Ubuntu 24.04+ | Asterisk 22.7.0 LTS
 # ============================================================
 
@@ -613,6 +613,8 @@ bash "$MANAGE_FW_DIR/firewall.sh" \
     --udp-range 10000-20000 \
     --local-tcp 5038 \
     --private-tcp 3333 \
+    --private-tcp 3334 \
+    --private-tcp 3335 \
     --fail2ban \
     --jail-name asterisk \
     --jail-ports "$PJSIP_PORT,$IAX_PORT" \

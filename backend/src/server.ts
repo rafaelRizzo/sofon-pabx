@@ -12,27 +12,40 @@ async function start() {
     try {
         // Validate environment variables
         const env = validateEnv()
-        logger.info({ event: 'env.validated' })
+        logger.info({ event: 'env.validated', role: env.PROCESS_ROLE })
 
-        // Connect to Redis
-        await connectRedis()
+        const runsWeb = env.PROCESS_ROLE === 'web' || env.PROCESS_ROLE === 'all'
+        const runsWorker = env.PROCESS_ROLE === 'worker' || env.PROCESS_ROLE === 'all'
 
-        // Autocura config estática do Asterisk (sofon-managed.conf/features.conf) a cada boot —
-        // deploy vira só "git pull + rebuild", sem precisar chamar resyncDialplan manualmente nem
-        // reinstalar o Asterisk pra propagar ajustes como transferdigittimeout. Nunca lança.
-        await ensureStaticAsteriskConfig()
+        if (runsWeb) {
+            // Redis só é usado pelo JTI (auth middleware), lado web
+            await connectRedis()
+        }
 
-        startAgiServer(env.AGI_HOST, env.AGI_PORT)
-        startAmiEvents()
-        startHolidayResyncJob()
-        startAgentAffinityRecalcJob()
+        if (runsWorker) {
+            // Autocura config estática do Asterisk (sofon-managed.conf/features.conf) a cada boot —
+            // deploy vira só "git pull + rebuild", sem precisar chamar resyncDialplan manualmente nem
+            // reinstalar o Asterisk pra propagar ajustes como transferdigittimeout. Nunca lança.
+            await ensureStaticAsteriskConfig()
 
-        await app.listen({ port: env.PORT, host: env.HOST })
-        logger.info({
-            event: 'server.started',
-            host: env.HOST,
-            port: env.PORT,
-        })
+            // AGI/AMI/jobs são singleton por natureza (porta fixa, listener de evento único, jobs
+            // idempotentes mas redundantes se duplicados) — nunca rodam em réplica 'web'
+            startAgiServer(env.AGI_HOST, env.AGI_PORT)
+            startAmiEvents()
+            startHolidayResyncJob()
+            startAgentAffinityRecalcJob()
+        }
+
+        if (runsWeb) {
+            await app.listen({ port: env.PORT, host: env.HOST })
+            logger.info({
+                event: 'server.started',
+                host: env.HOST,
+                port: env.PORT,
+            })
+        } else {
+            logger.info({ event: 'worker.started' })
+        }
     } catch (err) {
         logger.error({
             event: 'server.start.error',
@@ -43,17 +56,25 @@ async function start() {
     }
 }
 
+async function shutdown() {
+    const env = validateEnv()
+    if (env.PROCESS_ROLE === 'worker' || env.PROCESS_ROLE === 'all') {
+        await stopAmiEvents()
+    }
+    if (env.PROCESS_ROLE === 'web' || env.PROCESS_ROLE === 'all') {
+        await disconnectRedis()
+    }
+}
+
 process.on('SIGTERM', async () => {
     logger.info({ event: 'server.shutdown' })
-    await stopAmiEvents()
-    await disconnectRedis()
+    await shutdown()
     process.exit(0)
 })
 
 process.on('SIGINT', async () => {
     logger.info({ event: 'server.interrupt' })
-    await stopAmiEvents()
-    await disconnectRedis()
+    await shutdown()
     process.exit(0)
 })
 

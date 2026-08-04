@@ -2,6 +2,10 @@ import { z } from 'zod'
 
 const envSchema = z.object({
     NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+    // Controla o que esse processo sobe: 'web' (só API HTTP, escalável em N réplicas), 'worker'
+    // (AGI + AMI events + cron jobs, sempre 1 instância só) ou 'all' (tudo junto, default —
+    // preserva o comportamento de sempre em dev local/single-instance)
+    PROCESS_ROLE: z.enum(['web', 'worker', 'all']).default('all'),
     PORT: z.coerce.number().default(3333),
     HOST: z.string().default('0.0.0.0'),
     DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
