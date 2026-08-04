@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-# INSTALADOR SOFON PBX v7.4 - PJSIP + IAX2 (sem Docker, sem chan_sip)
+# INSTALADOR SOFON PBX v7.5 - PJSIP + IAX2 (sem Docker, sem chan_sip)
 # Debian 11+ | Ubuntu 24.04+ | Asterisk 22.7.0 LTS
 # ============================================================
 
@@ -36,7 +36,7 @@ show_header() {
     clear
     echo ""
     echo -e "${CYAN}════════════════════════════════════════════════════════${NC}"
-    echo -e "  ${BOLD}INSTALADOR SOFON PBX v7.4 - PJSIP + IAX2${NC}"
+    echo -e "  ${BOLD}INSTALADOR SOFON PBX v7.5 - PJSIP + IAX2${NC}"
     echo -e "${CYAN}════════════════════════════════════════════════════════${NC}"
     echo ""
 }
@@ -583,7 +583,10 @@ sleep 1
 # Clona o manage-fw (https://github.com/rafaelRizzo/manage-fw) e delega pro
 # firewall.sh dele — em vez de duplicar aqui a lógica de nftables/Fail2Ban/
 # manage-fw, reusa o script genérico (backup+diff automático do nftables.conf,
-# --update, --reload, restore do Docker).
+# --update, --reload, restore do Docker). --update mescla com o config salvo
+# numa reinstalação (mantém portas já liberadas + adiciona as novas do
+# installer) em vez de sobrescrever — só é passado se já existir config
+# anterior, senão o próprio firewall.sh recusa --update (sem baseline salva).
 # ============================================================
 show_header
 show_progress 11 13 "Configurando firewall"
@@ -597,7 +600,11 @@ else
         || err "Falha ao clonar manage-fw"
 fi
 
+FIREWALL_MODE_FLAG=()
+[[ -f /etc/manage-fw/config.args ]] && FIREWALL_MODE_FLAG=(--update)
+
 bash "$MANAGE_FW_DIR/firewall.sh" \
+    "${FIREWALL_MODE_FLAG[@]}" \
     --log "$LOG_FILE" \
     --extra-ssh 21122 \
     --tcp-public 81 \
