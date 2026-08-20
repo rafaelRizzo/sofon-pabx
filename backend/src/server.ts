@@ -17,13 +17,11 @@ async function start() {
         const runsWeb = env.PROCESS_ROLE === 'web' || env.PROCESS_ROLE === 'all'
         const runsWorker = env.PROCESS_ROLE === 'worker' || env.PROCESS_ROLE === 'all'
 
-        if (runsWeb) {
-            // Redis: JTI (auth middleware) + cache de entidades (config/cache.ts) — lado web.
-            // Cache de entidades precisa ser compartilhado (não node-cache em memória) porque
-            // roda em múltiplas réplicas web atrás do nginx; invalidação local não afetaria as
-            // outras réplicas (ver docker-compose.yml, "Réplicas web")
-            await connectRedis()
-        }
+        // Redis: JTI + cache de entidades (lado web) e cache de presence AMI (lado worker,
+        // ver ami-events.ts/writePresence) — precisa estar conectado nos dois papéis, senão
+        // toda escrita de presence no worker falha silenciosa com "The client is closed"
+        // (engolida por ami.events.handler.failed) e o status ao vivo nunca chega no Redis
+        await connectRedis()
 
         if (runsWorker) {
             // Autocura config estática do Asterisk (sofon-managed.conf/features.conf) a cada boot —
@@ -64,9 +62,7 @@ async function shutdown() {
     if (env.PROCESS_ROLE === 'worker' || env.PROCESS_ROLE === 'all') {
         await stopAmiEvents()
     }
-    if (env.PROCESS_ROLE === 'web' || env.PROCESS_ROLE === 'all') {
-        await disconnectRedis()
-    }
+    await disconnectRedis()
 }
 
 process.on('SIGTERM', async () => {

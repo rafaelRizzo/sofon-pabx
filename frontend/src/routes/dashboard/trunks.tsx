@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input"
 import { useCompanies } from "@/hooks/use-companies"
 import { useCompanyFilter } from "@/hooks/use-company-filter"
 import { usePagination } from "@/hooks/use-pagination"
+import { useRealtimeTrunks } from "@/hooks/use-realtime"
 import { useTrunks, type Trunk } from "@/hooks/use-trunks"
 
 function TrunksPage() {
@@ -31,6 +32,8 @@ function TrunksPage() {
         updateTrunk,
         deleteTrunk,
     } = useTrunks(companyFilter)
+
+    const { trunks: realtimeTrunks } = useRealtimeTrunks(companyFilter)
 
     const [createOpen, setCreateOpen] = useState(false)
     const [editTrunk, setEditTrunk] = useState<Trunk | null>(null)
@@ -74,6 +77,7 @@ function TrunksPage() {
 
             <TrunksTable
                 trunks={paginated}
+                realtimeTrunks={realtimeTrunks}
                 loading={loading}
                 companySelected={!!companyFilter}
                 onEdit={setEditTrunk}

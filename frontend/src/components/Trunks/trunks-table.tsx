@@ -2,6 +2,7 @@
 
 import { InfinityIcon, PencilIcon, Trash2Icon } from "lucide-react"
 
+import { PresenceBadge } from "@/components/presence-badge"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -19,10 +20,12 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { type RealtimeTrunk } from "@/hooks/use-realtime"
 import { type Trunk } from "@/hooks/use-trunks"
 
 type Props = {
     trunks: Trunk[]
+    realtimeTrunks: RealtimeTrunk[]
     loading: boolean
     companySelected: boolean
     onEdit: (trunk: Trunk) => void
@@ -31,11 +34,16 @@ type Props = {
 
 export function TrunksTable({
     trunks,
+    realtimeTrunks,
     loading,
     companySelected,
     onEdit,
     onDelete,
 }: Props) {
+    const presenceById = new Map(
+        realtimeTrunks.map((rt) => [rt.id, rt.presence])
+    )
+
     return (
         <div className="rounded-md border">
             <Table>
@@ -44,6 +52,7 @@ export function TrunksTable({
                         <TableHead>Nome</TableHead>
                         <TableHead>Tipo</TableHead>
                         <TableHead>Modo</TableHead>
+                        <TableHead>Status</TableHead>
                         <TableHead>Host</TableHead>
                         <TableHead>Codecs</TableHead>
                         <TableHead className="text-center">
@@ -56,7 +65,7 @@ export function TrunksTable({
                     {loading ? (
                         Array.from({ length: 3 }).map((_, i) => (
                             <TableRow key={i}>
-                                {Array.from({ length: 7 }).map((_, j) => (
+                                {Array.from({ length: 8 }).map((_, j) => (
                                     <TableCell key={j}>
                                         <Skeleton className="h-4 w-full" />
                                     </TableCell>
@@ -66,7 +75,7 @@ export function TrunksTable({
                     ) : trunks.length === 0 ? (
                         <TableRow>
                             <TableCell
-                                colSpan={7}
+                                colSpan={8}
                                 className="h-24 text-center text-muted-foreground"
                             >
                                 {companySelected
@@ -104,6 +113,14 @@ export function TrunksTable({
                                             ? "Outbound"
                                             : `Inbound (${trunk.identifyBy === "username" ? "usuário" : "IP"})`}
                                     </Badge>
+                                </TableCell>
+                                <TableCell>
+                                    <PresenceBadge
+                                        presence={
+                                            presenceById.get(trunk.id) ??
+                                            "unknown"
+                                        }
+                                    />
                                 </TableCell>
                                 <TableCell className="font-mono text-sm">
                                     {trunk.host

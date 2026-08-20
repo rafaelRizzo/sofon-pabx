@@ -80,7 +80,11 @@ function IntegrationCredentialsPage() {
                     onOpenChange={setCreateOpen}
                     integrationCredential={null}
                     companies={companies}
-                    onSave={(form) => createIntegrationCredential(form, form.companyId)}
+                    onSave={async (form) => {
+                        const ok = await createIntegrationCredential(form, form.companyId)
+                        if (ok) setCompanyFilter(form.companyId)
+                        return ok
+                    }}
                 />
             )}
 
