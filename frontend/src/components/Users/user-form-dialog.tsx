@@ -8,6 +8,14 @@ import { Controller, useForm, useWatch } from "react-hook-form"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
+    Combobox,
+    ComboboxContent,
+    ComboboxEmpty,
+    ComboboxInput,
+    ComboboxItem,
+    ComboboxList,
+} from "@/components/ui/combobox"
+import {
     Dialog,
     DialogContent,
     DialogDescription,
@@ -37,6 +45,7 @@ import {
 } from "@/components/ui/tooltip"
 import { PERMISSION_RESOURCES } from "@/hooks/use-auth"
 import { useCompanies } from "@/hooks/use-companies"
+import { useExtensions, type Extension } from "@/hooks/use-extensions"
 import {
     createUserSchema,
     updateUserSchema,
@@ -89,6 +98,7 @@ export function UserFormDialog({
             role: "user",
             permissions: [],
             companyIds: [],
+            extensionId: null,
         },
     })
 
@@ -96,6 +106,12 @@ export function UserFormDialog({
     // atual do usuário; no create, segue o role selecionado no form
     const watchedRole = useWatch({ control, name: "role" })
     const showPermissions = (isEdit ? user?.role : watchedRole) === "user"
+
+    // ramal pra vincular (softphone WebRTC) — disponível no create e no update; useExtensions só
+    // busca 1 empresa por vez, então usa a primeira selecionada (caso comum de 1 empresa só)
+    const watchedCompanyIds = useWatch({ control, name: "companyIds" })
+    const { extensions } = useExtensions(watchedCompanyIds?.[0])
+    const pjsipExtensions = extensions.filter((e) => e.type === "pjsip")
 
     const generatePassword = () => {
         const charset =
@@ -126,6 +142,7 @@ export function UserFormDialog({
                 role: user?.role ?? "user",
                 permissions: user?.permissions ?? [],
                 companyIds: user?.companies.map((c) => c.id) ?? [],
+                extensionId: user?.extensionId ?? null,
             })
         }
     }, [open, user, reset])
@@ -270,6 +287,60 @@ export function UserFormDialog({
                                         {errors.companyIds.message}
                                     </FieldError>
                                 )}
+                            </Field>
+                            <Field>
+                                <FieldLabel>
+                                    Ramal (softphone WebRTC)
+                                </FieldLabel>
+                                <Controller
+                                    control={control}
+                                    name="extensionId"
+                                    render={({ field }) => {
+                                        const sel =
+                                            pjsipExtensions.find(
+                                                (e) => e.id === field.value
+                                            ) ?? null
+                                        return (
+                                            <Combobox<Extension>
+                                                items={pjsipExtensions}
+                                                value={sel}
+                                                itemToStringLabel={(e) =>
+                                                    `${e.alias} — ${e.name}`
+                                                }
+                                                isItemEqualToValue={(a, b) =>
+                                                    a.id === b.id
+                                                }
+                                                onValueChange={(ext) =>
+                                                    field.onChange(
+                                                        ext?.id ?? null
+                                                    )
+                                                }
+                                            >
+                                                <ComboboxInput
+                                                    placeholder="Buscar ramal..."
+                                                    showClear
+                                                />
+                                                <ComboboxContent>
+                                                    <ComboboxEmpty>
+                                                        Nenhum ramal
+                                                        encontrado
+                                                    </ComboboxEmpty>
+                                                    <ComboboxList>
+                                                        {(ext: Extension) => (
+                                                            <ComboboxItem
+                                                                key={ext.id}
+                                                                value={ext}
+                                                            >
+                                                                {ext.alias} —{" "}
+                                                                {ext.name}
+                                                            </ComboboxItem>
+                                                        )}
+                                                    </ComboboxList>
+                                                </ComboboxContent>
+                                            </Combobox>
+                                        )
+                                    }}
+                                />
                             </Field>
                             {!isEdit && (
                                 <Field>

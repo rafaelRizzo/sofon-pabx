@@ -35,7 +35,7 @@ async function withDestinationLabels<T extends { entryDestination: unknown }>(fl
 // módulos (Extension/Queue/TimeCondition/...) e usedBy é referência reversa; nenhum dos dois é
 // invalidado por quem os altera (ex: renomear uma Extension não invalida FlowsCache). Resolver os
 // dois fora do cache, sempre fresh, evita servir nome desatualizado indefinidamente (TTL do
-// node-cache é infinito, só expira por invalidação explícita).
+// cache é infinito, só expira por invalidação explícita).
 export const getFlowsByCompany = async (companyId: string) => {
     let rows = (await FlowsCache.getByCompany(companyId)) as FlowRow[] | null
     if (!rows) {

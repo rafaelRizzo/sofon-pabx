@@ -517,6 +517,26 @@ export const resetExtensionPassword = async (id: string) => {
     return { password }
 }
 
+// Self-service: usuário logado busca as credenciais do PRÓPRIO ramal pra registrar o softphone
+// WebRTC no browser (ver User.extensionId) — sem gate de permissão de extensions, é identidade,
+// não CRUD de terceiro (mesma lógica de /auth/me)
+export const getMyWebrtcCredentials = async (userId: string) => {
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { extensionId: true } })
+    if (!user?.extensionId) throw new AppError('Nenhum ramal vinculado a este usuário', 404)
+
+    const extension = await prisma.extension.findUnique({ where: { id: user.extensionId } })
+    if (!extension) throw new AppError('Extension not found', 404)
+    if (extension.type !== 'pjsip') throw new AppError('Ramal legado (chan_sip) não suporta WebRTC', 400)
+
+    const endpoint = await prisma.ps_endpoints.findUnique({ where: { id: extension.number }, select: { webrtc: true } })
+    if (!endpoint?.webrtc) throw new AppError('WebRTC não habilitado para este ramal', 400)
+
+    const auth = await prisma.ps_auths.findUnique({ where: { id: extension.number }, select: { password: true } })
+    if (!auth?.password) throw new AppError('Credenciais do ramal não encontradas', 404)
+
+    return { username: extension.number, password: auth.password, displayName: extension.name, context: extension.context }
+}
+
 export const createExtensionBatch = async (items: CreateExtensionInput[]): Promise<BatchResult> => {
     const results = await Promise.allSettled(items.map((item) => createExtension(item)))
 

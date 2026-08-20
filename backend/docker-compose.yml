@@ -3,7 +3,13 @@ x-backend-common: &backend-common
     context: .
     dockerfile: Dockerfile
   restart: unless-stopped
-  network_mode: host
+  networks:
+    - dokploy-network
+  # Permite o container falar com o Asterisk nativo no host (AMI, ver ami-client.ts) sem
+  # network_mode: host — "host-gateway" resolve pro IP do host visto de dentro do container
+  # (Docker 20.10+; funciona tanto no Docker Engine da VPS quanto no Dokploy).
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
   env_file:
     - .env
   depends_on:
@@ -35,12 +41,14 @@ services:
       postgres
       -c timezone=America/Sao_Paulo
       -c log_timezone=America/Sao_Paulo
+    # Porta publicada no host: o Asterisk nativo (fora do Docker) acessa via ODBC em
+    # 127.0.0.1:5433 (ver setups/odbc-realtime.sh) — isso independe de network_mode do backend.
     ports:
       - "5433:5432"
     volumes:
       - postgres_sofon_data:/var/lib/postgresql
     networks:
-      - proxy
+      - dokploy-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
       interval: 10s
@@ -62,7 +70,7 @@ services:
     volumes:
       - redis_sofon_data:/data
     networks:
-      - proxy
+      - dokploy-network
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -77,60 +85,43 @@ services:
     container_name: sofon_backend_worker
     environment:
       PROCESS_ROLE: worker
-      DATABASE_URL: postgresql://postgres:senha_forte@127.0.0.1:5433/asterisk
-      REDIS_URL: redis://default:${REDIS_PASSWORD:?Defina REDIS_PASSWORD no .env}@127.0.0.1:6379
+      # Nome do serviço na rede interna (dokploy-network), não mais 127.0.0.1 — sem
+      # network_mode: host o container não enxerga o host via loopback.
+      DATABASE_URL: postgresql://postgres:senha_forte@postgres:5432/asterisk
+      REDIS_URL: redis://default:${REDIS_PASSWORD:?Defina REDIS_PASSWORD no .env}@redis:6379
+    # Publica a 4573 no host — é assim que o Asterisk nativo (AGI_HOST=127.0.0.1 no .env)
+    # consegue chamar de volta o FastAGI server do container.
+    ports:
+      - "4573:4573"
 
-  # Réplicas web — API HTTP stateless, escalável. network_mode host exige porta própria por
-  # réplica (não dá pra bindar a mesma porta 2x no host); nginx (upstream sofon_backend) faz
-  # o load balancing entre as 3. Pra adicionar réplica: copiar bloco, trocar PORT/container_name,
-  # e adicionar a mesma porta no upstream do NPM.
-  backend-web-1:
+  # API HTTP — stateless, escalável via replicas. Sem network_mode: host todas as réplicas
+  # escutam a MESMA porta interna (3333); o Traefik do Dokploy descobre e faz load balancing
+  # entre elas sozinho (provider Docker), sem upstream/keepalive manual e sem porta por réplica.
+  backend:
     <<: *backend-common
-    container_name: sofon_backend_web_1
-    environment:
+    deploy:
+      replicas: 3
+    environment:  
       PROCESS_ROLE: web
       PORT: 3333
-      DATABASE_URL: postgresql://postgres:senha_forte@127.0.0.1:5433/asterisk
-      REDIS_URL: redis://default:${REDIS_PASSWORD:?Defina REDIS_PASSWORD no .env}@127.0.0.1:6379
+      DATABASE_URL: postgresql://postgres:senha_forte@postgres:5432/asterisk
+      REDIS_URL: redis://default:${REDIS_PASSWORD:?Defina REDIS_PASSWORD no .env}@redis:6379
     healthcheck:
       test: ["CMD-SHELL", "bun -e \"fetch('http://127.0.0.1:3333/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 10s
-
-  backend-web-2:
-    <<: *backend-common
-    container_name: sofon_backend_web_2
-    environment:
-      PROCESS_ROLE: web
-      PORT: 3334
-      DATABASE_URL: postgresql://postgres:senha_forte@127.0.0.1:5433/asterisk
-      REDIS_URL: redis://default:${REDIS_PASSWORD:?Defina REDIS_PASSWORD no .env}@127.0.0.1:6379
-    healthcheck:
-      test: ["CMD-SHELL", "bun -e \"fetch('http://127.0.0.1:3334/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-
-  backend-web-3:
-    <<: *backend-common
-    container_name: sofon_backend_web_3
-    environment:
-      PROCESS_ROLE: web
-      PORT: 3335
-      DATABASE_URL: postgresql://postgres:senha_forte@127.0.0.1:5433/asterisk
-      REDIS_URL: redis://default:${REDIS_PASSWORD:?Defina REDIS_PASSWORD no .env}@127.0.0.1:6379
-    healthcheck:
-      test: ["CMD-SHELL", "bun -e \"fetch('http://127.0.0.1:3335/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
+    # Preencher via UI do Dokploy (aba Domains) — ela injeta os labels do Traefik sozinha.
+    # Se preferir manual, descomentar e ajustar o domínio/id:
+    # labels:
+    #   - traefik.enable=true
+    #   - traefik.http.routers.sofon-backend.rule=Host(`api.seudominio.com`)
+    #   - traefik.http.routers.sofon-backend.entrypoints=websecure
+    #   - traefik.http.services.sofon-backend.loadbalancer.server.port=3333
 
 networks:
-  proxy:
+  dokploy-network:
     external: true
 
 volumes:

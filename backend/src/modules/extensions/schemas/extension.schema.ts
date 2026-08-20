@@ -124,6 +124,8 @@ const pjsipFields = {
     // service prefixes with asteriskId before writing to ps_endpoints
     namedCallGroup: z.string().max(80).optional(),
     namedPickupGroup: z.string().max(80).optional(),
+    // Shortcut nativo do PJSIP (ICE + DTLS-SRTP + rtcp_mux) — liga o ramal pro softphone WebRTC
+    webrtc: z.boolean().optional(),
 }
 
 const baseShape = {
@@ -194,6 +196,7 @@ const pjsipCreateDefaults = {
     aorRemoveExisting: pjsipFields.aorRemoveExisting.default(true),
     aorAuthenticateQualify: pjsipFields.aorAuthenticateQualify.default(false),
     aorSupportPath: pjsipFields.aorSupportPath.default(false),
+    webrtc: pjsipFields.webrtc.default(false),
 }
 
 export const createExtensionSchema = z.discriminatedUnion('type', [
@@ -394,6 +397,14 @@ export const GetExtensionResponse = ok({ message: z.string(), extension: Extensi
 export const CreateExtensionResponse = ok({ message: z.string(), extension: ExtensionWithPasswordSchema })
 export const UpdateExtensionResponse = ok({ message: z.string(), extension: ExtensionSchema })
 export const ResetPasswordResponse = ok({ message: z.string(), password: z.string() })
+
+export const MyWebrtcSchema = z.object({
+    username: z.string(),
+    password: z.string(),
+    displayName: z.string(),
+    context: z.string(),
+})
+export const MyWebrtcResponse = ok({ message: z.string(), webrtc: MyWebrtcSchema })
 
 export const ExportExtensionSchema = z.object({
     id: z.string(),

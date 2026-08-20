@@ -930,6 +930,9 @@ model ps_endpoints {
   setvar              String?  @map("set_var") @db.VarChar(200)
   // sempre = Company.asteriskId — isola CDR por empresa via account_code, sem depender de parsing de canal/contexto
   accountcode         String?  @db.VarChar(40)
+  // Shortcut nativo do PJSIP: liga ICE + DTLS-SRTP (media_encryption) + rtcp_mux de uma vez só —
+  // necessário pro softphone WebRTC no browser, independente do transporte de sinalização (ws/wss)
+  webrtc              Boolean? @default(false)
 }
 
 // CDR nativo do Asterisk (cdr_adaptive_odbc) — account_code = Company.asteriskId, setado em todo ps_endpoints/sip_peers

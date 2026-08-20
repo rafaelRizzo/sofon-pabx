@@ -26,5 +26,6 @@ export const MeSchema = z.object({
     username: z.string(),
     role: z.enum(['admin', 'reseller', 'user']),
     permissions: z.array(z.string()),
+    extensionId: z.string().nullable(),
 })
 export const MeResponse = ok({ message: z.string(), user: MeSchema })

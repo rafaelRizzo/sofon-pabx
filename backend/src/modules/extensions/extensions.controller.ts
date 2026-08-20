@@ -37,6 +37,15 @@ export const exportExtensions = async (req: FastifyRequest, reply: FastifyReply)
     }
 }
 
+export const getMyWebrtcCredentials = async (req: FastifyRequest, reply: FastifyReply) => {
+    try {
+        const webrtc = await ExtensionsService.getMyWebrtcCredentials(req.user!.id)
+        return reply.send({ success: true, message: 'WebRTC credentials fetched successfully', webrtc })
+    } catch (error) {
+        return handleError(reply, error, req)
+    }
+}
+
 export const getExtensionById = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
         const { id } = extensionIdParamSchema.parse(req.params)

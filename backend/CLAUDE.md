@@ -105,12 +105,13 @@ onRequest: [...protectedRoute, requirePermission('<resource>', 'view'|'manage')]
 
 ## Cache
 
-**Redis** (`src/config/redis.ts`) — só para JTI. `jtiManager.add/exists/revoke/revokeByUserId`
-- Chave: `jti:<uuid>`, valor: userId, TTL: 15min
-
-**node-cache** (`src/config/cache.ts`) — cache de entidades em memória, `CacheManager` singleton
-- `cacheManager.get/set/invalidate(namespace)/invalidateByKey(key)/clear()`
-- Cada módulo tem `src/modules/<name>/cache/<name>.cache.ts` com métodos estáticos tipados
+**Redis** (`src/config/redis.ts`) — única instância, usada por dois consumidores:
+- JTI (`jtiManager.add/exists/revoke/revokeByUserId`) — chave `jti:<uuid>`, valor: userId, TTL: 15min
+- Cache de entidades (`src/config/cache.ts`, `CacheManager` singleton) — chave `cache:<namespace>:<key>`, valor JSON serializado
+  - `cacheManager.get/set/invalidate(namespace)/invalidateByKey(key)/clear()`
+  - Cada módulo tem `src/modules/<name>/cache/<name>.cache.ts` com métodos estáticos tipados
+  - Precisa ser Redis (compartilhado), não cache em memória por processo: o backend escala em múltiplas réplicas `web` atrás do nginx (ver seção Deploy), e invalidação feita numa réplica não é vista pelas outras se o cache for local — `node-cache` in-memory já causou esse bug (empresa criada não aparecia na listagem até a réplica errada expirar/reiniciar)
+  - Só conectado em processos `web`/`all` (`server.ts`) — `worker` não usa nenhum desses caches
 
 ---
 

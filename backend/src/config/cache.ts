@@ -1,57 +1,66 @@
-import NodeCache from 'node-cache'
+import { redisClient } from './redis'
 import { logger } from '../utils/logger'
 
 interface CacheConfig {
     ttl?: number
 }
 
-const store = new NodeCache({ stdTTL: 0, checkperiod: 600, useClones: false })
+// Prefixo próprio pra nunca colidir com as chaves `jti:*` (auth middleware, mesma instância Redis)
+// e pra invalidate()/clear() conseguirem fazer SCAN só no universo de cache de entidades.
+const PREFIX = 'cache:'
 
 class CacheManager {
-    get<T>(namespace: string, key: string): Promise<T | null> {
+    async get<T>(namespace: string, key: string): Promise<T | null> {
         try {
-            const fullKey = `${namespace}:${key}`
-            const value = store.get<T>(fullKey)
-            return Promise.resolve(value !== undefined ? value : null)
+            const raw = await redisClient.get(`${PREFIX}${namespace}:${key}`)
+            return raw ? (JSON.parse(raw) as T) : null
         } catch (error) {
             logger.error({ event: 'cache.get.error', namespace, key, error: error instanceof Error ? error.message : String(error) })
-            return Promise.resolve(null)
+            return null
         }
     }
 
-    set<T>(namespace: string, key: string, value: T, config?: CacheConfig): Promise<void> {
+    async set<T>(namespace: string, key: string, value: T, config?: CacheConfig): Promise<void> {
         try {
-            const fullKey = `${namespace}:${key}`
-            store.set(fullKey, value, config?.ttl ?? 0)
+            const fullKey = `${PREFIX}${namespace}:${key}`
+            const serialized = JSON.stringify(value)
+            if (config?.ttl) await redisClient.set(fullKey, serialized, { EX: config.ttl })
+            else await redisClient.set(fullKey, serialized)
         } catch (error) {
             logger.error({ event: 'cache.set.error', namespace, key, error: error instanceof Error ? error.message : String(error) })
         }
-        return Promise.resolve()
     }
 
-    invalidateByKey(key: string): Promise<void> {
+    async invalidateByKey(key: string): Promise<void> {
         try {
-            store.del(key)
+            await redisClient.del(`${PREFIX}${key}`)
         } catch (error) {
             logger.error({ event: 'cache.invalidate.error', key, error: error instanceof Error ? error.message : String(error) })
         }
-        return Promise.resolve()
     }
 
-    invalidate(namespace: string): Promise<void> {
+    async invalidate(namespace: string): Promise<void> {
         try {
-            const prefix = `${namespace}:`
-            const matched = store.keys().filter((k) => k.startsWith(prefix))
-            if (matched.length > 0) store.del(matched)
+            const matched: string[] = []
+            for await (const batch of redisClient.scanIterator({ MATCH: `${PREFIX}${namespace}:*` })) {
+                matched.push(...batch)
+            }
+            if (matched.length > 0) await Promise.all(matched.map((k) => redisClient.del(k)))
         } catch (error) {
             logger.error({ event: 'cache.invalidate_namespace.error', namespace, error: error instanceof Error ? error.message : String(error) })
         }
-        return Promise.resolve()
     }
 
-    clear(): Promise<void> {
-        store.flushAll()
-        return Promise.resolve()
+    async clear(): Promise<void> {
+        try {
+            const matched: string[] = []
+            for await (const batch of redisClient.scanIterator({ MATCH: `${PREFIX}*` })) {
+                matched.push(...batch)
+            }
+            if (matched.length > 0) await Promise.all(matched.map((k) => redisClient.del(k)))
+        } catch (error) {
+            logger.error({ event: 'cache.clear.error', error: error instanceof Error ? error.message : String(error) })
+        }
     }
 }
 

@@ -132,10 +132,10 @@ function Row({ tags, duration, reverse }: (typeof ROWS)[number]) {
       {doubled.map((tag, i) => (
         <span
           key={i}
-          className="group flex items-center gap-2 rounded-full border border-foreground/10 bg-foreground/4 px-4 py-2 whitespace-nowrap transition-colors duration-200 hover:border-primary/50 hover:bg-primary/10"
+          className="group flex items-center gap-2 rounded-full border border-foreground/10 bg-foreground/4 px-4 py-2 whitespace-nowrap transition-colors duration-200 hover:border-transparent hover:bg-violet-500/15 dark:hover:bg-violet-400/20"
         >
-          <tag.icon className="size-3.5 text-foreground/35 transition-colors duration-200 group-hover:text-primary" />
-          <span className="font-mono text-[11px] tracking-wide text-foreground/35 uppercase transition-colors duration-200 group-hover:text-primary">
+          <tag.icon className="size-3.5 text-foreground/35 transition-colors duration-200 group-hover:text-violet-600 dark:group-hover:text-violet-300" />
+          <span className="font-mono text-[11px] tracking-wide text-foreground/35 uppercase transition-colors duration-200 group-hover:text-violet-600 dark:group-hover:text-violet-300">
             {tag.label}
           </span>
         </span>

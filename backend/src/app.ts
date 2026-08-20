@@ -262,6 +262,12 @@ app.register(async (router) => {
             legacySipEnabled: env.SIP_LEGACY_ENABLED,
             sipPort: env.SIP_LEGACY_ENABLED ? env.SIP_PORT ?? null : null,
             pjsipPort: env.PJSIP_PORT,
+            webrtc: {
+                wsScheme: env.WS_SCHEME,
+                wsHost: env.PUBLIC_ADDRESS ?? null,
+                wsPort: env.WS_PORT,
+                wsPath: '/ws',
+            },
         })
     })
 })

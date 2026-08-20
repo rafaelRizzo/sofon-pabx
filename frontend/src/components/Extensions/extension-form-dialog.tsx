@@ -656,6 +656,11 @@ function PjsipSections({ r, c }: { r: any; c: any }) {
                             name="oneTouchRecording"
                             control={c}
                         />
+                        <BoolSwitch
+                            label="WebRTC (softphone no browser)"
+                            name="webrtc"
+                            control={c}
+                        />
                     </div>
                     <G2>
                         <StrInput label="Rel" name="rel" register={r} />
@@ -917,6 +922,7 @@ export function ExtensionFormDialog({
             createForm.setValue("aorRemoveExisting", true)
             createForm.setValue("aorAuthenticateQualify", false)
             createForm.setValue("aorSupportPath", false)
+            createForm.setValue("webrtc", false)
         } else {
             createForm.setValue("host", "dynamic")
             createForm.setValue("peerType", "friend")

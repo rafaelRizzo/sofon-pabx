@@ -33,35 +33,95 @@ touch "$LOG_FILE"
 show_header
 
 # ============================================================
-# VARIÁVEIS
+# VARIÁVEIS (default = Docker local deste projeto)
 # ============================================================
 PG_HOST="127.0.0.1"
 PG_PORT="5433"
 PG_ADMIN="postgres"
+PG_ADMIN_PASS=""
 PG_DB="asterisk"
 PG_USER="asterisk"
 PG_PASS=""
 DOCKER_CONTAINER="postgres_sofon"
-
-# ============================================================
-# HELPERS PSQL
-# FIX: pg_admin opera no DB padrão (postgres) — usado para DDL global
-#      pg_admin_db opera explicitamente no DB asterisk — usado para GRANT em schema/tables
-# ============================================================
-pg_admin()    { docker exec "$DOCKER_CONTAINER" psql -U "$PG_ADMIN" "$@"; }
-pg_admin_db() { docker exec "$DOCKER_CONTAINER" psql -U "$PG_ADMIN" -d "$PG_DB" "$@"; }
+CONN_MODE="docker"
 
 # ============================================================
 # COLETA DE DADOS
 # ============================================================
-# Senha gerada automaticamente — só usada internamente (role do Postgres + odbc.ini/res_odbc.conf,
-# ambos lidos só pelo Asterisk); ninguém precisa digitar nem guardar esse valor.
+echo -e "${BOLD}Conexão com o PostgreSQL:${NC}"
+echo ""
+echo -e "  [1] Padrão   — Docker local deste projeto (${CYAN}${DOCKER_CONTAINER}${NC}, ${CYAN}${PG_HOST}:${PG_PORT}${NC}, db ${CYAN}${PG_DB}${NC})"
+echo -e "  [2] Custom   — outro host/porta/banco/usuário admin"
+echo ""
+echo -ne "  Escolha [1/2] (default 1): "
+read -r CONN_CHOICE
+
+if [[ "$CONN_CHOICE" == "2" ]]; then
+    echo ""
+    echo -ne "  Host do PostgreSQL [${PG_HOST}]: "
+    read -r IN_HOST
+    [[ -n "$IN_HOST" ]] && PG_HOST="$IN_HOST"
+
+    echo -ne "  Porta [${PG_PORT}]: "
+    read -r IN_PORT
+    [[ -n "$IN_PORT" ]] && PG_PORT="$IN_PORT"
+
+    echo -ne "  Database [${PG_DB}]: "
+    read -r IN_DB
+    [[ -n "$IN_DB" ]] && PG_DB="$IN_DB"
+
+    echo -ne "  Usuário admin (com permissão de CREATE ROLE/DATABASE) [${PG_ADMIN}]: "
+    read -r IN_ADMIN
+    [[ -n "$IN_ADMIN" ]] && PG_ADMIN="$IN_ADMIN"
+
+    echo ""
+    echo -e "  Como acessar o admin acima:"
+    echo -e "    [1] Container Docker (docker exec)"
+    echo -e "    [2] Conexão direta (psql via TCP)"
+    echo -ne "  Escolha [1/2] (default 1): "
+    read -r IN_MODE
+
+    if [[ "$IN_MODE" == "2" ]]; then
+        CONN_MODE="direct"
+        echo -ne "  Senha do usuário admin '${PG_ADMIN}': "
+        read -rs PG_ADMIN_PASS
+        echo ""
+        command -v psql &>/dev/null || {
+            echo -e "  ${YELLOW}Instalando cliente psql...${NC}"
+            DEBIAN_FRONTEND=noninteractive apt-get install -y postgresql-client >> "$LOG_FILE" 2>&1 \
+                || err "Falha ao instalar postgresql-client"
+        }
+    else
+        CONN_MODE="docker"
+        echo -ne "  Nome do container Docker [${DOCKER_CONTAINER}]: "
+        read -r IN_CONTAINER
+        [[ -n "$IN_CONTAINER" ]] && DOCKER_CONTAINER="$IN_CONTAINER"
+    fi
+fi
+
+# ============================================================
+# HELPERS PSQL
+# FIX: pg_admin opera no DB padrão (postgres) — usado para DDL global
+#      pg_admin_db opera explicitamente no DB de destino — usado para GRANT em schema/tables
+# ============================================================
+if [[ "$CONN_MODE" == "direct" ]]; then
+    pg_admin()    { PGPASSWORD="$PG_ADMIN_PASS" psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_ADMIN" "$@"; }
+    pg_admin_db() { PGPASSWORD="$PG_ADMIN_PASS" psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_ADMIN" -d "$PG_DB" "$@"; }
+else
+    pg_admin()    { docker exec "$DOCKER_CONTAINER" psql -U "$PG_ADMIN" "$@"; }
+    pg_admin_db() { docker exec "$DOCKER_CONTAINER" psql -U "$PG_ADMIN" -d "$PG_DB" "$@"; }
+fi
+
+# Senha gerada automaticamente pro role dedicado do Asterisk — só usada internamente
+# (role do Postgres + odbc.ini/res_odbc.conf, ambos lidos só pelo Asterisk); ninguém
+# precisa digitar nem guardar esse valor.
 PG_PASS="$(openssl rand -base64 24)"
 
+echo ""
 echo -e "${BOLD}Configuração do PostgreSQL:${NC}"
 echo ""
 echo -e "  Host      : ${CYAN}${PG_HOST}:${PG_PORT}${NC}"
-echo -e "  Container : ${CYAN}${DOCKER_CONTAINER}${NC}"
+[[ "$CONN_MODE" == "docker" ]] && echo -e "  Container : ${CYAN}${DOCKER_CONTAINER}${NC}"
 echo -e "  Database  : ${CYAN}${PG_DB}${NC}"
 echo -e "  Usuário   : ${CYAN}${PG_USER}${NC} (senha gerada automaticamente)"
 echo ""
@@ -307,7 +367,7 @@ read -r MIGRATED
 if [[ $MIGRATED =~ ^[SsYy]$ ]]; then
     # Corrige owner de TODAS as tabelas via loop (tabelas criadas pelo Prisma)
     log "Corrigindo owner das tabelas (loop automático)..."
-    docker exec "$DOCKER_CONTAINER" psql -U "$PG_ADMIN" -d "$PG_DB" << ENDSQL >> "$LOG_FILE" 2>&1
+    pg_admin_db << ENDSQL >> "$LOG_FILE" 2>&1
 DO \$\$
 DECLARE
     tbl TEXT;
@@ -324,7 +384,7 @@ ENDSQL
 
     # ALTER TABLE explícito nas tabelas críticas do Asterisk
     log "Aplicando ALTER TABLE explícito nas tabelas Asterisk..."
-    docker exec "$DOCKER_CONTAINER" psql -U "$PG_ADMIN" -d "$PG_DB" << ENDSQL2 >> "$LOG_FILE" 2>&1
+    pg_admin_db << ENDSQL2 >> "$LOG_FILE" 2>&1
 ALTER TABLE IF EXISTS extensions      OWNER TO ${PG_USER};
 ALTER TABLE IF EXISTS ps_aors         OWNER TO ${PG_USER};
 ALTER TABLE IF EXISTS ps_auths        OWNER TO ${PG_USER};

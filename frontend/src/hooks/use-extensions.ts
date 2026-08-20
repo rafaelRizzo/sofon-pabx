@@ -55,6 +55,7 @@ export type Extension = {
     allowTransfer?: boolean
     allowSubscribe?: string | boolean
     oneTouchRecording?: boolean
+    webrtc?: boolean
     [key: string]: unknown
 }
 
@@ -176,6 +177,8 @@ const pjsipOptional = {
     aorOutboundProxy: z.string().max(40).optional(),
     namedCallGroup: z.string().max(80).optional(),
     namedPickupGroup: z.string().max(80).optional(),
+    // Shortcut nativo do PJSIP (ICE + DTLS-SRTP + rtcp_mux) — liga o ramal pro softphone WebRTC
+    webrtc: z.boolean().optional(),
 }
 
 // Schema plano para o form (union de campos — frontend filtra por tipo no submit)
@@ -216,6 +219,7 @@ export const createExtensionSchema = z.object({
     aorOutboundProxy: z.string().max(40).optional(),
     namedCallGroup: z.string().max(80).optional(),
     namedPickupGroup: z.string().max(80).optional(),
+    webrtc: z.boolean().optional(),
     // Campos conflitantes: SIP=string, PJSIP=boolean (union)
     directMedia: z.union([z.string().max(10), z.boolean()]).optional(),
     allowSubscribe: z.union([z.string().max(10), z.boolean()]).optional(),

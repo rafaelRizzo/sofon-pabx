@@ -88,10 +88,19 @@ export const createUser = async (data: CreateUserInput, createdBy?: string) => {
     // usuário nasce vinculado a >=1 empresa (garantido pelo min(1) do schema); sem isso,
     // req.scope.companyIds fica [] e ele não enxerga nenhum recurso escopado por empresa
     const created = await prisma.$transaction(async (tx) => {
-        const created = await tx.user.create({
-            data: { ...rest, password: hashedPassword, createdBy: createdBy ?? null },
-            select: { id: true },
-        })
+        let created: { id: string }
+        try {
+            created = await tx.user.create({
+                data: { ...rest, password: hashedPassword, createdBy: createdBy ?? null },
+                select: { id: true },
+            })
+        } catch (err) {
+            // extensionId é @unique — outro usuário já vinculado a esse ramal
+            if ((err as { code?: string })?.code === 'P2002') {
+                throw new AppError('Ramal já vinculado a outro usuário', 409)
+            }
+            throw err
+        }
         await tx.userCompany.createMany({
             data: companyIds.map((companyId) => ({ userId: created.id, companyId })),
         })
@@ -120,7 +129,15 @@ export const updateUser = async (id: string, data: UpdateUserInput) => {
     }
 
     const updated = await prisma.$transaction(async (tx) => {
-        await tx.user.update({ where: { id }, data: updateData })
+        try {
+            await tx.user.update({ where: { id }, data: updateData })
+        } catch (err) {
+            // extensionId é @unique — outro usuário já vinculado a esse ramal
+            if ((err as { code?: string })?.code === 'P2002') {
+                throw new AppError('Ramal já vinculado a outro usuário', 409)
+            }
+            throw err
+        }
 
         // substitui a lista completa (nunca vazio, garantido pelo min(1) do schema quando enviado)
         if (companyIds) {

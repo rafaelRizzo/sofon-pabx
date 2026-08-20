@@ -18,7 +18,10 @@ async function start() {
         const runsWorker = env.PROCESS_ROLE === 'worker' || env.PROCESS_ROLE === 'all'
 
         if (runsWeb) {
-            // Redis só é usado pelo JTI (auth middleware), lado web
+            // Redis: JTI (auth middleware) + cache de entidades (config/cache.ts) — lado web.
+            // Cache de entidades precisa ser compartilhado (não node-cache em memória) porque
+            // roda em múltiplas réplicas web atrás do nginx; invalidação local não afetaria as
+            // outras réplicas (ver docker-compose.yml, "Réplicas web")
             await connectRedis()
         }
 

@@ -61,6 +61,13 @@ const envSchema = z.object({
     SIP_LEGACY_ENABLED: z.coerce.boolean().default(false),
     SIP_PORT: z.coerce.number().optional(),
     PJSIP_PORT: z.coerce.number().default(5060),
+    // WebRTC (softphone no browser via SIP.js) — sinalização SIP sobre WebSocket. Sem domínio/TLS
+    // ainda, WS_SCHEME fica "ws" (sem criptografia no transporte); trocar pra "wss" quando houver
+    // certificado é só mudar essas 3 vars, sem deploy de código novo (ver GET /system/sip-config).
+    // PUBLIC_ADDRESS é o mesmo IP/domínio informado no install-asterisk.sh (external_media_address).
+    PUBLIC_ADDRESS: z.string().optional(),
+    WS_SCHEME: z.enum(['ws', 'wss']).default('ws'),
+    WS_PORT: z.coerce.number().default(8088),
     // TTS via ElevenLabs (src/modules/audios/providers/elevenlabs.provider.ts) — a API key é por
     // empresa (Company.elevenLabsApiKey), não global; aqui só a config não-secreta compartilhada
     ELEVENLABS_API_URL: z.string().default('https://api.elevenlabs.io'),

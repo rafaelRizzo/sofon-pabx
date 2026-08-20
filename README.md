@@ -151,6 +151,7 @@ Modelo: **uma VPS por instância** (ver "Escopo"). Nela convivem 3 mundos difere
   - `81` — painel do Nginx Proxy Manager
   - `5060`-`5062` — SIP/PJSIP (liberado só por IP via whitelist, ver `manage-fw` no fim desta seção)
   - `10000-20000/udp` — RTP (mesma whitelist)
+  - `8088` — WebSocket do Asterisk (WebRTC/softphone no browser). Pública, sem whitelist — só necessária se algum usuário for atender chamada pelo navegador. Sem TLS por enquanto (`ws`, não `wss` — sem domínio/certificado ainda)
 
 ### 1. Rede Docker compartilhada
 

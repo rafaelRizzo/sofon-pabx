@@ -88,6 +88,7 @@ export const usersRoutes = async (app: FastifyInstance) => {
                 401: errors[401],
                 403: errors[403],
                 404: errors[404],
+                409: errors[409],
             },
         },
     }, UsersController.updateUser as any)

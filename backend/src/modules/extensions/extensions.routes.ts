@@ -8,6 +8,7 @@ import {
     createExtensionSchema, createExtensionBatchSchema, updateExtensionSchema, extensionIdParamSchema,
     BatchResultSchema, ListExtensionsResponse, GetExtensionResponse,
     CreateExtensionResponse, UpdateExtensionResponse, ResetPasswordResponse, ExportExtensionsResponse,
+    MyWebrtcResponse,
 } from './schemas/extension.schema'
 import { errors, deleted } from '../../schemas/responses'
 
@@ -45,6 +46,22 @@ export const extensionsRoutes = async (app: FastifyInstance) => {
             },
         },
     }, ExtensionsController.exportExtensions as any)
+
+    router.get('/extensions/me/webrtc', {
+        onRequest: protectedRoute,
+        schema: {
+            tags: ['Extensions'],
+            summary: 'Credenciais WebRTC do usuário logado',
+            description: 'Busca as credenciais SIP do ramal vinculado ao usuário logado (User.extensionId), pra registrar o softphone no browser. Sem gate de permissão de extensions — é identidade, não CRUD de terceiro.',
+            security: [{ bearerAuth: [] }],
+            response: {
+                200: MyWebrtcResponse,
+                400: errors[400],
+                401: errors[401],
+                404: errors[404],
+            },
+        },
+    }, ExtensionsController.getMyWebrtcCredentials as any)
 
     router.get('/extensions/:id', {
         onRequest: [...protectedRoute, requirePermission('extensions', 'view')],

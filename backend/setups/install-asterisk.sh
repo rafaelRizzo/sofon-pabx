@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-# INSTALADOR SOFON PBX v7.7 - PJSIP + IAX2 (sem Docker, sem chan_sip)
+# INSTALADOR SOFON PBX v7.8 - PJSIP + IAX2 (sem Docker, sem chan_sip)
 # Debian 11+ | Ubuntu 24.04+ | Asterisk 22.7.0 LTS
 # ============================================================
 
@@ -16,6 +16,11 @@ readonly NC='\033[0m'
 readonly ASTERISK_VERSION="22.10.1"
 readonly PJSIP_PORT=5060
 readonly IAX_PORT=4569
+# WebRTC (softphone no browser via SIP.js) — sinalização SIP sobre WebSocket, sem TLS por enquanto
+# (sem domínio/certificado ainda). Servida pelo HTTP embutido do próprio Asterisk (res_http_websocket),
+# path fixo /ws. Upgrade futuro pra wss (quando houver domínio) é só trocar WS_SCHEME no .env do
+# backend + adicionar [transport-wss]/tls aqui — sem tocar no resto.
+readonly WS_PORT=8088
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PUBLIC_ADDRESS=""
 LOCAL_NET=""
@@ -36,7 +41,7 @@ show_header() {
     clear
     echo ""
     echo -e "${CYAN}════════════════════════════════════════════════════════${NC}"
-    echo -e "  ${BOLD}INSTALADOR SOFON PBX v7.6 - PJSIP + IAX2${NC}"
+    echo -e "  ${BOLD}INSTALADOR SOFON PBX v7.8 - PJSIP + IAX2${NC}"
     echo -e "${CYAN}════════════════════════════════════════════════════════${NC}"
     echo ""
 }
@@ -264,7 +269,7 @@ show_header
 show_progress 7 13 "Instalando binários"
 
 # Backup com timestamp completo para proteger re-execuções
-for f in pjsip.conf iax.conf extensions.conf rtp.conf modules.conf manager.conf; do
+for f in pjsip.conf iax.conf extensions.conf rtp.conf modules.conf manager.conf http.conf; do
     [[ -f /etc/asterisk/$f ]] && \
         cp /etc/asterisk/$f "/etc/asterisk/${f}.bak-$(date +%Y%m%d%H%M%S)"
 done
@@ -342,6 +347,15 @@ strictrtp=yes
 probation=4
 EOF
 
+# http.conf — servidor HTTP embutido do Asterisk, usado só pelo WebSocket do WebRTC (res_http_websocket
+# expõe /ws sozinho quando enabled=yes; sem TLS por enquanto, ver WS_PORT no topo do script)
+cat > /etc/asterisk/http.conf << EOF
+[general]
+enabled=yes
+bindaddr=0.0.0.0
+bindport=$WS_PORT
+EOF
+
 # pjsip.conf
 cat > /etc/asterisk/pjsip.conf << EOF
 [transport-udp]
@@ -359,6 +373,13 @@ bind=0.0.0.0:$PJSIP_PORT
 external_media_address=$PUBLIC_ADDRESS
 external_signaling_address=$PUBLIC_ADDRESS
 local_net=$LOCAL_NET
+
+; WebRTC (softphone no browser) — sinalização SIP sobre WebSocket, servida pelo HTTP embutido do
+; Asterisk (ver http.conf, path fixo /ws). Sem TLS por enquanto (ver WS_PORT no topo do script).
+[transport-ws]
+type=transport
+protocol=ws
+bind=0.0.0.0
 
 [global]
 type=global
@@ -554,7 +575,7 @@ EOF
 # modules.conf — garante chan_sip nunca carregado, chan_iax2 sempre carregado
 sed -i '/noload.*res_pjsip/d' /etc/asterisk/modules.conf 2>/dev/null || true
 grep -q "noload => chan_sip.so" /etc/asterisk/modules.conf 2>/dev/null || \
-    printf '\nnoload => chan_sip.so\nload => res_pjsip.so\nload => res_pjsip_session.so\nload => chan_pjsip.so\nload => chan_iax2.so\n' >> /etc/asterisk/modules.conf
+    printf '\nnoload => chan_sip.so\nload => res_pjsip.so\nload => res_pjsip_session.so\nload => chan_pjsip.so\nload => chan_iax2.so\nload => res_http_websocket.so\nload => res_pjsip_websocket.so\n' >> /etc/asterisk/modules.conf
 
 chown asterisk:asterisk /etc/asterisk/*.conf
 log "Configurações criadas"
@@ -608,6 +629,7 @@ bash "$MANAGE_FW_DIR/firewall.sh" \
     --log "$LOG_FILE" \
     --extra-ssh 21122 \
     --tcp-public 81 \
+    --tcp-public "$WS_PORT" \
     --tcp "$PJSIP_PORT" \
     --udp "$PJSIP_PORT,$IAX_PORT" \
     --udp-range 10000-20000 \
@@ -622,7 +644,7 @@ bash "$MANAGE_FW_DIR/firewall.sh" \
     --jail-filter "$SCRIPT_DIR/asterisk-fail2ban.filter" \
     || err "Falha ao configurar firewall (nftables/Fail2Ban/manage-fw)"
 
-log "Firewall configurado (SSH 22+21122, PJSIP/IAX2/RTP whitelist-only, AMI localhost-only, Fail2Ban ativo, manage-fw instalado)"
+log "Firewall configurado (SSH 22+21122, PJSIP/IAX2/RTP whitelist-only, WS $WS_PORT público p/ WebRTC, AMI localhost-only, Fail2Ban ativo, manage-fw instalado)"
 
 # ============================================================
 # STEP 12 - SEGURANÇA
@@ -732,12 +754,18 @@ if [[ -f "$BACKEND_ENV_FILE" ]]; then
     set_env_var "$BACKEND_ENV_FILE" "ASTERISK_VERSION" "$ASTERISK_VERSION"
     set_env_var "$BACKEND_ENV_FILE" "SIP_LEGACY_ENABLED" "false"
     set_env_var "$BACKEND_ENV_FILE" "PJSIP_PORT" "$PJSIP_PORT"
+    set_env_var "$BACKEND_ENV_FILE" "PUBLIC_ADDRESS" "$PUBLIC_ADDRESS"
+    set_env_var "$BACKEND_ENV_FILE" "WS_SCHEME" "ws"
+    set_env_var "$BACKEND_ENV_FILE" "WS_PORT" "$WS_PORT"
     log "Backend .env atualizado (${BACKEND_ENV_FILE}) — reinicie o serviço do backend para aplicar"
 else
     warn "Backend .env não encontrado em ${BACKEND_ENV_FILE} — adicione manualmente:"
     echo "    ASTERISK_VERSION=${ASTERISK_VERSION}"
     echo "    SIP_LEGACY_ENABLED=false"
     echo "    PJSIP_PORT=${PJSIP_PORT}"
+    echo "    PUBLIC_ADDRESS=${PUBLIC_ADDRESS}"
+    echo "    WS_SCHEME=ws"
+    echo "    WS_PORT=${WS_PORT}"
 fi
 sleep 1
 
@@ -755,6 +783,7 @@ echo -e "  Sistema    : ${CYAN}${OS_NAME} ${OS_VERSION}${NC}"
 echo -e "  IP Público : ${CYAN}${PUBLIC_ADDRESS}${NC}"
 echo -e "  Rede Local : ${CYAN}${LOCAL_NET}${NC}"
 echo -e "  PJSIP      : ${CYAN}${PJSIP_PORT}${NC} (UDP/TCP) — chan_sip ausente do build"
+echo -e "  WebRTC     : ${CYAN}ws://${PUBLIC_ADDRESS}:${WS_PORT}/ws${NC} — sem TLS (sem domínio ainda); trocar pra wss depois é só mudar WS_SCHEME no .env do backend"
 echo -e "  IAX2       : ${CYAN}${IAX_PORT}${NC} (UDP, troncos)"
 echo -e "  RTP        : ${CYAN}10000-20000${NC} (UDP)"
 echo -e "  Proxy Web  : ${CYAN}80, 443${NC} (HTTP/HTTPS) + ${CYAN}81${NC} (painel Nginx Proxy Manager)"

@@ -7,6 +7,7 @@ import {
 
 import { AppSidebar } from "@/components/Dashboard/app-sidebar"
 import { DashboardBreadcrumb } from "@/components/Dashboard/dashboard-breadcrumb"
+import { WebphoneWidget } from "@/components/Webphone/webphone-widget"
 import {
   SidebarInset,
   SidebarProvider,
@@ -51,6 +52,7 @@ function DashboardLayout() {
           </main>
         </SidebarInset>
       </SidebarProvider>
+      <WebphoneWidget />
     </AuthProvider>
   )
 }

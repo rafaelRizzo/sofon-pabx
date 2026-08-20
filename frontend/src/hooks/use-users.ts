@@ -34,6 +34,8 @@ export const createUserSchema = z.object({
     permissions: z.array(z.string()),
     // todo usuário precisa estar vinculado a >=1 empresa (ver users.schema.ts do backend)
     companyIds: z.array(z.string()).min(1, "Selecione ao menos uma empresa"),
+    // vincula o usuário a um ramal (softphone WebRTC, ver Extension.webrtc) — opcional, null = nenhum
+    extensionId: z.string().nullable().optional(),
 })
 
 // Mesmo shape do create para o form; senha em branco = manter a atual.
@@ -97,6 +99,7 @@ export function useUsers() {
                 // só admin altera; backend rejeita 403 se um "user" tentar (ver users.controller.ts)
                 permissions: form.permissions,
                 companyIds: form.companyIds,
+                extensionId: form.extensionId ?? null,
             }),
     })
 

@@ -19,6 +19,8 @@ export const createUserSchema = z.object({
     role: z.enum(['admin', 'reseller', 'user']).default('user'),
     permissions: permissionsSchema,
     companyIds: z.array(z.cuid2()).min(1, 'Select at least one company'),
+    // vincula direto ao ramal na criação (ver Extension.webrtc / softphone) — opcional
+    extensionId: z.cuid2().nullable().optional(),
 })
 
 export const updateUserSchema = z.object({

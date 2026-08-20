@@ -43,6 +43,7 @@ export type AuthUser = {
   username: string
   role: "admin" | "reseller" | "user"
   permissions: string[]
+  extensionId: string | null
 }
 
 type AuthContextValue = {
