@@ -125,7 +125,12 @@ networks:
     external: true
 
 volumes:
+  # external: true — os volumes já existem na VPS (criados fora deste compose); sem isso,
+  # o Dokploy avisa "volume already exists but was created for project X" a cada deploy porque
+  # tenta gerenciá-los como se fossem dele.
   postgres_sofon_data:
     name: postgres_sofon_data
+    external: true
   redis_sofon_data:
     name: redis_sofon_data
+    external: true
