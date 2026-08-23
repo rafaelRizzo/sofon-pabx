@@ -21,6 +21,7 @@ export type IntegrationCredential = {
     provider: IntegrationProvider
     name: string
     companyId: string
+    company: { id: string; name: string }
     baseUrl: string
     createdAt: string
     updatedAt: string

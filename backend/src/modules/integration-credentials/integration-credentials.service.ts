@@ -10,6 +10,7 @@ const select = {
     provider: true,
     name: true,
     companyId: true,
+    company: { select: { id: true, name: true } },
     baseUrl: true,
     createdAt: true,
     updatedAt: true,

@@ -14,7 +14,8 @@ import { formatDatesDeep, collectCompanyIds } from './utils/timezone'
 import { getCompanyById } from './modules/companies/companies.service'
 import { validateEnv } from './config/env'
 import { redisClient } from './config/redis'
-import { protectedRoute } from './middleware/scope.middleware'
+import { protectedRoute, scopeMiddleware, requireAdmin } from './middleware/scope.middleware'
+import { authMiddleware } from './middleware/auth.middleware'
 import { usersRoutes } from './modules/users/users.routes'
 import { authRoutes } from './modules/auth/auth.routes'
 import { companiesRoutes } from './modules/companies/companies.routes'
@@ -127,6 +128,17 @@ app.addHook('onResponse', async (request, reply) => {
     })
 })
 
+// /docs (Scalar + spec OpenAPI) expõe o mapa completo de endpoints/schemas — em produção só
+// admin autenticado acessa, pra não facilitar reconhecimento por quem só tem a URL pública.
+app.addHook('onRequest', async (request, reply) => {
+    if (env.NODE_ENV !== 'production' || !request.url.startsWith('/docs')) return
+    await authMiddleware(request as any, reply as any)
+    if (reply.sent) return
+    await scopeMiddleware(request as any, reply as any)
+    if (reply.sent) return
+    await requireAdmin(request as any, reply as any)
+})
+
 // Register swagger (must be before routes)
 app.register(swagger, {
     openapi: {
@@ -160,8 +172,13 @@ app.register(scalar, {
 })
 
 // Register plugins
-app.register(helmet, {
-    contentSecurityPolicy: false,
+// CSP default do helmet pra toda resposta — API é majoritariamente JSON, então o único risco de
+// regressão é a UI do Scalar em /docs (usa estilo/script inline), por isso ela mantém CSP
+// desligada especificamente (ver hook onSend abaixo), preservando o comportamento de sempre ali.
+app.register(helmet)
+app.addHook('onSend', async (request, reply, payload) => {
+    if (request.url.startsWith('/docs')) reply.removeHeader('content-security-policy')
+    return payload
 })
 app.register(cors, {
     origin: env.CORS_ORIGIN.split(',').map((o) => o.trim()),

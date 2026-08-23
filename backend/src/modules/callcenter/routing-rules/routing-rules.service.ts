@@ -108,7 +108,10 @@ const matchesConditions = (conditions: Record<string, any>, ctx: ResolveContext)
         } catch {
             return false
         }
-        if (!re.test(ctx.callerId)) return false
+        // Cap determinístico contra ReDoS: mesmo um padrão que escape da heurística de validação
+        // (ver isSafeRegexPattern) tem o blowup exponencial limitado por um n pequeno — callerId
+        // real (E.164) nunca passa de ~20 chars, então isso nunca afeta caller ID legítimo.
+        if (!re.test(ctx.callerId.slice(0, 32))) return false
     }
 
     if (conditions.weekdays?.length || (conditions.startTime && conditions.endTime)) {

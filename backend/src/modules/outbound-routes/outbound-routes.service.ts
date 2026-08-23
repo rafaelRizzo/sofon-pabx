@@ -682,7 +682,8 @@ export const addExtension = async (routeId: string, extensionId: string) => {
     })
     if (!route) throw new AppError('Outbound route not found', 404)
 
-    await getExtensionDto(extensionId)
+    const extension = await getExtensionDto(extensionId)
+    if (extension.companyId !== route.companyId) throw new AppError('Extension does not belong to the same company as the route', 403)
 
     const result = await prisma.outboundRouteExtension.create({ data: { routeId, extensionId } })
 

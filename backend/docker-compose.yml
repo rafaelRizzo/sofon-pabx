@@ -35,16 +35,17 @@ services:
     environment:
       POSTGRES_DB: asterisk
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: senha_forte
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no .env}
       TZ: America/Sao_Paulo
     command: >
       postgres
       -c timezone=America/Sao_Paulo
       -c log_timezone=America/Sao_Paulo
-    # Porta publicada no host: o Asterisk nativo (fora do Docker) acessa via ODBC em
-    # 127.0.0.1:5433 (ver setups/odbc-realtime.sh) — isso independe de network_mode do backend.
+    # Porta publicada só em loopback do host: o Asterisk nativo (fora do Docker) acessa via ODBC
+    # em 127.0.0.1:5433 (ver setups/odbc-realtime.sh) — isso independe de network_mode do backend,
+    # mas não precisa (e não deve) ser alcançável de fora da VPS.
     ports:
-      - "5433:5432"
+      - "127.0.0.1:5433:5432"
     volumes:
       - postgres_sofon_data:/var/lib/postgresql
     networks:
@@ -65,8 +66,10 @@ services:
       - sh
       - -c
       - exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"
+    # Só backend-web/backend-worker falam com o Redis, via nome de serviço na dokploy-network —
+    # publicar em loopback é só pra permitir redis-cli manual na própria VPS quando precisar debugar.
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis_sofon_data:/data
     networks:
@@ -87,12 +90,13 @@ services:
       PROCESS_ROLE: worker
       # Nome do serviço na rede interna (dokploy-network), não mais 127.0.0.1 — sem
       # network_mode: host o container não enxerga o host via loopback.
-      DATABASE_URL: postgresql://postgres:senha_forte@postgres:5432/asterisk
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no .env}@postgres:5432/asterisk
       REDIS_URL: redis://default:${REDIS_PASSWORD:?Defina REDIS_PASSWORD no .env}@redis:6379
-    # Publica a 4573 no host — é assim que o Asterisk nativo (AGI_HOST=127.0.0.1 no .env)
-    # consegue chamar de volta o FastAGI server do container.
+    # Publica a 4573 só em loopback do host — é assim que o Asterisk nativo (AGI_HOST=127.0.0.1 no
+    # .env) consegue chamar de volta o FastAGI server do container, sem expor o protocolo AGI (sem
+    # autenticação própria) pra fora da VPS.
     ports:
-      - "4573:4573"
+      - "127.0.0.1:4573:4573"
 
   # API HTTP — stateless, escalável via replicas. Sem network_mode: host todas as réplicas
   # escutam a MESMA porta interna (3333); o Traefik do Dokploy descobre e faz load balancing
@@ -104,7 +108,7 @@ services:
     environment:  
       PROCESS_ROLE: web
       PORT: 3333
-      DATABASE_URL: postgresql://postgres:senha_forte@postgres:5432/asterisk
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no .env}@postgres:5432/asterisk
       REDIS_URL: redis://default:${REDIS_PASSWORD:?Defina REDIS_PASSWORD no .env}@redis:6379
     healthcheck:
       test: ["CMD-SHELL", "bun -e \"fetch('http://127.0.0.1:3333/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]

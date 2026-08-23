@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { timestamp, ok } from '../../../../schemas/responses'
+import { isSafeRegexPattern } from '../../../../utils/safe-regex'
 
 const WEEKDAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const
 const timeRegex = /^([01]\d|2[0-3]):[0-5]\d$/
@@ -7,7 +8,13 @@ const timeRegex = /^([01]\d|2[0-3]):[0-5]\d$/
 const routingConditionsSchema = z
     .object({
         trunkId: z.cuid2().optional(),
-        callerIdPattern: z.string().max(80).optional(),
+        // Testada em todo inbound call no processo worker (singleton) — regex mal formada trava
+        // roteamento de todas as empresas. isSafeRegexPattern rejeita a assinatura clássica de
+        // ReDoS; o cap de tamanho da string testada em runtime (routing-rules.service.ts) é a
+        // defesa determinística.
+        callerIdPattern: z.string().max(80).refine(isSafeRegexPattern, {
+            message: 'Invalid or unsafe regex pattern (nested quantifiers like (a+)+ are not allowed)',
+        }).optional(),
         weekdays: z.array(z.enum(WEEKDAYS)).min(1).optional(),
         startTime: z.string().regex(timeRegex, 'Invalid time format HH:MM').optional(),
         endTime: z.string().regex(timeRegex, 'Invalid time format HH:MM').optional(),

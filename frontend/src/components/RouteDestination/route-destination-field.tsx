@@ -387,33 +387,51 @@ export function RouteDestinationField({
     // hangup é o único tipo sem segundo campo (id) — nesse caso o select de tipo ocupa a linha
     // inteira em vez de dividir espaço com um campo vazio
     const hasIdField = type !== "hangup"
+    // com um único tipo permitido não há o que escolher — mostra só o rótulo fixo em vez de
+    // um select de opção única (ex: nó "Verificar horário" só aceita "timecondition")
+    const singleType = allowedTypes.length === 1 ? allowedTypes[0] : null
 
     return (
         <div className={className}>
             <div className="flex flex-col gap-2 sm:flex-row">
-                <Select
-                    items={SELECT_ITEMS}
-                    value={type}
-                    onValueChange={(v) =>
-                        handleTypeChange(v as RouteDestinationType)
-                    }
-                >
-                    <SelectTrigger
-                        className={cn("w-full", hasIdField && "sm:w-52")}
+                {singleType ? (
+                    <div
+                        className={cn(
+                            "flex h-9 items-center gap-2 rounded-md border bg-muted/40 px-3 text-sm",
+                            hasIdField ? "sm:w-52" : "w-full"
+                        )}
                     >
-                        <SelectValue placeholder="Tipo de destino" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {allowedTypes.map((t) => {
-                            const Icon = ROUTE_DEST_ICONS[t]
-                            return (
-                                <SelectItem key={t} value={t}>
-                                    <Icon /> {ROUTE_DEST_LABELS[t]}
-                                </SelectItem>
-                            )
-                        })}
-                    </SelectContent>
-                </Select>
+                        {(() => {
+                            const Icon = ROUTE_DEST_ICONS[singleType]
+                            return <Icon className="size-4 text-muted-foreground" />
+                        })()}
+                        {ROUTE_DEST_LABELS[singleType]}
+                    </div>
+                ) : (
+                    <Select
+                        items={SELECT_ITEMS}
+                        value={type}
+                        onValueChange={(v) =>
+                            handleTypeChange(v as RouteDestinationType)
+                        }
+                    >
+                        <SelectTrigger
+                            className={cn("w-full", hasIdField && "sm:w-52")}
+                        >
+                            <SelectValue placeholder="Tipo de destino" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {allowedTypes.map((t) => {
+                                const Icon = ROUTE_DEST_ICONS[t]
+                                return (
+                                    <SelectItem key={t} value={t}>
+                                        <Icon /> {ROUTE_DEST_LABELS[t]}
+                                    </SelectItem>
+                                )
+                            })}
+                        </SelectContent>
+                    </Select>
+                )}
 
                 {type !== "hangup" && (
                     // key={type} força remontar ao trocar de tipo — sem isso o combobox mantém

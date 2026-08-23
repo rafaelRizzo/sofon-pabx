@@ -36,6 +36,7 @@ export function IntegrationCredentialsTable({ integrationCredentials, loading, c
                 <TableHeader>
                     <TableRow>
                         <TableHead>Nome</TableHead>
+                        <TableHead>Empresa</TableHead>
                         <TableHead>Provedor</TableHead>
                         <TableHead>Base URL</TableHead>
                         <TableHead className="w-30 text-right">Ações</TableHead>
@@ -45,7 +46,7 @@ export function IntegrationCredentialsTable({ integrationCredentials, loading, c
                     {loading ? (
                         Array.from({ length: 3 }).map((_, i) => (
                             <TableRow key={i}>
-                                {Array.from({ length: 4 }).map((_, j) => (
+                                {Array.from({ length: 5 }).map((_, j) => (
                                     <TableCell key={j}>
                                         <Skeleton className="h-4 w-full" />
                                     </TableCell>
@@ -54,7 +55,7 @@ export function IntegrationCredentialsTable({ integrationCredentials, loading, c
                         ))
                     ) : integrationCredentials.length === 0 ? (
                         <TableRow>
-                            <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
+                            <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
                                 {companySelected ? "Nenhuma credencial encontrada" : "Selecione uma empresa para listar"}
                             </TableCell>
                         </TableRow>
@@ -62,6 +63,7 @@ export function IntegrationCredentialsTable({ integrationCredentials, loading, c
                         integrationCredentials.map((c) => (
                             <TableRow key={c.id}>
                                 <TableCell className="font-medium">{c.name}</TableCell>
+                                <TableCell className="text-muted-foreground">{c.company.name}</TableCell>
                                 <TableCell>
                                     <Badge variant="secondary">{INTEGRATION_PROVIDER_LABELS[c.provider]}</Badge>
                                 </TableCell>

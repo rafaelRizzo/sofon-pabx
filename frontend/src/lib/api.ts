@@ -24,6 +24,7 @@ export async function refreshToken(): Promise<string> {
       cookies.set("token", data.token, {
         path: "/",
         sameSite: "lax",
+        secure: import.meta.env.PROD,
       })
       return data.token as string
     })

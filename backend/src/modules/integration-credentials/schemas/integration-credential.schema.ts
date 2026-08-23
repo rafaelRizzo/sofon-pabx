@@ -34,6 +34,7 @@ export const IntegrationCredentialSchema = z.object({
     provider: z.enum(INTEGRATION_PROVIDERS),
     name: z.string(),
     companyId: z.string(),
+    company: z.object({ id: z.string(), name: z.string() }),
     baseUrl: z.string(),
     createdAt: timestamp,
     updatedAt: timestamp,

@@ -127,7 +127,7 @@ export const companiesRoutes = async (app: FastifyInstance) => {
     }, CompaniesController.resyncDialplan as any)
 
     router.delete('/companies/:id', {
-        onRequest: [...protectedRoute, requirePermission('companies', 'manage')],
+        onRequest: [...protectedRoute, requireAdmin],
         schema: {
             tags: ['Companies'],
             summary: 'Remover empresa',

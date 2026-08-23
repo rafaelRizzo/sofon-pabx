@@ -2,19 +2,12 @@ import { z } from 'zod'
 import { timestamp, cuidParam, ok } from '../../../schemas/responses'
 import { routeDestinationSchema, routeDestinationResponseSchema } from '../../../schemas/route-destination.schema'
 import { usedBySchema } from '../../../schemas/flow-reference-label'
+import { isSafeDialplanValue } from '../../../schemas/dialplan-safety'
 
 export const idParamSchema = z.object({ id: cuidParam })
 export const companyQuerySchema = z.object({ companyId: z.cuid2() })
 
-// Interpolação é limitada a variáveis de canal e ao identificador do chamador. Não aceite funções
-// arbitrárias: módulos como SHELL(), CURL() e FILE() transformariam um campo configurável pela API
-// em execução de comando/leitura de arquivos no processo Asterisk.
-const ALLOWED_INTERPOLATION = /\$\{(?:[A-Za-z_][A-Za-z0-9_]*|CALLERID\((?:num|name|ani|rdnis|dnid)\))\}/g
-
-export const isSafeDialplanValue = (value: string) => {
-    const literal = value.replace(ALLOWED_INTERPOLATION, '')
-    return !/["\\(),;${}\x00-\x1f\x7f]/.test(literal)
-}
+export { isSafeDialplanValue }
 
 const assignmentSchema = z.object({
     variable: z.string().min(1).max(80).regex(/^[A-Za-z_][A-Za-z0-9_]*$/, 'Only letters, digits and underscore, starting with a letter or underscore'),

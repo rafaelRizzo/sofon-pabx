@@ -22,7 +22,7 @@ export function useLogin() {
     const id = toast.loading("Entrando...")
     try {
       const { data: res } = await api.post("/auth/login", data)
-      cookies.set("token", res.token, { path: "/", sameSite: "lax" })
+      cookies.set("token", res.token, { path: "/", sameSite: "lax", secure: import.meta.env.PROD })
       toast.success("Login realizado", { id })
       navigate({ to: "/dashboard" })
     } catch (err) {

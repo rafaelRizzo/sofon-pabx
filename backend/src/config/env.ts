@@ -77,10 +77,12 @@ const envSchema = z.object({
     // cifrados em repouso — ver src/lib/crypto.ts. Hoje só usada por IxcCredential.token.
     ENCRYPTION_MASTER_KEY: z.string().default('your-encryption-master-key-change-in-production'),
 }).superRefine((cfg, ctx) => {
-    // Em produção os defaults públicos de JWT_SECRET/REFRESH_SECRET são inaceitáveis (tokens forjáveis
-    // por quem lê o repo). Exige segredos próprios, fortes e distintos — só falha em produção pra não
-    // atrapalhar dev/test.
-    if (cfg.NODE_ENV !== 'production') return
+    // Defaults públicos de JWT_SECRET/REFRESH_SECRET/ENCRYPTION_MASTER_KEY são inaceitáveis fora de
+    // teste (tokens forjáveis e segredos de terceiro descriptografáveis por quem lê o repo). Checa em
+    // qualquer NODE_ENV que não seja 'test' — gatear só por 'production' permitiria rodar em produção
+    // com os defaults públicos caso alguém suba com NODE_ENV=development por engano (ex: copiando
+    // .env.example sem trocar essa linha).
+    if (cfg.NODE_ENV === 'test') return
     const check = (key: 'JWT_SECRET' | 'REFRESH_SECRET') => {
         const v = cfg[key]
         if (!v || v.length < 32 || v.startsWith('your-')) {

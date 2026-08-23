@@ -14,6 +14,12 @@ export const authMiddleware = async (req: FastifyRequest, reply: FastifyReply) =
 
         const decoded = verifyToken(token)
 
+        // Defesa em profundidade: um refresh token nunca deve autenticar uma rota normal, mesmo
+        // que JWT_SECRET/REFRESH_SECRET algum dia colidam (ex: erro de config/dev) — ver generateTokens.
+        if (decoded.type !== 'access') {
+            throw new AppError('Unauthorized', 401)
+        }
+
         if (decoded.jti) {
             const jtiExists = await jtiManager.exists(decoded.jti)
             if (!jtiExists) {
