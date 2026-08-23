@@ -7,7 +7,9 @@ type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 const env = validateEnv()
 
 // Bate com aliasSchema (/^\d{2,6}$/) — um padrão de dialplan por tamanho de alias
-const RAMAL_ALIAS_LENGTHS = [2, 3, 4, 5, 6]
+// Exportado pra outbound-routes.service.ts bloquear esses patterns + '_X.' em OutboundDialPattern —
+// são reservados no contexto global 'ramais' (ver ensureGenericRoutingPattern/ensureFallback abaixo)
+export const RAMAL_ALIAS_LENGTHS = [2, 3, 4, 5, 6]
 
 export const DialplanRepository = {
     // Padrão genérico compartilhado entre TODAS as empresas no mesmo contexto (idempotente, mesmo esquema de

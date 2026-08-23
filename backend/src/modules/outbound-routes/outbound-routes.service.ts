@@ -1,5 +1,6 @@
 import { prisma } from '../../lib/prisma'
 import { recordingFilenameSuffix } from '../../asterisk/dialplan-names'
+import { RAMAL_ALIAS_LENGTHS } from '../../asterisk/dialplan/dialplan.repository'
 import { getCompanyById } from '../companies/companies.service'
 import { getExtensionDto } from '../extensions/extensions.service'
 import { AppError } from '../../utils/errors/app.error'
@@ -52,16 +53,18 @@ function buildDialplanEntries(
     prefix: string | null | undefined,
     prepend: string | null | undefined,
     asteriskId: string,
+    routeName: string,
 ): Array<{ context: string; exten: string; priority: number; app: string; appdata: string | null }> {
     const hasTransform = !!(prefix || prepend)
     const destVar = hasTransform ? '${ODEST}' : '${EXTEN}'
 
     // Pre-compute start priority of each trunk block
+    const noopOffset = 1 // NoOp de debug (rota/pattern/origem/destino) — sempre a priority 1
     const transformOffset = hasTransform ? 1 : 0
     const recFileOffset = 1
     const mixmonitorOffset = 1
     const cdrOffset = 5 // Set(CDR(direction|origin_extension|dialed_number|recording_file), TRANSFER_CONTEXT)
-    const baseOffset = transformOffset + recFileOffset + mixmonitorOffset + cdrOffset + 1 // 1-indexed
+    const baseOffset = noopOffset + transformOffset + recFileOffset + mixmonitorOffset + cdrOffset + 1 // 1-indexed
 
     const blockStarts: number[] = []
     let cursor = baseOffset
@@ -73,6 +76,13 @@ function buildDialplanEntries(
 
     const entries: any[] = []
     let p = 1
+
+    // Debug de roteamento — mostra qual rota/pattern casou e origem/destino no CLI/log
+    entries.push({
+        context, exten, priority: p++, app: 'NoOp',
+        appdata: 'Saida outbound: rota=' + routeName + ' pattern=' + exten
+            + ' origem=${CALLERID(num)} destino=' + destVar,
+    })
 
     if (hasTransform) {
         const strip = prefix ? prefix.length : 0
@@ -160,11 +170,21 @@ async function syncPatternDialplan(
     prefix: string | null | undefined,
     prepend: string | null | undefined,
     asteriskId: string,
+    routeName: string,
 ) {
     await tx.extensions.deleteMany({ where: { context, exten } })
-    const entries = buildDialplanEntries(context, exten, trunks, prefix, prepend, asteriskId)
+    const entries = buildDialplanEntries(context, exten, trunks, prefix, prepend, asteriskId, routeName)
     await tx.extensions.createMany({ data: entries })
 }
+
+// Reservado pro contexto global 'ramais': ensureGenericRoutingPattern (aliases de ramal) + ensureFallback
+// (destino não encontrado) — ver dialplan.repository.ts. Um outbound route usando um desses patterns
+// sobrescreve/apaga esse dialplan do sistema (já aconteceu em produção: pattern "_X." de um outbound
+// route apagou o fallback global de "destino não encontrado" pra TODAS as empresas).
+const RESERVED_RAMAIS_PATTERNS = new Set<string>([
+    '_X.',
+    ...RAMAL_ALIAS_LENGTHS.map((len) => `_${'X'.repeat(len)}`),
+])
 
 // O dialplan é escrito em context='ramais' + exten=pattern (ver syncPatternDialplan) — duas rotas da
 // mesma empresa com o mesmo padrão se sobrescrevem silenciosamente no Asterisk, então o padrão precisa
@@ -175,6 +195,12 @@ async function assertPatternsAvailable(
     patterns: string[],
     exclude?: { routeId?: string; patternId?: string },
 ) {
+    for (const pattern of patterns) {
+        if (RESERVED_RAMAIS_PATTERNS.has(pattern)) {
+            throw new AppError(`Padrão "${pattern}" é reservado pelo sistema (contexto ramais) e não pode ser usado em outbound route`, 409)
+        }
+    }
+
     const seen = new Set<string>()
     for (const pattern of patterns) {
         if (seen.has(pattern)) {
@@ -206,7 +232,7 @@ async function assertPatternsAvailable(
 async function getRouteContext(tx: Tx, routeId: string) {
     const route = await tx.outboundRoute.findUnique({
         where: { id: routeId },
-        select: { company: { select: { asteriskId: true } } },
+        select: { name: true, company: { select: { asteriskId: true } } },
     })
     if (!route) return null
 
@@ -230,7 +256,7 @@ async function getRouteContext(tx: Tx, routeId: string) {
         orderBy: { position: 'asc' },
     })
 
-    return { company: route.company, patterns, trunks }
+    return { company: route.company, routeName: route.name, patterns, trunks }
 }
 
 export async function resyncAllPatterns(tx: Tx, routeId: string) {
@@ -248,7 +274,7 @@ export async function resyncAllPatterns(tx: Tx, routeId: string) {
         customHeaders: rt.trunk.customHeaders as CustomHeader[],
     }))
     for (const p of ctx.patterns) {
-        await syncPatternDialplan(tx, 'ramais', p.pattern, trunkOpts, p.prefix, p.prepend, ctx.company.asteriskId)
+        await syncPatternDialplan(tx, 'ramais', p.pattern, trunkOpts, p.prefix, p.prepend, ctx.company.asteriskId, ctx.routeName)
     }
 }
 
@@ -476,7 +502,7 @@ export const createOutboundRoute = async (data: CreateOutboundRouteInput) => {
         }
 
         for (const p of data.patterns) {
-            await syncPatternDialplan(tx, 'ramais', p.pattern, trunkOpts, p.prefix, p.prepend, company.asteriskId)
+            await syncPatternDialplan(tx, 'ramais', p.pattern, trunkOpts, p.prefix, p.prepend, company.asteriskId, data.name)
         }
     })
 

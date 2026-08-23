@@ -52,9 +52,16 @@ export async function resyncHolidayGroupFromUrl(tx: Tx, id: string, year: number
     if (!hg || !hg.url) return
 
     const dates = await datesFromUrl(hg.url, year)
+    // dates.length === 0 cobre tanto falha de rede/timeout quanto resposta vazia do provider (ver
+    // fetchHolidaysFromUrl, retorna null nos dois casos) — sem dado novo confiável, mantém o calendário
+    // atual em vez de apagar (senão uma instabilidade transitória do provider zera o grupo de feriados)
+    if (dates.length === 0) {
+        logger.warn({ event: 'holidays.resync.skipped', holidayGroupId: id, year })
+        return
+    }
 
     await tx.holidayDate.deleteMany({ where: { holidayGroupId: id } })
-    if (dates.length > 0) await tx.holidayDate.createMany({ data: dates.map((d) => ({ ...d, holidayGroupId: id })) })
+    await tx.holidayDate.createMany({ data: dates.map((d) => ({ ...d, holidayGroupId: id })) })
 }
 
 export async function resyncAllHolidayGroupsFromUrl(year: number) {
@@ -191,10 +198,17 @@ export const updateHolidayGroup = async (id: string, data: UpdateHolidayGroupInp
 
     const effectiveDates: DateInput[] = newDates ?? existing.dates.map((d) => ({ name: d.name, month: d.month, day: d.day }))
 
+    // urlJustSet + fetch falho/vazio (fetchHolidaysFromUrl retorna null nos dois casos) não deve apagar
+    // as datas manuais que já existiam — mantém o grupo como estava até um resync bem-sucedido
+    const shouldReplaceDates = newDates !== undefined && !(urlJustSet && newDates.length === 0)
+    if (urlJustSet && newDates?.length === 0) {
+        logger.warn({ event: 'holidays.url_set.fetch_empty', holidayGroupId: id, url: newUrl })
+    }
+
     const hg = await prisma.$transaction(async (tx) => {
-        if (newDates !== undefined) {
+        if (shouldReplaceDates) {
             await tx.holidayDate.deleteMany({ where: { holidayGroupId: id } })
-            if (newDates.length > 0) await tx.holidayDate.createMany({ data: newDates.map((d) => ({ ...d, holidayGroupId: id })) })
+            await tx.holidayDate.createMany({ data: newDates!.map((d) => ({ ...d, holidayGroupId: id })) })
         }
 
         const updated = await tx.holidayGroup.update({

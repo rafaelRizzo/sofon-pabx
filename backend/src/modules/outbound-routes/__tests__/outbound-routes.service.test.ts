@@ -119,7 +119,23 @@ describe('Service.createOutboundRoute', () => {
         db.trunk.findMany.mockResolvedValue([TRUNK])
         await expect(Service.createOutboundRoute({
             name: 'X', companyId: 'c1', position: 0, trunkIds: ['t1'],
-            patterns: [{ pattern: '_X.', position: 0 }, { pattern: '_X.', position: 1 }],
+            patterns: [{ pattern: '_0XXXXXXXX', position: 0 }, { pattern: '_0XXXXXXXX', position: 1 }],
+        }))
+            .rejects.toMatchObject({ statusCode: 409 })
+    })
+
+    it('throws 409 when pattern is reserved for the ramais context (ramal aliases/fallback)', async () => {
+        db.company.findUnique.mockResolvedValue(COMPANY)
+        db.trunk.findMany.mockResolvedValue([TRUNK])
+        await expect(Service.createOutboundRoute({
+            name: 'X', companyId: 'c1', position: 0, trunkIds: ['t1'],
+            patterns: [{ pattern: '_X.', position: 0 }],
+        }))
+            .rejects.toMatchObject({ statusCode: 409 })
+
+        await expect(Service.createOutboundRoute({
+            name: 'X', companyId: 'c1', position: 0, trunkIds: ['t1'],
+            patterns: [{ pattern: '_XXXX', position: 0 }],
         }))
             .rejects.toMatchObject({ statusCode: 409 })
     })

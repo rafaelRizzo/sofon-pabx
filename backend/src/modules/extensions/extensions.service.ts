@@ -137,6 +137,7 @@ async function provisionMissingAsteriskRecord(
         const password = generatePassword()
         await PjsipRepository.createExtension(tx, number, { password, name, context, extras: {} })
         await DialplanRepository.ensureGenericRoutingPattern(tx, context)
+        await DialplanRepository.ensureFallback(tx, context)
         return password
     }
 
@@ -145,6 +146,7 @@ async function provisionMissingAsteriskRecord(
     const password = generatePassword()
     await SipRepository.createExtension(tx, number, password, context, { callerid: `${name} <${number}>` })
     await DialplanRepository.ensureGenericRoutingPattern(tx, context)
+    await DialplanRepository.ensureFallback(tx, context)
     return password
 }
 

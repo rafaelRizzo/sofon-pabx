@@ -274,6 +274,9 @@ export const updateTrunk = async (id: string, data: UpdateTrunkInput) => {
     const maxInChanged = 'maxInChannels' in data && data.maxInChannels !== existing.maxInChannels
     const maxOutChanged = 'maxOutChannels' in data && data.maxOutChannels !== existing.maxOutChannels
     const customHeadersChanged = 'customHeaders' in data
+    // techPrefix vai direto pro Dial() do outbound route (ver outbound-routes.service.ts) — sem resync
+    // aqui a trunk fica com prefixo velho gravado no dialplan, silenciosamente
+    const techPrefixChanged = 'techPrefix' in data && data.techPrefix !== existing.techPrefix
 
     await prisma.$transaction(async (tx) => {
         if (existing.type === 'iax') {
@@ -312,7 +315,7 @@ export const updateTrunk = async (id: string, data: UpdateTrunkInput) => {
             }
         }
 
-        if (maxOutChanged || customHeadersChanged) {
+        if (maxOutChanged || customHeadersChanged || techPrefixChanged) {
             const affectedRouteIds = (
                 await tx.outboundRouteTrunk.findMany({ where: { trunkId: id }, select: { routeId: true } })
             ).map((rt) => rt.routeId)
