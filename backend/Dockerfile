@@ -2,8 +2,6 @@
 FROM oven/bun:1 AS deps
 WORKDIR /app
 COPY package.json bun.lock ./
-# cache mount desligado por ora (buildkit cache preso travando disco na VPS, ver rsync.sh/docker builder prune)
-# RUN --mount=type=cache,target=/root/.bun/install/cache \
 RUN bun install --frozen-lockfile
 
 FROM oven/bun:1 AS builder
@@ -20,8 +18,6 @@ RUN bun run build
 FROM oven/bun:1 AS prod-deps
 WORKDIR /app
 COPY package.json bun.lock ./
-# cache mount desligado por ora (buildkit cache preso travando disco na VPS, ver rsync.sh/docker builder prune)
-# RUN --mount=type=cache,target=/root/.bun/install/cache \
 RUN bun install --frozen-lockfile --production
 
 FROM oven/bun:1 AS runner
@@ -30,9 +26,6 @@ ENV NODE_ENV=production
 
 # sox: conversão de áudio em src/utils/audio-convert.ts. Reload do dialplan vai via AMI
 # (src/asterisk/ami-client.ts), não precisa mais do binário CLI do Asterisk aqui.
-# cache mount desligado por ora (buildkit cache preso travando disco na VPS, ver rsync.sh/docker builder prune)
-# RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-#     --mount=type=cache,target=/var/lib/apt,sharing=locked \
 RUN apt-get update \
     && apt-get install -y --no-install-recommends sox libsox-fmt-mp3
 
