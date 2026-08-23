@@ -4,6 +4,7 @@ import { connectRedis, disconnectRedis } from './config/redis'
 import { startAgiServer } from './asterisk/agi-server'
 import { startAmiEvents, stopAmiEvents } from './asterisk/ami-events'
 import { ensureStaticAsteriskConfig } from './asterisk/ensure-static-config'
+import { runCacheMigrations } from './lib/cache-migrations'
 import { startHolidayResyncJob } from './jobs/holiday-resync.job'
 import { startAgentAffinityRecalcJob } from './jobs/agent-affinity-recalc.job'
 import { logger } from './utils/logger'
@@ -28,6 +29,10 @@ async function start() {
             // deploy vira só "git pull + rebuild", sem precisar chamar resyncDialplan manualmente nem
             // reinstalar o Asterisk pra propagar ajustes como transferdigittimeout. Nunca lança.
             await ensureStaticAsteriskConfig()
+
+            // Correções de cache que só precisam rodar uma vez por ambiente (marca no Redis que
+            // já rodou) — ver src/lib/cache-migrations.ts
+            await runCacheMigrations()
 
             // AGI/AMI/jobs são singleton por natureza (porta fixa, listener de evento único, jobs
             // idempotentes mas redundantes se duplicados) — nunca rodam em réplica 'web'
