@@ -35,7 +35,7 @@ export function UsedByBadge({ usedBy }: UsedByBadgeProps) {
                     render={
                         <Badge
                             variant="outline"
-                            className="gap-1.5 border-transparent bg-violet-500/15 text-violet-600 dark:bg-violet-400/20 dark:text-violet-300"
+                            className="gap-1.5 border-transparent bg-indigo-500/15 text-indigo-600 dark:bg-indigo-400/20 dark:text-indigo-300"
                         >
                             <LinkIcon className="size-3" />
                             Usado em {usedBy.length}{" "}

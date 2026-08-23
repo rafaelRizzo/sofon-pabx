@@ -70,7 +70,9 @@ export const DialplanRepository = {
         await tx.extensions.createMany({
             data: [
                 { context, exten: '_X.', priority: 1, app: 'NoOp', appdata: 'Destino nao encontrado: ${EXTEN}' },
-                { context, exten: '_X.', priority: 2, app: 'Congestion', appdata: null },
+                // Som padrão do Asterisk (core-sounds) — anuncia o erro antes do tom de congestionamento
+                { context, exten: '_X.', priority: 2, app: 'Playback', appdata: 'pbx-invalid' },
+                { context, exten: '_X.', priority: 3, app: 'Congestion', appdata: null },
             ],
         })
     },

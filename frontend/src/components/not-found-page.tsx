@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router"
 import { HouseIcon, PhoneOffIcon } from "lucide-react"
-import { buttonVariants } from "@/components/ui/button"
+import { buttonVariants } from "@/components/ui/button-variants"
 import { Card, CardContent } from "@/components/ui/card"
 
 export function NotFoundPage() {

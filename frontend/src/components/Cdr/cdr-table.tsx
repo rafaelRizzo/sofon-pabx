@@ -43,7 +43,7 @@ const DIRECTION_TONE: Record<string, string> = {
     inbound:
         "border-transparent bg-blue-500/15 text-blue-600 dark:bg-blue-400/20 dark:text-blue-300",
     outbound:
-        "border-transparent bg-violet-500/15 text-violet-600 dark:bg-violet-400/20 dark:text-violet-300",
+        "border-transparent bg-indigo-500/15 text-indigo-600 dark:bg-indigo-400/20 dark:text-indigo-300",
     internal:
         "border-transparent bg-cyan-500/15 text-cyan-600 dark:bg-cyan-400/20 dark:text-cyan-300",
     transfer:

@@ -51,7 +51,7 @@ export function DeletableEdge({
     // ver deleteKeyCode em flow-canvas.tsx) não dava nenhum retorno visual — parecia que a seleção
     // simplesmente não acontecia.
     const selectedStyle = selected
-        ? { stroke: "var(--color-violet-500)", strokeWidth: 3 }
+        ? { stroke: "var(--color-indigo-500)", strokeWidth: 3 }
         : undefined
 
     return (

@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router"
 import { HouseIcon, RefreshCwIcon, ServerCrashIcon } from "lucide-react"
-import { Button, buttonVariants } from "@/components/ui/button"
+import { Button } from "@/components/ui/button"
+import { buttonVariants } from "@/components/ui/button-variants"
 import { Card, CardContent } from "@/components/ui/card"
 
 const CHUNK_LOAD_ERROR_PATTERN =

@@ -26,9 +26,9 @@ const TONE = {
         chip: "bg-amber-500/10 dark:bg-amber-400/10",
         icon: "text-amber-600 dark:text-amber-400",
     },
-    violet: {
-        chip: "bg-violet-500/10 dark:bg-violet-400/10",
-        icon: "text-violet-600 dark:text-violet-400",
+    indigo: {
+        chip: "bg-indigo-500/10 dark:bg-indigo-400/10",
+        icon: "text-indigo-600 dark:text-indigo-400",
     },
 } as const
 
@@ -122,7 +122,7 @@ export function CdrMetricsCards({ metrics, loading }: Props) {
                 value={formatDuration(metrics?.avgBillsec ?? null)}
                 loading={loading}
                 icon={TimerIcon}
-                tone="violet"
+                tone="indigo"
             />
         </div>
     )

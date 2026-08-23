@@ -25,7 +25,7 @@ type Props = {
 const TYPE_ACCENT: Record<string, string> = {
     pjsip: "bg-sky-500/15 text-sky-600 dark:bg-sky-400/20 dark:text-sky-300",
     sip: "bg-slate-500/15 text-slate-600 dark:bg-slate-400/20 dark:text-slate-300",
-    iax: "bg-violet-500/15 text-violet-600 dark:bg-violet-400/20 dark:text-violet-300",
+    iax: "bg-indigo-500/15 text-indigo-600 dark:bg-indigo-400/20 dark:text-indigo-300",
 }
 
 export function RealtimeTrunkCards({ trunks, loading, companySelected }: Props) {

@@ -48,6 +48,12 @@ describe('DialplanRepository.ensureFallback', () => {
         })
         const { data, skipDuplicates } = tx.extensions.createMany.mock.calls[0][0]
         expect(skipDuplicates).toBeUndefined()
-        expect(data).toHaveLength(2)
+        expect(data).toHaveLength(3)
+        expect(data).toContainEqual({
+            context: 'ramais', exten: '_X.', priority: 2, app: 'Playback', appdata: 'pbx-invalid',
+        })
+        expect(data).toContainEqual({
+            context: 'ramais', exten: '_X.', priority: 3, app: 'Congestion', appdata: null,
+        })
     })
 })

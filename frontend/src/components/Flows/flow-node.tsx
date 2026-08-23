@@ -441,7 +441,7 @@ export function FlowNode({
 
     return (
         <div
-            className={`group relative min-w-56 rounded-xl border bg-card text-card-foreground shadow-sm transition-[box-shadow,border-color] duration-150 outline-none hover:shadow-md focus-visible:ring-5 focus-visible:ring-ring/30 dark:focus-visible:ring-ring/45 ${selected ? "border-violet-950/10 ring-4 ring-violet-500/15 dark:border-violet-500/60 dark:ring-violet-500/25" : "border-border/60 dark:border-neutral-500/25"}`}
+            className={`group relative min-w-56 rounded-xl border bg-card text-card-foreground shadow-sm transition-[box-shadow,border-color] duration-150 outline-none hover:shadow-md focus-visible:ring-5 focus-visible:ring-ring/30 dark:focus-visible:ring-ring/45 ${selected ? "border-indigo-950/10 ring-4 ring-indigo-500/15 dark:border-indigo-500/60 dark:ring-indigo-500/25" : "border-border/60 dark:border-neutral-500/25"}`}
             onDoubleClick={() => data.onEdit?.()}
         >
             <Handle
@@ -451,7 +451,7 @@ export function FlowNode({
             />
 
             <div className="flex items-start gap-2.5 rounded-t-xl px-3 pt-3 pb-2.5">
-                <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary dark:bg-primary/20 dark:text-violet-400">
+                <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary dark:bg-primary/20 dark:text-indigo-400">
                     <Icon className="size-4" />
                 </div>
                 <div className="flex min-w-0 flex-col">
