@@ -264,6 +264,36 @@ export const resyncDialplan = async (id: string) => {
     })
 }
 
+// Não roda em paralelo: cada resyncDialplan já serializa por empresa (withDialplanLock) e mexe no
+// esqueleto global (ensureStaticAsteriskConfig, features.conf) — rodar N empresas ao mesmo tempo só
+// faria essas etapas globais colidirem entre si sem ganho real de tempo. Uma empresa que falhar não
+// interrompe as demais — erro é capturado e reportado por empresa no resultado final.
+export const resyncAllCompaniesDialplan = async () => {
+    const companies = await prisma.company.findMany({ select: { id: true, name: true } })
+
+    const results: Array<{ companyId: string; name: string; success: boolean; error?: string }> = []
+    for (const company of companies) {
+        try {
+            await resyncDialplan(company.id)
+            results.push({ companyId: company.id, name: company.name, success: true })
+        } catch (error) {
+            results.push({
+                companyId: company.id,
+                name: company.name,
+                success: false,
+                error: error instanceof Error ? error.message : String(error),
+            })
+        }
+    }
+
+    return {
+        total: companies.length,
+        succeeded: results.filter((r) => r.success).length,
+        failed: results.filter((r) => !r.success).length,
+        results,
+    }
+}
+
 export const deleteCompany = async (id: string) => {
     const existing = await prisma.company.findUnique({
         where: { id },

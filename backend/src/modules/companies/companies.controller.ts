@@ -81,6 +81,19 @@ export const resyncDialplan = async (req: FastifyRequest, reply: FastifyReply) =
     }
 }
 
+export const resyncAllDialplans = async (req: FastifyRequest, reply: FastifyReply) => {
+    try {
+        const summary = await CompaniesService.resyncAllCompaniesDialplan()
+        return reply.send({
+            success: true,
+            message: `Dialplan resynced for ${summary.succeeded}/${summary.total} companies`,
+            ...summary,
+        })
+    } catch (error) {
+        return handleError(reply, error, req)
+    }
+}
+
 export const getCompaniesByUser = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
         const { id_user } = userIdParamSchema.parse(req.params)

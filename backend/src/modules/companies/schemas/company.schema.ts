@@ -64,3 +64,16 @@ export const ResyncDialplanResponse = ok({
     orphansPruned: z.number(),
     reloadApplied: z.boolean(),
 })
+
+export const ResyncAllDialplansResponse = ok({
+    message: z.string(),
+    total: z.number(),
+    succeeded: z.number(),
+    failed: z.number(),
+    results: z.array(z.object({
+        companyId: z.string(),
+        name: z.string(),
+        success: z.boolean(),
+        error: z.string().optional(),
+    })),
+})

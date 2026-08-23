@@ -6,7 +6,7 @@ import { requirePermission } from '../../middleware/permission.middleware'
 import {
     createCompanySchema, updateCompanySchema, idParamSchema, userIdParamSchema,
     ListCompaniesResponse, GetCompanyResponse, CreateCompanyResponse, UpdateCompanyResponse,
-    ResyncDialplanResponse,
+    ResyncDialplanResponse, ResyncAllDialplansResponse,
 } from './schemas/company.schema'
 import { errors, deleted } from '../../schemas/responses'
 
@@ -125,6 +125,24 @@ export const companiesRoutes = async (app: FastifyInstance) => {
             },
         },
     }, CompaniesController.resyncDialplan as any)
+
+    router.post('/companies/resync-dialplan-all', {
+        onRequest: [...protectedRoute, requireAdmin],
+        schema: {
+            tags: ['Companies'],
+            summary: 'Resincronizar dialplan de todas as empresas',
+            description:
+                'Roda o mesmo resync-dialplan (ver POST /companies/:id/resync-dialplan) pra CADA empresa ' +
+                'cadastrada, sequencialmente. Uma empresa que falhar não interrompe as demais — o resultado ' +
+                'traz o sucesso/erro individual de cada empresa em "results". Requer role admin.',
+            security: [{ bearerAuth: [] }],
+            response: {
+                200: ResyncAllDialplansResponse,
+                401: errors[401],
+                403: errors[403],
+            },
+        },
+    }, CompaniesController.resyncAllDialplans as any)
 
     router.delete('/companies/:id', {
         onRequest: [...protectedRoute, requireAdmin],
