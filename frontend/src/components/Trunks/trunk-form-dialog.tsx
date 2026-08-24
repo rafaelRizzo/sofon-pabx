@@ -1,8 +1,8 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { PlusIcon, XIcon } from "lucide-react"
+import { EyeIcon, EyeOffIcon, PlusIcon, XIcon } from "lucide-react"
 import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form"
 
 import {
@@ -211,6 +211,7 @@ export function TrunkFormDialog({
     onUpdate,
 }: Props) {
     const isEdit = !!trunk
+    const [showPassword, setShowPassword] = useState(false)
 
     const createForm = useForm<TrunkCreateForm>({
         resolver: zodResolver(createTrunkSchema) as any,
@@ -670,7 +671,37 @@ export function TrunkFormDialog({
                                                     ? " (opcional)"
                                                     : ""}
                                             </FieldLabel>
-                                            <Input {...r("password")} />
+                                            <div className="flex gap-2">
+                                                <Input
+                                                    type={
+                                                        showPassword
+                                                            ? "text"
+                                                            : "password"
+                                                    }
+                                                    autoComplete="new-password"
+                                                    className="flex-1"
+                                                    {...r("password")}
+                                                />
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="icon"
+                                                    onClick={() =>
+                                                        setShowPassword(
+                                                            (v) => !v
+                                                        )
+                                                    }
+                                                >
+                                                    {showPassword ? (
+                                                        <EyeOffIcon />
+                                                    ) : (
+                                                        <EyeIcon />
+                                                    )}
+                                                    <span className="sr-only">
+                                                        Mostrar senha
+                                                    </span>
+                                                </Button>
+                                            </div>
                                             {errors.password && (
                                                 <FieldError>
                                                     {

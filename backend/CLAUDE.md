@@ -175,16 +175,18 @@ Modelo: Asterisk roda **nativo** na VPS (`setups/install-asterisk.sh` + `setups/
 - **`entrypoint.sh`** — roda `bunx prisma migrate deploy` automaticamente antes de subir o server (`bun dist/server.js`), **exceto** quando `PROCESS_ROLE=web` — evita N réplicas competindo pelo mesmo migrate ao subir juntas; quem migra é sempre o `worker` (ou `all`, dev/single-instance). `odbc-realtime.sh` (que dá os grants Postgres pro usuário `asterisk` usado pelo Realtime/ODBC) deve rodar **depois** do primeiro `docker compose up`, pra que as tabelas já existam.
 - Como o backend está em `network_mode: host`, ele não participa da rede Docker `proxy` (usada por frontend + Nginx Proxy Manager) — pra expor a API por domínio, o Proxy Host no NPM aponta pro gateway da rede `proxy` (IP privado, ex. `172.18.0.1`), não pelo nome do service. O `nftables` gerado por `install-asterisk.sh` já libera essa faixa privada (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`) pra porta `3333` — nunca exposta direto à internet. Cada porta de réplica web adicional (`3334`, `3335`, ...) precisa da mesma liberação, uma flag `--private-tcp <porta>` por porta em `setups/install-asterisk.sh` (a flag não aceita lista, é repetível).
 
-### Produção atual (VPS `72.60.53.81`, gerenciada via Dokploy) — diverge do modelo acima
+### Produção atual (VPS gerenciada via Dokploy) — diverge do modelo acima
 
-Essa VPS **não** usa `network_mode: host` — os containers do backend (`sofon_backend_worker` + `rafael-sofon-dv2qoi-backend-1/2/3`) rodam numa rede bridge (`dokploy-network`, Dokploy/Swarm), com `extra_hosts: host.docker.internal:host-gateway` no compose gerado. Isso muda a conectividade com o Asterisk nativo (que continua fora do Docker, só ouvindo em `127.0.0.1`):
+IP/hostname/slug real: ver anotação privada fora do repo (não versionar acesso de infra aqui).
+
+Essa VPS **não** usa `network_mode: host` — os containers do backend (worker + réplicas web numeradas) rodam numa rede bridge (`dokploy-network`, Dokploy/Swarm), com `extra_hosts: host.docker.internal:host-gateway` no compose gerado. Isso muda a conectividade com o Asterisk nativo (que continua fora do Docker, só ouvindo em `127.0.0.1`):
 
 - `AMI_HOST` não pode ser `127.0.0.1` (seria o loopback do próprio container, não do host) nem o IP público da VPS (Asterisk não escuta nele) — tem que ser `host.docker.internal`. Na prática isso resolve pra um IP dinâmico dentro de `172.16.0.0/12` (bridge `docker_gwbridge` do Swarm), não uma subnet fixa por container.
 - `manager.conf` do Asterisk precisa de `bindaddr = 0.0.0.0` (só `127.0.0.1` não é alcançável de dentro do container) + `permit = 172.16.0.0/255.240.0.0` na seção do usuário AMI (`[admin]`), já que a origem observada varia dentro dessa faixa. Aplicar com `asterisk -rx "manager reload"` (não precisa reiniciar o Asterisk).
 - Abrir `bindaddr` pra `0.0.0.0` expõe a porta `5038` na interface pública se não houver firewall de host (essa VPS não tinha nenhum — `iptables -L INPUT` só com policy `ACCEPT`, zero regras). Corrigido com uma regra bloqueando `tcp/5038` especificamente na interface pública (`eth0`), persistida via `iptables-persistent`/`netfilter-persistent` — a ACL do próprio Asterisk (`permit`/`deny` acima) seria a única linha de defesa sem isso.
 - `AGI_HOST` continua `127.0.0.1` sem mudança — é o Asterisk (no host) que conecta na porta publicada `4573:4573` do container, direção contrária à do AMI, funciona igual em qualquer network mode.
 - `REDIS_URL`/`DATABASE_URL` apontam pro nome do service (`redis`/`postgres`) dentro da `dokploy-network`, não `127.0.0.1` — só possível justamente por não ser `network_mode: host`.
-- Config real em `/etc/dokploy/compose/rafael-sofon-dv2qoi/code/backend/` na VPS (`.env` + `docker-compose.yml` gerado pelo Dokploy) — não confundir com o `ovh.rafael-rizzo.com` (VPS antiga/diferente, ainda com o modelo `network_mode: host` documentado acima, não é a produção atual).
+- Config real em `/etc/dokploy/compose/<slug>/code/backend/` na VPS (`.env` + `docker-compose.yml` gerado pelo Dokploy) — não confundir com a VPS antiga/diferente ainda com o modelo `network_mode: host` documentado acima (não é a produção atual). Nome/IP/slug reais: anotação privada fora do repo.
 
 ---
 
@@ -373,33 +375,33 @@ exten,3,<postQueueDestination app/appdata>
 
 Legend: `[x]` implementado + testado (unit + integration) | `[~]` implementado, só testes unit | `[ ]` pendente
 
-| Módulo | Rotas | Unit | Integration |
-|--------|-------|------|-------------|
-| Health | `GET /health` | — | — |
-| Auth | POST register/login/refresh/logout | `[x]` | `[x]` |
-| Users | GET list/:id/:id/companies · POST · PUT · DELETE | `[x]` | `[x]` |
-| Companies | GET list/:id · POST · PUT · DELETE | `[x]` | `[x]` |
-| DIDs | GET list/:id/company/:id · POST · PUT · DELETE | `[x]` | `[x]` |
-| Extensions | GET list/:id · POST · POST /batch · PUT · PATCH /password · DELETE | `[x]` | `[x]` |
-| Queues | GET list/company/:id/:id · POST · PUT · DELETE | `[x]` | `[x]` |
-| Queue Members | GET/POST/PUT/DELETE `/queues/:id/members` | `[x]` | `[ ]` |
-| Trunks | GET list/:id · POST · PUT · DELETE | `[~]` | `[ ]` |
-| Outbound Routes | GET list/:id · POST · PUT · DELETE · patterns CRUD · PUT /trunks · POST/DELETE /extensions | `[x]` | `[x]` |
-| Inbound Routes | GET list/:id · POST · PUT · DELETE | `[x]` | `[x]` |
-| Time Groups | GET list/:id · POST · PUT · DELETE | `[x]` | `[x]` |
-| Time Conditions | GET list/:id · POST · PUT · DELETE | `[x]` | `[x]` |
-| Holiday Groups | GET list/:id · POST · PUT · DELETE | `[~]` | `[ ]` |
-| CDR | GET /cdr | `[~]` | `[ ]` |
-| Announcements | GET list/:id · POST · PATCH · DELETE | `[~]` | `[ ]` |
-| IVR Menus | GET list/:id · POST · PUT · DELETE | `[~]` | `[ ]` |
-| Request Templates | GET list/:id · POST · PUT · DELETE | `[~]` | `[ ]` |
-| Audios | GET list/:id · POST · PATCH · DELETE | `[~]` | `[ ]` |
-| Variables | GET list/:id · POST · PATCH · DELETE | `[~]` | `[ ]` |
-| Variable Conditions | GET list/:id · POST · PUT · DELETE | `[~]` | `[ ]` |
-| Callcenter Agents | GET list/company/:id · POST · PATCH · DELETE | `[x]` | `[ ]` |
-| Callcenter Routing Rules | GET list/company/:id/:id · POST · PUT · DELETE | `[x]` | `[ ]` |
-| Callcenter Ratings | GET /callcenter/ratings · POST | `[x]` | `[ ]` |
-| Callcenter Engine (AGI route/survey + job de afinidade) | sem rota HTTP própria | `[~]`¹ | `[ ]` |
+| Módulo                                                  | Rotas                                                                                      | Unit   | Integration |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ------ | ----------- |
+| Health                                                  | `GET /health`                                                                              | —      | —           |
+| Auth                                                    | POST register/login/refresh/logout                                                         | `[x]`  | `[x]`       |
+| Users                                                   | GET list/:id/:id/companies · POST · PUT · DELETE                                           | `[x]`  | `[x]`       |
+| Companies                                               | GET list/:id · POST · PUT · DELETE                                                         | `[x]`  | `[x]`       |
+| DIDs                                                    | GET list/:id/company/:id · POST · PUT · DELETE                                             | `[x]`  | `[x]`       |
+| Extensions                                              | GET list/:id · POST · POST /batch · PUT · PATCH /password · DELETE                         | `[x]`  | `[x]`       |
+| Queues                                                  | GET list/company/:id/:id · POST · PUT · DELETE                                             | `[x]`  | `[x]`       |
+| Queue Members                                           | GET/POST/PUT/DELETE `/queues/:id/members`                                                  | `[x]`  | `[ ]`       |
+| Trunks                                                  | GET list/:id · POST · PUT · DELETE                                                         | `[~]`  | `[ ]`       |
+| Outbound Routes                                         | GET list/:id · POST · PUT · DELETE · patterns CRUD · PUT /trunks · POST/DELETE /extensions | `[x]`  | `[x]`       |
+| Inbound Routes                                          | GET list/:id · POST · PUT · DELETE                                                         | `[x]`  | `[x]`       |
+| Time Groups                                             | GET list/:id · POST · PUT · DELETE                                                         | `[x]`  | `[x]`       |
+| Time Conditions                                         | GET list/:id · POST · PUT · DELETE                                                         | `[x]`  | `[x]`       |
+| Holiday Groups                                          | GET list/:id · POST · PUT · DELETE                                                         | `[~]`  | `[ ]`       |
+| CDR                                                     | GET /cdr                                                                                   | `[~]`  | `[ ]`       |
+| Announcements                                           | GET list/:id · POST · PATCH · DELETE                                                       | `[~]`  | `[ ]`       |
+| IVR Menus                                               | GET list/:id · POST · PUT · DELETE                                                         | `[~]`  | `[ ]`       |
+| Request Templates                                       | GET list/:id · POST · PUT · DELETE                                                         | `[~]`  | `[ ]`       |
+| Audios                                                  | GET list/:id · POST · PATCH · DELETE                                                       | `[~]`  | `[ ]`       |
+| Variables                                               | GET list/:id · POST · PATCH · DELETE                                                       | `[~]`  | `[ ]`       |
+| Variable Conditions                                     | GET list/:id · POST · PUT · DELETE                                                         | `[~]`  | `[ ]`       |
+| Callcenter Agents                                       | GET list/company/:id · POST · PATCH · DELETE                                               | `[x]`  | `[ ]`       |
+| Callcenter Routing Rules                                | GET list/company/:id/:id · POST · PUT · DELETE                                             | `[x]`  | `[ ]`       |
+| Callcenter Ratings                                      | GET /callcenter/ratings · POST                                                             | `[x]`  | `[ ]`       |
+| Callcenter Engine (AGI route/survey + job de afinidade) | sem rota HTTP própria                                                                      | `[~]`¹ | `[ ]`       |
 
 ¹ `resolveActiveRule`, `parseMemberInterface` e `recalculateAffinity`/`recalculatePenaltiesForCompany` têm teste unit; os handlers AGI em si (`handleQueueRoute`/`handleQueueSurvey`/`handleSurveyResult`) não têm teste — mesma limitação de `handleRequestTemplate`, nunca testado neste projeto (protocolo AGI via socket TCP cru).
 

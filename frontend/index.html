@@ -4,22 +4,17 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      script-src sem 'unsafe-inline': por isso o init de tema vive em /theme-init.js (arquivo
+      próprio) em vez de <script> inline. connect-src precisa de ws:/wss: porque o webphone abre
+      WebSocket SIP pra um host dinâmico (Asterisk da empresa), não fixo em build time.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' %VITE_API_URL% ws: wss:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+    />
     <title>Sofon PABX</title>
-    <script>
-      (function () {
-        var key = "vite-ui-theme";
-        var stored = localStorage.getItem(key);
-        var theme = stored === "light" || stored === "dark" ? stored : "system";
-        var resolved =
-          theme === "system"
-            ? window.matchMedia("(prefers-color-scheme: dark)").matches
-              ? "dark"
-              : "light"
-            : theme;
-        document.documentElement.classList.add(resolved);
-        document.documentElement.style.colorScheme = resolved;
-      })();
-    </script>
+    <script src="/theme-init.js"></script>
   </head>
   <body>
     <div id="root"></div>

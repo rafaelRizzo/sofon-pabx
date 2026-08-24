@@ -8,7 +8,7 @@ import { SwitchboardGraph } from "./switchboard-graph"
 const FEED = [
   { route: "Ramal 1042 → Tronco 01", status: "Ativa", color: "bg-emerald-500" },
   { route: "Fila Suporte → Ramal 2340", status: "Tocando", color: "bg-amber-500" },
-  { route: "Ramal 3078 → Caixa postal", status: "Gravando", color: "bg-indigo-500" },
+  { route: "Digite seu CPF → HTTP", status: "Consultando", color: "bg-indigo-500" },
 ]
 
 export function LoginShowcase({ className }: { className?: string }) {
@@ -37,11 +37,11 @@ export function LoginShowcase({ className }: { className?: string }) {
         <div className="w-full max-w-sm space-y-4">
           <div className="space-y-1.5">
             <h2 className="text-xl font-semibold tracking-tight text-balance">
-              Um núcleo. Todas as chamadas.
+              Sua central, sob controle total.
             </h2>
             <p className="text-sm text-muted-foreground text-balance">
-              Ramais, troncos e filas roteados em tempo real por uma central
-              única.
+              Ramais, troncos e filas configurados num painel só, sem tocar em
+              linha de comando ou arquivo de config.
             </p>
           </div>
 

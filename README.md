@@ -76,8 +76,9 @@ Isolamento entre empresas é feito por sufixo (`asteriskId`) nos identificadores
 ### 1. Infra local (Postgres + Redis)
 
 ```bash
-cd backend/setups
-docker compose up -d                          # Postgres em localhost:5433
+docker run -d --name postgres_sofon_dev -p 5433:5432 \
+  -e POSTGRES_DB=asterisk -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=senha_forte \
+  postgres:18.3-alpine3.23                    # Postgres em localhost:5433
 docker run -d --name redis_sofon -p 6379:6379 redis:alpine
 ```
 

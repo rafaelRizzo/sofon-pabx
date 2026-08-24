@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import { useForm } from "react-hook-form"
 import { toast } from "sonner"
@@ -12,6 +13,7 @@ type LoginForm = {
 
 export function useLogin() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const cookies = new Cookies()
 
   const form = useForm<LoginForm>({
@@ -22,6 +24,8 @@ export function useLogin() {
     const id = toast.loading("Entrando...")
     try {
       const { data: res } = await api.post("/auth/login", data)
+      // limpa qualquer cache remanescente de uma sessão anterior na mesma aba antes de logar
+      queryClient.clear()
       cookies.set("token", res.token, { path: "/", sameSite: "lax", secure: import.meta.env.PROD })
       toast.success("Login realizado", { id })
       navigate({ to: "/dashboard" })

@@ -5,7 +5,7 @@ import {
   PhoneIcon,
   RadioIcon,
   UsersIcon,
-  VoicemailIcon,
+  WebhookIcon,
   type LucideIcon,
 } from "lucide-react"
 
@@ -24,7 +24,7 @@ const LINES: Line[] = [
   { label: "Fila", icon: UsersIcon, angle: 30 },
   { label: "Filial", icon: Building2Icon, angle: 90 },
   { label: "URA", icon: RadioIcon, angle: 150 },
-  { label: "Caixa postal", icon: VoicemailIcon, angle: 210 },
+  { label: "HTTP", icon: WebhookIcon, angle: 210 },
 ]
 
 function toRad(deg: number) {
