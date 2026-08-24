@@ -5,6 +5,7 @@ import {
   FileAudioIcon,
   FileClockIcon,
   HashIcon,
+  HistoryIcon,
   KeyRoundIcon,
   LayoutDashboardIcon,
   LogOutIcon,
@@ -19,6 +20,7 @@ import {
   type LucideIcon,
 } from "lucide-react"
 
+import { SofonMark } from "@/components/icons/sofon-mark"
 import {
   Sidebar,
   SidebarContent,
@@ -44,7 +46,7 @@ export type NavItem = {
   icon: LucideIcon
   // omitido = sempre visível (ex: Dashboard); presente = precisa de "<permission>:view"
   // (admin/reseller sempre veem tudo, só role "user" é filtrado; ver useAuth().hasPermission)
-  permission?: PermissionResourceKey | "cdr"
+  permission?: PermissionResourceKey | "cdr" | "audit-logs"
 }
 
 export type NavGroup = {
@@ -161,6 +163,12 @@ export const NAV: NavGroup[] = [
         icon: UsersIcon,
         permission: "users",
       },
+      {
+        title: "Log de auditoria",
+        href: "/dashboard/audit-logs",
+        icon: HistoryIcon,
+        permission: "audit-logs",
+      },
     ],
   },
 ]
@@ -187,7 +195,7 @@ export function AppSidebar() {
       <Sidebar collapsible="icon">
         <SidebarHeader>
           <div className="flex items-center gap-2 px-2 py-1.5">
-            <PhoneIcon className="size-5 shrink-0" />
+            <SofonMark className="size-6 shrink-0 text-primary" />
             <span className="font-semibold group-data-[collapsible=icon]:hidden">
               Sofon PABX
             </span>

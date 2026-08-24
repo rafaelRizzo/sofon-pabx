@@ -829,6 +829,30 @@ model QueueCall {
   @@map("queue_calls")
 }
 
+// Rastro de auditoria: escrita automática via extension do Prisma (src/lib/prisma.ts) toda vez que
+// um model da allowlist (AUDITED_MODELS) sofre create/update/upsert/delete/updateMany/deleteMany
+// dentro de uma request autenticada. actorId/actorName são snapshot (sem relation) — sobrevive à
+// exclusão do usuário que gerou o registro.
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String
+  actorName String?
+  ip        String?
+  action    String // CREATE | UPDATE | DELETE
+  model     String // nome do model Prisma afetado (ex: "Trunk", "Did")
+  recordId  String?
+  companyId String?
+  before    Json?
+  after     Json?
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([model, recordId])
+  @@index([actorId])
+  @@index([companyId])
+  @@index([createdAt(sort: Desc)])
+  @@map("audit_logs")
+}
+
 // ─── Asterisk Realtime Models ─────────────────────────────────────────────────
 
 model extensions {

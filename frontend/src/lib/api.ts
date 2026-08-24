@@ -127,7 +127,11 @@ export function getErrorMessage(err: unknown): string | undefined {
     if (messages.length) return messages.join(" | ")
   }
 
-  if (body?.message) return KNOWN_MESSAGES[body.message] ?? body.message
+  // "Route GET:/foo not found" — 404 padrão do Fastify pra rota inexistente (endpoint não
+  // registrado, typo na URL); nunca uma mensagem pensada pro usuário final, sempre cai no fallback
+  const isRawRouteNotFound = status === 404 && /^Route .+ not found$/i.test(body?.message ?? "")
+
+  if (body?.message && !isRawRouteNotFound) return KNOWN_MESSAGES[body.message] ?? body.message
 
   return STATUS_FALLBACK[status] ?? "Erro inesperado. Tente novamente."
 }

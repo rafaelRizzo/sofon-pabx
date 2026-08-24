@@ -27,6 +27,7 @@ export const createDidSchema = z.object({
 export const updateDidSchema = z.object({
     number: z.string().regex(/^\d+$/, "Apenas dígitos são permitidos"),
     status: z.enum(["active", "inactive", "blocked"], "Selecione um status"),
+    companyId: z.string().min(1, "Selecione a empresa"),
 })
 
 export type DidCreateForm = z.infer<typeof createDidSchema>

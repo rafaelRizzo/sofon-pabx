@@ -14,12 +14,13 @@ mock.module('../../../asterisk/inboundroute.repository', () => ({
     InboundRouteRepository: { create: mock(() => Promise.resolve()), update: mock(() => Promise.resolve()), delete: mock(() => Promise.resolve()) },
 }))
 mock.module('../../inbound-routes/cache/inbound-routes.cache', () => ({
-    InboundRoutesCache: { invalidateRoute: mock(() => Promise.resolve()), invalidateByCompany: mock(() => Promise.resolve()) },
+    InboundRoutesCache: { invalidateRoute: mock(() => Promise.resolve()), invalidateByCompany: mock(() => Promise.resolve()), invalidateNamespace: mock(() => Promise.resolve()) },
 }))
 
 import * as DidsService from '../dids.service'
 
 const COMPANY = { id: 'c1', name: 'ACME' }
+const COMPANY2 = { id: 'c2', name: 'Other Co' }
 const DID = { id: 'd1', number: '551100001111', companyId: 'c1', createdAt: new Date(), updatedAt: new Date() }
 
 beforeEach(() => clearPrismaMock(db))
@@ -93,10 +94,11 @@ describe('DidsService.updateDid', () => {
         const { InboundRouteRepository } = await import('../../../asterisk/inboundroute.repository')
         db.did.findUnique.mockResolvedValueOnce(DID).mockResolvedValueOnce(null)
         db.did.update.mockResolvedValue({ ...DID, number: '551100009998' })
-        db.inboundRoute.findMany.mockResolvedValue([{ id: 'ir1', trunkId: 't1', destination: { type: 'hangup' } }])
+        db.inboundRoute.findMany.mockResolvedValue([{ id: 'ir1', trunkId: 't1', trunk: { maxInChannels: 5 } }])
+        db.flowEdge.findMany.mockResolvedValue([{ sourceId: 'ir1', slot: 'default', targetType: 'extension', targetId: 'e1' }])
         await DidsService.updateDid('d1', { number: '551100009998' })
         expect(InboundRouteRepository.delete).toHaveBeenCalledWith(expect.anything(), 't1', DID.number)
-        expect(InboundRouteRepository.create).toHaveBeenCalledWith(expect.anything(), 't1', '551100009998', { type: 'hangup' })
+        expect(InboundRouteRepository.create).toHaveBeenCalledWith(expect.anything(), 't1', '551100009998', { type: 'extension', id: 'e1' }, 5)
     })
 
     it('does not touch dialplan when routing key is unchanged', async () => {
@@ -117,6 +119,35 @@ describe('DidsService.updateDid', () => {
         db.did.findUnique.mockResolvedValue(null)
         await expect(DidsService.updateDid('clxxxxxxxxxxxxxxxxxxxxxxxxx', { number: '123' }))
             .rejects.toMatchObject({ statusCode: 404 })
+    })
+
+    it('reassigns DID to another company and wipes old inbound routes/dialplan', async () => {
+        const { InboundRouteRepository } = await import('../../../asterisk/inboundroute.repository')
+        db.did.findUnique.mockResolvedValueOnce(DID).mockResolvedValueOnce(null)
+        db.company.findUnique.mockResolvedValue(COMPANY2)
+        db.inboundRoute.findMany.mockResolvedValue([{ id: 'ir1', trunkId: 't1' }])
+        db.did.update.mockResolvedValue({ ...DID, companyId: 'c2' })
+
+        const did = await DidsService.updateDid('d1', { companyId: 'c2' }) as any
+
+        expect(did.companyId).toBe('c2')
+        expect(InboundRouteRepository.delete).toHaveBeenCalledWith(expect.anything(), 't1', DID.number)
+        expect(db.inboundRoute.deleteMany).toHaveBeenCalledWith({ where: { didId: 'd1' } })
+        expect(db.flowEdge.deleteMany).toHaveBeenCalledWith({ where: { sourceType: 'inboundroute', sourceId: { in: ['ir1'] } } })
+    })
+
+    it('throws 404 when target company does not exist', async () => {
+        db.did.findUnique.mockResolvedValueOnce(DID)
+        db.company.findUnique.mockResolvedValue(null)
+        await expect(DidsService.updateDid('d1', { companyId: 'c2' }))
+            .rejects.toMatchObject({ statusCode: 404 })
+    })
+
+    it('throws 409 when number already exists in target company', async () => {
+        db.did.findUnique.mockResolvedValueOnce(DID).mockResolvedValueOnce({ id: 'd2', number: DID.number, companyId: 'c2' })
+        db.company.findUnique.mockResolvedValue(COMPANY2)
+        await expect(DidsService.updateDid('d1', { companyId: 'c2' }))
+            .rejects.toMatchObject({ statusCode: 409 })
     })
 })
 

@@ -50,7 +50,7 @@ type AuthContextValue = {
   user: AuthUser | null
   loading: boolean
   hasPermission: (
-    resource: PermissionResourceKey | "cdr",
+    resource: PermissionResourceKey | "cdr" | "audit-logs",
     action?: PermissionAction
   ) => boolean
   refetch: () => Promise<void>

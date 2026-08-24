@@ -10,6 +10,7 @@ import { serializerCompiler, jsonSchemaTransform } from 'fastify-type-provider-z
 import { ZodError, type ZodType } from 'zod'
 import { randomUUID, createHash } from 'crypto'
 import { logger } from './utils/logger'
+import { auditContext } from './lib/audit-context'
 import { formatDatesDeep, collectCompanyIds } from './utils/timezone'
 import { getCompanyById } from './modules/companies/companies.service'
 import { validateEnv } from './config/env'
@@ -44,6 +45,7 @@ import { callcenterRatingsRoutes } from './modules/callcenter/ratings/ratings.ro
 import { flowsRoutes } from './modules/flows/flows.routes'
 import { queueCallsRoutes } from './modules/queue-calls/queue-calls.routes'
 import { realtimeRoutes } from './modules/realtime/realtime.routes'
+import { auditLogsRoutes } from './modules/audit-logs/audit-logs.routes'
 
 const env = validateEnv()
 
@@ -84,6 +86,13 @@ app.addHook('preSerialization', async (request, reply, payload) => {
     return formatDatesDeep(payload, env.TZ, tzByCompanyId)
 })
 
+// Contexto de auditoria (AsyncLocalStorage): abre antes de tudo pra já ter o IP disponível; o
+// actorId entra depois, no preHandler global abaixo, quando authMiddleware (onRequest por rota)
+// já rodou e populou request.user. Ver src/lib/audit-context.ts e src/lib/prisma.ts.
+app.addHook('onRequest', async (request) => {
+    auditContext.init(request.ip)
+})
+
 // Adiciona logging para requests
 app.addHook('onRequest', async (request, reply) => {
     request.id = request.id || randomUUID()
@@ -93,6 +102,12 @@ app.addHook('onRequest', async (request, reply) => {
         url: request.url,
         ip: request.ip,
     })
+})
+
+// preHandler global roda depois do onRequest de cada rota (onde protectedRoute popula
+// request.user), então já dá pra completar o contexto de auditoria com o actorId
+app.addHook('preHandler', async (request) => {
+    if (request.user) auditContext.setActor(request.user.id)
 })
 
 // ETag pra GETs cacheáveis: revalida sempre (no-cache), mas devolve 304 sem body se o conteúdo
@@ -255,6 +270,7 @@ app.register(callcenterRatingsRoutes)
 app.register(flowsRoutes)
 app.register(queueCallsRoutes)
 app.register(realtimeRoutes)
+app.register(auditLogsRoutes)
 
 // Health check
 app.get('/health', async (req, reply) => {

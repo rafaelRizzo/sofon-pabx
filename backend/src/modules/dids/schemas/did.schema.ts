@@ -23,7 +23,8 @@ export const createDidSchema = z.object({
 export const updateDidSchema = z.object({
     number: z.string().regex(/^\d+$/, 'Only digits allowed').optional(),
     status: didStatusSchema.optional(),
-}).refine((d) => Object.keys(d).length > 0, { message: 'At least one field is required: number, status' })
+    companyId: z.cuid2().optional(),
+}).refine((d) => Object.keys(d).length > 0, { message: 'At least one field is required: number, status, companyId' })
 
 export type IdParam = z.infer<typeof idParamSchema>
 export type CompanyQuery = z.infer<typeof companyQuerySchema>

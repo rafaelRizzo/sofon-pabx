@@ -224,7 +224,8 @@ Essa VPS **não** usa `network_mode: host` — os containers do backend (`sofon_
 - `elevenLabsApiKey`: key da conta ElevenLabs da própria empresa, usada pelo TTS de Audios (ver seção Audios) — sem fallback global, cada empresa usa sua conta/billing. Retornada em texto puro no GET (mesmo padrão de `Trunk.password`, sem criptografia própria no projeto)
 
 **DIDs** — `{ id, number, companyId, company, createdAt, updatedAt }`
-- Create: `{ number(^\d+$), companyId }`; Update: `{ number? }`
+- Create: `{ number(^\d+$), companyId }`; Update: `{ number?, status?, companyId? }` (min 1)
+- `companyId` no update reatribui o DID a outra empresa (revenda de número cancelado): valida a empresa destino, checa unicidade `(number, companyId)` no destino, e dentro da mesma transaction apaga as `InboundRoute`/dialplan (`from-trunk-routed`) da empresa antiga — não recria rotas de entrada na nova empresa (destino de rota é decisão de negócio, precisa ser recriado manualmente via `POST /inbound-routes`). Controller exige `assertAccess` tanto na empresa atual quanto na de destino.
 
 **Extensions** — discriminatedUnion por `type: "sip"|"pjsip"`
 - Create sip: `{ alias(2-6 dígitos), name, companyId, context?, allowOutbound?, ...sipFields }`

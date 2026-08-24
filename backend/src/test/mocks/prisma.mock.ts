@@ -56,6 +56,9 @@ export function createPrismaMock() {
         flowNode: model(),
         flowNodeEdge: model(),
         queueCall: model(),
+        auditLog: model(),
+        integrationCredential: model(),
+        ixcNode: model(),
         // Asterisk realtime
         ps_endpoints: model(),
         ps_auths: model(),

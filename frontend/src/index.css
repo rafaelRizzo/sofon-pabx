@@ -148,9 +148,58 @@
     animation: lamp-pulse 2.4s ease-in-out infinite;
 }
 
+@keyframes switchboard-travel {
+    0% { offset-distance: 0%; opacity: 0; }
+    8% { opacity: 1; }
+    82% { opacity: 1; }
+    100% { offset-distance: 100%; opacity: 0; }
+}
+
+@keyframes switchboard-flash {
+    0%, 78% { opacity: 0; transform: scale(0.6); }
+    88% { opacity: 0.85; transform: scale(1); }
+    100% { opacity: 0; transform: scale(1.15); }
+}
+
+@keyframes switchboard-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+@keyframes switchboard-breathe {
+    0%, 100% { scale: 1; }
+    50% { scale: 1.06; }
+}
+
+.switchboard-packet {
+    offset-distance: 0%;
+    animation: switchboard-travel var(--sb-duration, 4s) linear infinite;
+    animation-delay: var(--sb-delay, 0s);
+}
+
+.switchboard-arrival {
+    transform-box: fill-box;
+    animation: switchboard-flash var(--sb-duration, 4s) linear infinite;
+    animation-delay: var(--sb-delay, 0s);
+}
+
+.switchboard-ring {
+    transform-origin: center;
+    transform-box: fill-box;
+    animation: switchboard-spin 120s linear infinite;
+}
+
+.switchboard-orb {
+    animation: switchboard-breathe 5s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
     .animate-marquee,
-    .animate-lamp-pulse {
+    .animate-lamp-pulse,
+    .switchboard-packet,
+    .switchboard-arrival,
+    .switchboard-ring,
+    .switchboard-orb {
         animation: none;
     }
 }

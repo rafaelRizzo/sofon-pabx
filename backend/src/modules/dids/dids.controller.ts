@@ -70,6 +70,7 @@ export const updateDid = async (req: FastifyRequest, reply: FastifyReply) => {
         const existing = await prisma.did.findUnique({ where: { id }, select: { companyId: true } })
         if (!existing) throw new AppError('DID not found', 404)
         req.scope.assertAccess(existing.companyId)
+        if (data.companyId) req.scope.assertAccess(data.companyId)
         await DidsService.updateDid(id, data)
         return reply.send({ success: true, message: 'DID updated successfully' })
     } catch (error) {

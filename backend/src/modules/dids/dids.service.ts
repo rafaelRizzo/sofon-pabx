@@ -3,6 +3,7 @@ import { getCompanyById } from '../companies/companies.service'
 import { DidsCache } from './cache/dids.cache'
 import type { CreateDidInput, UpdateDidInput } from './schemas/did.schema'
 import { InboundRouteRepository } from '../../asterisk/inboundroute.repository'
+import { FlowEdgeRepository } from '../../asterisk/flow-edge.repository'
 import type { InboundDest } from '../inbound-routes/schemas/inbound-route.schema'
 import { InboundRoutesCache } from '../inbound-routes/cache/inbound-routes.cache'
 import { AppError } from '../../utils/errors/app.error'
@@ -79,11 +80,47 @@ export const updateDid = async (id: string, data: UpdateDidInput) => {
     const existing = await prisma.did.findUnique({ where: { id } })
     if (!existing) throw new AppError('DID not found', 404)
 
-    if (data.number) {
+    const isReassign = data.companyId != null && data.companyId !== existing.companyId
+    const targetCompanyId = data.companyId ?? existing.companyId
+
+    if (isReassign) await getCompanyById(data.companyId!)
+
+    if (data.number || isReassign) {
         const conflict = await prisma.did.findUnique({
-            where: { number_companyId: { number: data.number, companyId: existing.companyId } },
+            where: { number_companyId: { number: data.number ?? existing.number, companyId: targetCompanyId } },
         })
         if (conflict && conflict.id !== id) throw new AppError('DID already exists for this company', 409)
+    }
+
+    if (isReassign) {
+        const inboundRoutes = await prisma.inboundRoute.findMany({
+            where: { didId: id },
+            select: { id: true, trunkId: true },
+        })
+
+        const did = await prisma.$transaction(async (tx) => {
+            for (const ir of inboundRoutes) {
+                await InboundRouteRepository.delete(tx, ir.trunkId, existing.number)
+            }
+            if (inboundRoutes.length > 0) {
+                await tx.inboundRoute.deleteMany({ where: { didId: id } })
+                await FlowEdgeRepository.deleteAllForSources(tx, 'inboundroute', inboundRoutes.map((ir) => ir.id))
+            }
+            return tx.did.update({ where: { id }, data, select })
+        })
+
+        for (const ir of inboundRoutes) {
+            await InboundRoutesCache.invalidateRoute(ir.id)
+        }
+        if (inboundRoutes.length > 0) {
+            await InboundRoutesCache.invalidateByCompany(existing.companyId)
+            await InboundRoutesCache.invalidateNamespace()
+        }
+        await DidsCache.invalidateDid(id)
+        await DidsCache.invalidateDidsByCompany(existing.companyId)
+        await DidsCache.invalidateDidsByCompany(targetCompanyId)
+        await DidsCache.invalidateNamespace()
+        return did
     }
 
     const oldRoutingKey = existing.number
@@ -91,14 +128,20 @@ export const updateDid = async (id: string, data: UpdateDidInput) => {
     const newRoutingKey = newNumber
 
     const inboundRoutes = newRoutingKey !== oldRoutingKey
-        ? await prisma.inboundRoute.findMany({ where: { didId: id }, select: { id: true, trunkId: true, destination: true } })
+        ? await prisma.inboundRoute.findMany({
+            where: { didId: id },
+            select: { id: true, trunkId: true, trunk: { select: { maxInChannels: true } } },
+        })
         : []
+
+    const destinations = await FlowEdgeRepository.getBySourceIds('inboundroute', inboundRoutes.map((ir) => ir.id))
 
     const did = await prisma.$transaction(async (tx) => {
         const updated = await tx.did.update({ where: { id }, data, select })
         for (const ir of inboundRoutes) {
+            const dest = destinations.get(ir.id)?.default ?? null
             await InboundRouteRepository.delete(tx, ir.trunkId, oldRoutingKey)
-            await InboundRouteRepository.create(tx, ir.trunkId, newRoutingKey, ir.destination as InboundDest)
+            await InboundRouteRepository.create(tx, ir.trunkId, newRoutingKey, dest, ir.trunk.maxInChannels)
         }
         return updated
     })

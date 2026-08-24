@@ -28,10 +28,11 @@ export const PERMISSION_RESOURCES = [
 export type PermissionResource = (typeof PERMISSION_RESOURCES)[number]
 export type PermissionAction = 'view' | 'manage'
 
-// CDR e Queue Calls são só leitura, não têm ação "manage"
+// CDR, Queue Calls e Audit Logs são só leitura, não têm ação "manage"
 export const PERMISSION_KEYS = [
     'cdr:view',
     'queue-calls:view',
+    'audit-logs:view',
     ...PERMISSION_RESOURCES.flatMap((r) => [`${r}:view`, `${r}:manage`] as const),
 ] as const
 

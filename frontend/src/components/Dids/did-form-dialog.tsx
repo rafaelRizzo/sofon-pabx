@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dialog"
 import {
     Field,
+    FieldDescription,
     FieldError,
     FieldGroup,
     FieldLabel,
@@ -91,12 +92,22 @@ export function DidFormDialog({
     useEffect(() => {
         if (!open) return
         if (isEdit) {
-            updateForm.reset({ number: did.number, status: did.status })
+            updateForm.reset({
+                number: did.number,
+                status: did.status,
+                companyId: did.companyId,
+            })
         } else {
             createForm.reset({ number: "", companyId: "" })
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, isEdit, did])
+
+    const selectedCompanyId = isEdit
+        ? updateForm.watch("companyId")
+        : undefined
+    const isReassigning =
+        isEdit && !!selectedCompanyId && selectedCompanyId !== did?.companyId
 
     const handleCreate = createForm.handleSubmit(async (form) => {
         const ok = await onCreate!(form)
@@ -127,7 +138,71 @@ export function DidFormDialog({
                     onSubmit={isEdit ? handleUpdate : handleCreate}
                 >
                     <FieldGroup>
-                        {!isEdit && (
+                        {isEdit ? (
+                            <Field>
+                                <FieldLabel>Empresa</FieldLabel>
+                                <Controller
+                                    control={updateForm.control}
+                                    name="companyId"
+                                    render={({ field }) => {
+                                        const sel =
+                                            companies.find(
+                                                (c) => c.id === field.value
+                                            ) ?? null
+                                        return (
+                                            <Combobox<Company>
+                                                items={companies}
+                                                value={sel}
+                                                itemToStringLabel={(c) =>
+                                                    c.name
+                                                }
+                                                isItemEqualToValue={(a, b) =>
+                                                    a.id === b.id
+                                                }
+                                                onValueChange={(company) =>
+                                                    field.onChange(
+                                                        company?.id ?? ""
+                                                    )
+                                                }
+                                            >
+                                                <ComboboxInput placeholder="Buscar empresa..." />
+                                                <ComboboxContent>
+                                                    <ComboboxEmpty>
+                                                        Nenhuma empresa
+                                                    </ComboboxEmpty>
+                                                    <ComboboxList>
+                                                        {(company: Company) => (
+                                                            <ComboboxItem
+                                                                key={company.id}
+                                                                value={company}
+                                                            >
+                                                                {company.name}
+                                                            </ComboboxItem>
+                                                        )}
+                                                    </ComboboxList>
+                                                </ComboboxContent>
+                                            </Combobox>
+                                        )
+                                    }}
+                                />
+                                {updateForm.formState.errors.companyId && (
+                                    <FieldError>
+                                        {
+                                            updateForm.formState.errors
+                                                .companyId.message as string
+                                        }
+                                    </FieldError>
+                                )}
+                                {isReassigning && (
+                                    <FieldDescription className="text-amber-600 dark:text-amber-400">
+                                        Ao trocar a empresa, as rotas de
+                                        entrada e o dialplan atuais deste DID
+                                        são apagados. Será necessário recriar
+                                        as rotas de entrada na nova empresa.
+                                    </FieldDescription>
+                                )}
+                            </Field>
+                        ) : (
                             <Field>
                                 <FieldLabel>Empresa</FieldLabel>
                                 <Controller
