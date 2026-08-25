@@ -49,6 +49,20 @@ const redact = (model: string, data: any): any => {
     return copy
 }
 
+// Prisma sempre rebate updatedAt (@updatedAt) mesmo sem mudança de negócio — ignorado aqui pra
+// não logar "Atualizado" em todo PUT idempotente (ex: form de edição reenviando os mesmos valores)
+const IGNORED_DIFF_FIELDS = new Set(['updatedAt'])
+
+const hasMeaningfulChange = (before: any, after: any): boolean => {
+    if (!before || !after) return true
+    const keys = new Set([...Object.keys(before), ...Object.keys(after)])
+    for (const key of keys) {
+        if (IGNORED_DIFF_FIELDS.has(key)) continue
+        if (JSON.stringify(before[key]) !== JSON.stringify(after[key])) return true
+    }
+    return false
+}
+
 const resolveActorName = async (userId: string) => {
     const user = await basePrisma.user.findUnique({ where: { id: userId }, select: { name: true } })
     return user?.name ?? null
@@ -122,6 +136,10 @@ const prisma = basePrisma.$extends({
                     : isBulk
                         ? { count: (result as any)?.count ?? null, affectedIds: (before as any[]).map((r) => r.id) }
                         : result
+
+                if (action === 'UPDATE' && !isBulk && !hasMeaningfulChange(before, after)) {
+                    return result
+                }
 
                 const recordId = isBulk ? null : ((result as any)?.id ?? where?.id ?? null)
                 const companyId = isBulk
