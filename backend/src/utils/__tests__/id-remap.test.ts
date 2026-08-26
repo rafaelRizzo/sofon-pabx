@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
-import { mapId, mapIdOptional, remapDestination, remapResourceId, hasDestination, type IdMap } from '../remap'
-import { AppError } from '../../../utils/errors/app.error'
+import { mapId, mapIdOptional, remapDestination, remapResourceId, hasDestination, type IdMap } from '../id-remap'
+import { AppError } from '../errors/app.error'
 
 describe('backup remap', () => {
     it('mapId resolves a previously registered id', () => {

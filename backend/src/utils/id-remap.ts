@@ -1,5 +1,5 @@
-import type { RouteDestination } from '../../schemas/route-destination.schema'
-import { AppError } from '../../utils/errors/app.error'
+import type { RouteDestination } from '../schemas/route-destination.schema'
+import { AppError } from './errors/app.error'
 
 // Chave `${entityType}:${oldId}` -> novo id criado durante o restore. entityType usa os mesmos
 // nomes de ROUTE_DEST_TYPES/FlowNodeType (ver DEST_TYPE_TO_ENTITY) exceto "extension"/"trunk"/
