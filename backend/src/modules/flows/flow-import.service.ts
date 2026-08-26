@@ -90,6 +90,19 @@ async function importAudioIfAny(ref: Raw | null | undefined, companyId: string, 
     return created.id
 }
 
+// Reimportar o mesmo export (ou importar um flow renomeado que colide com um já existente) não pode
+// falhar com 409 — soma "(cópia)"/"(cópia N)" até achar um nome livre nesta empresa
+async function resolveUniqueFlowName(name: string, companyId: string): Promise<string> {
+    const existing = await prisma.flow.findMany({ where: { companyId }, select: { name: true } })
+    const names = new Set(existing.map((f) => f.name))
+    if (!names.has(name)) return name
+
+    let candidate = `${name} (cópia)`
+    let i = 2
+    while (names.has(candidate)) candidate = `${name} (cópia ${i++})`
+    return candidate
+}
+
 async function importFlowRecursive(
     flow: Raw,
     companyId: string,
@@ -311,7 +324,7 @@ async function importFlowRecursive(
         }
     }
 
-    const createdFlow = await createFlow({ name: flow.name, companyId })
+    const createdFlow = await createFlow({ name: await resolveUniqueFlowName(flow.name, companyId), companyId })
     undo.push(() => deleteFlow(createdFlow.id))
     flowIdByOriginal.set(flow.id, createdFlow.id)
 
