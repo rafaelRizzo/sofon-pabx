@@ -27,7 +27,18 @@ import {
   BatchFlowNodeEdgesResponse,
   CheckResourceDeletionResponse,
 } from "./schemas/flow.schema";
+import {
+  flowImportPreviewSchema,
+  flowImportSchema,
+  FlowImportPreviewResponse,
+  FlowImportResponse,
+} from "./schemas/flow-export.schema";
 import { errors, deleted } from "../../schemas/responses";
+
+// Export/import embute config completa dos recursos referenciados (inclusive áudio em base64) —
+// mesmo motivo do bodyLimit maior em backup.routes.ts, só que num corpo tipicamente bem menor
+// (um único Flow, não a empresa inteira)
+const FLOW_TRANSFER_BODY_LIMIT = 50 * 1024 * 1024;
 
 export const flowsRoutes = async (app: FastifyInstance) => {
   const router = app.withTypeProvider<ZodTypeProvider>();
@@ -354,5 +365,78 @@ export const flowsRoutes = async (app: FastifyInstance) => {
       },
     },
     FlowsController.deleteFlow as any,
+  );
+
+  router.get(
+    "/flows/:id/export",
+    {
+      onRequest: [...protectedRoute, requirePermission("flows", "view")],
+      schema: {
+        tags: ["Flows"],
+        summary: "Exportar flow (canvas + config completa dos recursos)",
+        description:
+          "Retorna um .json autocontido (áudios em base64) com o Flow, seus nós/conexões do canvas e a configuração completa de cada recurso referenciado " +
+          "(Queue, IVR, Announcement, Request Template, Variable Set/Condition, Time Condition, Holiday Group), recursivo em nós de Flow aninhado. " +
+          "Nunca inclui credencial de integração (nó IXC) nem ramal (Extension) — esses dois exigem resolução manual no import.",
+        security: [{ bearerAuth: [] }],
+        params: idParamSchema,
+        response: {
+          401: errors[401],
+          403: errors[403],
+          404: errors[404],
+        },
+      },
+    },
+    FlowsController.exportFlow as any,
+  );
+
+  router.post(
+    "/flows/import/preview",
+    {
+      bodyLimit: FLOW_TRANSFER_BODY_LIMIT,
+      onRequest: [...protectedRoute, requirePermission("flows", "manage")],
+      schema: {
+        tags: ["Flows"],
+        summary: "Pré-visualizar import de flow (sem persistir)",
+        description:
+          "Recebe o .json de GET /flows/:id/export e devolve o que precisa de resolução manual antes de importar: ramais (Extension) e credenciais de " +
+          "integração (nó IXC), já com as opções existentes na empresa de destino pro frontend montar o passo de mapeamento.",
+        security: [{ bearerAuth: [] }],
+        body: flowImportPreviewSchema,
+        response: {
+          200: FlowImportPreviewResponse,
+          400: errors[400],
+          401: errors[401],
+          403: errors[403],
+          404: errors[404],
+        },
+      },
+    },
+    FlowsController.previewFlowImport as any,
+  );
+
+  router.post(
+    "/flows/import",
+    {
+      bodyLimit: FLOW_TRANSFER_BODY_LIMIT,
+      onRequest: [...protectedRoute, requirePermission("flows", "manage")],
+      schema: {
+        tags: ["Flows"],
+        summary: "Importar flow",
+        description:
+          "Recebe o .json de GET /flows/:id/export + as resoluções de ramal/credencial coletadas no preview, e recria o Flow (com todos os recursos que " +
+          "ele referencia) do zero nesta empresa. Falha no meio do caminho desfaz (best effort) tudo que já tinha sido criado nesta chamada.",
+        security: [{ bearerAuth: [] }],
+        body: flowImportSchema,
+        response: {
+          201: FlowImportResponse,
+          400: errors[400],
+          401: errors[401],
+          403: errors[403],
+          404: errors[404],
+        },
+      },
+    },
+    FlowsController.importFlow as any,
   );
 };

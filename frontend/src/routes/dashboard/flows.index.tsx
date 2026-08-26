@@ -1,19 +1,21 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 
 import { useState } from "react"
-import { PlusIcon } from "lucide-react"
+import { PlusIcon, UploadIcon } from "lucide-react"
 
 import { CompanyFilter } from "@/components/company-filter"
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog"
 import { DataPagination } from "@/components/data-pagination"
 import { FilterBar } from "@/components/filter-bar"
 import { FlowFormDialog } from "@/components/Flows/flow-form-dialog"
+import { FlowImportDialog } from "@/components/Flows/flow-import-dialog"
 import { FlowsTable } from "@/components/Flows/flows-table"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useCompanies } from "@/hooks/use-companies"
 import { useCompanyFilter } from "@/hooks/use-company-filter"
+import { useFlowExport } from "@/hooks/use-flow-transfer"
 import { useFlows, type Flow } from "@/hooks/use-flows"
 import { usePagination } from "@/hooks/use-pagination"
 
@@ -32,7 +34,10 @@ function FlowsPage() {
         deleteFlow,
     } = useFlows(companyFilter)
 
+    const { exporting, exportFlow } = useFlowExport()
+
     const [createOpen, setCreateOpen] = useState(false)
+    const [importOpen, setImportOpen] = useState(false)
     const [editFlow, setEditFlow] = useState<Flow | null>(null)
     const [deleteTarget, setDeleteTarget] = useState<Flow | null>(null)
 
@@ -60,10 +65,25 @@ function FlowsPage() {
                 title="Flows"
                 description="Monte cadeias de nós no canvas e reaproveite como um destino único em qualquer rota"
             >
-                <Button onClick={() => setCreateOpen(true)}>
-                    <PlusIcon />
-                    Novo flow
-                </Button>
+                <div className="flex items-center gap-2">
+                    <Button
+                        variant="outline"
+                        disabled={!companyFilter}
+                        onClick={() => setImportOpen(true)}
+                        title={
+                            companyFilter
+                                ? undefined
+                                : "Selecione uma empresa para importar"
+                        }
+                    >
+                        <UploadIcon />
+                        Importar flow
+                    </Button>
+                    <Button onClick={() => setCreateOpen(true)}>
+                        <PlusIcon />
+                        Novo flow
+                    </Button>
+                </div>
             </PageHeader>
 
             <FilterBar>
@@ -89,6 +109,8 @@ function FlowsPage() {
                 }
                 onEdit={setEditFlow}
                 onDelete={setDeleteTarget}
+                onExport={(flow) => exportFlow(flow.id, flow.name)}
+                exporting={exporting}
             />
 
             <DataPagination
@@ -127,6 +149,17 @@ function FlowsPage() {
                 itemName={deleteTarget?.name}
                 onConfirm={handleDelete}
             />
+
+            {importOpen && companyFilter && (
+                <FlowImportDialog
+                    open={importOpen}
+                    onOpenChange={setImportOpen}
+                    companyId={companyFilter}
+                    onImported={(flowId) =>
+                        navigate({ to: "/dashboard/flows/$id", params: { id: flowId } })
+                    }
+                />
+            )}
         </div>
     )
 }

@@ -1,5 +1,10 @@
 "use client"
 
+import { ArrowRight, Check, Copy } from "lucide-react"
+import { useState } from "react"
+import { toast } from "sonner"
+
+import { Button } from "@/components/ui/button"
 import {
     Dialog,
     DialogContent,
@@ -7,14 +12,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog"
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table"
+import { cn } from "@/lib/utils"
 import {
     ACTION_LABEL,
     AUDIT_LOG_MODEL_LABEL,
@@ -22,34 +20,198 @@ import {
     type AuditLogModel,
 } from "@/hooks/use-audit-logs"
 
-function formatValue(value: unknown): string {
-    if (value === undefined) return "-"
-    if (value === null) return "null"
-    if (typeof value === "object") return JSON.stringify(value)
-    return String(value)
-}
-
-// Diff campo a campo só faz sentido quando before/after são o snapshot de 1 registro (o caso
-// comum); updateMany/deleteMany internos guardam array/contador em vez disso, tratado à parte
-function isSingleRecordSnapshot(value: unknown): value is Record<string, unknown> {
-    return !!value && typeof value === "object" && !Array.isArray(value)
-}
-
 // updatedAt sempre muda junto de qualquer edição real (Prisma @updatedAt) — não é uma mudança de
-// negócio, então some da tabela mesmo quando outros campos realmente mudaram (ver IGNORED_DIFF_FIELDS
+// negócio, então some da lista mesmo quando outros campos realmente mudaram (ver IGNORED_DIFF_FIELDS
 // espelhado em backend/src/lib/prisma.ts, que usa o mesmo campo pra decidir se grava o log ou não)
 const IGNORED_DIFF_FIELDS = new Set(["updatedAt"])
 
-function diffFields(before: unknown, after: unknown) {
-    const beforeObj = isSingleRecordSnapshot(before) ? before : {}
-    const afterObj = isSingleRecordSnapshot(after) ? after : {}
-    const keys = new Set([...Object.keys(beforeObj), ...Object.keys(afterObj)])
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z?$/
 
-    return [...keys]
-        .filter((key) => !IGNORED_DIFF_FIELDS.has(key))
-        .filter((key) => JSON.stringify(beforeObj[key]) !== JSON.stringify(afterObj[key]))
-        .sort((a, b) => a.localeCompare(b))
-        .map((field) => ({ field, before: beforeObj[field], after: afterObj[field] }))
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+    return !!value && typeof value === "object" && !Array.isArray(value)
+}
+
+// "allowOutbound" -> "Allow Outbound"
+function humanizeKey(key: string): string {
+    const spaced = key.replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    return spaced.charAt(0).toUpperCase() + spaced.slice(1)
+}
+
+function formatLeafValue(value: unknown): string {
+    if (value === undefined) return "vazio"
+    if (value === null) return "vazio"
+    if (typeof value === "boolean") return value ? "Sim" : "Não"
+    if (typeof value === "number") {
+        return Number.isInteger(value) ? String(value) : String(Math.round(value * 100) / 100)
+    }
+    if (typeof value === "string" && ISO_DATE_RE.test(value)) {
+        return new Date(value).toLocaleString("pt-BR")
+    }
+    return String(value)
+}
+
+type Leaf = { groupPath: string[]; fieldLabel: string; value: unknown }
+
+// Achata objetos/arrays em pares "rótulo: valor" — arrays de objetos viram grupos (identificados por
+// nodeId/id/name quando existir), pra nunca precisar mostrar chaves/colchetes de JSON cru na tela
+function flattenValue(value: unknown, path: string[] = [], out: Leaf[] = []): Leaf[] {
+    if (Array.isArray(value)) {
+        value.forEach((item, index) => {
+            if (isPlainObject(item)) {
+                const label = String(item.nodeId ?? item.id ?? item.name ?? `Item ${index + 1}`)
+                flattenValue(item, [...path, label], out)
+            } else {
+                out.push({ groupPath: path, fieldLabel: `#${index + 1}`, value: item })
+            }
+        })
+        return out
+    }
+
+    if (isPlainObject(value)) {
+        for (const [key, val] of Object.entries(value)) {
+            if (isPlainObject(val) || Array.isArray(val)) {
+                flattenValue(val, [...path, humanizeKey(key)], out)
+            } else {
+                out.push({ groupPath: path, fieldLabel: humanizeKey(key), value: val })
+            }
+        }
+        return out
+    }
+
+    out.push({ groupPath: path.slice(0, -1), fieldLabel: path.at(-1) ?? "Valor", value })
+    return out
+}
+
+function omitIgnored(record: unknown): unknown {
+    if (!isPlainObject(record)) return record
+    return Object.fromEntries(Object.entries(record).filter(([key]) => !IGNORED_DIFF_FIELDS.has(key)))
+}
+
+type DiffLeaf = { groupPath: string[]; fieldLabel: string; before: unknown; after: unknown; changed: boolean }
+
+function diffLeaves(before: unknown, after: unknown): DiffLeaf[] {
+    const beforeLeaves = flattenValue(omitIgnored(before))
+    const afterLeaves = flattenValue(omitIgnored(after))
+    const keyOf = (leaf: Leaf) => `${leaf.groupPath.join(" · ")}::${leaf.fieldLabel}`
+
+    const beforeMap = new Map(beforeLeaves.map((leaf) => [keyOf(leaf), leaf]))
+    const afterMap = new Map(afterLeaves.map((leaf) => [keyOf(leaf), leaf]))
+    const keys = [...new Set([...beforeMap.keys(), ...afterMap.keys()])]
+
+    return keys.map((key) => {
+        const b = beforeMap.get(key)
+        const a = afterMap.get(key)
+        const ref = (b ?? a) as Leaf
+        return {
+            groupPath: ref.groupPath,
+            fieldLabel: ref.fieldLabel,
+            before: b?.value,
+            after: a?.value,
+            changed: JSON.stringify(b?.value) !== JSON.stringify(a?.value),
+        }
+    })
+}
+
+function groupByPath<T extends { groupPath: string[] }>(leaves: T[]): { label: string | null; leaves: T[] }[] {
+    const groups: { label: string | null; leaves: T[] }[] = []
+    for (const leaf of leaves) {
+        const label = leaf.groupPath.length ? leaf.groupPath.join(" · ") : null
+        const last = groups.at(-1)
+        if (last && last.label === label) last.leaves.push(leaf)
+        else groups.push({ label, leaves: [leaf] })
+    }
+    return groups
+}
+
+function CopyButton({ value }: { value: string }) {
+    const [copied, setCopied] = useState(false)
+
+    return (
+        <Button
+            variant="ghost"
+            size="icon"
+            className="size-5 shrink-0 text-muted-foreground hover:text-foreground"
+            onClick={() => {
+                navigator.clipboard.writeText(value)
+                setCopied(true)
+                toast.success("Valor copiado")
+                setTimeout(() => setCopied(false), 1200)
+            }}
+        >
+            {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
+        </Button>
+    )
+}
+
+function DiffLeafRow({ leaf }: { leaf: DiffLeaf }) {
+    const before = formatLeafValue(leaf.before)
+    const after = formatLeafValue(leaf.after)
+
+    return (
+        <div className="group flex items-center justify-between gap-3 py-1 text-xs">
+            <span className="shrink-0 text-muted-foreground">{leaf.fieldLabel}</span>
+            <span className="flex min-w-0 items-center gap-1.5 truncate font-mono">
+                <span className="truncate text-red-600/80 line-through dark:text-red-400/70">{before}</span>
+                <ArrowRight className="size-3 shrink-0 text-muted-foreground" />
+                <span className="truncate font-medium text-emerald-700 dark:text-emerald-400">{after}</span>
+                <span className="opacity-0 group-hover:opacity-100">
+                    <CopyButton value={after} />
+                </span>
+            </span>
+        </div>
+    )
+}
+
+function SnapshotLeafRow({ leaf, tone }: { leaf: Leaf; tone: "before" | "after" }) {
+    const formatted = formatLeafValue(leaf.value)
+
+    return (
+        <div className="group flex items-center justify-between gap-3 py-1 text-xs">
+            <span className="shrink-0 text-muted-foreground">{leaf.fieldLabel}</span>
+            <span className="flex min-w-0 items-center gap-1.5 truncate">
+                <span
+                    className={cn(
+                        "truncate font-mono",
+                        tone === "after" ? "text-emerald-700 dark:text-emerald-400" : "text-red-700 dark:text-red-400",
+                    )}
+                >
+                    {formatted}
+                </span>
+                <span className="opacity-0 group-hover:opacity-100">
+                    <CopyButton value={formatted} />
+                </span>
+            </span>
+        </div>
+    )
+}
+
+function GroupedList<T extends { groupPath: string[] }>({
+    leaves,
+    renderLeaf,
+}: {
+    leaves: T[]
+    renderLeaf: (leaf: T) => React.ReactNode
+}) {
+    const groups = groupByPath(leaves)
+
+    return (
+        <div className="space-y-3">
+            {groups.map((group, index) => (
+                <div key={`${group.label ?? "_root"}-${index}`}>
+                    {group.label && (
+                        <p className="mb-0.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                            {group.label}
+                        </p>
+                    )}
+                    <div className="divide-y divide-border/60 rounded-md border px-2.5">
+                        {group.leaves.map((leaf, leafIndex) => (
+                            <div key={leafIndex}>{renderLeaf(leaf)}</div>
+                        ))}
+                    </div>
+                </div>
+            ))}
+        </div>
+    )
 }
 
 type Props = {
@@ -59,7 +221,12 @@ type Props = {
 
 export function AuditLogDetailDialog({ log, onOpenChange }: Props) {
     const isBulk = Array.isArray(log?.before) || (log?.after && "affectedIds" in (log.after as object))
-    const rows = log && !isBulk ? diffFields(log.before, log.after) : []
+
+    const diff = log && !isBulk ? diffLeaves(log.before, log.after).filter((leaf) => leaf.changed) : []
+    const isCreate = log?.action === "CREATE"
+    const snapshot = log && !isBulk && (isCreate || log.action === "DELETE")
+        ? flattenValue(omitIgnored(isCreate ? log.after : log.before))
+        : []
 
     return (
         <Dialog open={!!log} onOpenChange={onOpenChange}>
@@ -84,34 +251,24 @@ export function AuditLogDetailDialog({ log, onOpenChange }: Props) {
                     <pre className="max-h-96 overflow-auto rounded-md border bg-muted/30 p-3 text-xs">
                         {JSON.stringify({ before: log?.before, after: log?.after }, null, 2)}
                     </pre>
-                ) : rows.length === 0 ? (
-                    <p className="py-4 text-center text-sm text-muted-foreground">
-                        Nenhum campo alterado registrado
-                    </p>
+                ) : log?.action === "UPDATE" ? (
+                    diff.length === 0 ? (
+                        <p className="py-4 text-center text-sm text-muted-foreground">
+                            Nenhum campo alterado registrado
+                        </p>
+                    ) : (
+                        <div className="max-h-[28rem] overflow-y-auto pr-1">
+                            <GroupedList leaves={diff} renderLeaf={(leaf) => <DiffLeafRow leaf={leaf} />} />
+                        </div>
+                    )
+                ) : snapshot.length === 0 ? (
+                    <p className="py-4 text-center text-sm text-muted-foreground">Nenhum dado registrado</p>
                 ) : (
-                    <div className="max-h-96 overflow-auto rounded-md border">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Campo</TableHead>
-                                    <TableHead>Antes</TableHead>
-                                    <TableHead>Depois</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {rows.map((row) => (
-                                    <TableRow key={row.field}>
-                                        <TableCell className="font-medium">{row.field}</TableCell>
-                                        <TableCell className="max-w-64 truncate font-mono text-xs text-muted-foreground">
-                                            {formatValue(row.before)}
-                                        </TableCell>
-                                        <TableCell className="max-w-64 truncate font-mono text-xs">
-                                            {formatValue(row.after)}
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
+                    <div className="max-h-[28rem] overflow-y-auto pr-1">
+                        <GroupedList
+                            leaves={snapshot}
+                            renderLeaf={(leaf) => <SnapshotLeafRow leaf={leaf} tone={isCreate ? "after" : "before"} />}
+                        />
                     </div>
                 )}
             </DialogContent>

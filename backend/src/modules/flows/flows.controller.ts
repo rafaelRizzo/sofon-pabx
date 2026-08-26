@@ -1,6 +1,9 @@
 import type { FastifyRequest, FastifyReply } from 'fastify'
 import * as FlowsService from './flows.service'
+import * as FlowExportService from './flow-export.service'
+import * as FlowImportService from './flow-import.service'
 import { createFlowSchema, updateFlowSchema, updateFlowLayoutSchema, idParamSchema, companyQuerySchema } from './schemas/flow.schema'
+import { flowImportPreviewSchema, flowImportSchema } from './schemas/flow-export.schema'
 import { handleError } from '../../utils/errors/handler.error'
 import { AppError } from '../../utils/errors/app.error'
 import { prisma } from '../../lib/prisma'
@@ -89,6 +92,44 @@ export const deleteFlow = async (req: FastifyRequest, reply: FastifyReply) => {
         req.scope.assertAccess(existing.companyId)
         await FlowsService.deleteFlow(id)
         return reply.send({ success: true, message: 'Flow deleted successfully' })
+    } catch (error) {
+        return handleError(reply, error, req)
+    }
+}
+
+export const exportFlow = async (req: FastifyRequest, reply: FastifyReply) => {
+    try {
+        const { id } = idParamSchema.parse(req.params)
+        const existing = await prisma.flow.findUnique({ where: { id }, select: { companyId: true, name: true } })
+        if (!existing) throw new AppError('Flow not found', 404)
+        req.scope.assertAccess(existing.companyId)
+        const bundle = await FlowExportService.exportFlow(id, existing.companyId)
+        const filename = existing.name.replace(/[^a-z0-9-_]+/gi, '_')
+        reply.header('Content-Disposition', `attachment; filename="flow-${filename}.json"`)
+        reply.type('application/json')
+        return reply.send(JSON.stringify(bundle))
+    } catch (error) {
+        return handleError(reply, error, req)
+    }
+}
+
+export const previewFlowImport = async (req: FastifyRequest, reply: FastifyReply) => {
+    try {
+        const { companyId, bundle } = flowImportPreviewSchema.parse(req.body)
+        req.scope.assertAccess(companyId)
+        const preview = await FlowImportService.previewFlowImport(bundle, companyId)
+        return reply.send({ success: true, message: 'Preview gerado com sucesso', ...preview })
+    } catch (error) {
+        return handleError(reply, error, req)
+    }
+}
+
+export const importFlow = async (req: FastifyRequest, reply: FastifyReply) => {
+    try {
+        const { companyId, bundle, resolutions } = flowImportSchema.parse(req.body)
+        req.scope.assertAccess(companyId)
+        const result = await FlowImportService.importFlow(bundle, resolutions, companyId)
+        return reply.status(201).send({ success: true, message: 'Flow importado com sucesso', flowId: result.flowId })
     } catch (error) {
         return handleError(reply, error, req)
     }

@@ -1,6 +1,6 @@
 "use client"
 
-import { PencilIcon, Trash2Icon, WorkflowIcon } from "lucide-react"
+import { DownloadIcon, PencilIcon, Trash2Icon, WorkflowIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -29,6 +29,8 @@ type Props = {
     onOpen: (flow: Flow) => void
     onEdit: (flow: Flow) => void
     onDelete: (flow: Flow) => void
+    onExport: (flow: Flow) => void
+    exporting: boolean
 }
 
 export function FlowsTable({
@@ -38,6 +40,8 @@ export function FlowsTable({
     onOpen,
     onEdit,
     onDelete,
+    onExport,
+    exporting,
 }: Props) {
     return (
         <div className="rounded-md border">
@@ -133,6 +137,28 @@ export function FlowsTable({
                                                 />
                                                 <TooltipContent>
                                                     Renomear flow
+                                                </TooltipContent>
+                                            </Tooltip>
+                                            <Tooltip>
+                                                <TooltipTrigger
+                                                    render={
+                                                        <Button
+                                                            variant="outline"
+                                                            size="icon"
+                                                            disabled={exporting}
+                                                            onClick={() =>
+                                                                onExport(flow)
+                                                            }
+                                                        >
+                                                            <DownloadIcon />
+                                                            <span className="sr-only">
+                                                                Exportar
+                                                            </span>
+                                                        </Button>
+                                                    }
+                                                />
+                                                <TooltipContent>
+                                                    Exportar flow
                                                 </TooltipContent>
                                             </Tooltip>
                                             <Tooltip>

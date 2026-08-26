@@ -43,7 +43,7 @@ import { createFlow, updateFlow } from '../flows/flows.service'
 import { createFlowNode, batchFlowNodeEdges } from '../flows/flow-nodes.service'
 import { createCompanySchema } from '../companies/schemas/company.schema'
 import { AppError } from '../../utils/errors/app.error'
-import { type IdMap, mapId, mapIdOptional, remapDestination, remapResourceId, hasDestination } from './remap'
+import { type IdMap, mapId, mapIdOptional, remapDestination, remapResourceId, hasDestination } from '../../utils/id-remap'
 
 type Raw = Record<string, any>
 const arr = (v: unknown): Raw[] => (Array.isArray(v) ? v : [])
