@@ -4,7 +4,8 @@ import { formatNaiveLocalISOString } from '../../utils/timezone'
 import { AppError } from '../../utils/errors/app.error'
 import { toAsteriskQueueName } from '../../asterisk/queue.repository'
 import { enrichCdrRecords } from './cdr-enrichment'
-import type { CdrMetricsQueryInput, CdrQueryInput } from './schemas/cdr.schema'
+import type { CdrExportQueryInput, CdrMetricsQueryInput, CdrQueryInput } from './schemas/cdr.schema'
+import type { CompanyDto } from '../companies/companies.service'
 
 // timezone do SO onde o Asterisk roda (setups/install-asterisk.sh) — ver comentário em schema.prisma no model cdr
 const TZ = process.env.TZ || 'America/Sao_Paulo'
@@ -122,6 +123,62 @@ export const getCdrByCompany = async (query: CdrQueryInput) => {
         total,
         limit: query.limit,
         page: query.page
+    }
+}
+
+const EXPORT_BATCH_SIZE = 500
+
+// Company já resolvida (e posse validada) pelo controller antes de abrir o stream — 404 precisa
+// acontecer antes do primeiro byte da resposta ser escrito, nunca no meio de um generator já
+// consumido pelo Readable
+export async function* iterateCdrExportRecords(
+    company: Pick<CompanyDto, 'id' | 'asteriskId'>,
+    query: CdrExportQueryInput
+) {
+    const where = await buildWhere(company, query)
+    let skip = 0
+    for (;;) {
+        const rows = await prisma.cdr.findMany({
+            where,
+            orderBy: [{ startTime: query.order }, { id: query.order }],
+            take: EXPORT_BATCH_SIZE,
+            skip,
+            select
+        })
+        if (rows.length === 0) break
+
+        const trunkIds = [
+            ...new Set(rows.map((r) => r.trunkId).filter((t): t is string => !!t))
+        ]
+        const trunks = trunkIds.length
+            ? await prisma.trunk.findMany({
+                  where: { id: { in: trunkIds } },
+                  select: { id: true, name: true }
+              })
+            : []
+        const trunkNameById = new Map(trunks.map((t) => [t.id, t.name]))
+
+        const enriched = await enrichCdrRecords(
+            rows.map(({ disposition, ...r }) => ({
+                ...r,
+                id: r.id.toString(),
+                callStatus: disposition,
+                startTime:
+                    r.startTime && formatNaiveLocalISOString(r.startTime, TZ),
+                answerTime:
+                    r.answerTime && formatNaiveLocalISOString(r.answerTime, TZ),
+                endTime: r.endTime && formatNaiveLocalISOString(r.endTime, TZ)
+            })),
+            company
+        )
+
+        yield enriched.map((r) => ({
+            ...r,
+            trunkName: r.trunkId ? trunkNameById.get(r.trunkId) ?? r.trunkId : null
+        }))
+
+        if (rows.length < EXPORT_BATCH_SIZE) break
+        skip += EXPORT_BATCH_SIZE
     }
 }
 

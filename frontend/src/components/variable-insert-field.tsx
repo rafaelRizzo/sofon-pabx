@@ -63,7 +63,10 @@ export function VariableInsertField<T extends FieldValues>({
                     {...rest}
                 />
             )}
-            <VariableInsertButton onSelect={insert} className="shrink-0 self-start" />
+            <VariableInsertButton
+                onSelect={insert}
+                className={multiline ? "shrink-0 self-start" : "shrink-0 self-center"}
+            />
         </div>
     )
 }

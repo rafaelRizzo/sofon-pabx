@@ -51,6 +51,13 @@ export const cdrMetricsQuerySchema = withDateRangeValidation(cdrQueryShape)
 
 export type CdrMetricsQueryInput = z.infer<typeof cdrMetricsQuerySchema>
 
+export const cdrExportQuerySchema = withDateRangeValidation({
+    ...cdrQueryShape,
+    order: z.enum(['asc', 'desc']).default('desc')
+})
+
+export type CdrExportQueryInput = z.infer<typeof cdrExportQuerySchema>
+
 export const CdrSchema = z.object({
     id: z.string(),
     src: z.string().nullable(),

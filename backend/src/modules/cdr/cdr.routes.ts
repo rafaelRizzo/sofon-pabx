@@ -4,6 +4,7 @@ import * as Controller from './cdr.controller'
 import { protectedRoute } from '../../middleware/scope.middleware'
 import { requirePermission } from '../../middleware/permission.middleware'
 import {
+    cdrExportQuerySchema,
     cdrIdParamSchema,
     cdrMetricsQuerySchema,
     cdrQuerySchema,
@@ -58,6 +59,27 @@ export const cdrRoutes = async (app: FastifyInstance) => {
             }
         },
         Controller.getCdrMetrics as any
+    )
+
+    router.get(
+        '/cdr/export',
+        {
+            onRequest: [...protectedRoute, requirePermission('cdr', 'view')],
+            schema: {
+                tags: ['CDR'],
+                summary: 'Exportar registros de chamadas (CSV)',
+                description:
+                    'Query obrigatória: ?companyId. Aceita os mesmos filtros da listagem, exceto paginação — faz streaming de todos os registros que batem com o filtro como CSV (sem limite de linhas).',
+                security: [{ bearerAuth: [] }],
+                querystring: cdrExportQuerySchema,
+                response: {
+                    401: errors[401],
+                    403: errors[403],
+                    404: errors[404]
+                }
+            }
+        },
+        Controller.exportCdr as any
     )
 
     router.get(

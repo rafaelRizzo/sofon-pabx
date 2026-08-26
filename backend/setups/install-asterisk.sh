@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-# INSTALADOR SOFON PBX v7.8 - PJSIP + IAX2 (sem Docker, sem chan_sip)
+# INSTALADOR SOFON PBX v7.9 - PJSIP + IAX2 (sem Docker, sem chan_sip)
 # Debian 11+ | Ubuntu 24.04+ | Asterisk 22.7.0 LTS
 # ============================================================
 
@@ -624,6 +624,10 @@ fi
 FIREWALL_MODE_FLAG=()
 [[ -f /etc/manage-fw/config.args ]] && FIREWALL_MODE_FLAG=(--update)
 
+# --local-tcp 5038 cobre o modelo padrão (bindaddr 127.0.0.1). --private-tcp 5038 é pro caso do
+# backend rodar em rede bridge (Dokploy/Swarm, ver backend/CLAUDE.md "Produção atual"), onde
+# bindaddr precisa virar 0.0.0.0 manualmente — sem essa liberação o AMI nunca é alcançável a
+# partir do container mesmo com o ACL do manager.conf certo (SYN cai no policy drop do host).
 bash "$MANAGE_FW_DIR/firewall.sh" \
     "${FIREWALL_MODE_FLAG[@]}" \
     --log "$LOG_FILE" \
@@ -637,6 +641,7 @@ bash "$MANAGE_FW_DIR/firewall.sh" \
     --private-tcp 3333 \
     --private-tcp 3334 \
     --private-tcp 3335 \
+    --private-tcp 5038 \
     --fail2ban \
     --jail-name asterisk \
     --jail-ports "$PJSIP_PORT,$IAX_PORT" \
@@ -644,7 +649,7 @@ bash "$MANAGE_FW_DIR/firewall.sh" \
     --jail-filter "$SCRIPT_DIR/asterisk-fail2ban.filter" \
     || err "Falha ao configurar firewall (nftables/Fail2Ban/manage-fw)"
 
-log "Firewall configurado (SSH 22+21122, PJSIP/IAX2/RTP whitelist-only, WS $WS_PORT público p/ WebRTC, AMI localhost-only, Fail2Ban ativo, manage-fw instalado)"
+log "Firewall configurado (SSH 22+21122, PJSIP/IAX2/RTP whitelist-only, WS $WS_PORT público p/ WebRTC, AMI localhost + rede privada (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16), Fail2Ban ativo, manage-fw instalado)"
 
 # ============================================================
 # STEP 12 - SEGURANÇA

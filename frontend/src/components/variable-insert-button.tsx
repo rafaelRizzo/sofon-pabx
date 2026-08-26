@@ -38,7 +38,7 @@ export function VariableInsertButton({ onSelect, className }: Props) {
                         render={
                             <PopoverTrigger
                                 render={
-                                    <Button type="button" variant="outline" size="icon-sm" className={className}>
+                                    <Button type="button" variant="outline" size="icon" className={className}>
                                         <BracesIcon />
                                         <span className="sr-only">Inserir variável</span>
                                     </Button>

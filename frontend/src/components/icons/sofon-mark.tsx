@@ -11,8 +11,8 @@ export function SofonMark(props: SVGProps<SVGSVGElement>) {
     <svg viewBox="0 0 32 32" {...props}>
       <defs>
         <radialGradient id={bgGradient} cx="50%" cy="42%" r="75%">
-          <stop offset="0%" stopColor="#3730a3" />
-          <stop offset="100%" stopColor="#26225e" />
+          <stop offset="0%" className="[stop-color:#e0e7ff] dark:[stop-color:#3730a3]" />
+          <stop offset="100%" className="[stop-color:#c7d2fe] dark:[stop-color:#26225e]" />
         </radialGradient>
         <radialGradient id={orbGradient} cx="35%" cy="28%" r="75%">
           <stop offset="0%" stopColor="#c7d2fe" />

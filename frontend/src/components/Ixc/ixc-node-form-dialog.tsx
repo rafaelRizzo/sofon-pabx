@@ -387,10 +387,10 @@ export function IxcNodeFormDialog({
                                                         ) : (
                                                             <div className="space-y-2 rounded-md border p-2">
                                                                 <div className="grid grid-cols-[1fr_1fr_1.75rem] gap-2">
-                                                                    <span className="text-xs font-medium text-muted-foreground">
+                                                                    <span className="px-3 text-xs font-medium text-muted-foreground">
                                                                         Caminho JSON
                                                                     </span>
-                                                                    <span className="text-xs font-medium text-muted-foreground">
+                                                                    <span className="px-3 text-xs font-medium text-muted-foreground">
                                                                         Variável
                                                                     </span>
                                                                     <span />

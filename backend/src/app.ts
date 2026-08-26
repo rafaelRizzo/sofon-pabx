@@ -46,14 +46,18 @@ import { flowsRoutes } from './modules/flows/flows.routes'
 import { queueCallsRoutes } from './modules/queue-calls/queue-calls.routes'
 import { realtimeRoutes } from './modules/realtime/realtime.routes'
 import { auditLogsRoutes } from './modules/audit-logs/audit-logs.routes'
+import { backupRoutes } from './modules/backup/backup.routes'
 
 const env = validateEnv()
 
 const app = Fastify({
     logger: false,
     // 1 hop confiável (nginx/NPM) — sem isso, X-Forwarded-For é ignorado e request.ip vira sempre
-    // o IP do proxy, fazendo rate-limit por-IP e logs de IP virarem um limite/valor global disfarçado
-    trustProxy: 1,
+    // o IP do proxy, fazendo rate-limit por-IP e logs de IP virarem um limite/valor global disfarçado.
+    // Fastify aceita number nessa opção (ver docs), mas o .d.ts da versão instalada (5.10.0) só
+    // declara boolean|string|string[]|TrustProxyFunction — gap de tipagem upstream, comportamento
+    // em runtime é idêntico ao documentado
+    trustProxy: 1 as unknown as boolean,
     logController: new LogController({ requestIdLogLabel: 'reqId' }),
     requestIdHeader: 'x-request-id',
     genReqId: () => randomUUID(),
@@ -271,6 +275,7 @@ app.register(flowsRoutes)
 app.register(queueCallsRoutes)
 app.register(realtimeRoutes)
 app.register(auditLogsRoutes)
+app.register(backupRoutes)
 
 // Health check
 app.get('/health', async (req, reply) => {

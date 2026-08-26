@@ -397,7 +397,7 @@ export function RouteDestinationField({
                 {singleType ? (
                     <div
                         className={cn(
-                            "flex h-9 items-center gap-2 rounded-md border bg-muted/40 px-3 text-sm",
+                            "flex h-7 items-center gap-2 rounded-md border bg-muted/40 px-2 text-xs/relaxed",
                             hasIdField ? "sm:w-52" : "w-full"
                         )}
                     >
@@ -418,7 +418,18 @@ export function RouteDestinationField({
                         <SelectTrigger
                             className={cn("w-full", hasIdField && "sm:w-52")}
                         >
-                            <SelectValue placeholder="Tipo de destino" />
+                            <span className="flex flex-1 items-center gap-2 overflow-hidden">
+                                {(() => {
+                                    const Icon = ROUTE_DEST_ICONS[type]
+                                    return (
+                                        <Icon className="size-4 shrink-0 text-muted-foreground" />
+                                    )
+                                })()}
+                                <SelectValue
+                                    placeholder="Tipo de destino"
+                                    className="truncate"
+                                />
+                            </span>
                         </SelectTrigger>
                         <SelectContent>
                             {allowedTypes.map((t) => {

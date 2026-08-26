@@ -175,29 +175,19 @@ export function useCdrRecords(
     }
 }
 
-const EXPORT_PAGE_LIMIT = 200
-
-// backend limita `limit` a MAX_LIMIT (200, ver cdr.schema.ts): pagina até completar `total`
-export async function fetchAllCdrRecords(
-    companyId: string,
-    filters: CdrFilters = {}
-): Promise<CdrRecord[]> {
-    const all: CdrRecord[] = []
-    let page = 1
-    for (;;) {
-        const { data } = await api.get("/cdr", {
-            params: filterParams(companyId, filters, {
-                page,
-                limit: EXPORT_PAGE_LIMIT,
-            }),
-        })
-        const records: CdrRecord[] = data.records ?? []
-        all.push(...records)
-        const total: number = data.total ?? 0
-        if (records.length === 0 || all.length >= total) break
-        page++
-    }
-    return all
+// Streaming CSV do backend (/cdr/export) — sem limite de linhas, sem carregar tudo em memória
+// como objeto antes de gerar o CSV no client (ver cdr.controller.ts/exportCdr)
+export async function downloadCdrExport(companyId: string, filters: CdrFilters = {}) {
+    const res = await api.get("/cdr/export", {
+        params: filterParams(companyId, filters),
+        responseType: "blob",
+    })
+    const url = URL.createObjectURL(res.data as Blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = "cdr.csv"
+    a.click()
+    URL.revokeObjectURL(url)
 }
 
 export type CdrMetrics = {

@@ -35,12 +35,18 @@ function isSingleRecordSnapshot(value: unknown): value is Record<string, unknown
     return !!value && typeof value === "object" && !Array.isArray(value)
 }
 
+// updatedAt sempre muda junto de qualquer edição real (Prisma @updatedAt) — não é uma mudança de
+// negócio, então some da tabela mesmo quando outros campos realmente mudaram (ver IGNORED_DIFF_FIELDS
+// espelhado em backend/src/lib/prisma.ts, que usa o mesmo campo pra decidir se grava o log ou não)
+const IGNORED_DIFF_FIELDS = new Set(["updatedAt"])
+
 function diffFields(before: unknown, after: unknown) {
     const beforeObj = isSingleRecordSnapshot(before) ? before : {}
     const afterObj = isSingleRecordSnapshot(after) ? after : {}
     const keys = new Set([...Object.keys(beforeObj), ...Object.keys(afterObj)])
 
     return [...keys]
+        .filter((key) => !IGNORED_DIFF_FIELDS.has(key))
         .filter((key) => JSON.stringify(beforeObj[key]) !== JSON.stringify(afterObj[key]))
         .sort((a, b) => a.localeCompare(b))
         .map((field) => ({ field, before: beforeObj[field], after: afterObj[field] }))

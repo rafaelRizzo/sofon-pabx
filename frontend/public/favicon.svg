@@ -1,8 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <defs>
+    <style>
+      .bg-stop-1 { stop-color: #3730a3; }
+      .bg-stop-2 { stop-color: #26225e; }
+      @media (prefers-color-scheme: light) {
+        .bg-stop-1 { stop-color: #e0e7ff; }
+        .bg-stop-2 { stop-color: #c7d2fe; }
+      }
+    </style>
     <radialGradient id="bg" cx="50%" cy="42%" r="75%">
-      <stop offset="0%" stop-color="#3730a3"/>
-      <stop offset="100%" stop-color="#26225e"/>
+      <stop offset="0%" class="bg-stop-1"/>
+      <stop offset="100%" class="bg-stop-2"/>
     </radialGradient>
     <radialGradient id="g" cx="35%" cy="28%" r="75%">
       <stop offset="0%" stop-color="#c7d2fe"/>

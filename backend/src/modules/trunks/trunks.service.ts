@@ -6,6 +6,7 @@ import type { CreateTrunkInput, UpdateTrunkInput } from './schemas/trunk.schema'
 import { PjsipRepository } from '../../asterisk/pjsip.repository'
 import { IaxRepository } from '../../asterisk/iax.repository'
 import { InboundRouteRepository, TRUNK_ENTRY_CONTEXT } from '../../asterisk/inboundroute.repository'
+import { FlowEdgeRepository } from '../../asterisk/flow-edge.repository'
 import { resyncAllPatterns } from '../outbound-routes/outbound-routes.service'
 import { OutboundRoutesCache } from '../outbound-routes/cache/outbound-routes.cache'
 import { AppError } from '../../utils/errors/app.error'
@@ -308,10 +309,17 @@ export const updateTrunk = async (id: string, data: UpdateTrunkInput) => {
             const newMax = data.maxInChannels ?? null
             const inboundRoutes = await tx.inboundRoute.findMany({
                 where: { trunkId: id },
-                select: { destination: true, did: { select: { number: true } } },
+                select: { id: true, did: { select: { number: true } } },
             })
+            // destination não é mais coluna de InboundRoute (migrou pra FlowEdge) — resolvida
+            // por id, mesmo padrão de InboundRouteRepository.regenerateAll
+            const edges = await FlowEdgeRepository.getBySourceIds(
+                'inboundroute',
+                inboundRoutes.map((ir) => ir.id)
+            )
             for (const ir of inboundRoutes) {
-                await InboundRouteRepository.update(tx, id, ir.did.number, ir.destination as any, newMax)
+                const dest = edges.get(ir.id)?.default ?? null
+                await InboundRouteRepository.update(tx, id, ir.did.number, dest, newMax)
             }
         }
 
