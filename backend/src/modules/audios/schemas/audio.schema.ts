@@ -24,6 +24,12 @@ export const createAudioTtsSchema = z.object({
     voiceId: z.string().min(1),
 })
 
+export const voicePreviewQuerySchema = z.object({
+    companyId: z.cuid2(),
+    voiceId: z.string().min(1),
+    language: z.enum(['pt', 'en']).default('pt'),
+})
+
 export const AudioSchema = z.object({
     id: z.string(),
     name: z.string(),

@@ -97,7 +97,7 @@ export const createAudioFromText = async (companyId: string, name: string, text:
     const existing = await prisma.audio.findUnique({ where: { name_companyId: { name, companyId } } })
     if (existing) throw new AppError('Audio already exists for this company', 409)
 
-    const buffer = await ElevenLabsProvider.textToSpeech(company.elevenLabsApiKey, voiceId, text)
+    const buffer = await ElevenLabsProvider.textToSpeech(company.elevenLabsApiKey.trim(), voiceId, text)
 
     const created = await prisma.audio.create({
         data: { name, companyId, source: 'TTS', ttsText: text, ttsVoiceId: voiceId },
@@ -109,6 +109,27 @@ export const createAudioFromText = async (companyId: string, name: string, text:
     return created
 }
 
+const VOICE_PREVIEW_TEXT: Record<'pt' | 'en', string> = {
+    pt: 'Olá! Esta é uma prévia da minha voz em português.',
+    en: 'Hello! This is a preview of my voice in English.',
+}
+
+export const previewVoiceAudio = async (companyId: string, voiceId: string, language: 'pt' | 'en') => {
+    const company = await getCompanyById(companyId)
+    if (!company.elevenLabsApiKey) throw new AppError('ElevenLabs is not configured for this company', 400)
+
+    const cached = await AudiosCache.getVoicePreview(companyId, voiceId, language)
+    if (cached) return Buffer.from(cached, 'base64')
+
+    const buffer = await ElevenLabsProvider.textToSpeech(
+        company.elevenLabsApiKey.trim(),
+        voiceId,
+        VOICE_PREVIEW_TEXT[language]
+    )
+    await AudiosCache.setVoicePreview(companyId, voiceId, language, buffer.toString('base64'))
+    return buffer
+}
+
 export const listVoices = async (companyId: string) => {
     const company = await getCompanyById(companyId)
     if (!company.elevenLabsApiKey) throw new AppError('ElevenLabs is not configured for this company', 400)
@@ -116,7 +137,7 @@ export const listVoices = async (companyId: string) => {
     const cached = await AudiosCache.getVoices(companyId)
     if (cached) return cached
 
-    const voices = await ElevenLabsProvider.listVoices(company.elevenLabsApiKey)
+    const voices = await ElevenLabsProvider.listVoices(company.elevenLabsApiKey.trim())
     await AudiosCache.setVoices(companyId, voices)
     return voices
 }

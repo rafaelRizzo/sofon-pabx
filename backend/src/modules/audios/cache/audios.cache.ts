@@ -60,4 +60,19 @@ export class AudiosCache {
         await cacheManager.set(`${NAMESPACE}:voices`, companyId, data, config ?? { ttl: 3600 })
         logger.info({ event: 'cache.set', namespace: NAMESPACE, key: `voices:${companyId}` })
     }
+
+    // Prévia de voz em base64 (frase curta gerada sob demanda) — cacheada por 7 dias por
+    // empresa+voz+idioma pra não gastar cota da ElevenLabs a cada clique no play da lista
+    static async getVoicePreview(companyId: string, voiceId: string, language: string) {
+        const key = `${companyId}:${voiceId}:${language}`
+        const cached = await cacheManager.get<string>(`${NAMESPACE}:preview`, key)
+        logger.info({ event: cached ? 'cache.hit' : 'cache.miss', namespace: NAMESPACE, key: `preview:${key}` })
+        return cached
+    }
+
+    static async setVoicePreview(companyId: string, voiceId: string, language: string, base64: string) {
+        const key = `${companyId}:${voiceId}:${language}`
+        await cacheManager.set(`${NAMESPACE}:preview`, key, base64, { ttl: 604800 })
+        logger.info({ event: 'cache.set', namespace: NAMESPACE, key: `preview:${key}` })
+    }
 }

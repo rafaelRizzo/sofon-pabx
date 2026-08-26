@@ -171,6 +171,16 @@
     50% { scale: 1.06; }
 }
 
+@keyframes voice-dot-bounce {
+    0%, 100% { transform: scale(0.5); opacity: 0.6; }
+    50% { transform: scale(1.4); opacity: 1; }
+}
+
+.animate-voice-dot {
+    animation: voice-dot-bounce 0.9s ease-in-out infinite;
+    animation-delay: var(--vd-delay, 0s);
+}
+
 .switchboard-packet {
     offset-distance: 0%;
     animation: switchboard-travel var(--sb-duration, 4s) linear infinite;
@@ -199,7 +209,8 @@
     .switchboard-packet,
     .switchboard-arrival,
     .switchboard-ring,
-    .switchboard-orb {
+    .switchboard-orb,
+    .animate-voice-dot {
         animation: none;
     }
 }

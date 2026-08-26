@@ -4,7 +4,7 @@ import * as AudiosController from './audios.controller'
 import { protectedRoute } from '../../middleware/scope.middleware'
 import { requirePermission } from '../../middleware/permission.middleware'
 import {
-    updateAudioSchema, createAudioTtsSchema, idParamSchema, companyQuerySchema,
+    updateAudioSchema, createAudioTtsSchema, idParamSchema, companyQuerySchema, voicePreviewQuerySchema,
     ListAudiosResponse, GetAudioResponse, CreateAudioResponse, UpdateAudioResponse,
     CreateAudioTtsResponse, ListVoicesResponse,
 } from './schemas/audio.schema'
@@ -136,6 +136,28 @@ export const audiosRoutes = async (app: FastifyInstance) => {
             },
         },
     }, AudiosController.createAudioTts as any)
+
+    router.get('/audios/tts/preview', {
+        ...uploadRateLimit,
+        onRequest: [...protectedRoute, requirePermission('audios', 'view')],
+        schema: {
+            tags: ['Audios'],
+            summary: 'Prévia de voz da ElevenLabs em pt/en',
+            description:
+                'Gera (ou reaproveita do cache) uma frase curta de demonstração na voz e idioma ' +
+                'escolhidos — diferente de `previewUrl` de `/audios/tts/voices`, que vem fixo da ' +
+                'ElevenLabs (geralmente em inglês). Retorna o áudio bruto (audio/mpeg), cacheado por ' +
+                '7 dias por empresa+voz+idioma pra não gastar cota da ElevenLabs a cada clique.',
+            security: [{ bearerAuth: [] }],
+            querystring: voicePreviewQuerySchema,
+            response: {
+                400: errors[400],
+                401: errors[401],
+                403: errors[403],
+                404: errors[404],
+            },
+        },
+    }, AudiosController.getVoicePreview as any)
 
     router.patch('/audios/:id', {
         onRequest: [...protectedRoute, requirePermission('audios', 'manage')],

@@ -6,11 +6,12 @@ import { useForm } from "react-hook-form"
 import { z } from "zod"
 import {
     FileAudioIcon,
-    PauseIcon,
+    Loader2Icon,
     PlayIcon,
     UploadIcon,
     XIcon,
 } from "lucide-react"
+import { toast } from "sonner"
 
 import {
     AlertDialog,
@@ -47,6 +48,7 @@ import {
     FieldLabel,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import { api, apiError } from "@/lib/api"
 import { cn } from "@/lib/utils"
 import {
     Select,
@@ -55,10 +57,12 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { type Audio } from "@/hooks/use-audios"
 import { useTtsVoices, type Voice } from "@/hooks/use-tts-voices"
+import { VoicePreviewDots } from "@/components/Audios/voice-preview-dots"
 
 const TTS_TEXT_MAX = 2500
 const ALL_LANGUAGES = "all"
@@ -195,20 +199,49 @@ export function AudioFormDialog({
     const fileInputRef = useRef<HTMLInputElement>(null)
 
     const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null)
+    const [previewLoadingId, setPreviewLoadingId] = useState<string | null>(
+        null
+    )
     const previewAudioRef = useRef<HTMLAudioElement | null>(null)
+    const previewObjectUrlRef = useRef<string | null>(null)
 
-    function togglePreview(voice: Voice) {
-        if (!voice.previewUrl) return
+    function stopPreview() {
         previewAudioRef.current?.pause()
+        if (previewObjectUrlRef.current) {
+            URL.revokeObjectURL(previewObjectUrlRef.current)
+            previewObjectUrlRef.current = null
+        }
+    }
+
+    // Prévia gerada sob demanda no idioma selecionado (diferente do `previewUrl` fixo, geralmente
+    // em inglês, que a ElevenLabs devolve em /audios/tts/voices)
+    async function togglePreview(voice: Voice) {
         if (playingVoiceId === voice.voiceId) {
+            stopPreview()
             setPlayingVoiceId(null)
             return
         }
-        const player = new window.Audio(voice.previewUrl)
-        player.onended = () => setPlayingVoiceId(null)
-        previewAudioRef.current = player
-        setPlayingVoiceId(voice.voiceId)
-        player.play()
+        stopPreview()
+        setPlayingVoiceId(null)
+        setPreviewLoadingId(voice.voiceId)
+        try {
+            const language = languageFilter === ALL_LANGUAGES ? "pt" : languageFilter
+            const res = await api.get("/audios/tts/preview", {
+                params: { companyId, voiceId: voice.voiceId, language },
+                responseType: "blob",
+            })
+            const url = URL.createObjectURL(res.data as Blob)
+            previewObjectUrlRef.current = url
+            const player = new window.Audio(url)
+            player.onended = () => setPlayingVoiceId(null)
+            previewAudioRef.current = player
+            setPlayingVoiceId(voice.voiceId)
+            await player.play()
+        } catch (err) {
+            toast.error(apiError(err, "Erro ao gerar prévia da voz"))
+        } finally {
+            setPreviewLoadingId(null)
+        }
     }
 
     useEffect(() => {
@@ -231,12 +264,13 @@ export function AudioFormDialog({
     // Para a prévia ao fechar o dialog ou desmontar, sem depender do usuário clicar de novo
     useEffect(() => {
         if (!open) {
-            previewAudioRef.current?.pause()
+            stopPreview()
             setPlayingVoiceId(null)
         }
         return () => {
-            previewAudioRef.current?.pause()
+            stopPreview()
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open])
 
     function selectFile(selected: File | null) {
@@ -313,10 +347,10 @@ export function AudioFormDialog({
                     <form
                         id="audio-form"
                         onSubmit={onSubmit}
-                        className="flex min-h-0 flex-1 flex-col"
+                        className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)]"
                     >
-                        <div className="flex-1 overflow-x-hidden overflow-y-auto">
-                            <FieldGroup>
+                        <ScrollArea className="min-h-0">
+                            <FieldGroup className="pr-3">
                                 <Field>
                                     <FieldLabel>Nome</FieldLabel>
                                     <Input
@@ -579,37 +613,42 @@ export function AudioFormDialog({
                                                                                 v.name
                                                                             }
                                                                         </span>
-                                                                        {v.previewUrl && (
-                                                                            <Button
-                                                                                type="button"
-                                                                                variant="ghost"
-                                                                                size="icon-xs"
-                                                                                onClick={(
-                                                                                    e
-                                                                                ) => {
-                                                                                    e.stopPropagation()
-                                                                                    togglePreview(
-                                                                                        v
-                                                                                    )
-                                                                                }}
-                                                                                onPointerDown={(
-                                                                                    e
-                                                                                ) =>
-                                                                                    e.stopPropagation()
-                                                                                }
-                                                                            >
-                                                                                {playingVoiceId ===
-                                                                                v.voiceId ? (
-                                                                                    <PauseIcon />
-                                                                                ) : (
-                                                                                    <PlayIcon />
-                                                                                )}
-                                                                                <span className="sr-only">
-                                                                                    Ouvir
-                                                                                    prévia
-                                                                                </span>
-                                                                            </Button>
-                                                                        )}
+                                                                        <Button
+                                                                            type="button"
+                                                                            variant="ghost"
+                                                                            size="icon-xs"
+                                                                            disabled={
+                                                                                previewLoadingId ===
+                                                                                v.voiceId
+                                                                            }
+                                                                            onClick={(
+                                                                                e
+                                                                            ) => {
+                                                                                e.stopPropagation()
+                                                                                togglePreview(
+                                                                                    v
+                                                                                )
+                                                                            }}
+                                                                            onPointerDown={(
+                                                                                e
+                                                                            ) =>
+                                                                                e.stopPropagation()
+                                                                            }
+                                                                        >
+                                                                            {previewLoadingId ===
+                                                                            v.voiceId ? (
+                                                                                <Loader2Icon className="animate-spin" />
+                                                                            ) : playingVoiceId ===
+                                                                              v.voiceId ? (
+                                                                                <VoicePreviewDots />
+                                                                            ) : (
+                                                                                <PlayIcon />
+                                                                            )}
+                                                                            <span className="sr-only">
+                                                                                Ouvir
+                                                                                prévia
+                                                                            </span>
+                                                                        </Button>
                                                                     </ComboboxItem>
                                                                 )}
                                                             </ComboboxList>
@@ -658,7 +697,7 @@ export function AudioFormDialog({
                                     </Field>
                                 )}
                             </FieldGroup>
-                        </div>
+                        </ScrollArea>
                     </form>
 
                     <DialogFooter className="pt-4">
