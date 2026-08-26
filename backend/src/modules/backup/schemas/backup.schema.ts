@@ -23,7 +23,8 @@ export type BackupRestoreInput = z.infer<typeof backupRestoreSchema>
 export const RestoreCompanyResultSchema = z.object({
     originalName: z.string(),
     newCompanyId: z.string().optional(),
-    error: z.string().optional()
+    error: z.string().optional(),
+    userWarnings: z.array(z.string()).optional()
 })
 
 export const RestoreBackupResponse = ok({

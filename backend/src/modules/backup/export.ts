@@ -64,6 +64,29 @@ async function exportIntegrationCredentials(companyId: string) {
     }))
 }
 
+// Só role="user" vinculado via UserCompany — admin/reseller são conta de plataforma, não dado
+// de empresa. password já é o hash argon2 armazenado (ver users.service.ts), restaurado 1:1 sem
+// re-hash, então o login continua funcionando com a senha original depois do restore
+async function exportUsers(companyId: string) {
+    const links = await prisma.userCompany.findMany({
+        where: { companyId, user: { role: 'user' } },
+        select: {
+            user: {
+                select: {
+                    id: true,
+                    name: true,
+                    username: true,
+                    password: true,
+                    status: true,
+                    permissions: true,
+                    extensionId: true
+                }
+            }
+        }
+    })
+    return links.map((l) => l.user)
+}
+
 async function exportQueues(companyId: string) {
     const queues = await getQueuesByCompany(companyId)
     return Promise.all(
@@ -116,7 +139,8 @@ export async function exportCompanyBackup(companyId: string) {
         outboundRoutes,
         agentCompanyScopes,
         routingRules,
-        flows
+        flows,
+        users
     ] = await Promise.all([
         exportExtensions(companyId),
         getTrunks(companyId),
@@ -137,7 +161,8 @@ export async function exportCompanyBackup(companyId: string) {
         getOutboundRoutes(companyId),
         getScopesByCompany(companyId),
         getRoutingRulesByCompany(companyId),
-        exportFlows(companyId)
+        exportFlows(companyId),
+        exportUsers(companyId)
     ])
 
     return {
@@ -168,7 +193,8 @@ export async function exportCompanyBackup(companyId: string) {
         outboundRoutes,
         agentCompanyScopes,
         routingRules,
-        flows
+        flows,
+        users
     }
 }
 

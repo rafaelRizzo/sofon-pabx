@@ -9,6 +9,9 @@ export type RestoreCompanyResult = {
     originalName: string
     newCompanyId?: string
     error?: string
+    // usuário pulado por username duplicado — não derruba o restore da empresa (ver
+    // backend/src/modules/backup/restore.ts)
+    userWarnings?: string[]
 }
 
 export type BackupPayload = {
@@ -46,6 +49,7 @@ const ENTITY_KEYS = [
     "agentCompanyScopes",
     "routingRules",
     "flows",
+    "users",
 ] as const
 
 function extractFilename(disposition: unknown, fallback: string): string {

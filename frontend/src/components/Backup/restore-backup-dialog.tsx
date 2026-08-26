@@ -3,7 +3,12 @@
 import { useEffect, useState } from "react"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
-import { AlertTriangleIcon, CheckCircle2Icon, DownloadIcon } from "lucide-react"
+import {
+    AlertTriangleIcon,
+    CheckCircle2Icon,
+    DownloadIcon,
+    InfoIcon,
+} from "lucide-react"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
@@ -151,20 +156,24 @@ export function RestoreBackupDialog({
                             ))}
                         </div>
 
-                        <Alert variant="destructive">
-                            <AlertTriangleIcon />
+                        <Alert>
+                            <InfoIcon />
                             <AlertTitle>
-                                Isso vai criar {summary.companies.length}{" "}
+                                Vai criar até {summary.companies.length}{" "}
                                 empresa(s) nova(s)
                             </AlertTitle>
                             <AlertDescription>
-                                Nunca sobrescreve uma empresa existente — cada
+                                Nunca sobrescreve uma empresa existente. Cada
                                 empresa do arquivo é recriada do zero, com
-                                todos os IDs remapeados. Senha de ramal é
+                                todos os IDs remapeados, e a senha de ramal é
                                 sempre regenerada (nunca a original). Se já
                                 existir uma empresa com o mesmo nome, aquela
-                                empresa específica falha e é reportada, sem
-                                duplicar.
+                                empresa específica é pulada e reportada como
+                                erro, sem criar duplicata. Usuários do painel
+                                vinculados à empresa são restaurados com a
+                                senha original — se o username já existir, só
+                                aquele usuário é pulado (não afeta o resto da
+                                empresa).
                             </AlertDescription>
                         </Alert>
                     </div>

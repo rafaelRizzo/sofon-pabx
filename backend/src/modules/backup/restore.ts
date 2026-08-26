@@ -48,7 +48,14 @@ import { type IdMap, mapId, mapIdOptional, remapDestination, remapResourceId, ha
 type Raw = Record<string, any>
 const arr = (v: unknown): Raw[] => (Array.isArray(v) ? v : [])
 
-export type RestoreCompanyResult = { originalName: string; newCompanyId?: string; error?: string }
+export type RestoreCompanyResult = {
+    originalName: string
+    newCompanyId?: string
+    error?: string
+    // usuário pulado (username já existe) não derruba o restore da empresa — cada linha aqui é
+    // um aviso não-fatal, diferente de `error` (que aborta a empresa inteira)
+    userWarnings?: string[]
+}
 
 // Cada empresa do backup é restaurada isoladamente: se qualquer passo falhar, a empresa criada
 // nesta mesma operação é apagada (cascade cobre tudo) e o erro é reportado só pra ela — as demais
@@ -58,8 +65,8 @@ export async function restoreBackup(companies: Raw[], userId: string, generatedA
     for (const raw of companies) {
         const originalName = typeof raw?.company?.name === 'string' ? raw.company.name : '(desconhecido)'
         try {
-            const newCompanyId = await restoreOneCompany(raw, userId, generatedAt)
-            results.push({ originalName, newCompanyId })
+            const { newCompanyId, userWarnings } = await restoreOneCompany(raw, userId, generatedAt)
+            results.push({ originalName, newCompanyId, userWarnings: userWarnings.length ? userWarnings : undefined })
         } catch (error) {
             results.push({
                 originalName,
@@ -70,7 +77,11 @@ export async function restoreBackup(companies: Raw[], userId: string, generatedA
     return results
 }
 
-async function restoreOneCompany(raw: Raw, userId: string, generatedAt: string): Promise<string> {
+async function restoreOneCompany(
+    raw: Raw,
+    userId: string,
+    generatedAt: string
+): Promise<{ newCompanyId: string; userWarnings: string[] }> {
     const companyInput = createCompanySchema.parse({
         name: raw.company?.name,
         doc: raw.company?.doc ?? undefined,
@@ -91,8 +102,9 @@ async function restoreOneCompany(raw: Raw, userId: string, generatedAt: string):
 
     const company = await createCompany(companyInput, userId)
 
+    let userWarnings: string[] = []
     try {
-        await restoreCompanyEntities(raw, company.id)
+        userWarnings = await restoreCompanyEntities(raw, company.id)
     } catch (error) {
         // Se a limpeza da empresa parcialmente criada também falhar, isso NÃO pode ser engolido
         // silenciosamente — o admin precisa saber que sobrou uma empresa "pela metade" no banco
@@ -128,10 +140,10 @@ async function restoreOneCompany(raw: Raw, userId: string, generatedAt: string):
         })
         .catch(() => {})
 
-    return company.id
+    return { newCompanyId: company.id, userWarnings }
 }
 
-async function restoreCompanyEntities(raw: Raw, companyId: string) {
+async function restoreCompanyEntities(raw: Raw, companyId: string): Promise<string[]> {
     const idMap: IdMap = new Map()
     const deferred: Array<() => Promise<void>> = []
 
@@ -152,6 +164,38 @@ async function restoreCompanyEntities(raw: Raw, companyId: string) {
         })
         const created = await createExtension(payload)
         idMap.set(`extension:${ext.id}`, created.id)
+    }
+
+    // username é único globalmente (não por empresa) — colisão pula só aquele usuário (vira
+    // warning) em vez de abortar a empresa inteira, mesmo espírito do guard de Company.name.
+    // password já é hash argon2 do arquivo, restaurado direto sem re-hash (ver export.ts)
+    const userWarnings: string[] = []
+    for (const u of arr(raw.users)) {
+        const username = typeof u.username === 'string' ? u.username : undefined
+        if (!username) continue
+        const existingUser = await prisma.user.findUnique({ where: { username }, select: { id: true } })
+        if (existingUser) {
+            userWarnings.push(`Usuário "${username}" já existe (id ${existingUser.id}) — não restaurado.`)
+            continue
+        }
+        try {
+            await prisma.user.create({
+                data: {
+                    name: u.name,
+                    username,
+                    password: u.password,
+                    role: 'user',
+                    status: u.status ?? 'active',
+                    permissions: Array.isArray(u.permissions) ? u.permissions : [],
+                    extensionId: mapIdOptional(idMap, 'extension', u.extensionId ?? null),
+                    companies: { create: [{ companyId }] }
+                }
+            })
+        } catch (error) {
+            userWarnings.push(
+                `Usuário "${username}" falhou: ${error instanceof Error ? error.message : String(error)}`
+            )
+        }
     }
 
     for (const t of arr(raw.trunks)) {
@@ -537,4 +581,6 @@ async function restoreCompanyEntities(raw: Raw, companyId: string) {
     // ─── Fase 2: religa todo destino adiado, agora que todo id já existe no mapa ───────────────
 
     for (const replay of deferred) await replay()
+
+    return userWarnings
 }

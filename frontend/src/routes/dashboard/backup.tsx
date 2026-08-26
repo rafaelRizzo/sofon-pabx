@@ -124,7 +124,10 @@ function BackupPage() {
                             backup. Nunca sobrescreve uma empresa existente —
                             sempre cria uma nova, com todos os ids
                             remapeados. Senha de ramal é sempre regenerada
-                            (nunca preservada). Só admin.
+                            (nunca preservada); usuários do painel vinculados
+                            à empresa são restaurados com a senha original,
+                            exceto se o username já existir (aí é pulado). Só
+                            admin.
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="flex flex-col gap-3">
@@ -137,8 +140,8 @@ function BackupPage() {
                         />
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                             {fileName ? (
-                                <div className="flex w-full items-center gap-2 rounded-md border px-3 py-2 text-sm sm:w-72">
-                                    <FileJsonIcon className="size-4 shrink-0 text-muted-foreground" />
+                                <div className="flex h-7 w-full items-center gap-1.5 rounded-md border px-2 text-xs/relaxed sm:w-72">
+                                    <FileJsonIcon className="size-3.5 shrink-0 text-muted-foreground" />
                                     <span className="min-w-0 flex-1 truncate">
                                         {fileName}
                                     </span>
@@ -193,6 +196,9 @@ function BackupPage() {
                                         <AlertDescription>
                                             {r.error ??
                                                 `Restaurada com sucesso (id: ${r.newCompanyId})`}
+                                            {r.userWarnings?.map((w, wi) => (
+                                                <p key={wi}>{w}</p>
+                                            ))}
                                         </AlertDescription>
                                     </Alert>
                                 ))}
