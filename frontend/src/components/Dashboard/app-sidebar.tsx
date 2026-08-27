@@ -1,6 +1,7 @@
 import { Link, useLocation } from "@tanstack/react-router"
 import {
   ActivityIcon,
+  BracesIcon,
   Building2Icon,
   DatabaseBackupIcon,
   FileAudioIcon,
@@ -140,6 +141,12 @@ export const NAV: NavGroup[] = [
         href: "/dashboard/audios",
         icon: FileAudioIcon,
         permission: "audios",
+      },
+      {
+        title: "Catálogo de Variáveis",
+        href: "/dashboard/variable-catalog",
+        icon: BracesIcon,
+        permission: "variable-catalog",
       },
       {
         title: "Credenciais de integração",

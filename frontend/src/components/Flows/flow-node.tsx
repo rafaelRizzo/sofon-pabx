@@ -347,7 +347,12 @@ function ExceptionRow({
     onCreateSlot,
 }: ExceptionRowProps) {
     return (
-        <div className="grid grid-cols-2 gap-2">
+        <div
+            className="grid gap-2"
+            style={{
+                gridTemplateColumns: `repeat(${Math.min(slots.length, 3)}, minmax(0, 1fr))`,
+            }}
+        >
             {slots.map((slot) => {
                 const Icon = SLOT_ICONS[slot]
                 return (

@@ -6,6 +6,7 @@ import { IvrRepository } from '../../asterisk/ivr.repository'
 import { FlowEdgeRepository } from '../../asterisk/flow-edge.repository'
 import { syncFlowNodeLabel } from '../flows/flow-nodes.service'
 import { assertAudioBelongsToCompany } from '../audios/audios.service'
+import { assertVariableExistsForCompany } from '../variable-catalog/variable-catalog.service'
 import { validateRouteDestination, assertNotReferenced } from '../../schemas/route-destination.validate'
 import { resolveDestinationLabels, withDestinationLabel } from '../../schemas/route-destination-label'
 import { resolveUsedByLabels, type UsedByRef } from '../../schemas/flow-reference-label'
@@ -174,6 +175,7 @@ export const createIvrMenu = async (data: CreateIvrMenuInput) => {
 
     const options = data.options ?? []
     assertTypeConsistency(data.type, data.variableName, options.length, data.maxDigits)
+    if (data.type === 'collect') await assertVariableExistsForCompany(data.variableName!, data.companyId)
 
     await assertAudioBelongsToCompany(data.audioId, data.companyId)
     await validateDest(data.invalidDestination, data.companyId, 'invalidDestination')
@@ -245,12 +247,14 @@ export const updateIvrMenu = async (id: string, data: UpdateIvrMenuInput) => {
         if (dup) throw new AppError('IVR menu name already in use for this company', 409)
     }
 
+    const effectiveType = (data.type ?? existing.type) as 'menu' | 'collect'
     assertTypeConsistency(
-        (data.type ?? existing.type) as 'menu' | 'collect',
+        effectiveType,
         data.variableName !== undefined ? data.variableName : existing.variableName,
         data.options !== undefined ? data.options.length : existing._count.options,
         data.maxDigits ?? existing.maxDigits,
     )
+    if (effectiveType === 'collect' && data.variableName) await assertVariableExistsForCompany(data.variableName, existing.companyId)
 
     if (data.audioId !== undefined) await assertAudioBelongsToCompany(data.audioId, existing.companyId)
     if (data.invalidDestination !== undefined) await validateDest(data.invalidDestination, existing.companyId, 'invalidDestination')

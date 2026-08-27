@@ -10,6 +10,7 @@ import { resolveUsedByLabels, type UsedByRef } from '../../schemas/flow-referenc
 import type { RouteDestination } from '../../schemas/route-destination.schema'
 import type { CreateVariableSetInput, UpdateVariableSetInput } from './schemas/variable.schema'
 import { AppError } from '../../utils/errors/app.error'
+import { assertVariableExistsForCompany } from '../variable-catalog/variable-catalog.service'
 
 const select = {
     id: true,
@@ -117,6 +118,7 @@ export const createVariableSet = async (data: CreateVariableSetInput) => {
     })
     if (existing) throw new AppError('Variable set already exists for this company', 409)
 
+    for (const a of data.assignments) await assertVariableExistsForCompany(a.variable, data.companyId)
     await validateRouteDestination(data.destination ?? null, data.companyId)
 
     const variableSet = await prisma.$transaction(async (tx) => {
@@ -152,6 +154,9 @@ export const updateVariableSet = async (id: string, data: UpdateVariableSetInput
         if (conflict) throw new AppError('Variable set name already in use for this company', 409)
     }
 
+    if (data.assignments !== undefined) {
+        for (const a of data.assignments) await assertVariableExistsForCompany(a.variable, existing.companyId)
+    }
     if (data.destination !== undefined) await validateRouteDestination(data.destination, existing.companyId)
 
     const variableSet = await prisma.$transaction(async (tx) => {

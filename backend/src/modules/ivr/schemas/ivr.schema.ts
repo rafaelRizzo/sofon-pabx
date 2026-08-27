@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { timestamp, cuidParam, ok } from '../../../schemas/responses'
 import { routeDestinationSchema, routeDestinationResponseSchema } from '../../../schemas/route-destination.schema'
 import { usedBySchema } from '../../../schemas/flow-reference-label'
+import { variableNameSchema as baseVariableNameSchema } from '../../../schemas/variable-name.schema'
 
 export const idParamSchema = z.object({ id: cuidParam })
 export const companyQuerySchema = z.object({ companyId: z.cuid2() })
@@ -26,8 +27,7 @@ export type IvrMenuType = (typeof IVR_MENU_TYPES)[number]
 // como variableName, senão o Set() do modo "collect" corrompe o próprio controle de retries
 const RESERVED_IVR_VARIABLES = ['IVR_DIGITS', '__IVR_INV', '__IVR_TMO']
 
-const variableNameSchema = z.string().min(1).max(80)
-    .regex(/^[A-Za-z_][A-Za-z0-9_]*$/, 'Nome de variável inválido, use letras, números e _, começando com letra ou _')
+const variableNameSchema = baseVariableNameSchema
     .refine((v) => !RESERVED_IVR_VARIABLES.includes(v), { message: 'Nome de variável reservado pelo sistema' })
 
 export const createIvrMenuSchema = z.object({

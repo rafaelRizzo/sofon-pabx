@@ -30,7 +30,7 @@ describe('buildDialplan (IVR)', () => {
         expect(byPriority.get(2)).toMatchObject({ app: 'Set', appdata: '__IVR_INV=0' })
         expect(byPriority.get(3)).toMatchObject({ app: 'Set', appdata: '__IVR_TMO=0' })
         expect(byPriority.get(4)).toMatchObject({ app: 'Read', appdata: 'IVR_DIGITS,/sounds/ast1/audio1,1,,1,5' })
-        expect(byPriority.get(5)).toMatchObject({ app: 'GotoIf', appdata: '$["${READSTATUS}"="TIMEOUT"]?15' })
+        expect(byPriority.get(5)).toMatchObject({ app: 'GotoIf', appdata: '$["${IVR_DIGITS}"=""]?15' })
         expect(byPriority.get(6)).toMatchObject({ app: 'GotoIf', appdata: '$[${LEN(${IVR_DIGITS})} > 1]?13' })
         expect(byPriority.get(7)).toMatchObject({ app: 'GotoIf', appdata: '$["${IVR_DIGITS}"="1"]?ramais,1001,1' })
         expect(byPriority.get(8)).toMatchObject({ app: 'GotoIf', appdata: '$["${IVR_DIGITS}"="2"]?queues-app,q-1,1' })

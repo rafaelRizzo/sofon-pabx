@@ -39,6 +39,7 @@ import { ixcNodesRoutes } from './modules/ixc-nodes/ixc-nodes.routes'
 import { audiosRoutes } from './modules/audios/audios.routes'
 import { variablesRoutes } from './modules/variables/variables.routes'
 import { variableConditionsRoutes } from './modules/variable-conditions/variable-conditions.routes'
+import { variableCatalogRoutes } from './modules/variable-catalog/variable-catalog.routes'
 import { callcenterAgentsRoutes } from './modules/callcenter/agents/agents.routes'
 import { routingRulesRoutes } from './modules/callcenter/routing-rules/routing-rules.routes'
 import { callcenterRatingsRoutes } from './modules/callcenter/ratings/ratings.routes'
@@ -268,6 +269,7 @@ app.register(ixcNodesRoutes)
 app.register(audiosRoutes)
 app.register(variablesRoutes)
 app.register(variableConditionsRoutes)
+app.register(variableCatalogRoutes)
 app.register(callcenterAgentsRoutes)
 app.register(routingRulesRoutes)
 app.register(callcenterRatingsRoutes)

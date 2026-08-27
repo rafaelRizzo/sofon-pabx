@@ -42,6 +42,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { EntityFormDialogSkeletonContent } from "@/components/entity-form-dialog-skeleton"
+import { VariableCombobox } from "@/components/variable-combobox"
 import { type Company } from "@/hooks/use-companies"
 import {
     createVariableSetFormSchema,
@@ -282,11 +283,31 @@ export function VariableSetFormDialog({
                                                                 className="grid grid-cols-[1fr_1fr_1.75rem] items-start gap-2"
                                                             >
                                                                 <div>
-                                                                    <Input
-                                                                        placeholder="CRM_ID"
-                                                                        {...register(
-                                                                            `assignments.${index}.variable`
-                                                                        )}
+                                                                    <VariableCombobox
+                                                                        companyId={
+                                                                            companyId
+                                                                        }
+                                                                        value={
+                                                                            watch(
+                                                                                `assignments.${index}.variable`
+                                                                            ) ??
+                                                                            null
+                                                                        }
+                                                                        onChange={(
+                                                                            name
+                                                                        ) =>
+                                                                            setValue(
+                                                                                `assignments.${index}.variable`,
+                                                                                name ??
+                                                                                    "",
+                                                                                {
+                                                                                    shouldValidate:
+                                                                                        true,
+                                                                                    shouldDirty:
+                                                                                        true,
+                                                                                }
+                                                                            )
+                                                                        }
                                                                     />
                                                                     {errors
                                                                         .assignments?.[

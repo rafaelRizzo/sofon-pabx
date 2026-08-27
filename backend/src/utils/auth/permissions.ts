@@ -22,6 +22,7 @@ export const PERMISSION_RESOURCES = [
     'ixc',
     'variables',
     'variable-conditions',
+    'variable-catalog',
     'flows',
 ] as const
 

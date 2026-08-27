@@ -52,6 +52,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { RouteDestinationField } from "@/components/RouteDestination/route-destination-field"
 import { Toggle } from "@/components/ui/toggle"
+import { VariableCombobox } from "@/components/variable-combobox"
 import { type Audio, useAudios } from "@/hooks/use-audios"
 import { type Company } from "@/hooks/use-companies"
 import {
@@ -265,7 +266,7 @@ export function IvrMenuFormDialog({
     return (
         <>
             <Dialog open={open} onOpenChange={requestClose}>
-                <DialogContent className="sm:max-w-xl">
+                <DialogContent className="flex max-h-full flex-col sm:max-w-xl">
                     <DialogHeader className="pr-8">
                         <DialogTitle>
                             {isEdit ? "Editar menu de URA" : "Novo menu de URA"}
@@ -280,8 +281,9 @@ export function IvrMenuFormDialog({
                     <form
                         id="ivr-menu-form"
                         onSubmit={onSubmit}
+                        className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)]"
                     >
-                        <ScrollArea className="h-[65vh] max-h-[calc(100vh-14rem)]">
+                        <ScrollArea className="min-h-0">
                             <FieldGroup className="pr-3">
                                 {flowNodeMode && (
                                     <Field>
@@ -435,14 +437,13 @@ export function IvrMenuFormDialog({
                                         <FieldLabel>
                                             Nome da variável
                                         </FieldLabel>
-                                        <Input
-                                            placeholder="Ex: CPF_CLIENTE"
-                                            maxLength={80}
-                                            value={variableName ?? ""}
-                                            onChange={(e) =>
+                                        <VariableCombobox
+                                            companyId={companyId}
+                                            value={variableName}
+                                            onChange={(name) =>
                                                 setValue(
                                                     "variableName",
-                                                    e.target.value || null,
+                                                    name,
                                                     {
                                                         shouldValidate: true,
                                                         shouldDirty: true,

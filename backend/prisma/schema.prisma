@@ -43,6 +43,7 @@ model Company {
   agentAffinities        AgentAffinity[]
   variableSets           VariableSet[]
   variableConditions     VariableCondition[]
+  variables              Variable[]
   flowEdges              FlowEdge[]
   flows                  Flow[]
   queueCalls             QueueCall[]
@@ -564,6 +565,24 @@ model VariableCondition {
   @@unique([name, companyId])
   @@index([companyId])
   @@map("variable_conditions")
+}
+
+// Catálogo de nomes de variável declarados pela empresa - fonte de verdade validada por
+// IvrMenu.variableName e VariableSet.assignments[].variable ao criar/editar (ver
+// variable-catalog.service.ts:assertVariableExistsForCompany). Não é FK: os dois continuam
+// guardando o nome como string solta, igual antes - essa tabela só valida existência/unicidade.
+model Variable {
+  id          String   @id @default(cuid())
+  name        String   @db.VarChar(80)
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  description String?  @db.VarChar(200)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  @@unique([name, companyId])
+  @@index([companyId])
+  @@map("variable_catalog")
 }
 
 // Credencial de acesso a uma API de terceiro (`provider` identifica qual — hoje só "ixc", desenhado

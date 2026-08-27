@@ -51,6 +51,7 @@ export function createPrismaMock() {
         agentAffinity: model(),
         variableSet: model(),
         variableCondition: model(),
+        variable: model(),
         flowEdge: model(),
         flow: model(),
         flowNode: model(),

@@ -32,6 +32,7 @@ export const PERMISSION_RESOURCES = [
   { key: "request-templates", label: "Templates de requisição", category: "Automação" },
   { key: "variables", label: "Variáveis", category: "Automação" },
   { key: "variable-conditions", label: "Condições de variável", category: "Automação" },
+  { key: "variable-catalog", label: "Catálogo de Variáveis", category: "Automação" },
   { key: "integrations", label: "Credenciais de integração", category: "Automação" },
   { key: "ixc", label: "Nós IXCsoft", category: "Automação" },
 ] as const

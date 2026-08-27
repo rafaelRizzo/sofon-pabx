@@ -32,8 +32,10 @@ type MenuConfig = {
 // labels do extensions.conf, que não existem no dialplan estático gerado por entidade (mesma
 // limitação de tc-<id>).
 //
-// Read() lê até maxDigits, parando antes se o chamador pausar entre dígitos: 0 dígitos == timeout
-// (READSTATUS=TIMEOUT), 1+ dígitos == segue pro match (LEN==1 checa as opções; LEN>1 vai pro
+// Read() lê até maxDigits, parando antes se o chamador pausar entre dígitos: checa IVR_DIGITS vazio
+// (não READSTATUS - o Read seta READSTATUS=TIMEOUT sempre que o intervalo entre dígitos estoura,
+// mesmo com dígitos já coletados, ex: CPF de 11 numa URA configurada pra até 14). 0 dígitos ==
+// timeout de verdade, 1+ dígitos == segue pro match (LEN==1 checa as opções; LEN>1 vai pro
 // longDestination, ex: CPF/CNPJ em type="collect", que não tem opções). Antes desse Goto, se
 // variableName estiver configurado, os dígitos são copiados pra essa variável (Set): é o único
 // jeito de outros módulos (Request Template, Validar Variável) lerem o valor coletado depois do
@@ -77,7 +79,7 @@ export function buildDialplan(
     push(2, 'Set', '__IVR_INV=0')
     push(3, 'Set', '__IVR_TMO=0')
     push(READ, 'Read', `IVR_DIGITS,${cfg.soundPath},${cfg.maxDigits},,1,${cfg.digitTimeout}`)
-    push(TIMEOUT_CHECK, 'GotoIf', `$["\${READSTATUS}"="TIMEOUT"]?${TIMEOUT_INCR}`)
+    push(TIMEOUT_CHECK, 'GotoIf', `$["\${IVR_DIGITS}"=""]?${TIMEOUT_INCR}`)
     push(LEN_CHECK, 'GotoIf', `$[\${LEN(\${IVR_DIGITS})} > 1]?${MULTI_SET}`)
 
     options.forEach((opt, i) => {

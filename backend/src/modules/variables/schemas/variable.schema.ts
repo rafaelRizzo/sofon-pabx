@@ -3,6 +3,7 @@ import { timestamp, cuidParam, ok } from '../../../schemas/responses'
 import { routeDestinationSchema, routeDestinationResponseSchema } from '../../../schemas/route-destination.schema'
 import { usedBySchema } from '../../../schemas/flow-reference-label'
 import { isSafeDialplanValue } from '../../../schemas/dialplan-safety'
+import { variableNameSchema } from '../../../schemas/variable-name.schema'
 
 export const idParamSchema = z.object({ id: cuidParam })
 export const companyQuerySchema = z.object({ companyId: z.cuid2() })
@@ -10,7 +11,7 @@ export const companyQuerySchema = z.object({ companyId: z.cuid2() })
 export { isSafeDialplanValue }
 
 const assignmentSchema = z.object({
-    variable: z.string().min(1).max(80).regex(/^[A-Za-z_][A-Za-z0-9_]*$/, 'Only letters, digits and underscore, starting with a letter or underscore'),
+    variable: variableNameSchema,
     value: z.string().max(500).refine(isSafeDialplanValue, {
         message: 'Use only literal text or approved interpolations such as ${CALLERID(num)} and ${VARIABLE_NAME}',
     }),

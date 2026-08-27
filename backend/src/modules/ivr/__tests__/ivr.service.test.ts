@@ -242,6 +242,7 @@ describe('IvrService.createIvrMenu', () => {
     it('creates a collect-type menu with variableName and no options', async () => {
         db.company.findUnique.mockResolvedValue(COMPANY)
         db.ivrMenu.findUnique.mockResolvedValue(null)
+        db.variable.findUnique.mockResolvedValue({ id: 'v1' })
         db.ivrMenu.create.mockResolvedValue({ id: 'ivr1' })
         db.ivrMenu.findUniqueOrThrow.mockResolvedValue({ ...MENU, type: 'collect', variableName: 'CPF_CLIENTE', maxDigits: 11 })
         const menu = await IvrService.createIvrMenu({
@@ -250,6 +251,16 @@ describe('IvrService.createIvrMenu', () => {
         }) as any
         expect(menu.type).toBe('collect')
         expect(menu.variableName).toBe('CPF_CLIENTE')
+    })
+
+    it('throws 404 when variableName is not declared in the catalog', async () => {
+        db.company.findUnique.mockResolvedValue(COMPANY)
+        db.ivrMenu.findUnique.mockResolvedValue(null)
+        db.variable.findUnique.mockResolvedValue(null)
+        await expect(IvrService.createIvrMenu({
+            name: 'coleta-cpf', companyId: 'c1', type: 'collect', variableName: 'CPF_CLIENTE',
+            maxDigits: 11, digitTimeout: 10, invalidRetries: 2, timeoutRetries: 2, options: [],
+        })).rejects.toMatchObject({ statusCode: 404 })
     })
 })
 
@@ -352,6 +363,7 @@ describe('IvrService.updateIvrMenu', () => {
     it('keeps only the collect port when switching from menu to collect', async () => {
         const withOptions = { ...MENU, options: [{ id: 'old-option', digit: '1' }], _count: { options: 1 } }
         db.ivrMenu.findUnique.mockResolvedValueOnce(withOptions)
+        db.variable.findUnique.mockResolvedValue({ id: 'v1' })
         db.ivrMenu.update.mockResolvedValue({ ...MENU, type: 'collect', variableName: 'CPF_CLIENTE', maxDigits: 11 })
         db.ivrMenu.findUniqueOrThrow.mockResolvedValue({ ...MENU, type: 'collect', variableName: 'CPF_CLIENTE', maxDigits: 11, options: [] })
         db.flowEdge.findMany.mockResolvedValue([])
@@ -398,6 +410,7 @@ describe('IvrService.updateIvrMenu', () => {
 
     it('switches an existing menu to type=collect with variableName and empty options', async () => {
         db.ivrMenu.findUnique.mockResolvedValueOnce(MENU)
+        db.variable.findUnique.mockResolvedValue({ id: 'v1' })
         db.ivrMenu.update.mockResolvedValue({ ...MENU, type: 'collect', variableName: 'CPF_CLIENTE', maxDigits: 11 })
         db.ivrMenu.findUniqueOrThrow.mockResolvedValue({ ...MENU, type: 'collect', variableName: 'CPF_CLIENTE', maxDigits: 11 })
         db.flowEdge.findMany.mockResolvedValue([])
@@ -406,6 +419,14 @@ describe('IvrService.updateIvrMenu', () => {
         }) as any
         expect(menu.type).toBe('collect')
         expect(menu.variableName).toBe('CPF_CLIENTE')
+    })
+
+    it('throws 404 when switching to type=collect with a variableName not declared in the catalog', async () => {
+        db.ivrMenu.findUnique.mockResolvedValueOnce(MENU)
+        db.variable.findUnique.mockResolvedValue(null)
+        await expect(IvrService.updateIvrMenu('ivr1', {
+            type: 'collect', variableName: 'CPF_CLIENTE', maxDigits: 11, options: [],
+        })).rejects.toMatchObject({ statusCode: 404 })
     })
 })
 

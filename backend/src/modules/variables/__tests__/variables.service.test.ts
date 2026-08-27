@@ -36,6 +36,7 @@ describe('VariablesService.createVariableSet', () => {
     it('creates a variable set and regenerates dialplan', async () => {
         db.company.findUnique.mockResolvedValue(COMPANY)
         db.variableSet.findUnique.mockResolvedValueOnce(null) // dup check
+        db.variable.findUnique.mockResolvedValue({ id: 'catalog1' })
         db.variableSet.create.mockResolvedValue(VARSET)
         const created = await VariablesService.createVariableSet({
             name: 'Seta CRM', companyId: 'c1', assignments: [{ variable: 'CRM_ID', value: '123' }],
@@ -47,6 +48,7 @@ describe('VariablesService.createVariableSet', () => {
     it('validates destination against the same company', async () => {
         db.company.findUnique.mockResolvedValue(COMPANY)
         db.variableSet.findUnique.mockResolvedValueOnce(null)
+        db.variable.findUnique.mockResolvedValue({ id: 'catalog1' })
         db.extension.findUnique.mockResolvedValue(null)
         await expect(VariablesService.createVariableSet({
             name: 'x', companyId: 'c1', assignments: [{ variable: 'X', value: '1' }],
@@ -66,6 +68,15 @@ describe('VariablesService.createVariableSet', () => {
         db.company.findUnique.mockResolvedValue(null)
         await expect(VariablesService.createVariableSet({
             name: 'x', companyId: 'clxxxxxxxxxxxxxxxxxxxxxxxxx', assignments: [{ variable: 'X', value: '1' }],
+        })).rejects.toMatchObject({ statusCode: 404 })
+    })
+
+    it('throws 404 when an assignment references a variable not declared in the catalog', async () => {
+        db.company.findUnique.mockResolvedValue(COMPANY)
+        db.variableSet.findUnique.mockResolvedValueOnce(null)
+        db.variable.findUnique.mockResolvedValue(null)
+        await expect(VariablesService.createVariableSet({
+            name: 'x', companyId: 'c1', assignments: [{ variable: 'X', value: '1' }],
         })).rejects.toMatchObject({ statusCode: 404 })
     })
 })
@@ -90,6 +101,7 @@ describe('VariablesService.getVariableSetById', () => {
 describe('VariablesService.updateVariableSet', () => {
     it('replaces assignments and regenerates dialplan', async () => {
         db.variableSet.findUnique.mockResolvedValueOnce(VARSET) // existing
+        db.variable.findUnique.mockResolvedValue({ id: 'catalog1' })
         db.flowEdge.findMany.mockResolvedValue([])
         db.variableSet.update.mockResolvedValue({ ...VARSET, assignments: [{ variable: 'X', value: '2' }] })
         const updated = await VariablesService.updateVariableSet('v1', { assignments: [{ variable: 'X', value: '2' }] }) as any
@@ -100,6 +112,13 @@ describe('VariablesService.updateVariableSet', () => {
     it('throws 404 with non-existent id', async () => {
         db.variableSet.findUnique.mockResolvedValue(null)
         await expect(VariablesService.updateVariableSet('clxxxxxxxxxxxxxxxxxxxxxxxxx', { name: 'x' }))
+            .rejects.toMatchObject({ statusCode: 404 })
+    })
+
+    it('throws 404 when a new assignment references a variable not declared in the catalog', async () => {
+        db.variableSet.findUnique.mockResolvedValueOnce(VARSET)
+        db.variable.findUnique.mockResolvedValue(null)
+        await expect(VariablesService.updateVariableSet('v1', { assignments: [{ variable: 'X', value: '2' }] }))
             .rejects.toMatchObject({ statusCode: 404 })
     })
 })
