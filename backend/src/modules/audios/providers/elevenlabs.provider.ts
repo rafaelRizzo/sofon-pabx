@@ -59,12 +59,22 @@ export async function listVoices(apiKey: string): Promise<ElevenLabsVoice[]> {
     }, 'elevenlabs.voices.error')
 }
 
+// Ajuste moderado a partir do default da ElevenLabs (0.5/0.75), válido pra qualquer tamanho de
+// texto (saudação curta, menu de URA, anúncio longo): stability um pouco mais alta reduz a
+// variação errática de entonação — mais perceptível em frases curtas (poucas sílabas = pouco
+// contexto pro modelo), mas sem travar a prosódia de textos longos (stability extrema, tipo
+// 0.85+, é que soaria monótona ali). similarity_boost mais alto mantém o timbre fiel à voz
+// original em qualquer duração. style em 0 (exagero emocional só soma risco de distorção, sem
+// ganho pro caso de uso) e use_speaker_boost ligado (latência não importa, geração é única/
+// assíncrona, não streaming ao vivo).
+const VOICE_SETTINGS = { stability: 0.65, similarity_boost: 0.85, style: 0, use_speaker_boost: true }
+
 export async function textToSpeech(apiKey: string, voiceId: string, text: string): Promise<Buffer> {
     return withTimeout(async (signal) => {
         const res = await fetch(`${env.ELEVENLABS_API_URL}/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`, {
             method: 'POST',
             headers: { 'xi-api-key': apiKey, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text, model_id: env.ELEVENLABS_MODEL_ID }),
+            body: JSON.stringify({ text, model_id: env.ELEVENLABS_MODEL_ID, voice_settings: VOICE_SETTINGS }),
             signal,
         })
         if (!res.ok) {
