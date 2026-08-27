@@ -49,7 +49,10 @@ import {
 } from "@/components/ui/select"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { EntityFormDialogSkeletonContent } from "@/components/entity-form-dialog-skeleton"
+import { VariableRefPickerButton } from "@/components/VariableConditions/variable-ref-picker-button"
 import { type Company } from "@/hooks/use-companies"
+import { useVariableCatalog } from "@/hooks/use-variable-catalog"
+import { cn } from "@/lib/utils"
 import {
     createVariableConditionFormSchema,
     ruleNeedsValue,
@@ -60,6 +63,22 @@ import {
     type VariableConditionForm,
     type VariableRuleOperator,
 } from "@/hooks/use-variable-conditions"
+
+// Nome de identificador simples que não bate com nenhum builtin conhecido nem está no catálogo -
+// pode ser uma variável definida fora do fluxo (API, script externo), então o aviso é só
+// informativo (não bloqueia o submit, que já é validado por ruleFieldSchema)
+const KNOWN_PLAIN_IDENTIFIERS = new Set(["EXTEN", "UNIQUEID"])
+function unknownVariableWarning(
+    rawValue: string,
+    catalogNames: Set<string>
+): string | null {
+    const value = rawValue.trim()
+    if (!value || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(value)) return null
+    if (KNOWN_PLAIN_IDENTIFIERS.has(value) || catalogNames.has(value)) {
+        return null
+    }
+    return "Não está no catálogo nem é uma variável nativa conhecida - confira o nome."
+}
 
 const OPERATOR_ITEMS = VARIABLE_RULE_OPERATORS.map((op) => ({
     value: op,
@@ -125,6 +144,8 @@ export function VariableConditionFormDialog({
     const combinator = watch("combinator")
     const rules = watch("rules")
     const selectedCompany = companies.find((c) => c.id === companyId) ?? null
+    const { variables: catalogVariables } = useVariableCatalog(companyId)
+    const catalogNames = new Set(catalogVariables.map((v) => v.name))
 
     useEffect(() => {
         if (!open) return
@@ -352,20 +373,45 @@ export function VariableConditionFormDialog({
                                                                     key={
                                                                         field.id
                                                                     }
-                                                                    className="grid grid-cols-[1fr_9rem_1fr_1.75rem] items-start gap-2"
+                                                                    className={cn(
+                                                                        "grid items-start gap-2",
+                                                                        needsValue
+                                                                            ? "grid-cols-[1fr_9rem_1fr_1.75rem]"
+                                                                            : "grid-cols-[1fr_1fr_1.75rem]"
+                                                                    )}
                                                                 >
                                                                     <div>
-                                                                        <Input
-                                                                            placeholder="CALLERID(num)"
-                                                                            {...register(
-                                                                                `rules.${index}.variable`
-                                                                            )}
-                                                                        />
+                                                                        <div className="flex gap-1">
+                                                                            <Input
+                                                                                placeholder="CALLERID(num)"
+                                                                                className="flex-1"
+                                                                                {...register(
+                                                                                    `rules.${index}.variable`
+                                                                                )}
+                                                                            />
+                                                                            <VariableRefPickerButton
+                                                                                companyId={
+                                                                                    companyId
+                                                                                }
+                                                                                onSelect={(
+                                                                                    name
+                                                                                ) =>
+                                                                                    setValue(
+                                                                                        `rules.${index}.variable`,
+                                                                                        name,
+                                                                                        {
+                                                                                            shouldDirty: true,
+                                                                                            shouldValidate: true,
+                                                                                        }
+                                                                                    )
+                                                                                }
+                                                                            />
+                                                                        </div>
                                                                         {errors
                                                                             .rules?.[
                                                                             index
                                                                         ]
-                                                                            ?.variable && (
+                                                                            ?.variable ? (
                                                                             <FieldError>
                                                                                 {
                                                                                     errors
@@ -376,6 +422,25 @@ export function VariableConditionFormDialog({
                                                                                         ?.message
                                                                                 }
                                                                             </FieldError>
+                                                                        ) : (
+                                                                            (() => {
+                                                                                const warning =
+                                                                                    unknownVariableWarning(
+                                                                                        rules?.[
+                                                                                            index
+                                                                                        ]
+                                                                                            ?.variable ??
+                                                                                            "",
+                                                                                        catalogNames
+                                                                                    )
+                                                                                return warning ? (
+                                                                                    <FieldDescription className="text-amber-600 dark:text-amber-400">
+                                                                                        {
+                                                                                            warning
+                                                                                        }
+                                                                                    </FieldDescription>
+                                                                                ) : null
+                                                                            })()
                                                                         )}
                                                                     </div>
                                                                     <div>
@@ -426,37 +491,32 @@ export function VariableConditionFormDialog({
                                                                             </SelectContent>
                                                                         </Select>
                                                                     </div>
-                                                                    <div>
-                                                                        <Input
-                                                                            placeholder={
-                                                                                needsValue
-                                                                                    ? "11"
-                                                                                    : "-"
-                                                                            }
-                                                                            disabled={
-                                                                                !needsValue
-                                                                            }
-                                                                            {...register(
-                                                                                `rules.${index}.value`
+                                                                    {needsValue && (
+                                                                        <div>
+                                                                            <Input
+                                                                                placeholder="11"
+                                                                                {...register(
+                                                                                    `rules.${index}.value`
+                                                                                )}
+                                                                            />
+                                                                            {errors
+                                                                                .rules?.[
+                                                                                index
+                                                                            ]
+                                                                                ?.value && (
+                                                                                <FieldError>
+                                                                                    {
+                                                                                        errors
+                                                                                            .rules[
+                                                                                            index
+                                                                                        ]
+                                                                                            ?.value
+                                                                                            ?.message
+                                                                                    }
+                                                                                </FieldError>
                                                                             )}
-                                                                        />
-                                                                        {errors
-                                                                            .rules?.[
-                                                                            index
-                                                                        ]
-                                                                            ?.value && (
-                                                                            <FieldError>
-                                                                                {
-                                                                                    errors
-                                                                                        .rules[
-                                                                                        index
-                                                                                    ]
-                                                                                        ?.value
-                                                                                        ?.message
-                                                                                }
-                                                                            </FieldError>
-                                                                        )}
-                                                                    </div>
+                                                                        </div>
+                                                                    )}
                                                                     <Button
                                                                         type="button"
                                                                         variant="outline"
