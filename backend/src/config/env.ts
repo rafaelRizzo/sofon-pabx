@@ -71,7 +71,7 @@ const envSchema = z.object({
     // TTS via ElevenLabs (src/modules/audios/providers/elevenlabs.provider.ts) — a API key é por
     // empresa (Company.elevenLabsApiKey), não global; aqui só a config não-secreta compartilhada
     ELEVENLABS_API_URL: z.string().default('https://api.elevenlabs.io'),
-    ELEVENLABS_MODEL_ID: z.string().default('eleven_multilingual_v2'),
+    ELEVENLABS_MODEL_ID: z.string().default('eleven_v3'),
     ELEVENLABS_TIMEOUT_MS: z.coerce.number().int().min(1000).max(60000).default(30000),
     // Master key pra derivar (HKDF, por companyId) a chave AES-256-GCM de segredos de terceiro
     // cifrados em repouso — ver src/lib/crypto.ts. Hoje só usada por IxcCredential.token.
