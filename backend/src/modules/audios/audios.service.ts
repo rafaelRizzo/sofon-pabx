@@ -90,14 +90,14 @@ export const createAudio = async (companyId: string, name: string, audio: Buffer
     return created
 }
 
-export const createAudioFromText = async (companyId: string, name: string, text: string, voiceId: string) => {
+export const createAudioFromText = async (companyId: string, name: string, text: string, voiceId: string, language: 'pt' | 'en') => {
     const company = await getCompanyById(companyId)
     if (!company.elevenLabsApiKey) throw new AppError('ElevenLabs is not configured for this company', 400)
 
     const existing = await prisma.audio.findUnique({ where: { name_companyId: { name, companyId } } })
     if (existing) throw new AppError('Audio already exists for this company', 409)
 
-    const buffer = await ElevenLabsProvider.textToSpeech(company.elevenLabsApiKey.trim(), voiceId, text)
+    const buffer = await ElevenLabsProvider.textToSpeech(company.elevenLabsApiKey.trim(), voiceId, text, language)
 
     const created = await prisma.audio.create({
         data: { name, companyId, source: 'TTS', ttsText: text, ttsVoiceId: voiceId },
@@ -124,7 +124,8 @@ export const previewVoiceAudio = async (companyId: string, voiceId: string, lang
     const buffer = await ElevenLabsProvider.textToSpeech(
         company.elevenLabsApiKey.trim(),
         voiceId,
-        VOICE_PREVIEW_TEXT[language]
+        VOICE_PREVIEW_TEXT[language],
+        language
     )
     await AudiosCache.setVoicePreview(companyId, voiceId, language, buffer.toString('base64'))
     return buffer

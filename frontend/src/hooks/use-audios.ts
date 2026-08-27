@@ -109,7 +109,8 @@ export function useAudios(companyId?: string) {
         name: string,
         targetCompanyId: string,
         text: string,
-        voiceId: string
+        voiceId: string,
+        language: "pt" | "en"
     ) => {
         const id = toast.loading("Gerando áudio...")
         try {
@@ -118,6 +119,7 @@ export function useAudios(companyId?: string) {
                 companyId: targetCompanyId,
                 text,
                 voiceId,
+                language,
             })
             toast.success("Áudio gerado", { id })
             await invalidate()

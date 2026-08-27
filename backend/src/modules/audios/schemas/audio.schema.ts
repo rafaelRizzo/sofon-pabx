@@ -22,6 +22,7 @@ export const createAudioTtsSchema = z.object({
     companyId: z.cuid2(),
     text: z.string().min(1).max(2500),
     voiceId: z.string().min(1),
+    language: z.enum(['pt', 'en']).default('pt'),
 })
 
 export const voicePreviewQuerySchema = z.object({

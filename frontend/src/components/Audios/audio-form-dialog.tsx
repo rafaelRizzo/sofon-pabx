@@ -116,7 +116,7 @@ const audioFormSchema = z
 
 type AudioFormValues = z.infer<typeof audioFormSchema>
 
-type TtsPayload = { text: string; voiceId: string }
+type TtsPayload = { text: string; voiceId: string; language: "pt" | "en" }
 
 type Props = {
     open: boolean
@@ -303,7 +303,13 @@ export function AudioFormDialog({
         const upload = !isEdit && form.mode === "upload" ? file : null
         const tts =
             !isEdit && form.mode === "tts"
-                ? { text: form.text, voiceId: form.voiceId }
+                ? {
+                      text: form.text,
+                      voiceId: form.voiceId,
+                      language: (languageFilter === ALL_LANGUAGES
+                          ? "pt"
+                          : languageFilter) as "pt" | "en",
+                  }
                 : null
         const ok = await onSave(form, upload, tts)
         if (ok) onOpenChange(false)

@@ -69,12 +69,18 @@ export async function listVoices(apiKey: string): Promise<ElevenLabsVoice[]> {
 // assíncrona, não streaming ao vivo).
 const VOICE_SETTINGS = { stability: 0.65, similarity_boost: 0.85, style: 0, use_speaker_boost: true }
 
-export async function textToSpeech(apiKey: string, voiceId: string, text: string): Promise<Buffer> {
+export async function textToSpeech(apiKey: string, voiceId: string, text: string, language: 'pt' | 'en'): Promise<Buffer> {
     return withTimeout(async (signal) => {
+        // language_code (ISO 639-1) força o idioma em vez de depender de auto-detecção — evita
+        // ambiguidade em textos curtos, mas não distingue variante (pt-BR vs pt-PT, sem suporte
+        // na API). Não suportado em multilingual_v2, só nos modelos mais novos (v3, turbo/flash).
+        const requestBody: Record<string, unknown> = { text, model_id: env.ELEVENLABS_MODEL_ID, voice_settings: VOICE_SETTINGS }
+        if (env.ELEVENLABS_MODEL_ID !== 'eleven_multilingual_v2') requestBody.language_code = language
+
         const res = await fetch(`${env.ELEVENLABS_API_URL}/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`, {
             method: 'POST',
             headers: { 'xi-api-key': apiKey, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text, model_id: env.ELEVENLABS_MODEL_ID, voice_settings: VOICE_SETTINGS }),
+            body: JSON.stringify(requestBody),
             signal,
         })
         if (!res.ok) {
