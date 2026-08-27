@@ -14,10 +14,13 @@ import { finalizeByQueueStatus } from '../../modules/queue-calls/queue-calls.ser
 import type { VariableMapping } from '../../modules/request-templates/schemas/request-template.schema'
 import { decryptForCompany } from '../../lib/crypto'
 import { runIxcAction, type IxcAction } from '../../integrations/ixc/client'
+import { evaluateRule, evaluateRules, type VariableRule, type Combinator } from '../destinations/variablecondition.repository'
 
 // Servidor FastAGI - Asterisk conecta via AGI(agi://AGI_HOST:AGI_PORT/<script>,<args>) em 5 pontos:
 // - /run,<requestTemplateId> - RouteDestination type: "request"
 // - /ixc,<ixcNodeId>         - RouteDestination type: "ixc"
+// - /varcond,<variableConditionId> - RouteDestination type: "variable-condition" (regras avaliadas
+//   em JS puro, ver evaluateRule - motivo em variablecondition.repository.ts)
 // - /queue-route,<queueId>   - antes do Queue() nativo, seta QUEUE_PRIO a partir de RoutingRule
 // - /queue-outcome,<queueId> - depois do Queue(), lê QUEUESTATUS pra finalizar queue_calls
 //   (timeout/sem agente/fila cheia - únicos casos sem evento AMI terminal, ver ami-events.ts)
@@ -289,6 +292,37 @@ async function handleIxcNode(conn: AgiConn, nodeId: string) {
     if (target) await agiExecGoto(conn, target)
 }
 
+// Lê o valor REAL de cada rule.variable via AGI GET VARIABLE (resolve função de canal tipo
+// CALLERID(num) nativamente, sem precisar montar nenhuma expressão) e avalia em JS puro - ver
+// motivo da migração (era $[...] interpolado, quebrava com valor de tamanho errado ou com aspas)
+// no comentário de topo de variablecondition.repository.ts. Sequencial de propósito: comandos AGI
+// não podem ser concorrentes no mesmo socket.
+async function handleVariableCondition(conn: AgiConn, conditionId: string) {
+    const condition = await prisma.variableCondition.findUnique({ where: { id: conditionId } })
+    if (!condition) {
+        logger.warn({ event: 'agi.variable_condition.not_found', conditionId })
+        return
+    }
+
+    const rules = condition.rules as VariableRule[]
+    const results: boolean[] = []
+    for (const rule of rules) {
+        const value = (await agiGetVariable(conn, rule.variable)) ?? ''
+        results.push(evaluateRule(value, rule))
+    }
+    const matched = evaluateRules(condition.combinator as Combinator, results)
+
+    logger.info({ event: 'agi.variable_condition.done', conditionId, matched })
+    const nodeId = await agiGetVariable(conn, FLOW_NODE_ID_VAR)
+    if (nodeId) {
+        await agiExecGoto(conn, { context: FLOW_NODE_CONTEXT, exten: flowNodeExitExten(nodeId, matched ? 'true' : 'false'), priority: 1 })
+        return
+    }
+    const dest = await FlowEdgeRepository.getOne('variablecondition', conditionId, matched ? 'true' : 'false')
+    const target = await resolveRouteDestinationToDialplan(dest)
+    if (target) await agiExecGoto(conn, target)
+}
+
 // Seta QUEUE_PRIO (lido nativamente pelo Queue() nativo pra furar a fila) a partir da RoutingRule
 // ativa de maior priority cujas conditions batem (trunk/callerId/weekday/horário) - ver
 // RoutingRulesService.resolveActiveRule. Sem regra ativa/nenhuma bate, não seta nada (comportamento
@@ -468,5 +502,6 @@ async function handleConnection(conn: AgiConn) {
     else if (script === 'queue-survey') await handleQueueSurvey(conn, arg1)
     else if (script === 'survey-result') await handleSurveyResult(conn, arg1, env['agi_arg_2'] ?? '')
     else if (script === 'ixc') await handleIxcNode(conn, arg1)
+    else if (script === 'varcond') await handleVariableCondition(conn, arg1)
     else await handleRequestTemplate(conn, arg1)
 }

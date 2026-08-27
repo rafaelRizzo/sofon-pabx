@@ -1,12 +1,12 @@
 import { prisma } from '../../lib/prisma'
-import type { RouteDestination } from '../../schemas/route-destination.schema'
+import { validateEnv } from '../../config/env'
 import { VARCOND_CONTEXT, varCondEntry } from '../dialplan/dialplan-names'
 import { resolveAsteriskId, withDialplanLock, writeContextFile, reloadDialplan, type DialplanRow } from '../dialplan/dialplan-file.repository'
-import { resolveRouteDestinationToDialplan } from '../dialplan/route-destination-resolver'
-import { FlowEdgeRepository } from '../flows/flow-edge.repository'
-import { nodeExitCheck } from '../flows/flow-node-runtime'
 
 export { VARCOND_CONTEXT, varCondEntry }
+
+const env = validateEnv()
+const buildAgiUrl = (id: string) => `agi://${env.AGI_HOST}:${env.AGI_PORT}/varcond,${id}`
 
 export type VariableRuleOperator =
     | 'filled' | 'empty'
@@ -18,30 +18,28 @@ export type VariableRuleOperator =
 export type VariableRule = { variable: string; operator: VariableRuleOperator; value?: string }
 export type Combinator = 'and' | 'or'
 
-const varMatched = (entry: string) => `${entry}-matched`
-
-// escapa metacaracteres de regex POSIX ERE (usado pelo Asterisk REGEX()) - só usado internamente
-// pra transformar um "contains" (substring literal) num pattern seguro, nunca em texto vindo direto
-// do usuário sem passar por aqui (schema já proíbe aspas/backslash em `value`, ver variable-condition.schema.ts)
-function escapeRegex(value: string): string {
-    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-}
-
-// Validação de dígito verificador (checksum) de CPF/CNPJ como aritmética Asterisk pura, sem
-// AGI/código externo, pra não sair do padrão "buildExpr é função pura sem I/O" deste arquivo.
-// Cada dígito é extraído via ${VAR:offset:1} (resolvido pelo dialplan ANTES de chegar no
-// avaliador de expressão $[...], então "fatiar + multiplicar" funciona direto como texto).
-// Truque "resto<2?0:11-resto" sem condicional: ((soma*10)%11)%10, equivalente pros 11 valores
-// possíveis de resto (0..10), ver prova em CLAUDE.md/histórico do PR.
-// Limitação conhecida: só valida CNPJ numérico tradicional. O formato alfanumérico (IN RFB
-// 2.229/2024) exigiria conversão char→código ASCII, que o ast_expr2 não tem. Não bloqueante pro
-// caso de uso principal (dígitos vindos de IVR/DTMF são sempre numéricos).
+// Checksum de CPF/CNPJ como aritmética JS pura, avaliada no AGI server com o valor REAL da
+// variável em mãos - substitui a versão anterior que montava a conta como texto interpolado num
+// $[...] do Asterisk (ver histórico do arquivo). Essa versão anterior tinha dois problemas:
+// 1) offsets fixos (${VAR:baseLen:1}) em valor mais curto que o esperado viravam slice vazio,
+//    gerando "$[( = (...))]" - erro de sintaxe no ast_expr2 (não "falso", erro de parse mesmo),
+//    logado toda vez que alguém digitava um CPF/CNPJ de tamanho errado - o caso mais comum de uso.
+// 2) qualquer operador que interpola o VALOR EM TEMPO REAL da variável (eq/contains/regex/filled,
+//    não só cpf/cnpj) fica vulnerável a esse valor conter aspas/parênteses e quebrar o parser -
+//    dado vindo de CNAM/CALLERID(name) é controlado por quem liga, não por quem configura o fluxo.
+// Avaliar em JS elimina as duas classes de bug de uma vez: sem parser de expressão nenhum pra
+// escapar, só comparação de string/número normal.
 type ChecksumSpec = {
     length: number       // 11 (CPF) ou 14 (CNPJ)
-    baseLen: number      // dígitos antes dos verificadores: 9 (CPF) ou 12 (CNPJ)
-    weights1: number[]   // pesos do 1º dígito verificador, length = baseLen
-    weights2: number[]   // pesos do 2º dígito verificador, length = baseLen + 1 (último = peso do dv1)
+    baseLen: number       // caracteres antes dos 2 dígitos verificadores: 9 (CPF) ou 12 (CNPJ)
+    weights1: number[]    // pesos do 1º dígito verificador, length = baseLen
+    weights2: number[]    // pesos do 2º dígito verificador, length = baseLen + 1 (último = peso do dv1)
     excludeRepeated: boolean // exclui 000...0..999...9: matematicamente válidos, mas fake conhecido (só CPF)
+    // CNPJ alfanumérico (IN RFB 2.229/2024): a raiz (12 primeiros caracteres) pode ter A-Z além de
+    // 0-9, valor de cada posição = code(char) - 48 (mesma fórmula pros dígitos: '0'-48=0..'9'-48=9,
+    // 'A'-48=17..'Z'-48=42). Os 2 dígitos verificadores continuam sempre numéricos. CPF nunca ganhou
+    // esse formato (é identificador de pessoa física, não de empresa) - fica 100% numérico.
+    alphanumericBase: boolean
 }
 
 const CPF_SPEC: ChecksumSpec = {
@@ -49,6 +47,7 @@ const CPF_SPEC: ChecksumSpec = {
     weights1: [10, 9, 8, 7, 6, 5, 4, 3, 2],
     weights2: [11, 10, 9, 8, 7, 6, 5, 4, 3, 2],
     excludeRepeated: true,
+    alphanumericBase: false,
 }
 
 const CNPJ_SPEC: ChecksumSpec = {
@@ -56,145 +55,89 @@ const CNPJ_SPEC: ChecksumSpec = {
     weights1: [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2],
     weights2: [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2],
     excludeRepeated: false,
+    alphanumericBase: true,
 }
 
-const slice = (variable: string, offset: number) => `\${${variable}:${offset}:1}`
+const checkDigit = (sum: number) => ((sum * 10) % 11) % 10
 
-// Soma ponderada sempre entre parênteses, obrigatório: no ast_expr2, */% têm precedência sobre
-// +, então uma soma sem parênteses quebra o cálculo do módulo em checkDigit().
-function weightedSum(variable: string, weights: number[], extraTerm?: string): string {
-    const terms = weights.map((w, i) => `(${slice(variable, i)}*${w})`)
-    if (extraTerm) terms.push(extraTerm)
-    return `(${terms.join('+')})`
+function computeCheckDigits(baseDigits: number[], spec: ChecksumSpec): [number, number] {
+    const sum1 = spec.weights1.reduce((acc, w, i) => acc + baseDigits[i]! * w, 0)
+    const dv1 = checkDigit(sum1)
+    const extended = [...baseDigits, dv1]
+    const sum2 = spec.weights2.reduce((acc, w, i) => acc + extended[i]! * w, 0)
+    return [dv1, checkDigit(sum2)]
 }
 
-const checkDigit = (sumExpr: string) => `(((${sumExpr}*10)%11)%10)`
+// função pura, testável isoladamente (ver __tests__/variablecondition-repository.service.test.ts)
+export function validChecksum(value: string, spec: ChecksumSpec): boolean {
+    if (value.length !== spec.length) return false
 
-function checksumExpr(variable: string, spec: ChecksumSpec): string {
-    const dv1 = checkDigit(weightedSum(variable, spec.weights1))
-    const dv2Weight = spec.weights2[spec.baseLen]
-    const dv2 = checkDigit(weightedSum(variable, spec.weights2.slice(0, spec.baseLen), `(${dv1}*${dv2Weight})`))
+    const base = value.slice(0, spec.baseLen)
+    const checkPart = value.slice(spec.baseLen)
+    const bodyPattern = spec.alphanumericBase ? /^[0-9A-Z]+$/ : /^[0-9]+$/
+    if (!bodyPattern.test(base) || !/^\d{2}$/.test(checkPart)) return false
+    if (spec.excludeRepeated && new Set(value).size === 1) return false
 
-    const clauses = [
-        `(\${LEN(\${${variable}})} = ${spec.length})`,
-        `(\${REGEX("^[0-9]{${spec.length}}$",\${${variable}})} = 1)`,
-        ...(spec.excludeRepeated
-            ? Array.from({ length: 10 }, (_, d) => `("\${${variable}}" != "${String(d).repeat(spec.length)}")`)
-            : []),
-        `(${slice(variable, spec.baseLen)} = ${dv1})`,
-        `(${slice(variable, spec.baseLen + 1)} = ${dv2})`,
-    ]
-    return clauses.join(' & ')
+    const baseDigits = [...base].map((c) => c.charCodeAt(0) - 48)
+    const [dv1, dv2] = computeCheckDigits(baseDigits, spec)
+    return checkPart === `${dv1}${dv2}`
 }
 
-// mesmo contrato de resolveRoute() em timecondition.repository.ts - "context,exten,priority" ou null
-async function resolveRoute(route: RouteDestination): Promise<string | null> {
-    const target = await resolveRouteDestinationToDialplan(route)
-    return target ? `${target.context},${target.exten},${target.priority}` : null
-}
-
-// Monta a expressão booleana Asterisk ($[...]) equivalente a uma regra - função pura, sem I/O,
-// testável isoladamente. `value` já vem validado pelo schema (sem aspas/backslash), então dá pra
-// interpolar direto nas strings entre aspas sem escaping em runtime.
-export function buildExpr(rule: VariableRule): string {
-    const v = `\${${rule.variable}}`
+// Avalia uma regra contra o valor REAL da variável (já resolvido pelo AGI via GET VARIABLE, que
+// entende função de canal tipo CALLERID(num) nativamente) - função pura, sem I/O, testável
+// isoladamente. `rule.value` já vem validado pelo schema (sem aspas/backslash, numérico quando o
+// operador exige), mas isso não importa mais aqui: não tem string sendo montada pra nenhum parser.
+export function evaluateRule(value: string, rule: VariableRule): boolean {
+    const ruleValue = rule.value ?? ''
     switch (rule.operator) {
-        case 'filled':     return `"${v}" != ""`
-        case 'empty':      return `"${v}" = ""`
-        case 'length_eq':  return `\${LEN(${v})} = ${rule.value}`
-        case 'length_neq': return `\${LEN(${v})} != ${rule.value}`
-        case 'length_gt':  return `\${LEN(${v})} > ${rule.value}`
-        case 'length_gte': return `\${LEN(${v})} >= ${rule.value}`
-        case 'length_lt':  return `\${LEN(${v})} < ${rule.value}`
-        case 'length_lte': return `\${LEN(${v})} <= ${rule.value}`
-        case 'eq':         return `"${v}" = "${rule.value}"`
-        case 'neq':        return `"${v}" != "${rule.value}"`
-        case 'gt':         return `${v} > ${rule.value}`
-        case 'gte':        return `${v} >= ${rule.value}`
-        case 'lt':         return `${v} < ${rule.value}`
-        case 'lte':        return `${v} <= ${rule.value}`
-        case 'contains':   return `\${REGEX("${escapeRegex(rule.value ?? '')}",${v})} = 1`
-        case 'regex':      return `\${REGEX("${rule.value}",${v})} = 1`
-        case 'cpf':        return checksumExpr(rule.variable, CPF_SPEC)
-        case 'cnpj':       return checksumExpr(rule.variable, CNPJ_SPEC)
+        case 'filled': return value !== ''
+        case 'empty': return value === ''
+        case 'length_eq': return value.length === Number(ruleValue)
+        case 'length_neq': return value.length !== Number(ruleValue)
+        case 'length_gt': return value.length > Number(ruleValue)
+        case 'length_gte': return value.length >= Number(ruleValue)
+        case 'length_lt': return value.length < Number(ruleValue)
+        case 'length_lte': return value.length <= Number(ruleValue)
+        case 'eq': return value === ruleValue
+        case 'neq': return value !== ruleValue
+        case 'contains': return value.includes(ruleValue)
+        case 'regex':
+            // padrão configurado por quem monta o fluxo (mesma confiança de antes, quando rodava via
+            // Asterisk REGEX()) - sintaxe JS/PCRE-like, não POSIX ERE puro como o Asterisk usava; pattern
+            // inválido não derruba a chamada, só não bate (mesmo espírito de "nunca lançar" do AGI server)
+            try {
+                return ruleValue ? new RegExp(ruleValue).test(value) : false
+            } catch {
+                return false
+            }
+        case 'gt': return Number(value) > Number(ruleValue)
+        case 'gte': return Number(value) >= Number(ruleValue)
+        case 'lt': return Number(value) < Number(ruleValue)
+        case 'lte': return Number(value) <= Number(ruleValue)
+        case 'cpf': return validChecksum(value, CPF_SPEC)
+        case 'cnpj': return validChecksum(value, CNPJ_SPEC)
     }
 }
 
-// GotoIf(condition?label1:label2) - destino omitido = continua na próxima priority do mesmo exten.
-// "or": qualquer regra batendo já pula pro "-matched" (mesmo truque de GotoIfTime em
-// timecondition.repository.ts); nenhuma bateu = cai no falseRoute.
-// "and": cada regra que falhar pula direto pro "-matched" (mesmo exten de destino do "or" - o nome
-// não indica true/false, é só o alvo de convergência do loop; ver NoOp logo antes de cada Goto/Hangup
-// pra saber qual branch foi de fato tomado sem precisar interpretar o appdata do GotoIf no log)
-export function buildDialplan(
-    id: string,
-    name: string,
-    combinator: Combinator,
-    rules: VariableRule[],
-    trueAsterisk: string | null,
-    falseAsterisk: string | null,
-): DialplanRow[] {
-    const context = VARCOND_CONTEXT
-    const entry = varCondEntry(id)
-    const matched = varMatched(entry)
-    const entries: DialplanRow[] = [{ context, exten: entry, priority: 1, app: 'NoOp', appdata: `VariableCondition: ${name}` }]
-
-    let priority = 2
-
-    if (combinator === 'or') {
-        for (const rule of rules) {
-            entries.push({ context, exten: entry, priority, app: 'GotoIf', appdata: `$[${buildExpr(rule)}]?${matched},1` })
-            priority++
-        }
-        entries.push({ context, exten: entry, priority, app: 'NoOp', appdata: 'VariableCondition: NOT MATCHED' })
-        entries.push({ context, exten: entry, priority: priority + 1, app: falseAsterisk ? 'Goto' : 'Hangup', appdata: falseAsterisk })
-        entries.push({ context, exten: matched, priority: 1, app: 'NoOp', appdata: 'VariableCondition: MATCHED' })
-        entries.push({ context, exten: matched, priority: 2, app: trueAsterisk ? 'Goto' : 'Hangup', appdata: trueAsterisk })
-    } else {
-        for (const rule of rules) {
-            entries.push({ context, exten: entry, priority, app: 'GotoIf', appdata: `$[${buildExpr(rule)}]?:${matched},1` })
-            priority++
-        }
-        entries.push({ context, exten: entry, priority, app: 'NoOp', appdata: 'VariableCondition: MATCHED' })
-        entries.push({ context, exten: entry, priority: priority + 1, app: trueAsterisk ? 'Goto' : 'Hangup', appdata: trueAsterisk })
-        entries.push({ context, exten: matched, priority: 1, app: 'NoOp', appdata: 'VariableCondition: NOT MATCHED' })
-        entries.push({ context, exten: matched, priority: 2, app: falseAsterisk ? 'Goto' : 'Hangup', appdata: falseAsterisk })
-    }
-
-    return entries
+export function evaluateRules(combinator: Combinator, results: boolean[]): boolean {
+    return combinator === 'or' ? results.some(Boolean) : results.every(Boolean)
 }
 
+// Dialplan de uma VariableCondition é sempre o mesmo par fixo (AGI + Hangup) - mesmo padrão de
+// RequestTemplateRepository/IxcNodeRepository. Quem varia (rules/combinator/rotas) é lido pelo AGI
+// server em tempo de chamada via o id no agiUrl (ver handleVariableCondition em agi-server.ts).
 export const VariableConditionRepository = {
-    // Reconstrói o arquivo de dialplan da empresa inteira pra esse contexto, a partir do estado
-    // atual em banco - chamado depois de qualquer create/update/delete de VariableCondition.
     async regenerate(companyId: string) {
         const asteriskId = await resolveAsteriskId(companyId)
         return withDialplanLock(`${VARCOND_CONTEXT}:${asteriskId}`, async () => {
-            const [conditions, edges] = await Promise.all([
-                prisma.variableCondition.findMany({ where: { companyId } }),
-                FlowEdgeRepository.getBySource(companyId, 'variablecondition'),
-            ])
-            const entries: DialplanRow[] = []
-            for (const c of conditions) {
-                const [trueAsterisk, falseAsterisk] = await Promise.all([
-                    resolveRoute(edges.get(c.id)?.true ?? null),
-                    resolveRoute(edges.get(c.id)?.false ?? null),
-                ])
-                const rows = buildDialplan(c.id, c.name, c.combinator as Combinator, c.rules as VariableRule[], trueAsterisk, falseAsterisk)
-                const entry = varCondEntry(c.id)
-                const matched = varMatched(entry)
-                const mainPort = c.combinator === 'or' ? 'false' : 'true'
-                const matchedPort = c.combinator === 'or' ? 'true' : 'false'
-                const withNodeExits: DialplanRow[] = []
-                for (const row of rows) {
-                    if ((row.exten === entry || row.exten === matched) && (row.app === 'Goto' || row.app === 'Hangup')) {
-                        const port = row.exten === entry ? mainPort : matchedPort
-                        withNodeExits.push(nodeExitCheck(VARCOND_CONTEXT, row.exten, row.priority, port))
-                        withNodeExits.push({ ...row, priority: row.priority + 1 })
-                    } else withNodeExits.push(row)
-                }
-                entries.push(...withNodeExits)
-            }
+            const conditions = await prisma.variableCondition.findMany({ where: { companyId }, select: { id: true } })
+            const entries: DialplanRow[] = conditions.flatMap(({ id }) => {
+                const exten = varCondEntry(id)
+                return [
+                    { context: VARCOND_CONTEXT, exten, priority: 1, app: 'AGI', appdata: buildAgiUrl(id) },
+                    { context: VARCOND_CONTEXT, exten, priority: 2, app: 'Hangup', appdata: null },
+                ]
+            })
             await writeContextFile(VARCOND_CONTEXT, asteriskId, entries)
             reloadDialplan()
         })
