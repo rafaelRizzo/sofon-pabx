@@ -29,8 +29,14 @@ const envSchema = z.object({
     REDIS_URL: z.string().default('redis://localhost:6379'),
     TZ: z.string().default('America/Sao_Paulo'),
     // FastAGI server (src/asterisk/agi-server.ts) - host/porta que o Asterisk usa pra conectar via
-    // AGI(agi://AGI_HOST:AGI_PORT/run,<requestTemplateId>) ao executar um RouteDestination type: "request"
+    // AGI(agi://AGI_HOST:AGI_PORT/run,<requestTemplateId>) ao executar um RouteDestination type: "request".
+    // AGI_HOST é o endereço que o ASTERISK disca (normalmente 127.0.0.1 do host, alcançado via porta
+    // publicada do container) - NÃO é necessariamente o endereço que o processo deve escutar por
+    // dentro: um container só enxerga "127.0.0.1" como o próprio loopback interno dele, não a
+    // interface de rede que recebe o tráfego encaminhado pelo docker-proxy. Por isso o bind usa
+    // AGI_LISTEN_HOST (0.0.0.0 por padrão, todas as interfaces), separado de AGI_HOST.
     AGI_HOST: z.string().default('127.0.0.1'),
+    AGI_LISTEN_HOST: z.string().default('0.0.0.0'),
     AGI_PORT: z.coerce.number().default(4573),
     // AMI (Asterisk Manager Interface, src/asterisk/ami-client.ts) - usado pra mandar comandos tipo
     // "dialplan reload" sem depender do binário CLI do Asterisk instalado no host/container do backend.

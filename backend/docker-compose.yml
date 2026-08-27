@@ -97,6 +97,16 @@ services:
     # autenticação própria) pra fora da VPS.
     ports:
       - "127.0.0.1:4573:4573"
+    # dokploy-network é overlay (Swarm) — publicar porta host (`ports:` acima) de um container
+    # avulso (não um service Swarm de verdade) numa rede overlay não é sustentado direito pelo
+    # Docker: o docker-proxy que atende 127.0.0.1:4573 falha em resolver o IP real do container
+    # nela, encaminhando pra um IP de rede bridge padrão que nem existe mais. sofon-agi-bridge é
+    # rede bridge normal dedicada só a isso — sofon-agi-bridge precisa existir antes do deploy
+    # (`docker network create --driver bridge sofon-agi-bridge`), dokploy-network continua sendo
+    # usada pra falar com postgres/redis (isso nunca teve esse problema).
+    networks:
+      dokploy-network: {}
+      sofon-agi-bridge: {}
 
   # API HTTP — stateless, escalável via replicas. Sem network_mode: host todas as réplicas
   # escutam a MESMA porta interna (3333); o Traefik do Dokploy descobre e faz load balancing
@@ -126,6 +136,8 @@ services:
 
 networks:
   dokploy-network:
+    external: true
+  sofon-agi-bridge:
     external: true
 
 volumes:

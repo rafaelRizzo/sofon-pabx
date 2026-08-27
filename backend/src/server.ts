@@ -36,7 +36,7 @@ async function start() {
 
             // AGI/AMI/jobs são singleton por natureza (porta fixa, listener de evento único, jobs
             // idempotentes mas redundantes se duplicados) - nunca rodam em réplica 'web'
-            startAgiServer(env.AGI_HOST, env.AGI_PORT)
+            startAgiServer(env.AGI_LISTEN_HOST, env.AGI_PORT)
             startAmiEvents()
             startHolidayResyncJob()
             startAgentAffinityRecalcJob()
