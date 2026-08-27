@@ -14,6 +14,29 @@ api.interceptors.request.use((config) => {
   return config
 })
 
+// lê o `exp` do próprio JWT em vez de duplicar o TTL do access token (JWT_EXPIRES_IN do backend)
+// aqui - evita um segundo ponto de drift além do já existente em schemas/hooks
+function decodeJwtExpSeconds(token: string): number | undefined {
+  try {
+    const payload = token.split(".")[1]
+    const { exp } = JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/")))
+    return typeof exp === "number" ? Math.max(0, exp - Math.floor(Date.now() / 1000)) : undefined
+  } catch {
+    return undefined
+  }
+}
+
+// cookie de sessão (sem maxAge) some ao fechar o navegador antes do refreshToken (7d) expirar -
+// o guard de rota (auth-cookie.ts) só olha esse cookie e desloga sem tentar refresh nesse caso
+export function setAccessTokenCookie(token: string) {
+  cookies.set("token", token, {
+    path: "/",
+    sameSite: "lax",
+    secure: import.meta.env.PROD,
+    maxAge: decodeJwtExpSeconds(token) ?? 15 * 60,
+  })
+}
+
 // refresh compartilhado: várias requests 401 simultâneas disparam um único /auth/refresh
 let refreshing: Promise<string> | null = null
 
@@ -21,11 +44,7 @@ export async function refreshToken(): Promise<string> {
   refreshing ??= api
     .post("/auth/refresh")
     .then(({ data }) => {
-      cookies.set("token", data.token, {
-        path: "/",
-        sameSite: "lax",
-        secure: import.meta.env.PROD,
-      })
+      setAccessTokenCookie(data.token)
       return data.token as string
     })
     .finally(() => {
@@ -35,17 +54,25 @@ export async function refreshToken(): Promise<string> {
   try {
     return await refreshing
   } catch (error) {
-    cookies.remove("token", { path: "/" })
-    if (typeof window !== "undefined") window.location.href = "/login"
+    // só força logout quando o backend rejeitou a sessão de fato (401) - erro de rede/5xx
+    // (ex: Redis fora do ar) é transiente e não pode derrubar o usuário
+    if (axios.isAxiosError(error) && error.response?.status === 401) {
+      cookies.remove("token", { path: "/" })
+      if (typeof window !== "undefined") window.location.href = "/login"
+    }
     throw error
   }
 }
+
+// rotas de auth que não devem tentar refresh automático em 401 (evita loop) - só as que rodam
+// sem sessão prévia; /auth/me e /auth/logout continuam elegíveis pro retry
+const NO_RETRY_ROUTES = ["/auth/login", "/auth/refresh", "/auth/register"]
 
 api.interceptors.response.use(
   (res) => res,
   async (error) => {
     const original = error.config
-    const isAuthRoute = original?.url?.includes("/auth/")
+    const isAuthRoute = NO_RETRY_ROUTES.some((route) => original?.url?.startsWith(route))
 
     if (
       error.response?.status === 401 &&
@@ -73,6 +100,7 @@ const KNOWN_MESSAGES: Record<string, string> = {
   Unauthorized: "Sessão expirada. Faça login novamente.",
   Forbidden: "Você não tem permissão para executar essa ação.",
   "Token revoked": "Sua sessão foi revogada. Faça login novamente.",
+  "Auth service unavailable": "Serviço de autenticação indisponível no momento. Tente novamente em instantes.",
   "Internal server error": "Erro interno do servidor. Tente novamente mais tarde.",
   "Validation error": "Dados inválidos. Verifique os campos e tente novamente.",
   "Not Found": "Recurso não encontrado.",

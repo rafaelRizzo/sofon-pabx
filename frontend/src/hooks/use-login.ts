@@ -2,9 +2,8 @@ import { useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import { useForm } from "react-hook-form"
 import { toast } from "sonner"
-import Cookies from "universal-cookie"
 
-import { api, apiError } from "@/lib/api"
+import { api, apiError, setAccessTokenCookie } from "@/lib/api"
 
 type LoginForm = {
   username: string
@@ -14,7 +13,6 @@ type LoginForm = {
 export function useLogin() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const cookies = new Cookies()
 
   const form = useForm<LoginForm>({
     defaultValues: { username: "", password: "" },
@@ -26,7 +24,7 @@ export function useLogin() {
       const { data: res } = await api.post("/auth/login", data)
       // limpa qualquer cache remanescente de uma sessão anterior na mesma aba antes de logar
       queryClient.clear()
-      cookies.set("token", res.token, { path: "/", sameSite: "lax", secure: import.meta.env.PROD })
+      setAccessTokenCookie(res.token)
       toast.success("Login realizado", { id })
       navigate({ to: "/dashboard" })
     } catch (err) {

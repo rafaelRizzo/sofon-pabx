@@ -21,7 +21,13 @@ export const authMiddleware = async (req: FastifyRequest, reply: FastifyReply) =
         }
 
         if (decoded.jti) {
-            const jtiExists = await jtiManager.exists(decoded.jti)
+            let jtiExists: boolean
+            try {
+                jtiExists = await jtiManager.exists(decoded.jti)
+            } catch {
+                // Redis fora do ar - não é o mesmo que "token revogado", não pode forçar logout
+                throw new AppError('Auth service unavailable', 503)
+            }
             if (!jtiExists) {
                 throw new AppError('Token revoked', 401)
             }
@@ -29,6 +35,7 @@ export const authMiddleware = async (req: FastifyRequest, reply: FastifyReply) =
 
         req.user = decoded
     } catch (error) {
+        if (error instanceof AppError) throw error
         throw new AppError('Unauthorized', 401)
     }
 }

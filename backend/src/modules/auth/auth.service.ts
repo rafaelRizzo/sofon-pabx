@@ -38,8 +38,18 @@ export const refreshAccessToken = async (refreshToken: string) => {
         const decoded = verifyRefreshToken(refreshToken)
 
         if (decoded.type !== 'refresh') throw new AppError('Invalid token type', 401)
-        // JTI precisa existir no Redis - revogado no logout/rotação, bloqueia replay de refresh antigo
-        if (!decoded.jti || !(await jtiManager.exists(decoded.jti))) {
+        if (!decoded.jti) throw new AppError('Token revoked', 401)
+
+        // consume atômico (GETDEL): garante que o mesmo refresh token nunca gera dois pares novos,
+        // mesmo sob duas requests concorrentes (ex: duas abas do mesmo navegador refrescando junto)
+        let consumed: string | null
+        try {
+            consumed = await jtiManager.consume(decoded.jti)
+        } catch {
+            // Redis fora do ar - não é o mesmo que "token revogado", não pode forçar logout
+            throw new AppError('Auth service unavailable', 503)
+        }
+        if (!consumed) {
             throw new AppError('Token revoked', 401)
         }
 
@@ -51,9 +61,6 @@ export const refreshAccessToken = async (refreshToken: string) => {
         if (!user || user.status !== 'active') {
             throw new AppError('User not found or inactive', 401)
         }
-
-        // rotação real: invalida o refresh atual antes de emitir o novo par
-        await jtiManager.revoke(decoded.jti)
 
         return generateTokens({ id: user.id, role: user.role })
     } catch (error) {

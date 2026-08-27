@@ -11,6 +11,7 @@ mock.module('../../../lib/jwt', () => ({
 mock.module('../../../lib/jti', () => ({
     jtiManager: {
         exists: mock(() => Promise.resolve(true)),
+        consume: mock(() => Promise.resolve('user-id')),
         revoke: mock(() => Promise.resolve()),
         add: mock(() => Promise.resolve()),
     },
@@ -90,5 +91,19 @@ describe('AuthService.refreshAccessToken', () => {
         db.user.findUnique.mockResolvedValue(null)
         await expect(AuthService.refreshAccessToken('valid-refresh-token'))
             .rejects.toMatchObject({ statusCode: 401 })
+    })
+
+    it('throws 401 when refresh token already consumed (rotated/revoked)', async () => {
+        const { jtiManager } = await import('../../../lib/jti')
+            ; (jtiManager.consume as any).mockResolvedValueOnce(null)
+        await expect(AuthService.refreshAccessToken('valid-refresh-token'))
+            .rejects.toMatchObject({ statusCode: 401 })
+    })
+
+    it('throws 503 when Redis is unavailable during consume', async () => {
+        const { jtiManager } = await import('../../../lib/jti')
+            ; (jtiManager.consume as any).mockRejectedValueOnce(new Error('redis down'))
+        await expect(AuthService.refreshAccessToken('valid-refresh-token'))
+            .rejects.toMatchObject({ statusCode: 503 })
     })
 })

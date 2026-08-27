@@ -32,7 +32,31 @@ export const jtiManager = {
                 jti,
                 error: err instanceof Error ? err.message : String(err),
             })
-            return false
+            // Redis indisponível != token revogado - propaga pra quem chama decidir (503, não 401),
+            // senão um blip de Redis desloga todo mundo simultaneamente
+            throw err
+        }
+    },
+
+    // GETDEL: lê e apaga numa única operação atômica no Redis - elimina a janela de corrida entre
+    // exists() e revoke() que permitia duas requests concorrentes (ex: 2 abas refrescando ao mesmo
+    // tempo com o mesmo refresh token) passarem no check antes de qualquer uma revogar
+    consume: async (jti: string): Promise<string | null> => {
+        try {
+            const userId = await redisClient.getDel(`${JTI_PREFIX}${jti}`)
+            logger.info({
+                event: userId ? 'jti.consumed' : 'jti.consume_miss',
+                jti,
+                userId: userId ?? undefined,
+            })
+            return userId
+        } catch (err) {
+            logger.error({
+                event: 'jti.consume_failed',
+                jti,
+                error: err instanceof Error ? err.message : String(err),
+            })
+            throw err
         }
     },
 
