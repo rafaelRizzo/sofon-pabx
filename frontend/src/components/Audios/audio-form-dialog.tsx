@@ -171,7 +171,9 @@ export function AudioFormDialog({
     const text = watch("text")
     const voiceId = watch("voiceId")
 
-    const { voices, loading: loadingVoices, fetchVoices } = useTtsVoices()
+    const { voices, loading: loadingVoices } = useTtsVoices(companyId, {
+        enabled: mode === "tts",
+    })
 
     const [languageFilter, setLanguageFilter] = useState(ALL_LANGUAGES)
     const filteredVoices = useMemo(
@@ -256,10 +258,6 @@ export function AudioFormDialog({
         setFileError(null)
         setLanguageFilter(ALL_LANGUAGES)
     }, [open, audio, reset])
-
-    useEffect(() => {
-        if (mode === "tts" && companyId) fetchVoices(companyId)
-    }, [mode, companyId, fetchVoices])
 
     // Para a prévia ao fechar o dialog ou desmontar, sem depender do usuário clicar de novo
     useEffect(() => {

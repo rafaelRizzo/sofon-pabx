@@ -1,9 +1,8 @@
 "use client"
 
-import { useCallback, useRef, useState } from "react"
-import { toast } from "sonner"
+import { useQuery } from "@tanstack/react-query"
 
-import { api, apiError } from "@/lib/api"
+import { api } from "@/lib/api"
 
 export type Voice = {
     voiceId: string
@@ -12,29 +11,26 @@ export type Voice = {
     languages: string[]
 }
 
-// Busca sob demanda (chamada só quando a aba "Gerar por voz" é aberta com uma empresa
-// selecionada), não no mount da página. Vozes são da conta ElevenLabs da própria empresa
-// (Company.elevenLabsApiKey), então o cache é invalidado ao trocar de empresa.
-export function useTtsVoices() {
-    const [voices, setVoices] = useState<Voice[]>([])
-    const [loading, setLoading] = useState(false)
-    const fetchedForRef = useRef<string | null>(null)
+async function fetchVoicesRequest(companyId: string): Promise<Voice[]> {
+    const { data } = await api.get("/audios/tts/voices", {
+        params: { companyId },
+    })
+    return data.voices ?? []
+}
 
-    const fetchVoices = useCallback(async (companyId: string) => {
-        if (!companyId || fetchedForRef.current === companyId) return
-        setLoading(true)
-        try {
-            const { data } = await api.get("/audios/tts/voices", {
-                params: { companyId },
-            })
-            setVoices(data.voices ?? [])
-            fetchedForRef.current = companyId
-        } catch (err) {
-            toast.error(apiError(err, "Erro ao buscar vozes"))
-        } finally {
-            setLoading(false)
-        }
-    }, [])
+// Cache via TanStack Query (staleTime 5min) — evita refetch a cada vez que o dialog "Gerar
+// áudio por voz" reabre; o backend já cacheia a mesma lista por 1h (Redis, ver audios.cache.ts),
+// isso só evita o round-trip HTTP repetido enquanto o usuário navega pela mesma sessão.
+export function useTtsVoices(
+    companyId?: string,
+    options?: { enabled?: boolean }
+) {
+    const { data: voices = [], isLoading: loading } = useQuery({
+        queryKey: ["tts-voices", companyId],
+        queryFn: () => fetchVoicesRequest(companyId as string),
+        enabled: !!companyId && (options?.enabled ?? true),
+        staleTime: 5 * 60 * 1000,
+    })
 
-    return { voices, loading, fetchVoices }
+    return { voices, loading }
 }
