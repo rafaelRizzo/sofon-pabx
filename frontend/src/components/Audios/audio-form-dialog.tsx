@@ -61,7 +61,8 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
-import { type Audio } from "@/hooks/use-audios"
+import { AudioWaveform } from "@/components/ui/audio-waveform"
+import { loadAudioFile, type Audio } from "@/hooks/use-audios"
 import { useTtsVoices, type Voice } from "@/hooks/use-tts-voices"
 import { VoicePreviewDots } from "@/components/Audios/voice-preview-dots"
 
@@ -126,11 +127,12 @@ type Props = {
     // empresa já escolhida na tela (filtro da tabela, ou a do áudio em edição) — não dá pra
     // trocar dentro do dialog, mesmo padrão de AnnouncementFormDialog/InboundRouteFormDialog
     companyId: string
+    // null = falhou; string = audioId criado/editado (usado pra mostrar o preview após TTS)
     onSave: (
         form: AudioFormValues,
         file: File | null,
         tts: TtsPayload | null
-    ) => Promise<boolean>
+    ) => Promise<string | null>
 }
 
 // .gsm não tem MIME type padrão no browser; validação cai pra extensão quando o MIME não vem
@@ -219,6 +221,34 @@ export function AudioFormDialog({
         }
     }
 
+    // Player do áudio recém-gerado por TTS (o .wav final já convertido, via /audios/:id/file) —
+    // diferente do togglePreview acima, que só toca a prévia curta da voz antes de gerar
+    const [generatedAudioId, setGeneratedAudioId] = useState<string | null>(
+        null
+    )
+    const [generatedAudioUrl, setGeneratedAudioUrl] = useState<string | null>(
+        null
+    )
+
+    useEffect(() => {
+        if (!generatedAudioId) {
+            setGeneratedAudioUrl(null)
+            return
+        }
+        let cancelled = false
+        let objectUrl: string | null = null
+        setGeneratedAudioUrl(null)
+        loadAudioFile(generatedAudioId).then((url) => {
+            if (cancelled) return
+            objectUrl = url
+            setGeneratedAudioUrl(url)
+        })
+        return () => {
+            cancelled = true
+            if (objectUrl) URL.revokeObjectURL(objectUrl)
+        }
+    }, [generatedAudioId])
+
     // Prévia gerada sob demanda no idioma selecionado (diferente do `previewUrl` fixo, geralmente
     // em inglês, que a ElevenLabs devolve em /audios/tts/voices)
     async function togglePreview(voice: Voice) {
@@ -261,6 +291,7 @@ export function AudioFormDialog({
         setFile(null)
         setFileError(null)
         setLanguageFilter(ALL_LANGUAGES)
+        setGeneratedAudioId(null)
     }, [open, audio, reset])
 
     // Para a prévia ao fechar o dialog ou desmontar, sem depender do usuário clicar de novo
@@ -268,6 +299,7 @@ export function AudioFormDialog({
         if (!open) {
             stopPreview()
             setPlayingVoiceId(null)
+            setGeneratedAudioId(null)
         }
         return () => {
             stopPreview()
@@ -315,14 +347,15 @@ export function AudioFormDialog({
                           : languageFilter) as "pt" | "en",
                   }
                 : null
-        const ok = await onSave(form, upload, tts)
-        if (!ok) return
+        if (tts) setGeneratedAudioId(null)
+        const audioId = await onSave(form, upload, tts)
+        if (!audioId) return
 
-        // TTS: mantém voz/idioma selecionados e só limpa nome/texto, pra gerar vários áudios
-        // seguidos com a mesma voz sem reabrir o dialog e reselecionar tudo de novo
+        // TTS: mantém voz/idioma/texto selecionados e só limpa o nome, pra gerar vários áudios
+        // seguidos com a mesma voz/texto sem reabrir o dialog e reselecionar tudo de novo
         if (tts) {
             setValue("name", "")
-            setValue("text", "")
+            setGeneratedAudioId(audioId)
             return
         }
         onOpenChange(false)
@@ -730,6 +763,28 @@ export function AudioFormDialog({
                                                         8kHz.
                                                     </FieldDescription>
                                                 </Field>
+
+                                                {generatedAudioId && (
+                                                    <Field>
+                                                        <FieldLabel>
+                                                            Áudio gerado
+                                                        </FieldLabel>
+                                                        <div className="min-w-0 overflow-hidden rounded-lg border bg-muted/30 p-3">
+                                                            {generatedAudioUrl ? (
+                                                                <AudioWaveform
+                                                                    src={
+                                                                        generatedAudioUrl
+                                                                    }
+                                                                    autoPlay
+                                                                />
+                                                            ) : (
+                                                                <div className="flex items-center justify-center py-2">
+                                                                    <Loader2Icon className="size-4 animate-spin text-muted-foreground" />
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </Field>
+                                                )}
                                             </TabsContent>
                                         </Tabs>
                                     </Field>

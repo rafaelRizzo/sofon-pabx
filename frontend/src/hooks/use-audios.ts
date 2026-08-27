@@ -95,13 +95,13 @@ export function useAudios(companyId?: string) {
             form.append("name", name)
             form.append("companyId", targetCompanyId)
             form.append("file", file)
-            await api.post("/audios", form)
+            const { data } = await api.post("/audios", form)
             toast.success("Áudio enviado", { id })
             await invalidate()
-            return true
+            return data.audioId as string
         } catch (err) {
             toast.error(apiError(err, "Erro ao enviar áudio"), { id })
-            return false
+            return null
         }
     }
 
@@ -114,7 +114,7 @@ export function useAudios(companyId?: string) {
     ) => {
         const id = toast.loading("Gerando áudio...")
         try {
-            await api.post("/audios/tts", {
+            const { data } = await api.post("/audios/tts", {
                 name,
                 companyId: targetCompanyId,
                 text,
@@ -123,10 +123,10 @@ export function useAudios(companyId?: string) {
             })
             toast.success("Áudio gerado", { id })
             await invalidate()
-            return true
+            return data.audioId as string
         } catch (err) {
             toast.error(apiError(err, "Erro ao gerar áudio"), { id })
-            return false
+            return null
         }
     }
 
@@ -136,10 +136,10 @@ export function useAudios(companyId?: string) {
             await api.patch(`/audios/${audioId}`, { name })
             toast.success("Áudio renomeado", { id })
             await invalidate()
-            return true
+            return audioId
         } catch (err) {
             toast.error(apiError(err, "Erro ao renomear áudio"), { id })
-            return false
+            return null
         }
     }
 
