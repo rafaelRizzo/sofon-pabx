@@ -991,7 +991,7 @@ export function ExtensionFormDialog({
     if (isEdit && loadingExtension) {
         return (
             <Dialog open={open} onOpenChange={onOpenChange}>
-                <DialogContent className="sm:max-w-2xl">
+                <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-2xl">
                     <DialogHeader>
                         <DialogTitle
                             render={<Skeleton className="h-5 w-40" />}
@@ -1001,7 +1001,7 @@ export function ExtensionFormDialog({
                         />
                     </DialogHeader>
 
-                    <div className="flex h-[65vh] flex-col gap-4 overflow-hidden pr-3">
+                    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden pr-3">
                         <G2>
                             <Skeleton className="h-14 w-full" />
                             <Skeleton className="h-14 w-full" />
@@ -1026,7 +1026,7 @@ export function ExtensionFormDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-2xl">
+            <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>
                         {isEdit ? "Editar ramal" : "Novo ramal"}
@@ -1038,11 +1038,12 @@ export function ExtensionFormDialog({
                     </DialogDescription>
                 </DialogHeader>
 
-                <ScrollArea className="h-[65vh]">
-                    <form
-                        id="extension-form"
-                        onSubmit={isEdit ? handleUpdate : handleCreate}
-                    >
+                <form
+                    id="extension-form"
+                    onSubmit={isEdit ? handleUpdate : handleCreate}
+                    className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)]"
+                >
+                    <ScrollArea className="min-h-0">
                         <FieldGroup className="pr-3">
                             {!isEdit && (
                                 <Field>
@@ -1201,8 +1202,8 @@ export function ExtensionFormDialog({
                                 <PjsipSections r={r} c={c} />
                             )}
                         </FieldGroup>
-                    </form>
-                </ScrollArea>
+                    </ScrollArea>
+                </form>
 
                 <DialogFooter>
                     <Button
