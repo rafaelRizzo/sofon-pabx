@@ -8,13 +8,14 @@
       script-src sem 'unsafe-inline': por isso o init de tema vive em /theme-init.js (arquivo
       próprio) em vez de <script> inline. connect-src precisa de ws:/wss: porque o webphone abre
       WebSocket SIP pra um host dinâmico (Asterisk da empresa), não fixo em build time. media-src
-      precisa dos hosts de preview de voz da ElevenLabs (storage.googleapis.com pras vozes premade,
-      *.elevenlabs.io pras prévias assinadas por região) — sem isso o <audio> de prévia (Audios,
-      "Gerar por voz") é bloqueado silenciosamente, sem erro de rede, só CSP no console.
+      precisa de blob: (prévia de voz autenticada é buscada via axios/blob e tocada com
+      `new Audio(blobUrl)`, ver audio-form-dialog.tsx) + storage.googleapis.com/*.elevenlabs.io
+      (preview_url fixo da ElevenLabs, ainda usado como fallback visual) — sem isso o <audio> é
+      bloqueado silenciosamente, sem erro de rede, só CSP no console.
     -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; media-src 'self' https://storage.googleapis.com https://*.elevenlabs.io; connect-src 'self' %VITE_API_URL% ws: wss:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; media-src 'self' blob: https://storage.googleapis.com https://*.elevenlabs.io; connect-src 'self' %VITE_API_URL% ws: wss:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
     />
     <title>Sofon PABX</title>
     <script src="/theme-init.js"></script>
