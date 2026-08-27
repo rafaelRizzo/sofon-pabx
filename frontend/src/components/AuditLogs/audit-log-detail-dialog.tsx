@@ -12,6 +12,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
 import {
     ACTION_LABEL,
@@ -248,28 +249,34 @@ export function AuditLogDetailDialog({ log, onOpenChange }: Props) {
                 </DialogHeader>
 
                 {isBulk ? (
-                    <pre className="max-h-96 overflow-auto rounded-md border bg-muted/30 p-3 text-xs">
-                        {JSON.stringify({ before: log?.before, after: log?.after }, null, 2)}
-                    </pre>
+                    <ScrollArea className="max-h-96 rounded-md border bg-muted/30">
+                        <pre className="p-3 text-xs">
+                            {JSON.stringify({ before: log?.before, after: log?.after }, null, 2)}
+                        </pre>
+                    </ScrollArea>
                 ) : log?.action === "UPDATE" ? (
                     diff.length === 0 ? (
                         <p className="py-4 text-center text-sm text-muted-foreground">
                             Nenhum campo alterado registrado
                         </p>
                     ) : (
-                        <div className="max-h-[28rem] overflow-y-auto pr-1">
-                            <GroupedList leaves={diff} renderLeaf={(leaf) => <DiffLeafRow leaf={leaf} />} />
-                        </div>
+                        <ScrollArea className="max-h-[28rem]">
+                            <div className="pr-3">
+                                <GroupedList leaves={diff} renderLeaf={(leaf) => <DiffLeafRow leaf={leaf} />} />
+                            </div>
+                        </ScrollArea>
                     )
                 ) : snapshot.length === 0 ? (
                     <p className="py-4 text-center text-sm text-muted-foreground">Nenhum dado registrado</p>
                 ) : (
-                    <div className="max-h-[28rem] overflow-y-auto pr-1">
-                        <GroupedList
-                            leaves={snapshot}
-                            renderLeaf={(leaf) => <SnapshotLeafRow leaf={leaf} tone={isCreate ? "after" : "before"} />}
-                        />
-                    </div>
+                    <ScrollArea className="h-[28rem]">
+                        <div className="pr-3">
+                            <GroupedList
+                                leaves={snapshot}
+                                renderLeaf={(leaf) => <SnapshotLeafRow leaf={leaf} tone={isCreate ? "after" : "before"} />}
+                            />
+                        </div>
+                    </ScrollArea>
                 )}
             </DialogContent>
         </Dialog>

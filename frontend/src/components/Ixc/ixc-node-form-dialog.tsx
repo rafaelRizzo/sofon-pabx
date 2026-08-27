@@ -50,6 +50,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { type Company } from "@/hooks/use-companies"
 import { useIntegrationCredentials } from "@/hooks/use-integration-credentials"
@@ -177,9 +178,9 @@ export function IxcNodeFormDialog({
                                 </DialogDescription>
                             </DialogHeader>
 
-                            <form id="ixc-node-form" onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col">
-                                <div className="flex-1 overflow-x-hidden overflow-y-auto">
-                                    <FieldGroup>
+                            <form id="ixc-node-form" onSubmit={onSubmit} className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)]">
+                                <ScrollArea className="min-h-0">
+                                    <FieldGroup className="pr-3">
                                         <Field>
                                             <FieldLabel>Nome</FieldLabel>
                                             <Input placeholder="Ex: consulta-cliente-cpf" {...register("name")} />
@@ -440,7 +441,7 @@ export function IxcNodeFormDialog({
                                             </TabsContent>
                                         </Tabs>
                                     </FieldGroup>
-                                </div>
+                                </ScrollArea>
                             </form>
 
                             <DialogFooter className="pt-4">

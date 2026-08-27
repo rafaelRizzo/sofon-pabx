@@ -9,29 +9,31 @@ import {
 import { api } from "@/lib/api"
 
 // Espelha o catálogo do backend (backend/src/utils/auth/permissions.ts); só relevante para
-// role "user" (admin/reseller têm acesso irrestrito, ver hasPermission abaixo)
+// role "user" (admin/reseller têm acesso irrestrito, ver hasPermission abaixo).
+// `category` agrupa a lista na UI de edição de usuário (user-form-dialog.tsx) — não existe no
+// backend, é só apresentação.
 export const PERMISSION_RESOURCES = [
-  { key: "companies", label: "Empresas" },
-  { key: "users", label: "Usuários" },
-  { key: "extensions", label: "Ramais" },
-  { key: "queues", label: "Filas" },
-  { key: "ivr", label: "URA" },
-  { key: "announcements", label: "Anúncios" },
-  { key: "callcenter", label: "Callcenter" },
-  { key: "dids", label: "DIDs" },
-  { key: "inbound-routes", label: "Rotas de entrada" },
-  { key: "outbound-routes", label: "Rotas de saída" },
-  { key: "trunks", label: "Troncos" },
-  { key: "audios", label: "Áudios" },
-  { key: "time-groups", label: "Grupos de horário" },
-  { key: "time-conditions", label: "Condições de horário" },
-  { key: "holiday-groups", label: "Feriados" },
-  { key: "request-templates", label: "Templates de requisição" },
-  { key: "integrations", label: "Credenciais de integração" },
-  { key: "ixc", label: "Nós IXCsoft" },
-  { key: "variables", label: "Variáveis" },
-  { key: "variable-conditions", label: "Condições de variável" },
-  { key: "flows", label: "Flows" },
+  { key: "companies", label: "Empresas", category: "Administração" },
+  { key: "users", label: "Usuários", category: "Administração" },
+  { key: "extensions", label: "Ramais", category: "Telefonia" },
+  { key: "dids", label: "DIDs", category: "Telefonia" },
+  { key: "trunks", label: "Troncos", category: "Telefonia" },
+  { key: "inbound-routes", label: "Rotas de entrada", category: "Roteamento" },
+  { key: "outbound-routes", label: "Rotas de saída", category: "Roteamento" },
+  { key: "queues", label: "Filas", category: "Filas e atendimento" },
+  { key: "callcenter", label: "Callcenter", category: "Filas e atendimento" },
+  { key: "flows", label: "Flows", category: "Automação" },
+  { key: "ivr", label: "URA", category: "Automação" },
+  { key: "announcements", label: "Anúncios", category: "Automação" },
+  { key: "audios", label: "Áudios", category: "Automação" },
+  { key: "time-groups", label: "Grupos de horário", category: "Automação" },
+  { key: "time-conditions", label: "Condições de horário", category: "Automação" },
+  { key: "holiday-groups", label: "Feriados", category: "Automação" },
+  { key: "request-templates", label: "Templates de requisição", category: "Automação" },
+  { key: "variables", label: "Variáveis", category: "Automação" },
+  { key: "variable-conditions", label: "Condições de variável", category: "Automação" },
+  { key: "integrations", label: "Credenciais de integração", category: "Automação" },
+  { key: "ixc", label: "Nós IXCsoft", category: "Automação" },
 ] as const
 
 export type PermissionResourceKey = (typeof PERMISSION_RESOURCES)[number]["key"]

@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { NumberInput } from "@/components/ui/number-input"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import {
     Tooltip,
     TooltipContent,
@@ -260,10 +261,10 @@ export function OutboundRouteFormDialog({
                     <form
                         id="outbound-route-form"
                         onSubmit={onSubmit}
-                        className="flex min-h-0 flex-1 flex-col"
+                        className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)]"
                     >
-                        <div className="flex-1 overflow-x-hidden overflow-y-auto">
-                            <FieldGroup>
+                        <ScrollArea className="min-h-0">
+                            <FieldGroup className="pr-3">
                                 <div className="grid grid-cols-3 gap-3">
                                     <Field className="col-span-2">
                                         <FieldLabel>Nome</FieldLabel>
@@ -512,7 +513,7 @@ export function OutboundRouteFormDialog({
                                     </FieldDescription>
                                 </Field>
                             </FieldGroup>
-                        </div>
+                        </ScrollArea>
                     </form>
 
                     <DialogFooter className="pt-4">

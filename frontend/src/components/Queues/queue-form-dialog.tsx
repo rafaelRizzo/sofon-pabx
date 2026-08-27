@@ -49,6 +49,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { Switch } from "@/components/ui/switch"
 import {
     Tooltip,
@@ -225,10 +226,10 @@ export function QueueFormDialog({
                             <form
                                 id="queue-form"
                                 onSubmit={onSubmit}
-                                className="flex min-h-0 flex-1 flex-col"
+                                className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)]"
                             >
-                                <div className="flex-1 overflow-x-hidden overflow-y-auto">
-                                    <FieldGroup>
+                                <ScrollArea className="min-h-0">
+                                    <FieldGroup className="pr-3">
                                         <Field>
                                             <FieldLabel>Nome</FieldLabel>
                                             <Input
@@ -901,7 +902,7 @@ export function QueueFormDialog({
                                             )}
                                         </Field>
                                     </FieldGroup>
-                                </div>
+                                </ScrollArea>
                             </form>
 
                             <DialogFooter className="pt-4">

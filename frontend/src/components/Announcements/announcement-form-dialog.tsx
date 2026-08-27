@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/field"
 import { EntityFormDialogSkeletonContent } from "@/components/entity-form-dialog-skeleton"
 import { Input } from "@/components/ui/input"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { type Audio, useAudios } from "@/hooks/use-audios"
 import {
     createAnnouncementFormSchema,
@@ -136,10 +137,10 @@ export function AnnouncementFormDialog({
                             <form
                                 id="announcement-form"
                                 onSubmit={onSubmit}
-                                className="flex min-h-0 flex-1 flex-col"
+                                className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)]"
                             >
-                                <div className="flex-1 overflow-x-hidden overflow-y-auto">
-                                    <FieldGroup>
+                                <ScrollArea className="min-h-0">
+                                    <FieldGroup className="pr-3">
                                         <Field>
                                             <FieldLabel>Nome</FieldLabel>
                                             <Input
@@ -199,7 +200,7 @@ export function AnnouncementFormDialog({
                                             </FieldDescription>
                                         </Field>
                                     </FieldGroup>
-                                </div>
+                                </ScrollArea>
                             </form>
 
                             <DialogFooter className="pt-4">

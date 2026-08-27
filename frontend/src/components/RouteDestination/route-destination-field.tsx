@@ -431,7 +431,7 @@ export function RouteDestinationField({
                                 />
                             </span>
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent alignItemWithTrigger={false}>
                             {allowedTypes.map((t) => {
                                 const Icon = ROUTE_DEST_ICONS[t]
                                 return (

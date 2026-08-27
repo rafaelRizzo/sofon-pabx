@@ -29,6 +29,7 @@ import {
     FieldLabel,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import {
     Select,
     SelectContent,
@@ -122,10 +123,10 @@ export function CompanyFormDialog({
                 </DialogHeader>
                 <form
                     onSubmit={onSubmit}
-                    className="flex min-h-0 flex-1 flex-col"
+                    className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_auto]"
                 >
-                    <div className="flex-1 overflow-x-hidden overflow-y-auto">
-                        <FieldGroup>
+                    <ScrollArea className="min-h-0">
+                        <FieldGroup className="pr-3">
                             <Field>
                                 <FieldLabel htmlFor="name">Nome</FieldLabel>
                                 <Input
@@ -314,7 +315,7 @@ export function CompanyFormDialog({
                                 ))}
                             </Field>
                         </FieldGroup>
-                    </div>
+                    </ScrollArea>
                     <DialogFooter className="pt-4">
                         <Button
                             type="button"

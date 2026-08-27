@@ -47,6 +47,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { EntityFormDialogSkeletonContent } from "@/components/entity-form-dialog-skeleton"
 import { type Company } from "@/hooks/use-companies"
 import {
@@ -176,10 +177,10 @@ export function VariableConditionFormDialog({
                             <form
                                 id="variable-condition-form"
                                 onSubmit={onSubmit}
-                                className="flex min-h-0 flex-1 flex-col"
+                                className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)]"
                             >
-                                <div className="flex-1 overflow-x-hidden overflow-y-auto">
-                                    <FieldGroup>
+                                <ScrollArea className="min-h-0">
+                                    <FieldGroup className="pr-3">
                                         <Field>
                                             <FieldLabel>Nome</FieldLabel>
                                             <Input
@@ -480,7 +481,7 @@ export function VariableConditionFormDialog({
                                             )}
                                         </Field>
                                     </FieldGroup>
-                                </div>
+                                </ScrollArea>
                             </form>
 
                             <DialogFooter className="pt-4">

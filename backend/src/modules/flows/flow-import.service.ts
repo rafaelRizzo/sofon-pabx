@@ -83,24 +83,44 @@ export async function previewFlowImport(bundle: Raw, companyId: string) {
 // compartilhado — mesmo motivo do backup/restore.ts). Em caso de erro no meio do caminho, desfaz
 // em ordem reversa tudo que já foi criado nesta chamada (best effort) e propaga o erro original.
 
-async function importAudioIfAny(ref: Raw | null | undefined, companyId: string, undo: Array<() => Promise<void>>): Promise<string | undefined> {
-    if (!ref?.wavBase64) return undefined
-    const created = await createAudio(companyId, ref.name, Buffer.from(ref.wavBase64, 'base64'), 'flow-import.wav')
-    undo.push(() => deleteAudio(created.id).then(() => undefined))
-    return created.id
-}
-
-// Reimportar o mesmo export (ou importar um flow renomeado que colide com um já existente) não pode
-// falhar com 409 — soma "(cópia)"/"(cópia N)" até achar um nome livre nesta empresa
-async function resolveUniqueFlowName(name: string, companyId: string): Promise<string> {
-    const existing = await prisma.flow.findMany({ where: { companyId }, select: { name: true } })
-    const names = new Set(existing.map((f) => f.name))
+// Reimportar o mesmo export (ou importar um flow que colide com recurso já existente na empresa
+// destino, inclusive de outra empresa) não pode falhar com 409 cru — soma "(cópia)"/"(cópia N)" até
+// achar um nome livre. Usado por todo recurso do flow com constraint @@unique([name, companyId])
+async function resolveUniqueName(
+    model: { findMany: (args: { where: { companyId: string }; select: { name: true } }) => Promise<{ name: string }[]> },
+    name: string,
+    companyId: string
+): Promise<string> {
+    const existing = await model.findMany({ where: { companyId }, select: { name: true } })
+    const names = new Set(existing.map((r) => r.name))
     if (!names.has(name)) return name
 
     let candidate = `${name} (cópia)`
     let i = 2
     while (names.has(candidate)) candidate = `${name} (cópia ${i++})`
     return candidate
+}
+
+// Queue.number só aceita dígitos (regex do schema) — não dá pra sufixar "(cópia)"; incrementa até
+// achar um número livre na empresa destino
+async function resolveUniqueQueueNumber(number: string, companyId: string): Promise<string> {
+    const existing = await prisma.queue.findMany({ where: { companyId }, select: { number: true } })
+    const numbers = new Set(existing.map((q) => q.number))
+    if (!numbers.has(number)) return number
+
+    let candidate = Number(number)
+    do {
+        candidate++
+    } while (numbers.has(String(candidate)))
+    return String(candidate)
+}
+
+async function importAudioIfAny(ref: Raw | null | undefined, companyId: string, undo: Array<() => Promise<void>>): Promise<string | undefined> {
+    if (!ref?.wavBase64) return undefined
+    const name = await resolveUniqueName(prisma.audio, ref.name, companyId)
+    const created = await createAudio(companyId, name, Buffer.from(ref.wavBase64, 'base64'), 'flow-import.wav')
+    undo.push(() => deleteAudio(created.id).then(() => undefined))
+    return created.id
 }
 
 async function importFlowRecursive(
@@ -141,8 +161,8 @@ async function importFlowRecursive(
                 if (!r) throw new AppError(`Nó "${label}" (fila) está sem configuração no arquivo de export`, 400)
                 const created = await createQueue(
                     createQueueSchema.parse({
-                        name: r.name,
-                        number: r.number,
+                        name: await resolveUniqueName(prisma.queue, r.name, companyId),
+                        number: await resolveUniqueQueueNumber(r.number, companyId),
                         companyId,
                         strategy: r.strategy,
                         musicOnHold: r.musicOnHold,
@@ -173,7 +193,7 @@ async function importFlowRecursive(
                 if (!r) throw new AppError(`Nó "${label}" (IVR) está sem configuração no arquivo de export`, 400)
                 const created = await createIvrMenu(
                     createIvrMenuSchema.parse({
-                        name: r.name,
+                        name: await resolveUniqueName(prisma.ivrMenu, r.name, companyId),
                         companyId,
                         type: r.type,
                         variableName: r.variableName ?? undefined,
@@ -194,7 +214,11 @@ async function importFlowRecursive(
                 const r = n.resource
                 if (!r) throw new AppError(`Nó "${label}" (anúncio) está sem configuração no arquivo de export`, 400)
                 const created = await createAnnouncement(
-                    createAnnouncementSchema.parse({ name: r.name, companyId, audioId: await importAudioIfAny(r.audio, companyId, undo) })
+                    createAnnouncementSchema.parse({
+                        name: await resolveUniqueName(prisma.announcement, r.name, companyId),
+                        companyId,
+                        audioId: await importAudioIfAny(r.audio, companyId, undo)
+                    })
                 )
                 undo.push(() => deleteAnnouncement(created.id))
                 resourceIdByNode.set(n.id, created.id)
@@ -206,7 +230,7 @@ async function importFlowRecursive(
                 if (!r) throw new AppError(`Nó "${label}" (request) está sem configuração no arquivo de export`, 400)
                 const created = await createRequestTemplate(
                     createRequestTemplateSchema.parse({
-                        name: r.name,
+                        name: await resolveUniqueName(prisma.requestTemplate, r.name, companyId),
                         companyId,
                         method: r.method,
                         url: r.url,
@@ -224,7 +248,13 @@ async function importFlowRecursive(
             case 'variable-set': {
                 const r = n.resource
                 if (!r) throw new AppError(`Nó "${label}" (setar variável) está sem configuração no arquivo de export`, 400)
-                const created = await createVariableSet(createVariableSetSchema.parse({ name: r.name, companyId, assignments: arr(r.assignments) }))
+                const created = await createVariableSet(
+                    createVariableSetSchema.parse({
+                        name: await resolveUniqueName(prisma.variableSet, r.name, companyId),
+                        companyId,
+                        assignments: arr(r.assignments)
+                    })
+                )
                 undo.push(() => deleteVariableSet(created.id))
                 resourceIdByNode.set(n.id, created.id)
                 break
@@ -234,7 +264,12 @@ async function importFlowRecursive(
                 const r = n.resource
                 if (!r) throw new AppError(`Nó "${label}" (condição de variável) está sem configuração no arquivo de export`, 400)
                 const created = await createVariableCondition(
-                    createVariableConditionSchema.parse({ name: r.name, companyId, combinator: r.combinator, rules: arr(r.rules) })
+                    createVariableConditionSchema.parse({
+                        name: await resolveUniqueName(prisma.variableCondition, r.name, companyId),
+                        companyId,
+                        combinator: r.combinator,
+                        rules: arr(r.rules)
+                    })
                 )
                 undo.push(() => deleteVariableCondition(created.id))
                 resourceIdByNode.set(n.id, created.id)
@@ -250,7 +285,7 @@ async function importFlowRecursive(
                     if (!newGroupId) {
                         const createdGroup = await createTimeGroup(
                             createTimeGroupSchema.parse({
-                                name: g.name,
+                                name: await resolveUniqueName(prisma.timeGroup, g.name, companyId),
                                 companyId,
                                 ranges: arr(g.ranges).map((rg) => ({
                                     startTime: rg.startTime,
@@ -267,7 +302,13 @@ async function importFlowRecursive(
                     }
                     groupIds.push(newGroupId)
                 }
-                const created = await createTimeCondition(createTimeConditionSchema.parse({ name: r.name, companyId, groupIds }))
+                const created = await createTimeCondition(
+                    createTimeConditionSchema.parse({
+                        name: await resolveUniqueName(prisma.timeCondition, r.name, companyId),
+                        companyId,
+                        groupIds
+                    })
+                )
                 undo.push(() => deleteTimeCondition(created.id))
                 resourceIdByNode.set(n.id, created.id)
                 break
@@ -278,7 +319,7 @@ async function importFlowRecursive(
                 if (!r) throw new AppError(`Nó "${label}" (feriados) está sem configuração no arquivo de export`, 400)
                 const created = await createHolidayGroup(
                     createHolidayGroupSchema.parse({
-                        name: r.name,
+                        name: await resolveUniqueName(prisma.holidayGroup, r.name, companyId),
                         companyId,
                         url: r.url ?? undefined,
                         dates: r.url ? undefined : arr(r.dates).map((d) => ({ name: d.name, month: d.month, day: d.day }))
@@ -298,7 +339,7 @@ async function importFlowRecursive(
                 if (!credential || credential.companyId !== companyId) throw new AppError('Credencial selecionada é inválida para esta empresa', 400)
                 const created = await createIxcNode(
                     createIxcNodeSchema.parse({
-                        name: r.name,
+                        name: await resolveUniqueName(prisma.ixcNode, r.name, companyId),
                         companyId,
                         credentialId,
                         action: r.action,
@@ -324,7 +365,7 @@ async function importFlowRecursive(
         }
     }
 
-    const createdFlow = await createFlow({ name: await resolveUniqueFlowName(flow.name, companyId), companyId })
+    const createdFlow = await createFlow({ name: await resolveUniqueName(prisma.flow, flow.name, companyId), companyId })
     undo.push(() => deleteFlow(createdFlow.id))
     flowIdByOriginal.set(flow.id, createdFlow.id)
 

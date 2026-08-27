@@ -46,6 +46,7 @@ import {
     InputGroupAddon,
     InputGroupInput,
 } from "@/components/ui/input-group"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { MonthdaysField } from "@/components/TimeGroups/monthdays-field"
 import { MonthsField } from "@/components/TimeGroups/months-field"
 import { WeekdayCheckboxes } from "@/components/TimeGroups/weekday-checkboxes"
@@ -158,10 +159,10 @@ export function TimeGroupFormDialog({
                     <form
                         id="time-group-form"
                         onSubmit={onSubmit}
-                        className="flex min-h-0 flex-1 flex-col"
+                        className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)]"
                     >
-                        <div className="flex-1 overflow-x-hidden overflow-y-auto">
-                            <FieldGroup>
+                        <ScrollArea className="min-h-0">
+                            <FieldGroup className="pr-3">
                                 <Field>
                                     <FieldLabel>Nome</FieldLabel>
                                     <Input
@@ -461,7 +462,7 @@ export function TimeGroupFormDialog({
                                     </div>
                                 </Field>
                             </FieldGroup>
-                        </div>
+                        </ScrollArea>
                     </form>
 
                     <DialogFooter className="pt-4">

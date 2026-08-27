@@ -1,8 +1,8 @@
 "use client"
 
-import { Fragment, useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { EyeIcon, EyeOffIcon, WandSparklesIcon } from "lucide-react"
+import { EyeIcon, EyeOffIcon, SearchIcon, WandSparklesIcon } from "lucide-react"
 import { Controller, useForm, useWatch } from "react-hook-form"
 
 import { Button } from "@/components/ui/button"
@@ -37,6 +37,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import {
     Tooltip,
     TooltipContent,
@@ -53,12 +54,29 @@ import {
     type User,
     type UserRole,
 } from "@/hooks/use-users"
+import { cn } from "@/lib/utils"
 import { CompanySelect } from "./company-select"
 
 const ROLES: { value: UserRole; label: string }[] = [
     { value: "user", label: "Usuário" },
     { value: "reseller", label: "Revenda" },
     { value: "admin", label: "Administrador" },
+]
+
+// CDR é só-leitura no backend (sem ação "manage", ver PERMISSION_KEYS em
+// backend/src/utils/auth/permissions.ts) — entra na mesma lista/categoria pra render unificado
+const PERMISSION_ROWS = [
+    { key: "cdr", label: "CDR", category: "Relatórios", manageable: false },
+    ...PERMISSION_RESOURCES.map((r) => ({ ...r, manageable: true as const })),
+]
+
+const PERMISSION_CATEGORY_ORDER = [
+    "Relatórios",
+    "Administração",
+    "Telefonia",
+    "Roteamento",
+    "Filas e atendimento",
+    "Automação",
 ]
 
 type UserFormDialogProps = {
@@ -77,6 +95,7 @@ export function UserFormDialog({
     const isEdit = !!user
 
     const [showPassword, setShowPassword] = useState(false)
+    const [permissionSearch, setPermissionSearch] = useState("")
     const { companies } = useCompanies()
 
     const {
@@ -144,8 +163,28 @@ export function UserFormDialog({
                 companyIds: user?.companies.map((c) => c.id) ?? [],
                 extensionId: user?.extensionId ?? null,
             })
+            setPermissionSearch("")
         }
     }, [open, user, reset])
+
+    const visiblePermissionRows = useMemo(() => {
+        const query = permissionSearch.trim().toLowerCase()
+        if (!query) return PERMISSION_ROWS
+        return PERMISSION_ROWS.filter(
+            (r) =>
+                r.label.toLowerCase().includes(query) ||
+                r.category.toLowerCase().includes(query)
+        )
+    }, [permissionSearch])
+
+    const permissionGroups = useMemo(
+        () =>
+            PERMISSION_CATEGORY_ORDER.map((category) => ({
+                category,
+                rows: visiblePermissionRows.filter((r) => r.category === category),
+            })).filter((g) => g.rows.length > 0),
+        [visiblePermissionRows]
+    )
 
     const onSubmit = handleSubmit(async (form) => {
         const ok = await onSave(form)
@@ -154,7 +193,12 @@ export function UserFormDialog({
 
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
-            <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-md">
+            <DialogContent
+                className={cn(
+                    "flex max-h-[90vh] flex-col sm:max-w-md",
+                    showPermissions && "sm:max-w-2xl"
+                )}
+            >
                 <DialogHeader>
                     <DialogTitle>
                         {isEdit ? "Editar usuário" : "Novo usuário"}
@@ -167,10 +211,10 @@ export function UserFormDialog({
                 </DialogHeader>
                 <form
                     onSubmit={onSubmit}
-                    className="flex min-h-0 flex-1 flex-col"
+                    className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_auto]"
                 >
-                    <div className="flex-1 overflow-x-hidden overflow-y-auto">
-                        <FieldGroup>
+                    <ScrollArea className="min-h-0">
+                        <FieldGroup className="pr-3">
                             <Field>
                                 <FieldLabel htmlFor="name">Nome</FieldLabel>
                                 <Input
@@ -382,6 +426,11 @@ export function UserFormDialog({
                                     <FieldLabel>
                                         Permissões de acesso
                                     </FieldLabel>
+                                    <p className="text-xs text-muted-foreground">
+                                        Ver libera consultar o recurso.
+                                        Gerenciar libera criar, editar e
+                                        excluir — e já inclui Ver.
+                                    </p>
                                     <Controller
                                         control={control}
                                         name="permissions"
@@ -428,92 +477,200 @@ export function UserFormDialog({
                                                     ...new Set(next),
                                                 ])
                                             }
+                                            const markAllView = () => {
+                                                const additions =
+                                                    visiblePermissionRows.map(
+                                                        (r) => `${r.key}:view`
+                                                    )
+                                                field.onChange([
+                                                    ...new Set([
+                                                        ...perms,
+                                                        ...additions,
+                                                    ]),
+                                                ])
+                                            }
+                                            const markAllManage = () => {
+                                                const additions =
+                                                    visiblePermissionRows
+                                                        .filter(
+                                                            (r) =>
+                                                                r.manageable
+                                                        )
+                                                        .flatMap((r) => [
+                                                            `${r.key}:view`,
+                                                            `${r.key}:manage`,
+                                                        ])
+                                                field.onChange([
+                                                    ...new Set([
+                                                        ...perms,
+                                                        ...additions,
+                                                    ]),
+                                                ])
+                                            }
+                                            const clearVisible = () => {
+                                                const keys = new Set(
+                                                    visiblePermissionRows.flatMap(
+                                                        (r) => [
+                                                            `${r.key}:view`,
+                                                            `${r.key}:manage`,
+                                                        ]
+                                                    )
+                                                )
+                                                field.onChange(
+                                                    perms.filter(
+                                                        (p) => !keys.has(p)
+                                                    )
+                                                )
+                                            }
                                             return (
-                                                <div className="rounded-md border p-3">
-                                                    <div className="grid grid-cols-[1fr_auto_auto] items-center gap-x-3 gap-y-2 text-sm">
-                                                        <span className="font-medium text-muted-foreground">
-                                                            Recurso
-                                                        </span>
-                                                        <span className="justify-self-center font-medium text-muted-foreground">
+                                                <div className="flex flex-col gap-2 rounded-md border p-3">
+                                                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                                        <div className="relative">
+                                                            <SearchIcon className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                                                            <Input
+                                                                value={
+                                                                    permissionSearch
+                                                                }
+                                                                onChange={(e) =>
+                                                                    setPermissionSearch(
+                                                                        e
+                                                                            .target
+                                                                            .value
+                                                                    )
+                                                                }
+                                                                placeholder="Buscar recurso..."
+                                                                className="h-8 w-full pl-7 sm:w-56"
+                                                            />
+                                                        </div>
+                                                        <div className="flex items-center gap-3 text-xs">
+                                                            <button
+                                                                type="button"
+                                                                className="text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                                                                onClick={
+                                                                    markAllView
+                                                                }
+                                                            >
+                                                                Marcar Ver
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                className="text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                                                                onClick={
+                                                                    markAllManage
+                                                                }
+                                                            >
+                                                                Marcar
+                                                                Gerenciar
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                className="text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                                                                onClick={
+                                                                    clearVisible
+                                                                }
+                                                            >
+                                                                Limpar
+                                                            </button>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="grid grid-cols-[1fr_auto_auto] items-center gap-x-3 px-1 text-xs font-medium text-muted-foreground">
+                                                        <span>Recurso</span>
+                                                        <span className="w-10 text-center">
                                                             Ver
                                                         </span>
-                                                        <span className="justify-self-center font-medium text-muted-foreground">
+                                                        <span className="w-16 text-center">
                                                             Gerenciar
                                                         </span>
-                                                        <span>CDR</span>
-                                                        <Checkbox
-                                                            className="justify-self-center"
-                                                            checked={has(
-                                                                "cdr:view"
-                                                            )}
-                                                            onCheckedChange={(
-                                                                c
-                                                            ) =>
-                                                                field.onChange(
-                                                                    c === true
-                                                                        ? [
-                                                                              ...new Set(
-                                                                                  [
-                                                                                      ...perms,
-                                                                                      "cdr:view",
-                                                                                  ]
-                                                                              ),
-                                                                          ]
-                                                                        : perms.filter(
-                                                                              (
-                                                                                  p
-                                                                              ) =>
-                                                                                  p !==
-                                                                                  "cdr:view"
-                                                                          )
-                                                                )
-                                                            }
-                                                        />
-                                                        <span />
-                                                        {PERMISSION_RESOURCES.map(
-                                                            (r) => (
-                                                                <Fragment
-                                                                    key={r.key}
-                                                                >
-                                                                    <span>
-                                                                        {
-                                                                            r.label
-                                                                        }
-                                                                    </span>
-                                                                    <Checkbox
-                                                                        className="justify-self-center"
-                                                                        checked={has(
-                                                                            `${r.key}:view`
-                                                                        )}
-                                                                        onCheckedChange={(
-                                                                            c
-                                                                        ) =>
-                                                                            setView(
-                                                                                r.key,
-                                                                                c ===
-                                                                                    true
-                                                                            )
-                                                                        }
-                                                                    />
-                                                                    <Checkbox
-                                                                        className="justify-self-center"
-                                                                        checked={has(
-                                                                            `${r.key}:manage`
-                                                                        )}
-                                                                        onCheckedChange={(
-                                                                            c
-                                                                        ) =>
-                                                                            setManage(
-                                                                                r.key,
-                                                                                c ===
-                                                                                    true
-                                                                            )
-                                                                        }
-                                                                    />
-                                                                </Fragment>
-                                                            )
-                                                        )}
                                                     </div>
+
+                                                    <ScrollArea className="h-72">
+                                                        {permissionGroups.length ===
+                                                        0 ? (
+                                                            <p className="py-4 text-center text-sm text-muted-foreground">
+                                                                Nenhum recurso
+                                                                encontrado
+                                                            </p>
+                                                        ) : (
+                                                            <div className="flex flex-col gap-3 pr-3">
+                                                                {permissionGroups.map(
+                                                                    (
+                                                                        group
+                                                                    ) => (
+                                                                        <div
+                                                                            key={
+                                                                                group.category
+                                                                            }
+                                                                        >
+                                                                            <p className="mb-1 px-1 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                                                                                {
+                                                                                    group.category
+                                                                                }
+                                                                            </p>
+                                                                            <div className="divide-y rounded-md border">
+                                                                                {group.rows.map(
+                                                                                    (
+                                                                                        r
+                                                                                    ) => (
+                                                                                        <div
+                                                                                            key={
+                                                                                                r.key
+                                                                                            }
+                                                                                            className="grid grid-cols-[1fr_auto_auto] items-center gap-x-3 px-2 py-1.5 text-sm hover:bg-muted/40"
+                                                                                        >
+                                                                                            <span>
+                                                                                                {
+                                                                                                    r.label
+                                                                                                }
+                                                                                            </span>
+                                                                                            <div className="flex w-10 justify-center">
+                                                                                                <Checkbox
+                                                                                                    checked={has(
+                                                                                                        `${r.key}:view`
+                                                                                                    )}
+                                                                                                    onCheckedChange={(
+                                                                                                        c
+                                                                                                    ) =>
+                                                                                                        setView(
+                                                                                                            r.key,
+                                                                                                            c ===
+                                                                                                                true
+                                                                                                        )
+                                                                                                    }
+                                                                                                />
+                                                                                            </div>
+                                                                                            <div className="flex w-16 justify-center">
+                                                                                                {r.manageable ? (
+                                                                                                    <Checkbox
+                                                                                                        checked={has(
+                                                                                                            `${r.key}:manage`
+                                                                                                        )}
+                                                                                                        onCheckedChange={(
+                                                                                                            c
+                                                                                                        ) =>
+                                                                                                            setManage(
+                                                                                                                r.key,
+                                                                                                                c ===
+                                                                                                                    true
+                                                                                                            )
+                                                                                                        }
+                                                                                                    />
+                                                                                                ) : (
+                                                                                                    <span className="text-muted-foreground">
+                                                                                                        —
+                                                                                                    </span>
+                                                                                                )}
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    )
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                    )
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </ScrollArea>
                                                 </div>
                                             )
                                         }}
@@ -521,7 +678,7 @@ export function UserFormDialog({
                                 </Field>
                             )}
                         </FieldGroup>
-                    </div>
+                    </ScrollArea>
                     <DialogFooter className="pt-4">
                         <Button
                             type="button"

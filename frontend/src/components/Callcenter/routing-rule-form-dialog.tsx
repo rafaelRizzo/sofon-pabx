@@ -46,6 +46,7 @@ import {
     InputGroupInput,
 } from "@/components/ui/input-group"
 import { NumberInput } from "@/components/ui/number-input"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { Switch } from "@/components/ui/switch"
 import { WeekdayCheckboxes } from "@/components/TimeGroups/weekday-checkboxes"
 import {
@@ -147,10 +148,10 @@ export function RoutingRuleFormDialog({
                     <form
                         id="routing-rule-form"
                         onSubmit={onSubmit}
-                        className="flex min-h-0 flex-1 flex-col"
+                        className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)]"
                     >
-                        <div className="flex-1 overflow-x-hidden overflow-y-auto">
-                            <FieldGroup>
+                        <ScrollArea className="min-h-0">
+                            <FieldGroup className="pr-3">
                                 <Field>
                                     <FieldLabel>Nome</FieldLabel>
                                     <Input
@@ -335,7 +336,7 @@ export function RoutingRuleFormDialog({
                                     </FieldLabel>
                                 </Field>
                             </FieldGroup>
-                        </div>
+                        </ScrollArea>
                     </form>
 
                     <DialogFooter className="pt-4">

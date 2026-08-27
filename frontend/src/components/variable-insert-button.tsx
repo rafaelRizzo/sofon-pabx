@@ -6,6 +6,7 @@ import { BracesIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { ASTERISK_VARIABLES, insertToken } from "@/lib/asterisk-variables"
 
@@ -57,7 +58,7 @@ export function VariableInsertButton({ onSelect, className }: Props) {
                     onChange={(e) => setQuery(e.target.value)}
                     className="mb-1"
                 />
-                <div className="max-h-64 overflow-y-auto">
+                <ScrollArea className="h-64">
                     {filtered.length === 0 ? (
                         <p className="p-2 text-xs text-muted-foreground">Nenhuma variável encontrada</p>
                     ) : (
@@ -77,7 +78,7 @@ export function VariableInsertButton({ onSelect, className }: Props) {
                             </button>
                         ))
                     )}
-                </div>
+                </ScrollArea>
             </PopoverContent>
         </Popover>
     )
