@@ -92,8 +92,15 @@ async function agiSetVariable(conn: AgiConn, name: string, value: string) {
     await sendAgiCommand(conn, `SET VARIABLE ${name} ${agiQuote(value)}`)
 }
 
+// SET CONTEXT/EXTENSION/PRIORITY são os comandos nativos do protocolo AGI pra redirecionar o
+// dialplan pra onde o script quer continuar QUANDO ele terminar - diferente de "EXEC Goto ctx,ext,pri"
+// (rodar a aplicação Goto por dentro do próprio AGI), que tem histórico de comportamento
+// inconsistente entre versões/timing e foi a causa raiz de um Goto que simplesmente não surtia
+// efeito em produção (ver comentário no topo de variablecondition.repository.ts).
 async function agiExecGoto(conn: AgiConn, target: { context: string; exten: string; priority: number }) {
-    await sendAgiCommand(conn, `EXEC Goto ${target.context},${target.exten},${target.priority}`)
+    await sendAgiCommand(conn, `SET CONTEXT ${target.context}`)
+    await sendAgiCommand(conn, `SET EXTENSION ${target.exten}`)
+    await sendAgiCommand(conn, `SET PRIORITY ${target.priority}`)
 }
 
 const PLACEHOLDER_RE = /\{\{([^}]+)\}\}/g
@@ -308,19 +315,49 @@ async function handleVariableCondition(conn: AgiConn, conditionId: string) {
     const results: boolean[] = []
     for (const rule of rules) {
         const value = (await agiGetVariable(conn, rule.variable)) ?? ''
-        results.push(evaluateRule(value, rule))
+        const result = evaluateRule(value, rule)
+        results.push(result)
+        // um log por regra - é o que dá pra saber, olhando só o log, o que foi lido do canal (não
+        // só o que tá configurado) e por que bateu/não bateu, sem precisar reproduzir a ligação
+        logger.info({
+            event: 'agi.variable_condition.rule',
+            conditionId,
+            name: condition.name,
+            variable: rule.variable,
+            value,
+            operator: rule.operator,
+            ruleValue: rule.value ?? null,
+            result,
+        })
     }
     const matched = evaluateRules(condition.combinator as Combinator, results)
+    logger.info({
+        event: 'agi.variable_condition.done',
+        conditionId,
+        name: condition.name,
+        combinator: condition.combinator,
+        results,
+        matched,
+    })
 
-    logger.info({ event: 'agi.variable_condition.done', conditionId, matched })
     const nodeId = await agiGetVariable(conn, FLOW_NODE_ID_VAR)
     if (nodeId) {
-        await agiExecGoto(conn, { context: FLOW_NODE_CONTEXT, exten: flowNodeExitExten(nodeId, matched ? 'true' : 'false'), priority: 1 })
+        const exten = flowNodeExitExten(nodeId, matched ? 'true' : 'false')
+        logger.info({ event: 'agi.variable_condition.goto', conditionId, via: 'flow_node', nodeId, exten })
+        await agiExecGoto(conn, { context: FLOW_NODE_CONTEXT, exten, priority: 1 })
         return
     }
     const dest = await FlowEdgeRepository.getOne('variablecondition', conditionId, matched ? 'true' : 'false')
     const target = await resolveRouteDestinationToDialplan(dest)
-    if (target) await agiExecGoto(conn, target)
+    if (!target) {
+        // configurado (ou o create/update esqueceu de ligar essa porta) mas sem rota resolvível -
+        // sem esse log, isso parece exatamente um "AGI não fez nada" visto de fora (mesmo formato do
+        // bug de deploy que a gente acabou de caçar sem log nenhum pra guiar)
+        logger.warn({ event: 'agi.variable_condition.no_route', conditionId, dest, matched })
+        return
+    }
+    logger.info({ event: 'agi.variable_condition.goto', conditionId, via: 'route_destination', target })
+    await agiExecGoto(conn, target)
 }
 
 // Seta QUEUE_PRIO (lido nativamente pelo Queue() nativo pra furar a fila) a partir da RoutingRule
@@ -492,16 +529,30 @@ async function handleConnection(conn: AgiConn) {
     const env = await readAgiEnv(conn)
     const script = env['agi_network_script']
     const arg1 = env['agi_arg_1']
+    logger.info({ event: 'agi.session.start', script, arg1, channel: env['agi_channel'] })
 
-    // Único script sem argumento - resolve tudo via variáveis do canal (EXTEN/accountcode)
-    if (script === 'transfer-route') { await handleTransferRoute(conn); return }
-    if (!arg1) return
+    try {
+        // Único script sem argumento - resolve tudo via variáveis do canal (EXTEN/accountcode)
+        if (script === 'transfer-route') { await handleTransferRoute(conn); return }
+        if (!arg1) return
 
-    if (script === 'queue-route') await handleQueueRoute(conn, arg1)
-    else if (script === 'queue-outcome') await handleQueueOutcome(conn, arg1)
-    else if (script === 'queue-survey') await handleQueueSurvey(conn, arg1)
-    else if (script === 'survey-result') await handleSurveyResult(conn, arg1, env['agi_arg_2'] ?? '')
-    else if (script === 'ixc') await handleIxcNode(conn, arg1)
-    else if (script === 'varcond') await handleVariableCondition(conn, arg1)
-    else await handleRequestTemplate(conn, arg1)
+        if (script === 'queue-route') await handleQueueRoute(conn, arg1)
+        else if (script === 'queue-outcome') await handleQueueOutcome(conn, arg1)
+        else if (script === 'queue-survey') await handleQueueSurvey(conn, arg1)
+        else if (script === 'survey-result') await handleSurveyResult(conn, arg1, env['agi_arg_2'] ?? '')
+        else if (script === 'ixc') await handleIxcNode(conn, arg1)
+        else if (script === 'varcond') await handleVariableCondition(conn, arg1)
+        else await handleRequestTemplate(conn, arg1)
+    } catch (error) {
+        // sem isso, uma exceção em qualquer handler vira um "AGI não fez nada" indistinguível de
+        // script não reconhecido/registro não encontrado - só dava pra saber qual script/arg caiu
+        // olhando o dialplan gerado e cruzando na mão (foi assim que achamos o bug de deploy antigo)
+        logger.error({
+            event: 'agi.session.error',
+            script,
+            arg1,
+            message: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined,
+        })
+    }
 }
