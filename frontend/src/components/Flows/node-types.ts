@@ -134,7 +134,7 @@ type NodeTypeConfig = {
     // então conectar/desconectar manda só o campo do slot que mudou)
     slotField: Record<string, string>
     // false = só pode ser adicionado ao canvas via "nó existente", não criado direto por aqui
-    // (Extension tem form próprio bem mais complexo — sip/pjsip, alocação de alias/senha — fora do
+    // (Extension tem form próprio bem mais complexo - sip/pjsip, alocação de alias/senha - fora do
     // escopo de "criar direto no canvas" desta entrega; Flow aninhado fica pra tela de lista, evita
     // aninhamento confuso na primeira versão)
     creatable: boolean
@@ -225,7 +225,7 @@ export const SLOT_LABELS: Record<string, string> = {
     entry: "",
 }
 
-// Ícone das saídas de exceção da URA (invalid/timeout/long) — mostrado como selo pequeno acima do
+// Ícone das saídas de exceção da URA (invalid/timeout/long) - mostrado como selo pequeno acima do
 // chip, já que o texto do botão vira o destino conectado assim que existe conexão (ver flow-node.tsx)
 export const SLOT_ICONS: Partial<Record<string, LucideIcon>> = {
     invalid: TriangleAlertIcon,
@@ -233,7 +233,7 @@ export const SLOT_ICONS: Partial<Record<string, LucideIcon>> = {
     long: ListChecksIcon,
 }
 
-// Separação visual dos slots condicionais (true/false, success/error) — cor do texto + do handle,
+// Separação visual dos slots condicionais (true/false, success/error) - cor do texto + do handle,
 // pra diferenciar de cara qual saída é qual sem precisar ler o label.
 export const SLOT_COLORS: Record<string, { text: string; handle: string }> = {
     true: {
@@ -254,9 +254,9 @@ export const SLOT_COLORS: Record<string, { text: string; handle: string }> = {
     },
 }
 
-// chave composta type:id — única no canvas independente do tipo, usada como id de nó do React Flow.
+// chave composta type:id - única no canvas independente do tipo, usada como id de nó do React Flow.
 // 1 card por recurso: o destino de saída (trueRoute/falseRoute/postQueueDestination/etc) é uma
-// coluna do próprio recurso no banco, não existe "conexão por card" — reusar o mesmo destino em
+// coluna do próprio recurso no banco, não existe "conexão por card" - reusar o mesmo destino em
 // vários pontos do flow é só ter várias edges convergindo pra esse único card (nativo do React Flow).
 export const nodeKey = (type: string, id: string) => `${type}:${id}`
 export const parseNodeKey = (key: string): { type: string; id: string } => {

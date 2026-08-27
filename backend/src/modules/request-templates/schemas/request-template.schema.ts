@@ -9,7 +9,7 @@ export const optionalCompanyQuery = z.object({ companyId: z.cuid2().optional() }
 
 export const HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const
 
-// path avaliado sobre o JSON de resposta (ex: "data.client[0].id") — ver evalResponsePath em agi-server.ts
+// path avaliado sobre o JSON de resposta (ex: "data.client[0].id") - ver evalResponsePath em agi-server.ts
 const variableMappingSchema = z.object({
     path: z.string().min(1).max(200),
     variable: z.string().min(1).max(80).regex(/^[A-Za-z_][A-Za-z0-9_]*$/, 'Only letters, digits and underscore, starting with a letter or underscore'),

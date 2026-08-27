@@ -1,8 +1,8 @@
 import { safeFetch } from '../../utils/net/safe-url'
 
-// Cliente da API webservice do IXCsoft (ERP de provedores de internet BR) — padrão público:
+// Cliente da API webservice do IXCsoft (ERP de provedores de internet BR) - padrão público:
 // POST {baseUrl}/webservice/v1/{tabela}, Basic base64(token), header "ixcsoft: listar" pra listagem
-// com filtro (qtype/query/oper). Credencial já vem descriptografada (ver src/lib/crypto.ts) — nunca
+// com filtro (qtype/query/oper). Credencial já vem descriptografada (ver src/lib/crypto.ts) - nunca
 // loga o token.
 export type IxcCredentialInput = { baseUrl: string; token: string }
 
@@ -20,7 +20,7 @@ async function ixcRequest(credential: IxcCredentialInput, table: string, filters
     return res.json()
 }
 
-// Catálogo de ações do nó IXCsoft — cada action mapeia pra uma tabela do webservice e um campo de
+// Catálogo de ações do nó IXCsoft - cada action mapeia pra uma tabela do webservice e um campo de
 // busca padrão. Campos exatos de qtype/tabela são o de-para público, a confirmar/ajustar contra o
 // token real do usuário (ver plano aprovado).
 export const IXC_ACTIONS = {

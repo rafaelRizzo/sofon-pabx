@@ -13,14 +13,14 @@ export const exportBackup = async (req: FastifyRequest, reply: FastifyReply) => 
             req.scope.assertAccess(companyId)
         } else if (!req.scope.isAdmin) {
             // backup sem companyId inclui segredo (senha de tronco, token de integração) de
-            // TODA empresa do sistema — reseller não vê isso nem pra suas próprias empresas
+            // TODA empresa do sistema - reseller não vê isso nem pra suas próprias empresas
             throw new AppError('Exportar backup de todas as empresas requer admin', 403)
         }
 
         const backup = await Service.exportBackup(companyId)
 
         // Export não passa por nenhum create/update (só leitura), então não é capturado pela
-        // extensão de audit log automática do Prisma (lib/prisma.ts) — sem isso, baixar um
+        // extensão de audit log automática do Prisma (lib/prisma.ts) - sem isso, baixar um
         // arquivo com segredo em texto puro de toda empresa do sistema ficaria sem rastro nenhum
         await prisma.auditLog
             .create({

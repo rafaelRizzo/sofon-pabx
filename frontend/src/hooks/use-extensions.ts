@@ -177,11 +177,11 @@ const pjsipOptional = {
     aorOutboundProxy: z.string().max(40).optional(),
     namedCallGroup: z.string().max(80).optional(),
     namedPickupGroup: z.string().max(80).optional(),
-    // Shortcut nativo do PJSIP (ICE + DTLS-SRTP + rtcp_mux) — liga o ramal pro softphone WebRTC
+    // Shortcut nativo do PJSIP (ICE + DTLS-SRTP + rtcp_mux) - liga o ramal pro softphone WebRTC
     webrtc: z.boolean().optional(),
 }
 
-// Schema plano para o form (union de campos — frontend filtra por tipo no submit)
+// Schema plano para o form (union de campos - frontend filtra por tipo no submit)
 const commonFields = {
     alias: aliasSchema,
     name: z.string().min(1, "Informe o nome"),
@@ -224,7 +224,7 @@ export const createExtensionSchema = z.object({
     directMedia: z.union([z.string().max(10), z.boolean()]).optional(),
     allowSubscribe: z.union([z.string().max(10), z.boolean()]).optional(),
     // transport: SIP usa "udp"/"tcp" (curto), PJSIP referencia nome de seção em pjsip.conf
-    // (ex: "transport-udp") — usa o limite mais permissivo, igual updateExtensionSchema
+    // (ex: "transport-udp") - usa o limite mais permissivo, igual updateExtensionSchema
     transport: z.string().max(40).optional(),
 })
 
@@ -242,7 +242,7 @@ export const updateExtensionSchema = z.object({
 export type ExtensionCreateForm = z.infer<typeof createExtensionSchema>
 export type ExtensionUpdateForm = z.infer<typeof updateExtensionSchema>
 
-// Chaves exclusivas de cada protocolo — usadas para filtrar o payload no create
+// Chaves exclusivas de cada protocolo - usadas para filtrar o payload no create
 const SIP_KEYS = new Set(Object.keys(sipOptional))
 const PJSIP_KEYS = new Set(Object.keys(pjsipOptional))
 const COMMON_KEYS = new Set([

@@ -6,7 +6,7 @@ import type { RouteDestination } from './route-destination.schema'
 
 type RouteDestType = Exclude<RouteDestination, null>['type']
 
-// Nome legível de cada sourceType — usado só na mensagem de erro do guard de delete abaixo.
+// Nome legível de cada sourceType - usado só na mensagem de erro do guard de delete abaixo.
 const SOURCE_LABELS: Record<string, string> = {
     inboundroute: 'Inbound route',
     timecondition: 'Time condition',
@@ -23,7 +23,7 @@ const SOURCE_LABELS: Record<string, string> = {
 }
 
 // Validação de existência/posse compartilhada por Inbound Routes e Time Conditions
-// (trueRoute/falseRoute) — mesmo destino, mesmas regras, um lugar só.
+// (trueRoute/falseRoute) - mesmo destino, mesmas regras, um lugar só.
 // label prefixa a mensagem (ex: "trueRoute: ") quando o caller tem mais de um campo de destino.
 export async function validateRouteDestination(
     dest: RouteDestination,
@@ -58,13 +58,13 @@ export async function validateRouteDestination(
                 )
             if (!q.number)
                 throw new AppError(
-                    `${prefix}Queue has no number — cannot use as route destination`,
+                    `${prefix}Queue has no number - cannot use as route destination`,
                     400
                 )
             break
         }
         case 'voicemail':
-            // voicemail id é livre (ramal ou id de usuário) — sem FK pra validar
+            // voicemail id é livre (ramal ou id de usuário) - sem FK pra validar
             break
         case 'timecondition': {
             const tc = await prisma.timeCondition.findUnique({
@@ -189,7 +189,7 @@ export async function validateRouteDestination(
     }
 }
 
-// Guard de delete — barra remover um nó ainda usado como destino em outro fluxo (senão vira Goto
+// Guard de delete - barra remover um nó ainda usado como destino em outro fluxo (senão vira Goto
 // morto no dialplan regenerado, só descoberto em tempo de chamada). Chamar no topo de deleteX() de
 // qualquer entidade que possa ser alvo de RouteDestination, antes do delete em si.
 export async function assertNotReferenced(
@@ -212,7 +212,7 @@ export async function assertNotReferenced(
     if (safeNodeRefs.length > 0)
         sources.push(`${safeNodeRefs.length} Flow node(s)`)
     throw new AppError(
-        `Still referenced by: ${sources.join(', ')} — update or remove those routes first`,
+        `Still referenced by: ${sources.join(', ')} - update or remove those routes first`,
         409
     )
 }

@@ -15,7 +15,7 @@ async function resolveTarget(dest: RouteDestination): Promise<string | null> {
 }
 
 // soundPath: caminho absoluto SEM extensão (Playback resolve o formato sozinho), ou null quando não
-// há áudio vinculado — nesse caso grava só o destino para evitar "invalid extension"
+// há áudio vinculado - nesse caso grava só o destino para evitar "invalid extension"
 function buildDialplan(id: string, soundPath: string | null, target: string | null): DialplanRow[] {
     const exten = announcementExten(id)
     return soundPath
@@ -32,7 +32,7 @@ function buildDialplan(id: string, soundPath: string | null, target: string | nu
 
 export const AnnouncementRepository = {
     // Reconstrói o arquivo de dialplan da empresa inteira pra esse contexto, a partir do estado
-    // atual em banco — chamado depois de qualquer create/update/delete de Announcement.
+    // atual em banco - chamado depois de qualquer create/update/delete de Announcement.
     async regenerate(companyId: string) {
         const asteriskId = await resolveAsteriskId(companyId)
         return withDialplanLock(`${ANNOUNCEMENT_CONTEXT}:${asteriskId}`, async () => {

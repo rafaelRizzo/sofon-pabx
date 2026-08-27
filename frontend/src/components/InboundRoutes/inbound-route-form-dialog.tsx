@@ -57,7 +57,7 @@ type Props = {
     companyId: string
     dids: Did[]
     trunks: Trunk[]
-    // Todas as rotas da empresa — usadas só pra avisar em tempo real sobre combinação
+    // Todas as rotas da empresa - usadas só pra avisar em tempo real sobre combinação
     // DID + tronco duplicada; a validação que vale é o 409 do backend
     existingRoutes: InboundRoute[]
     onSave: (form: InboundRouteForm) => Promise<boolean>
@@ -106,7 +106,7 @@ export function InboundRouteFormDialog({
         })
     }, [open, route, reset])
 
-    // Mesma checagem do backend (trunkId + didId único) — só se aplica à criação, já que
+    // Mesma checagem do backend (trunkId + didId único) - só se aplica à criação, já que
     // o PUT não permite trocar DID/tronco de uma rota existente
     const duplicateRouteName = useMemo(() => {
         if (isEdit || !didId || !trunkId) return null

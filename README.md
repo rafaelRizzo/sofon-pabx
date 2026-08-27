@@ -16,11 +16,11 @@ Backend de gerenciamento de PABX (Asterisk): provisionamento de ramais, troncos,
 **Este projeto não é um micro-SaaS multi-tenant.** É uma ferramenta de centralização de provisionamento e roteamento de chamadas para **instâncias de Asterisk isoladas, uma por VPS**, no modelo MagnusBilling: o Sofon orquestra várias instâncias via API, cada instância roda isolada com IP público e troncos próprios.
 
 **Motivo técnico:** troncos SIP (operadoras) monitoram volume e padrão de chamadas por IP de origem para detecção de fraude/spam (CLI spoofing, robocall, SIMbox). Concentrar troncos de várias empresas distintas numa única VPS/IP:
-- amplia o raio de bloqueio — tráfego anômalo de um cliente pode derrubar/blacklistar o IP pra todos os outros;
+- amplia o raio de bloqueio - tráfego anômalo de um cliente pode derrubar/blacklistar o IP pra todos os outros;
 - viola limites contratuais de canais simultâneos por IP que a maioria das operadoras impõe;
 - acopla o risco de fraude/compliance de clientes sem nenhuma relação entre si.
 
-O isolamento entre empresas por sufixo `asteriskId` (ver [backend/CLAUDE.md](backend/CLAUDE.md), seção "context de Extension") só é seguro **dentro de uma única instância controlada pelo mesmo operador** — não usar como base pra hospedar clientes finais desconhecidos entre si compartilhando a mesma VPS/IP de troncos.
+O isolamento entre empresas por sufixo `asteriskId` (ver [backend/CLAUDE.md](backend/CLAUDE.md), seção "context de Extension") só é seguro **dentro de uma única instância controlada pelo mesmo operador** - não usar como base pra hospedar clientes finais desconhecidos entre si compartilhando a mesma VPS/IP de troncos.
 
 ## Stack
 
@@ -29,7 +29,7 @@ O isolamento entre empresas por sufixo `asteriskId` (ver [backend/CLAUDE.md](bac
 - **Validação**: Zod (`fastify-type-provider-zod`)
 - **Banco**: PostgreSQL via Prisma ORM (mesmo banco usado pelo Asterisk Realtime/ODBC)
 - **Cache**: Redis (JTI de autenticação) + node-cache (cache de entidades em memória)
-- **Auth**: JWT (HS256) — access token 15min, refresh token 7d
+- **Auth**: JWT (HS256) - access token 15min, refresh token 7d
 - **Docs**: Swagger/OpenAPI via `@fastify/swagger` + Scalar UI
 
 ## Estrutura do repositório
@@ -52,7 +52,7 @@ sofon-pabx/
 │   ├── Dockerfile, docker-compose.yml, entrypoint.sh  # imagem de produção (backend + Postgres)
 │   └── setups/            # docker-compose (Postgres p/ dev), scripts de instalação do
 │                           # Asterisk e do Realtime/ODBC (VPS)
-└── frontend/         # Next.js (App Router) — dashboard
+└── frontend/         # Next.js (App Router) - dashboard
     ├── app/, components/, hooks/, lib/
     └── Dockerfile, docker-compose.yml  # imagem de produção
 ```
@@ -61,9 +61,9 @@ Cada módulo do backend segue o padrão `routes → controller → service`, com
 
 ## Arquitetura Asterisk
 
-O backend não fala AMI/ARI diretamente — ele escreve nas tabelas realtime (`sip_peers`, `ps_endpoints`, `ps_auths`, `ps_aors`, `queues`, `queue_members`, `extensions`/dialplan) que o Asterisk lê via ODBC. Suporta `chan_sip` (legado) e `chan_pjsip` em paralelo por compatibilidade com o mercado BR.
+O backend não fala AMI/ARI diretamente - ele escreve nas tabelas realtime (`sip_peers`, `ps_endpoints`, `ps_auths`, `ps_aors`, `queues`, `queue_members`, `extensions`/dialplan) que o Asterisk lê via ODBC. Suporta `chan_sip` (legado) e `chan_pjsip` em paralelo por compatibilidade com o mercado BR.
 
-Isolamento entre empresas é feito por sufixo (`asteriskId`) nos identificadores (ramal, número), não por contexto Asterisk separado — todas as empresas compartilham o mesmo `extensions.conf` estático com `switch => Realtime`. Esse isolamento é lógico (dialplan/banco), não de rede/tronco — por isso vale só dentro da mesma VPS/operador (ver seção "Escopo").
+Isolamento entre empresas é feito por sufixo (`asteriskId`) nos identificadores (ramal, número), não por contexto Asterisk separado - todas as empresas compartilham o mesmo `extensions.conf` estático com `switch => Realtime`. Esse isolamento é lógico (dialplan/banco), não de rede/tronco - por isso vale só dentro da mesma VPS/operador (ver seção "Escopo").
 
 ## Desenvolvimento
 
@@ -103,7 +103,7 @@ cp .env.example .env   # NEXT_PUBLIC_API_URL=http://localhost:3333
 pnpm dev                # http://localhost:3000
 ```
 
-### 4. Nginx Proxy Manager (opcional — testar por domínio localmente)
+### 4. Nginx Proxy Manager (opcional - testar por domínio localmente)
 
 Backend e frontend rodam nativos (`bun dev`/`pnpm dev`), fora de qualquer rede Docker. Pra expor por domínio local em vez de `localhost:3333`/`localhost:3000`, o NPM (em container) precisa alcançar o host via `host.docker.internal` (Docker Desktop no Mac/Windows resolve automaticamente):
 
@@ -140,19 +140,19 @@ bun run test:integration # só *.routes.test.ts (sobe app + Redis)
 
 ## Deploy (VPS)
 
-Modelo: **uma VPS por instância** (ver "Escopo"). Nela convivem 3 mundos diferentes — Asterisk nativo (compilado do fonte, fora do Docker), backend/frontend/Postgres em containers, e um reverse proxy (Nginx Proxy Manager) que termina TLS e expõe tudo por domínio.
+Modelo: **uma VPS por instância** (ver "Escopo"). Nela convivem 3 mundos diferentes - Asterisk nativo (compilado do fonte, fora do Docker), backend/frontend/Postgres em containers, e um reverse proxy (Nginx Proxy Manager) que termina TLS e expõe tudo por domínio.
 
 ### Pré-requisitos
 
 - VPS Debian 11+/Ubuntu 24.04+, acesso root, IP público
 - Docker + Docker Compose plugin instalados
-- Portas liberadas no firewall do provedor (cloud/security group) — o firewall interno (`nftables`) já é configurado pelo instalador do Asterisk (passo 2):
-  - `22`, `21122` — SSH
-  - `80`, `443` — HTTP/HTTPS (proxy + emissão de certificado ACME)
-  - `81` — painel do Nginx Proxy Manager
-  - `5060`-`5062` — SIP/PJSIP (liberado só por IP via whitelist, ver `manage-fw` no fim desta seção)
-  - `10000-20000/udp` — RTP (mesma whitelist)
-  - `8088` — WebSocket do Asterisk (WebRTC/softphone no browser). Pública, sem whitelist — só necessária se algum usuário for atender chamada pelo navegador. Sem TLS por enquanto (`ws`, não `wss` — sem domínio/certificado ainda)
+- Portas liberadas no firewall do provedor (cloud/security group) - o firewall interno (`nftables`) já é configurado pelo instalador do Asterisk (passo 2):
+  - `22`, `21122` - SSH
+  - `80`, `443` - HTTP/HTTPS (proxy + emissão de certificado ACME)
+  - `81` - painel do Nginx Proxy Manager
+  - `5060`-`5062` - SIP/PJSIP (liberado só por IP via whitelist, ver `manage-fw` no fim desta seção)
+  - `10000-20000/udp` - RTP (mesma whitelist)
+  - `8088` - WebSocket do Asterisk (WebRTC/softphone no browser). Pública, sem whitelist - só necessária se algum usuário for atender chamada pelo navegador. Sem TLS por enquanto (`ws`, não `wss` - sem domínio/certificado ainda)
 
 ### 1. Rede Docker compartilhada
 
@@ -160,7 +160,7 @@ Modelo: **uma VPS por instância** (ver "Escopo"). Nela convivem 3 mundos difere
 docker network create proxy
 ```
 
-Backend, frontend e Nginx Proxy Manager referenciam essa rede `proxy` como `external: true` nos respectivos `docker-compose.yml`. O backend roda em `network_mode: host` (precisa falar com Asterisk/Postgres em `127.0.0.1`), então não entra nessa rede — ver nota no passo 7.
+Backend, frontend e Nginx Proxy Manager referenciam essa rede `proxy` como `external: true` nos respectivos `docker-compose.yml`. O backend roda em `network_mode: host` (precisa falar com Asterisk/Postgres em `127.0.0.1`), então não entra nessa rede - ver nota no passo 7.
 
 ### 2. Asterisk (nativo, fora do Docker)
 
@@ -203,7 +203,7 @@ networks:
 docker compose up -d
 ```
 
-Painel em `http://<ip-da-vps>:81` — trocar o login/senha padrão no primeiro acesso.
+Painel em `http://<ip-da-vps>:81` - trocar o login/senha padrão no primeiro acesso.
 
 ### 4. Backend + Postgres
 
@@ -211,13 +211,13 @@ Painel em `http://<ip-da-vps>:81` — trocar o login/senha padrão no primeiro a
 cd backend
 cp .env.example .env
 # editar .env: JWT_SECRET/REFRESH_SECRET (>=32 chars, distintos entre si), AMI_SECRET (passo 2),
-# CORS_ORIGIN (domínio do frontend) — demais defaults servem
+# CORS_ORIGIN (domínio do frontend) - demais defaults servem
 docker compose up -d --build
 ```
 
 - Sobe `postgres` (porta `5433` publicada no host) e `backend` (`network_mode: host`).
-- `entrypoint.sh` roda `prisma migrate deploy` automaticamente antes de subir o server — não precisa migration manual.
-- Monta os volumes criados no passo 2 (`dialplan-extra`, `sounds`) — é assim que o backend materializa dialplan estático (timeconditions/ivrs/announcements/filas/etc., ver `backend/CLAUDE.md`).
+- `entrypoint.sh` roda `prisma migrate deploy` automaticamente antes de subir o server - não precisa migration manual.
+- Monta os volumes criados no passo 2 (`dialplan-extra`, `sounds`) - é assim que o backend materializa dialplan estático (timeconditions/ivrs/announcements/filas/etc., ver `backend/CLAUDE.md`).
 
 ### 5. Conectar Asterisk ↔ Postgres (Realtime/ODBC)
 
@@ -241,20 +241,20 @@ echo "NEXT_PUBLIC_API_URL=https://api.seudominio.com" > .env
 docker compose up -d --build
 ```
 
-Sobe na rede `proxy`, porta `3000` interna (não publicada no host — só alcançável via a rede Docker).
+Sobe na rede `proxy`, porta `3000` interna (não publicada no host - só alcançável via a rede Docker).
 
-### 7. Nginx Proxy Manager — Proxy Hosts
+### 7. Nginx Proxy Manager - Proxy Hosts
 
-Diferente do dev local (passo 4 da seção anterior, que usa `host.docker.internal` porque backend/frontend rodam nativos fora do Docker), em prod frontend e NPM estão na **mesma rede Docker `proxy`** — o forward do `app` usa o nome do service (`frontend`), não IP. O backend continua fora da rede (`network_mode: host`), então o forward do `api` aponta pro gateway da rede `proxy` em vez de um service name.
+Diferente do dev local (passo 4 da seção anterior, que usa `host.docker.internal` porque backend/frontend rodam nativos fora do Docker), em prod frontend e NPM estão na **mesma rede Docker `proxy`** - o forward do `app` usa o nome do service (`frontend`), não IP. O backend continua fora da rede (`network_mode: host`), então o forward do `api` aponta pro gateway da rede `proxy` em vez de um service name.
 
-Antes de criar os Proxy Hosts, aponte o DNS (A record) de `app.seudominio.com` e `api.seudominio.com` pro IP público da VPS — o Let's Encrypt (ACME) só emite certificado se o domínio já resolver pra cá.
+Antes de criar os Proxy Hosts, aponte o DNS (A record) de `app.seudominio.com` e `api.seudominio.com` pro IP público da VPS - o Let's Encrypt (ACME) só emite certificado se o domínio já resolver pra cá.
 
-No painel (`:81`), criar 2 Proxy Hosts com SSL (Let's Encrypt) — em cada um, aba **SSL** → escolher "Request a new SSL Certificate" → habilitar "Force SSL":
+No painel (`:81`), criar 2 Proxy Hosts com SSL (Let's Encrypt) - em cada um, aba **SSL** → escolher "Request a new SSL Certificate" → habilitar "Force SSL":
 
 | Domínio | Forward Hostname/IP | Porta | Observação |
 |---|---|---|---|
 | `app.seudominio.com` | `frontend` | `3000` | mesma rede Docker `proxy`, resolve pelo nome do service |
-| `api.seudominio.com` | gateway da rede `proxy` (`docker network inspect proxy --format '{{(index .IPAM.Config 0).Gateway}}'`, tipicamente `172.18.0.1`) | `3333` | backend está em `network_mode: host`, sem nome de service — o `nftables` do passo 2 já libera essa faixa privada pra porta `3333` |
+| `api.seudominio.com` | gateway da rede `proxy` (`docker network inspect proxy --format '{{(index .IPAM.Config 0).Gateway}}'`, tipicamente `172.18.0.1`) | `3333` | backend está em `network_mode: host`, sem nome de service - o `nftables` do passo 2 já libera essa faixa privada pra porta `3333` |
 
 ### 8. Primeiro acesso
 
@@ -268,14 +268,14 @@ Só funciona uma vez (enquanto `COUNT(users) === 0`) e sempre cria o primeiro us
 
 ### 9. Escalar backend em réplicas (opcional)
 
-Por padrão o passo 4 sobe **1 container** com `PROCESS_ROLE=all` (API HTTP + AGI + AMI events + jobs de cron, tudo no mesmo processo) — suficiente pra maioria dos casos. Se o backend virar gargalo de CPU sob carga real (não teste sintético — ver seção de troubleshooting de performance no histórico do projeto), dá pra separar em réplicas:
+Por padrão o passo 4 sobe **1 container** com `PROCESS_ROLE=all` (API HTTP + AGI + AMI events + jobs de cron, tudo no mesmo processo) - suficiente pra maioria dos casos. Se o backend virar gargalo de CPU sob carga real (não teste sintético - ver seção de troubleshooting de performance no histórico do projeto), dá pra separar em réplicas:
 
-- **`backend-worker`** (sempre **1 instância só**): AGI (porta fixa `4573`) + AMI events (listener único) + jobs de cron (`holiday-resync`, `agent-affinity-recalc`). Nunca escalar — duplicaria efeito colateral (job rodando 2x em paralelo) e conflitaria porta.
-- **`backend-web-N`** (escalável): só a API HTTP (Fastify), stateless. Cada réplica precisa de porta própria porque o backend roda em `network_mode: host` (não dá pra bindar a mesma porta 2x no host) — ex. `3333`, `3334`, `3335`.
+- **`backend-worker`** (sempre **1 instância só**): AGI (porta fixa `4573`) + AMI events (listener único) + jobs de cron (`holiday-resync`, `agent-affinity-recalc`). Nunca escalar - duplicaria efeito colateral (job rodando 2x em paralelo) e conflitaria porta.
+- **`backend-web-N`** (escalável): só a API HTTP (Fastify), stateless. Cada réplica precisa de porta própria porque o backend roda em `network_mode: host` (não dá pra bindar a mesma porta 2x no host) - ex. `3333`, `3334`, `3335`.
 
-**1. `docker-compose.yml`** — trocar o service único `backend` por 1 `backend-worker` + N `backend-web-N`, cada um com `PROCESS_ROLE` e `PORT` (só web) via `environment:`. Ver exemplo completo em `backend/docker-compose.yml` (usa YAML anchor `x-backend-common` pra não duplicar `volumes`/`depends_on`/`build` entre os services).
+**1. `docker-compose.yml`** - trocar o service único `backend` por 1 `backend-worker` + N `backend-web-N`, cada um com `PROCESS_ROLE` e `PORT` (só web) via `environment:`. Ver exemplo completo em `backend/docker-compose.yml` (usa YAML anchor `x-backend-common` pra não duplicar `volumes`/`depends_on`/`build` entre os services).
 
-**2. Firewall** — cada porta nova de réplica web precisa ser liberada pro NPM alcançar (mesma faixa privada da porta `3333` original). Editar `backend/setups/install-asterisk.sh`, repetindo a flag `--private-tcp` (ela não aceita lista separada por vírgula, cada porta é uma flag):
+**2. Firewall** - cada porta nova de réplica web precisa ser liberada pro NPM alcançar (mesma faixa privada da porta `3333` original). Editar `backend/setups/install-asterisk.sh`, repetindo a flag `--private-tcp` (ela não aceita lista separada por vírgula, cada porta é uma flag):
 
 ```bash
 --private-tcp 3333 \
@@ -283,11 +283,11 @@ Por padrão o passo 4 sobe **1 container** com `PROCESS_ROLE=all` (API HTTP + AG
 --private-tcp 3335 \
 ```
 
-Numa VPS já instalada, sem rodar o instalador inteiro de novo: pegar as flags salvas em `/etc/manage-fw/config.args` (root-only) e re-executar `bash /opt/manage-fw/firewall.sh --update` com o mesmo conjunto + as portas novas. **Atenção:** `--update` restarta o Docker inteiro pra ressincronizar as chains nftables — todo container da VPS reinicia junto (não só os do backend).
+Numa VPS já instalada, sem rodar o instalador inteiro de novo: pegar as flags salvas em `/etc/manage-fw/config.args` (root-only) e re-executar `bash /opt/manage-fw/firewall.sh --update` com o mesmo conjunto + as portas novas. **Atenção:** `--update` restarta o Docker inteiro pra ressincronizar as chains nftables - todo container da VPS reinicia junto (não só os do backend).
 
-**3. Nginx Proxy Manager** — o Proxy Host (passo 7) usa `proxy_pass` com variável (`$server:$port`), e nginx **não reaproveita conexão com o backend** nesse modo (limitação do nginx, não do NPM) — cada request abre TCP novo. Pra ter keepalive real de verdade entre nginx e as réplicas, dois arquivos:
+**3. Nginx Proxy Manager** - o Proxy Host (passo 7) usa `proxy_pass` com variável (`$server:$port`), e nginx **não reaproveita conexão com o backend** nesse modo (limitação do nginx, não do NPM) - cada request abre TCP novo. Pra ter keepalive real de verdade entre nginx e as réplicas, dois arquivos:
 
-`~/nginx-proxy/data/nginx/custom/http_top.conf` (editar direto no filesystem do host — não é gerenciado pela UI do NPM, nunca é sobrescrito):
+`~/nginx-proxy/data/nginx/custom/http_top.conf` (editar direto no filesystem do host - não é gerenciado pela UI do NPM, nunca é sobrescrito):
 ```nginx
 upstream sofon_backend {
     server 10.0.4.1:3333;
@@ -310,7 +310,7 @@ location ~ ^/ {
     proxy_pass http://sofon_backend;
 }
 ```
-(`location ~ ^/` é regex e tem prioridade sobre o `location /` padrão gerado pelo NPM — não precisa remover nada, só evita conflito/duplicação.) Depois de criar o `http_top.conf`, `docker restart npm` (senão o `upstream` não existe ainda e o NPM recusa aplicar o Advanced por falha no `nginx -t`).
+(`location ~ ^/` é regex e tem prioridade sobre o `location /` padrão gerado pelo NPM - não precisa remover nada, só evita conflito/duplicação.) Depois de criar o `http_top.conf`, `docker restart npm` (senão o `upstream` não existe ainda e o NPM recusa aplicar o Advanced por falha no `nginx -t`).
 
 **Ordem recomendada pra não derrubar produção sem perceber:** 1) firewall primeiro (senão as réplicas novas ficam inalcançáveis, parecendo "quebrado"), 2) `http_top.conf` + restart do NPM, 3) só then subir o `docker-compose.yml` com as réplicas.
 
@@ -323,4 +323,4 @@ sudo manage-fw list            # whitelist atual + banidos
 
 ## Licença
 
-Projeto proprietário e privado — todos os direitos reservados a Rafael Rizzo. Uso, cópia ou distribuição requerem autorização explícita do autor. Ver [LICENSE](LICENSE).
+Projeto proprietário e privado - todos os direitos reservados a Rafael Rizzo. Uso, cópia ou distribuição requerem autorização explícita do autor. Ver [LICENSE](LICENSE).

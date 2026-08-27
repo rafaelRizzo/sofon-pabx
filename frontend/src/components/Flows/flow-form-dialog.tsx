@@ -53,14 +53,14 @@ type Props = {
     open: boolean
     onOpenChange: (open: boolean) => void
     flow: Flow | null
-    // true enquanto o registro ainda está sendo buscado por id (ver EditNodeDialog) — nesse caso
+    // true enquanto o registro ainda está sendo buscado por id (ver EditNodeDialog) - nesse caso
     // `flow` também é null, mas não significa "criação": mostra skeleton em vez do form
     loading?: boolean
     companies: Company[]
     onSave: (form: FlowNameForm) => Promise<boolean>
 }
 
-// Só nome + empresa — o destino/conexões de um Flow são montados no canvas (ver
+// Só nome + empresa - o destino/conexões de um Flow são montados no canvas (ver
 // app/dashboard/flows/[id]/page.tsx), não num campo de formulário aqui.
 export function FlowFormDialog({
     open,

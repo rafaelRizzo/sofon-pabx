@@ -1,4 +1,4 @@
-// Parser puro (sem I/O) do protocolo AMI — separado de ami-events.ts pra ser testável direto com
+// Parser puro (sem I/O) do protocolo AMI - separado de ami-events.ts pra ser testável direto com
 // strings in/out. Registros AMI (Response/Event) são blocos "Chave: Valor" terminados por linha
 // em branco (\r\n\r\n); não cobre "Response: Follows" (Action: Command), que não é usado neste fluxo.
 

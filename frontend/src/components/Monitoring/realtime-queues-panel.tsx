@@ -115,7 +115,7 @@ export function RealtimeQueuesPanel({
                                                 className="flex items-center justify-between gap-2 text-sm"
                                             >
                                                 <span className="min-w-0 flex-1 truncate font-mono">
-                                                    {caller.callerNum || "—"}
+                                                    {caller.callerNum || "-"}
                                                 </span>
                                                 <span className="shrink-0 font-mono text-xs text-muted-foreground tabular-nums">
                                                     há{" "}

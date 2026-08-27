@@ -23,8 +23,8 @@ const select = {
 const _byId = () => prisma.variableSet.findUnique({ where: { id: '' }, select })
 type VariableSetRow = NonNullable<Awaited<ReturnType<typeof _byId>>> & { destination: RouteDestination }
 
-// Anexa o nome legível do destino (resolvido no backend, cache-first — ver route-destination-label.ts)
-// pra a badge do frontend não precisar buscar/mapear id->nome ela mesma. Agrupa por companyId —
+// Anexa o nome legível do destino (resolvido no backend, cache-first - ver route-destination-label.ts)
+// pra a badge do frontend não precisar buscar/mapear id->nome ela mesma. Agrupa por companyId -
 // getAllVariableSets pode misturar empresas diferentes na mesma lista (visão admin).
 async function withDestinationLabels<T extends { destination: unknown; companyId: string }>(sets: T[]): Promise<T[]> {
     if (sets.length === 0) return sets
@@ -40,7 +40,7 @@ async function withDestinationLabels<T extends { destination: unknown; companyId
     return sets.map((s) => ({ ...s, destination: withDestinationLabel(s.destination as RouteDestination, labelMaps.get(s.companyId)!) }))
 }
 
-// Resolve o indicador "usado por" em lote, agrupando por companyId — resolveUsedByLabels só aceita
+// Resolve o indicador "usado por" em lote, agrupando por companyId - resolveUsedByLabels só aceita
 // uma empresa por chamada (mesma razão de withDestinationLabels acima: getAllVariableSets pode
 // misturar empresas diferentes na mesma lista, visão admin).
 async function withUsedBy<T extends { id: string; companyId: string }>(sets: T[]): Promise<Map<string, UsedByRef[]>> {

@@ -2,7 +2,7 @@ import { prisma } from '../../../lib/prisma'
 import { toAsteriskInterface } from '../../../asterisk/queue.repository'
 
 // Recalcula AgentAffinity (média de CallRating por extensão×empresa) e, a partir dela, o `penalty`
-// dos queue_members realtime — app_queue tenta primeiro o grupo de menor penalty, independente da
+// dos queue_members realtime - app_queue tenta primeiro o grupo de menor penalty, independente da
 // strategy configurada, então melhor afinidade = penalty mais baixo = tentado primeiro. Chamado
 // periodicamente por src/jobs/agent-affinity-recalc.job.ts (mesmo padrão de holiday-resync.job.ts).
 export const recalculateAffinity = async () => {

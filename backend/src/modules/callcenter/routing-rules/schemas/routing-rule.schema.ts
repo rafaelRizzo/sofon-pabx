@@ -8,7 +8,7 @@ const timeRegex = /^([01]\d|2[0-3]):[0-5]\d$/
 const routingConditionsSchema = z
     .object({
         trunkId: z.cuid2().optional(),
-        // Testada em todo inbound call no processo worker (singleton) — regex mal formada trava
+        // Testada em todo inbound call no processo worker (singleton) - regex mal formada trava
         // roteamento de todas as empresas. isSafeRegexPattern rejeita a assinatura clássica de
         // ReDoS; o cap de tamanho da string testada em runtime (routing-rules.service.ts) é a
         // defesa determinística.

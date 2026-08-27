@@ -9,7 +9,7 @@ export const companyQuerySchema = z.object({ companyId: z.cuid2() })
 export const createAnnouncementSchema = z.object({
     name: z.string().min(1).max(80),
     companyId: z.cuid2(),
-    audioId: z.cuid2().optional().describe('id de um Audio (POST /audios) já enviado — sem ele o anúncio fica sem dialplan até vincular um depois'),
+    audioId: z.cuid2().optional().describe('id de um Audio (POST /audios) já enviado - sem ele o anúncio fica sem dialplan até vincular um depois'),
     destination: routeDestinationSchema.optional(),
 })
 
@@ -27,7 +27,7 @@ export const AnnouncementSchema = z.object({
     name: z.string(),
     companyId: z.string(),
     audioId: z.string().nullable(),
-    hasAudio: z.boolean().describe('true quando há um Audio vinculado — só então o destino pode ser usado em rotas'),
+    hasAudio: z.boolean().describe('true quando há um Audio vinculado - só então o destino pode ser usado em rotas'),
     destination: routeDestinationResponseSchema,
     usedBy: usedBySchema,
     createdAt: timestamp,

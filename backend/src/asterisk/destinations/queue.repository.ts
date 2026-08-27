@@ -23,7 +23,7 @@ export const toAsteriskInterface = (type: string, number: string) => `${type.toU
 // Inverso de toAsteriskInterface: "PJSIP/2002_ast1" -> { type: 'pjsip',
 // number: '2002_ast1' }. MEMBERINTERFACE (setado nativamente pelo Queue() no canal do caller após
 // o bridge) vem exatamente nesse formato, sem sufixo de canal (diferente de nome de canal tipo
-// "PJSIP/2002_ast1-00000a1b") — não precisa strip de sufixo hex.
+// "PJSIP/2002_ast1-00000a1b") - não precisa strip de sufixo hex.
 export function parseMemberInterface(iface: string): { type: string; number: string } | null {
     const idx = iface.indexOf('/')
     if (idx === -1) return null
@@ -31,7 +31,7 @@ export function parseMemberInterface(iface: string): { type: string; number: str
 }
 
 // Inverso de toAsteriskQueueName: "<asteriskId>-<number>" -> { asteriskId, queueNumber }.
-// Company.asteriskId tem tamanho FIXO (10 chars, substring de UUID sem hífen) — parsing por
+// Company.asteriskId tem tamanho FIXO (10 chars, substring de UUID sem hífen) - parsing por
 // tamanho fixo em vez de split('-') pra não depender de queueNumber nunca conter '-'.
 export function parseAsteriskQueueName(name: string): { asteriskId: string; queueNumber: string } | null {
     if (name.length < 12 || name[10] !== '-') return null
@@ -39,18 +39,18 @@ export function parseAsteriskQueueName(name: string): { asteriskId: string; queu
 }
 
 // AGI de pré-roteamento (seta QUEUE_PRIO a partir de RoutingRule, ver handleQueueRoute em agi-server.ts)
-// e AGI de pós-fila (captura MEMBERINTERFACE pra pesquisa de satisfação, ver handleQueueSurvey) —
+// e AGI de pós-fila (captura MEMBERINTERFACE pra pesquisa de satisfação, ver handleQueueSurvey) -
 // mesmo padrão de buildAgiUrl de request-template.repository.ts, só variando o script.
 const buildQueueRouteAgiUrl = (queueId: string) => `agi://${env.AGI_HOST}:${env.AGI_PORT}/queue-route,${queueId}`
 const buildQueueSurveyAgiUrl = (queueId: string) => `agi://${env.AGI_HOST}:${env.AGI_PORT}/queue-survey,${queueId}`
-// Roda logo após o Queue() retornar, antes da pesquisa — cobre timeout/sem agente/fila cheia
+// Roda logo após o Queue() retornar, antes da pesquisa - cobre timeout/sem agente/fila cheia
 // (únicos casos sem evento AMI terminal, porque o canal do ligante sobrevive e o Queue() segue
 // pra próxima priority); abandono/atendimento já são capturados via AMI (ver
 // src/modules/queue-calls/queue-calls.service.ts + ami-events.ts)
 const buildQueueOutcomeAgiUrl = (queueId: string) => `agi://${env.AGI_HOST}:${env.AGI_PORT}/queue-outcome,${queueId}`
 
 // Pra onde o cliente vai quando a fila termina sem ele ter desligado (timeout, sem agente, ou
-// agente desliga primeiro) — mesmo RouteDestination usado por Inbound Routes/Time Conditions
+// agente desliga primeiro) - mesmo RouteDestination usado por Inbound Routes/Time Conditions
 async function resolvePostQueueDestination(dest: RouteDestination): Promise<{ app: string; appdata: string | null }> {
     const target = await resolveRouteDestinationToDialplan(dest)
     return target ? { app: 'Goto', appdata: `${target.context},${target.exten},${target.priority}` } : { app: 'Hangup', appdata: null }
@@ -63,7 +63,7 @@ type AsteriskQueueData = {
     retry?: number
     maxLen?: number
     wrapupTime?: number
-    // `announce` aqui é o `announce` NATIVO de queues.conf/tabela realtime — tocado pro AGENTE
+    // `announce` aqui é o `announce` NATIVO de queues.conf/tabela realtime - tocado pro AGENTE
     // antes do bridge (agent announcement), resolvido a partir de Queue.agentAnnounce pelo
     // service. O "join announcement" (Queue.announce, tocado pro caller ao entrar) é um Playback
     // no dialplan antes do Queue() (ver regenerate() abaixo), não essa coluna
@@ -101,7 +101,7 @@ export const AsteriskQueueRepository = {
         })
     },
 
-    // Chaveia por appQueueId (estável), não por `name` recalculado — o Asterisk só entende `name`
+    // Chaveia por appQueueId (estável), não por `name` recalculado - o Asterisk só entende `name`
     // como chave, mas se o app confiasse em recomputar o nome antigo pra achar a linha, qualquer
     // drift prévio (linha renomeada fora do fluxo normal, criada manualmente, etc.) faria essa
     // busca ser um no-op silencioso e o upsert seguinte criava uma segunda linha órfã.
@@ -118,7 +118,7 @@ export const AsteriskQueueRepository = {
             return
         }
 
-        // appQueueId ainda não vinculado (linha criada antes dessa coluna existir, ou drift) —
+        // appQueueId ainda não vinculado (linha criada antes dessa coluna existir, ou drift) -
         // acha pelo nome atual/anterior e autocura anexando o id agora, sem precisar de migration
         // de dados: a partir daqui essa fila nunca mais depende do nome pra ser localizada.
         const byName = await tx.queues.findFirst({
@@ -137,7 +137,7 @@ export const AsteriskQueueRepository = {
             return
         }
 
-        // linha realtime nunca existiu (drift total) — recria do zero, mesma rede de segurança do
+        // linha realtime nunca existiu (drift total) - recria do zero, mesma rede de segurança do
         // upsert anterior
         await tx.queues.create({ data: { name: newAsteriskName, appQueueId, ...update } })
     },
@@ -207,7 +207,7 @@ export const AsteriskQueueRepository = {
     },
 
     // Reconstrói o arquivo de dialplan da empresa inteira pra esse contexto, a partir do estado
-    // atual em banco — chamado depois de qualquer create/update/delete de Queue (nome, número ou
+    // atual em banco - chamado depois de qualquer create/update/delete de Queue (nome, número ou
     // postQueueDestination). exten de cada fila é `<asteriskId>-<number>` (queueAppExten).
     async regenerate(companyId: string) {
         const asteriskId = await resolveAsteriskId(companyId)
@@ -224,21 +224,21 @@ export const AsteriskQueueRepository = {
                 const { app, appdata } = await resolvePostQueueDestination(edges.get(q.id)?.default ?? null)
 
                 // callcenterEnabled=false: fila roda 100% nativa, sem o AGI de pré-roteamento
-                // (RoutingRule/QUEUE_PRIO) — pesquisa (priority AGI queue-survey) segue independente,
+                // (RoutingRule/QUEUE_PRIO) - pesquisa (priority AGI queue-survey) segue independente,
                 // gated pelo próprio surveyAudioId dentro do handler
                 let priority = 1
                 if (q.callcenterEnabled)
                     entries.push({ context: QUEUE_APP_CONTEXT, exten, priority: priority++, app: 'AGI', appdata: buildQueueRouteAgiUrl(q.id) })
-                // Anúncio tocado uma única vez pro caller antes de entrar na fila — Playback direto
+                // Anúncio tocado uma única vez pro caller antes de entrar na fila - Playback direto
                 // no dialplan, não o `announce` nativo do Asterisk (esse é pro agente, ver acima)
                 if (q.announce)
                     entries.push({ context: QUEUE_APP_CONTEXT, exten, priority: priority++, app: 'Playback', appdata: audioSoundPath(asteriskId, q.announce) })
                 entries.push(
-                    // Carimba o CDR com o nome da fila antes do Queue() rodar — ver comentário do
+                    // Carimba o CDR com o nome da fila antes do Queue() rodar - ver comentário do
                     // campo queueName em schema.prisma. Sobrevive mesmo se o lastapp/context do CDR
                     // mudar depois (pesquisa/postQueueDestination rodam DEPOIS do Queue() retornar).
                     { context: QUEUE_APP_CONTEXT, exten, priority: priority++, app: 'Set', appdata: `CDR(queue_name)=${asteriskName}` },
-                    // opção "t": só o AGENTE (member) pode iniciar transferência DTMF atendida (*2) — sem
+                    // opção "t": só o AGENTE (member) pode iniciar transferência DTMF atendida (*2) - sem
                     // "T", que daria esse poder pro cliente que está esperando/atendido na fila
                     { context: QUEUE_APP_CONTEXT, exten, priority: priority++, app: 'Queue', appdata: `${asteriskName},t` },
                     { context: QUEUE_APP_CONTEXT, exten, priority: priority++, app: 'AGI', appdata: buildQueueOutcomeAgiUrl(q.id) },

@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils"
 
 // Pulso "ao vivo": sinaliza dado fresco via SSE (push do AMI, não polling) e é reaproveitado
-// como indicador de urgência (ex: chamadas aguardando > 0) — mesma linguagem visual pros dois
+// como indicador de urgência (ex: chamadas aguardando > 0) - mesma linguagem visual pros dois
 // significados ("isso está atualizando agora" / "isso precisa de atenção agora").
 export function LiveDot({
     active = true,

@@ -85,8 +85,8 @@ const removeStaleFlowNodeEdges = async (
 }
 
 // Anexa o nome legível de invalidDestination/timeoutDestination/longDestination/options[].destination
-// (resolvido no backend, cache-first — ver route-destination-label.ts). Todas as chamadas aqui são
-// de uma única empresa por vez — sem visão cross-empresa nesse módulo (sem getAllIvrMenus).
+// (resolvido no backend, cache-first - ver route-destination-label.ts). Todas as chamadas aqui são
+// de uma única empresa por vez - sem visão cross-empresa nesse módulo (sem getAllIvrMenus).
 type IvrDestFields = {
     invalidDestination: unknown
     timeoutDestination: unknown

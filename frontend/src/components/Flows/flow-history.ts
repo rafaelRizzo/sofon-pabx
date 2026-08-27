@@ -7,12 +7,12 @@ import type { CanvasNodeType } from "@/components/Flows/node-types"
 
 type Point = { x: number; y: number }
 
-// Histórico em memória do editor de flow — uma entrada por ação atômica concluída no canvas.
+// Histórico em memória do editor de flow - uma entrada por ação atômica concluída no canvas.
 // kind "create-node" (recurso já existia, ex. escolhido via popover de conexão) e
 // "create-resource-node" (recurso criado pelo próprio canvas) são variantes separadas porque o
 // inverso difere: desfazer a primeira só remove o nó; desfazer a segunda remove nó E recurso.
 // `nodeId`/`resourceId` de create-resource-node e `node` de delete-node/delete-resource são
-// mutados in-place a cada undo/redo que recria a entidade (novo id do backend) — a pilha em si
+// mutados in-place a cada undo/redo que recria a entidade (novo id do backend) - a pilha em si
 // nunca é substituída, só os campos desses objetos, ver `resolveNodeId`/nodeIdMapRef em flow-canvas.tsx.
 export type HistoryAction =
     | { kind: "move-node"; nodeId: string; from: Point; to: Point }
@@ -69,10 +69,10 @@ export type HistoryDirection = "undo" | "redo"
 
 const MAX_HISTORY = 50
 
-// Controlador de undo/redo do canvas — pilhas em memória, zeradas ao desmontar (trocar de flow ou
+// Controlador de undo/redo do canvas - pilhas em memória, zeradas ao desmontar (trocar de flow ou
 // recarregar a página). `applyAction` é injetado depois via `setApplyAction` (não como argumento
 // do hook) porque ele precisa fechar sobre os comandos do canvas (connectNodes, deleteNode etc.),
-// que por sua vez chamam `push` — passar a função direto criaria dependência circular na montagem
+// que por sua vez chamam `push` - passar a função direto criaria dependência circular na montagem
 // dos hooks. `busyRef` cumpre duas funções: serializa undo/redo entre si e suprime `push` enquanto
 // uma ação está sendo re-executada (evitando registrar histórico do próprio replay).
 export function useFlowHistory() {
@@ -112,7 +112,7 @@ export function useFlowHistory() {
             destStack.current.push(action)
         } catch {
             // reconciliação com o backend e o toast de erro já acontecem dentro do comando que
-            // falhou — aqui só devolvemos a ação pra MESMA pilha de origem, pra permitir retry sem
+            // falhou - aqui só devolvemos a ação pra MESMA pilha de origem, pra permitir retry sem
             // fabricar/perder nada na pilha oposta.
             sourceStack.current.push(action)
         } finally {
@@ -124,7 +124,7 @@ export function useFlowHistory() {
     const undo = useCallback(() => void run("undo"), [run])
     const redo = useCallback(() => void run("redo"), [run])
 
-    // push/undo/redo/setApplyAction são estáveis (deps vazias ou só de outras funções estáveis) —
+    // push/undo/redo/setApplyAction são estáveis (deps vazias ou só de outras funções estáveis) -
     // memoizar o objeto retornado por `tick` evita recriar sua identidade a cada render. Sem isso,
     // qualquer código que ponha `history` (em vez de `history.push` etc.) numa lista de
     // dependências de useCallback/useEffect recria essas dependências a cada render, o que pode

@@ -66,7 +66,7 @@ export async function loadAudioFile(id: string): Promise<string | null> {
     }
 }
 
-// companyId opcional — enquanto não informado, a lista não é buscada (filtro de empresa
+// companyId opcional - enquanto não informado, a lista não é buscada (filtro de empresa
 // da página exige seleção antes de consultar o backend). Diferente da empresa do upload
 // (que é passada explicitamente para createAudio, pois pode divergir deste filtro)
 export function useAudios(companyId?: string) {
@@ -83,7 +83,7 @@ export function useAudios(companyId?: string) {
         queryClient.invalidateQueries({ queryKey: ["audios"] })
 
     // Multipart: o backend lê file.fields, que só é populado com as partes já recebidas
-    // ANTES do arquivo no stream — por isso name/companyId são anexados antes do file
+    // ANTES do arquivo no stream - por isso name/companyId são anexados antes do file
     const createAudio = async (
         file: File,
         name: string,

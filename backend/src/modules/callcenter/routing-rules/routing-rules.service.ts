@@ -86,7 +86,7 @@ type ResolveContext = { callerId: string; at: Date; timezone: string; trunkId?: 
 
 const WEEKDAY_TOKENS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const
 
-// weekday/HH:MM via Intl (não depende do TZ do processo Node/Bun) — avalia no fuso da empresa,
+// weekday/HH:MM via Intl (não depende do TZ do processo Node/Bun) - avalia no fuso da empresa,
 // mesmo vocabulário de Time Groups (weekdays mon-sun, startTime/endTime HH:MM)
 const partsInTz = (at: Date, timezone: string) => {
     const parts = new Intl.DateTimeFormat('en-US', {
@@ -109,7 +109,7 @@ const matchesConditions = (conditions: Record<string, any>, ctx: ResolveContext)
             return false
         }
         // Cap determinístico contra ReDoS: mesmo um padrão que escape da heurística de validação
-        // (ver isSafeRegexPattern) tem o blowup exponencial limitado por um n pequeno — callerId
+        // (ver isSafeRegexPattern) tem o blowup exponencial limitado por um n pequeno - callerId
         // real (E.164) nunca passa de ~20 chars, então isso nunca afeta caller ID legítimo.
         if (!re.test(ctx.callerId.slice(0, 32))) return false
     }
@@ -123,7 +123,7 @@ const matchesConditions = (conditions: Record<string, any>, ctx: ResolveContext)
     return true
 }
 
-// Maior priority entre as regras ativas cujas conditions batem — usado pelo AGI de pré-roteamento
+// Maior priority entre as regras ativas cujas conditions batem - usado pelo AGI de pré-roteamento
 // (handleQueueRoute) pra setar QUEUE_PRIO antes do Queue() nativo assumir.
 export const resolveActiveRule = async (companyId: string, ctx: ResolveContext) => {
     const rules = await getRoutingRulesByCompany(companyId)

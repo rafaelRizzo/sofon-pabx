@@ -10,19 +10,19 @@ import {
 
 export type DialplanTarget = { context: string; exten: string; priority: number }
 
-// Única implementação do switch RouteDestination → context/exten/priority Asterisk — usada pelo AGI
+// Única implementação do switch RouteDestination → context/exten/priority Asterisk - usada pelo AGI
 // server (src/asterisk/agi-server.ts) pra decidir onSuccess/onError de RequestTemplate em tempo de
 // execução, e por todo repositório que materializa dialplan estático (announcement/ivr/timecondition/
 // holidaygroup/variable/variablecondition/queue/inboundroute), formatando o resultado pro shape local
 // que cada um precisa (string "ctx,exten,prio" ou {app,appdata}). Não duplicar esse switch de novo.
-// 'request' encadeia outro template normalmente (mesmo Goto estático de sempre) — loop entre
+// 'request' encadeia outro template normalmente (mesmo Goto estático de sempre) - loop entre
 // templates é erro de configuração do usuário, mesma situação já possível com timecondition.
 export async function resolveRouteDestinationToDialplan(dest: RouteDestination): Promise<DialplanTarget | null> {
     if (!dest || dest.type === 'hangup') return null
 
     switch (dest.type) {
         case 'extension': {
-            // exten é o alias puro (ex: "2002"), não o `number` completo (ex: "2002_a9e2463c8f") —
+            // exten é o alias puro (ex: "2002"), não o `number` completo (ex: "2002_a9e2463c8f") -
             // o dialplan genérico de ramal (DialplanRepository.ensureGenericRoutingPattern) só casa
             // padrões de alias puro (2-6 dígitos); usar `number` aqui nunca bateria com nenhuma
             // exten real, caindo sempre no fallback (Congestion)

@@ -11,7 +11,7 @@ export function mapId(idMap: IdMap, entityType: string, oldId: string): string {
     const newId = idMap.get(`${entityType}:${oldId}`)
     if (!newId)
         throw new AppError(
-            `Backup restore: referência quebrada — ${entityType}:${oldId} não foi criado (arquivo de backup corrompido ou incompleto)`,
+            `Backup restore: referência quebrada - ${entityType}:${oldId} não foi criado (arquivo de backup corrompido ou incompleto)`,
             400
         )
     return newId
@@ -39,7 +39,7 @@ export const DEST_TYPE_TO_ENTITY: Record<string, string> = {
 }
 
 // Usado nos campos destination/trueRoute/falseRoute/postQueueDestination/onSuccess/onError/
-// entryDestination — todos com o mesmo shape {type, id}. hangup/null vira null (create já
+// entryDestination - todos com o mesmo shape {type, id}. hangup/null vira null (create já
 // assume hangup quando o campo é omitido).
 export function remapDestination(
     idMap: IdMap,
@@ -52,7 +52,7 @@ export function remapDestination(
     return { type: dest.type, id: mapId(idMap, entityType, dest.id) } as RouteDestination
 }
 
-// Usado só em FlowNode.resourceId — mesma família de tipos de RouteDestination, mas nunca é
+// Usado só em FlowNode.resourceId - mesma família de tipos de RouteDestination, mas nunca é
 // {type,id}, é só o id cru (o type já vem de FlowNode.type).
 export function remapResourceId(idMap: IdMap, type: string, resourceId: string | null | undefined): string | null {
     if (!resourceId) return null
@@ -62,7 +62,7 @@ export function remapResourceId(idMap: IdMap, type: string, resourceId: string |
     return mapId(idMap, entityType, resourceId)
 }
 
-// true quando dest carrega um destino "de verdade" (não hangup/vazio) — usado pra decidir se
+// true quando dest carrega um destino "de verdade" (não hangup/vazio) - usado pra decidir se
 // vale a pena adiar uma chamada de update() na fase 2 (cada update() dispara regenerate de
 // dialplan; pular quando não há nada a religar evita reload desnecessário)
 export function hasDestination(dest: RouteDestination | null | undefined): boolean {

@@ -6,7 +6,7 @@ import type { FieldValues, Path, UseFormSetValue, UseFormGetValues } from "react
 type FieldElement = HTMLInputElement | HTMLTextAreaElement
 
 // Insere um token (ex: "{{CALLERID(num)}}") na posição do cursor de um campo de texto controlado
-// por react-hook-form, sem precisar tornar o campo controlled — mantém o `register(name)` normal,
+// por react-hook-form, sem precisar tornar o campo controlled - mantém o `register(name)` normal,
 // só precisa mesclar `elementRef` no `ref` do input/textarea (ver VariableInsertButton).
 export function useVariableInsert<TFieldValues extends FieldValues>(
     name: Path<TFieldValues>,

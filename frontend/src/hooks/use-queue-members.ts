@@ -6,7 +6,7 @@ import { z } from "zod"
 
 import { api, apiError } from "@/lib/api"
 
-// Espelha QueueMemberSchema de backend/src/modules/queue-members/schemas/queue-member.schema.ts —
+// Espelha QueueMemberSchema de backend/src/modules/queue-members/schemas/queue-member.schema.ts -
 // a resposta não inclui o objeto extension nem created/updatedAt, só os campos abaixo
 export type QueueMember = {
     id: string

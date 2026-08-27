@@ -13,7 +13,7 @@ export type TimeCondition = {
     id: string
     name: string
     companyId: string
-    // não são mais editáveis por aqui — só via arrastar uma conexão no canvas do Flow (ver
+    // não são mais editáveis por aqui - só via arrastar uma conexão no canvas do Flow (ver
     // flow-canvas.tsx), que grava direto no FlowEdge por PUT separado. Mantidos no tipo só porque a
     // API ainda devolve os campos (label resolvido, usado em telas de leitura)
     trueRoute: RouteDestination
@@ -25,7 +25,7 @@ export type TimeCondition = {
 }
 
 // Espelha create/updateTimeConditionSchema de backend/src/modules/time-conditions/schemas/time-condition.schema.ts
-// (sem trueRoute/falseRoute — ver comentário no tipo TimeCondition acima) — companyId/groupIds só
+// (sem trueRoute/falseRoute - ver comentário no tipo TimeCondition acima) - companyId/groupIds só
 // existem no create, o PUT do backend não permite trocar empresa nem os grupos vinculados
 export const createTimeConditionFormSchema = z.object({
     name: z.string().min(1, "Informe o nome").max(80, "Máximo 80 caracteres"),
@@ -44,7 +44,7 @@ export type TimeConditionUpdateForm = z.infer<
     typeof updateTimeConditionFormSchema
 >
 
-// DTO de criação a partir do registro salvo (sem companyId — recriação sempre usa a empresa do
+// DTO de criação a partir do registro salvo (sem companyId - recriação sempre usa a empresa do
 // flow). Diferente de TimeConditionUpdateForm (só "name", já que o PUT não permite trocar grupos):
 // aqui precisamos de groupIds também, pois recriar o recurso do zero exige os grupos vinculados.
 // Usado pelo histórico de undo/redo do Flow pra recriar o recurso quando o usuário desfaz uma
@@ -60,7 +60,7 @@ export function toTimeConditionCreationDto(
     }
 }
 
-// companyId opcional — enquanto não informado, a lista não é buscada (filtro de
+// companyId opcional - enquanto não informado, a lista não é buscada (filtro de
 // empresa da página exige seleção antes de consultar o backend)
 async function fetchTimeConditionsRequest(
     companyId: string
@@ -87,7 +87,7 @@ export function useTimeConditions(companyId?: string) {
             api.post("/time-conditions", form),
     })
 
-    // companyId da condição vem do próprio form (campo "Empresa" do dialog), não do filtro da página —
+    // companyId da condição vem do próprio form (campo "Empresa" do dialog), não do filtro da página -
     // permite criar uma condição pra empresa X enquanto a tabela lista a empresa Y
     async function createTimeCondition(
         form: TimeConditionForm

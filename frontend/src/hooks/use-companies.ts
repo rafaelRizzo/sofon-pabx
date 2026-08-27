@@ -47,7 +47,7 @@ async function fetchCompaniesRequest(): Promise<Company[]> {
     return data.companies ?? []
 }
 
-// Cache compartilhado via TanStack Query — uma única lista de empresas reaproveitada por
+// Cache compartilhado via TanStack Query - uma única lista de empresas reaproveitada por
 // todas as páginas que montam useCompanies() (CompanyFilter aparece em quase toda tela),
 // em vez de cada página refazer o fetch do zero ao navegar
 export function useCompanies() {
@@ -135,7 +135,7 @@ export function useCompanies() {
         }
     }
 
-    // Regenera todo dialplan estático da empresa a partir do banco — usado quando um arquivo em
+    // Regenera todo dialplan estático da empresa a partir do banco - usado quando um arquivo em
     // /etc/asterisk/dialplan-extra ficou desatualizado (ex: migração/deploy que mudou como o
     // dialplan é gerado) sem precisar salvar módulo por módulo. Requer role admin (backend).
     const resyncDialplan = async (companyId: string) => {

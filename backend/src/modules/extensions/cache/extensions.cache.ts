@@ -31,7 +31,7 @@ export class ExtensionsCache {
         logger.info({ event: 'cache.invalidate', namespace: NAMESPACE, key: `company:${companyId}` })
     }
 
-    // Lista de /extensions escopada por usuário não-admin com MAIS DE UMA empresa vinculada —
+    // Lista de /extensions escopada por usuário não-admin com MAIS DE UMA empresa vinculada -
     // getByCompany (1 empresa) e getAllExtensions (admin) não cobrem esse caso.
     // Invalidada de forma ampla por invalidateAllExtensions() (prefixo "extensions:"), como os demais.
     static async getForScope(userId: string) {

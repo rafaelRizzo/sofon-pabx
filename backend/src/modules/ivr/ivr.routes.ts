@@ -144,7 +144,7 @@ export const ivrRoutes = async (app: FastifyInstance) => {
         schema: {
             tags: ['IVR'],
             summary: 'Remover menu de URA',
-            description: 'Remove o registro, as opções e o dialplan — o Audio vinculado não é apagado.',
+            description: 'Remove o registro, as opções e o dialplan - o Audio vinculado não é apagado.',
             security: [{ bearerAuth: [] }],
             params: idParamSchema,
             response: {

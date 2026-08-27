@@ -10,7 +10,7 @@ mock.module('../dialplan/route-destination-resolver', () => ({
     ),
 }))
 // Não mockar FlowEdgeRepository (compartilhado por muitos módulos, ver route-destination-label.ts
-// e afins) — mock.module vaza entre arquivos de teste no bun, quebrando quem não mocka esse módulo
+// e afins) - mock.module vaza entre arquivos de teste no bun, quebrando quem não mocka esse módulo
 // e espera o real. Em vez disso, dirige o comportamento via prisma.flowEdge.findMany (já mockado).
 import { InboundRouteRepository } from '../destinations/inboundroute.repository'
 

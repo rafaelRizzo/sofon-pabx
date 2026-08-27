@@ -11,9 +11,9 @@ async function resolveDestination(dest: InboundDest): Promise<{ app: string; app
     return target ? { app: 'Goto', appdata: `${target.context},${target.exten},${target.priority}` } : { app: 'Hangup', appdata: null }
 }
 
-// contexto único compartilhado por todas as trunks — ps_endpoints.context de toda trunk inbound
+// contexto único compartilhado por todas as trunks - ps_endpoints.context de toda trunk inbound
 export const TRUNK_ENTRY_CONTEXT = 'from-trunk'
-// contexto onde o dialplan real é resolvido, já com TRUNKID (setvar do endpoint) embutido no exten —
+// contexto onde o dialplan real é resolvido, já com TRUNKID (setvar do endpoint) embutido no exten -
 // isola trunks/empresas diferentes mesmo quando o mesmo número de DID é reusado entre elas
 export const TRUNK_ROUTED_CONTEXT = 'from-trunk-routed'
 
@@ -31,7 +31,7 @@ function buildInboundEntries(
     didNumber: string,
     maxIn: number | null | undefined,
 ): Entry[] {
-    // didNumber vem de Did.number, validado por regex ^\d+$ (ver did.schema.ts) — seguro
+    // didNumber vem de Did.number, validado por regex ^\d+$ (ver did.schema.ts) - seguro
     // interpolar direto no appdata, sem risco de injeção no dialplan
     const mixmonitorFilename =
         '/var/spool/asterisk/monitor/${CHANNEL(accountcode)}/${STRFTIME(${EPOCH},,%Y/%m/%d)}/' +
@@ -44,20 +44,20 @@ function buildInboundEntries(
     }
 
     push('Set', `${ROUTING_TRUNK_VAR}=${trunkId}`)
-    // Contexto nativo do canal do cliente é from-trunk-routed, não ramais — sem isso, uma
+    // Contexto nativo do canal do cliente é from-trunk-routed, não ramais - sem isso, uma
     // transferência atendida (DTMF *2) tentaria resolver o destino em from-trunk-routed e falharia com
     // "extensão não encontrada". [transfer] (extensions.conf, estático) chama o AGI transfer-route,
     // que resolve o dígito discado pra ramal OU fila da MESMA empresa via CHANNEL(accountcode)
-    // (ver handleTransferRoute em agi-server.ts) — sem isso, transferir pra uma fila (ex: 600) caía
+    // (ver handleTransferRoute em agi-server.ts) - sem isso, transferir pra uma fila (ex: 600) caía
     // direto em ramais e tentava discar um ramal PJSIP inexistente.
     // Duplo underscore (herança indefinida): quem inicia a transferência DTMF é sempre a parte
-    // CHAMADA (opção "t", nunca "T" — ver dialplan.repository.ts/queue.repository.ts), ou seja o
+    // CHAMADA (opção "t", nunca "T" - ver dialplan.repository.ts/queue.repository.ts), ou seja o
     // canal do ramal/agente, criado por Dial()/Queue() A PARTIR deste canal do trunk. Sem "__", só
     // este canal (o do cliente) teria a variável, e o Asterisk resolve TRANSFER_CONTEXT do canal
-    // que PRESSIONOU o DTMF (o ramal) — sem herança, cai no fallback (contexto próprio do ramal,
+    // que PRESSIONOU o DTMF (o ramal) - sem herança, cai no fallback (contexto próprio do ramal,
     // "ramais") e trata o destino como ramal em vez de rodar o AGI transfer-route.
     push('Set', '__TRANSFER_CONTEXT=transfer')
-    // Enriquecimento de CDR — persiste no canal do ligante e sobrevive a qualquer Goto
+    // Enriquecimento de CDR - persiste no canal do ligante e sobrevive a qualquer Goto
     // intermediário (timecondition/holiday/ivr/queue/extension) até o Dial final
     push('Set', 'CDR(direction)=inbound')
     push('Set', `CDR(trunk_id)=${trunkId}`)
@@ -71,7 +71,7 @@ function buildInboundEntries(
     }
 
     push('Answer', null)
-    // Grava desde a entrada — mesmo padrão de dialplan.repository.ts (ramais/internal), só que
+    // Grava desde a entrada - mesmo padrão de dialplan.repository.ts (ramais/internal), só que
     // sem alias de ramal: usa o número do DID discado como identificador no nome do arquivo
     push('Set', `MIXMONITOR_FILENAME=${mixmonitorFilename}`)
     push('MixMonitor', '${MIXMONITOR_FILENAME},b')
@@ -114,7 +114,7 @@ export const InboundRouteRepository = {
         })
     },
 
-    // Regera o dialplan de TODAS as inbound routes da empresa a partir do template atual — cobre
+    // Regera o dialplan de TODAS as inbound routes da empresa a partir do template atual - cobre
     // rotas criadas antes de uma mudança de template (ex: novos campos de CDR, gravação) que nunca
     // foram salvas de novo via update() desde então. Usado por resyncDialplan (companies.service.ts).
     async regenerateAll(companyId: string) {
@@ -136,7 +136,7 @@ export const InboundRouteRepository = {
     },
 
     // Remove linhas Realtime de from-trunk-routed que sobraram de uma InboundRoute apagada por fora
-    // do fluxo normal (delete()/deleteMany() já limpam na hora — isso cobre drift: tamper manual no
+    // do fluxo normal (delete()/deleteMany() já limpam na hora - isso cobre drift: tamper manual no
     // banco, bug, restore parcial). Escopado às trunks da empresa via sufixo _<trunkId> no exten
     // (trunkId é cuid único globalmente, sem risco de tocar exten de outra empresa).
     async pruneOrphans(companyId: string) {

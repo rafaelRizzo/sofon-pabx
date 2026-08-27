@@ -516,7 +516,7 @@ function SidebarMenuButton({
     tooltip?: string | React.ComponentProps<typeof TooltipContent>
   } & VariantProps<typeof sidebarMenuButtonVariants>) {
   const { isMobile, state } = useSidebar()
-  // Tooltip só é exibido com a sidebar recolhida (ícone) no desktop — nesses outros casos
+  // Tooltip só é exibido com a sidebar recolhida (ícone) no desktop - nesses outros casos
   // (mobile, expandida) o wrapper de hover/touch do Tooltip fica inútil e, em telas touch,
   // rouba o primeiro tap do link (abre a interação de hover em vez de navegar), exigindo
   // um segundo toque. Só monta o Tooltip quando ele de fato vai aparecer.

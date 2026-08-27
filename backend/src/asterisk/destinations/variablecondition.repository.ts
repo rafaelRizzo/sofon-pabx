@@ -20,7 +20,7 @@ export type Combinator = 'and' | 'or'
 
 const varMatched = (entry: string) => `${entry}-matched`
 
-// escapa metacaracteres de regex POSIX ERE (usado pelo Asterisk REGEX()) — só usado internamente
+// escapa metacaracteres de regex POSIX ERE (usado pelo Asterisk REGEX()) - só usado internamente
 // pra transformar um "contains" (substring literal) num pattern seguro, nunca em texto vindo direto
 // do usuário sem passar por aqui (schema já proíbe aspas/backslash em `value`, ver variable-condition.schema.ts)
 function escapeRegex(value: string): string {
@@ -87,13 +87,13 @@ function checksumExpr(variable: string, spec: ChecksumSpec): string {
     return clauses.join(' & ')
 }
 
-// mesmo contrato de resolveRoute() em timecondition.repository.ts — "context,exten,priority" ou null
+// mesmo contrato de resolveRoute() em timecondition.repository.ts - "context,exten,priority" ou null
 async function resolveRoute(route: RouteDestination): Promise<string | null> {
     const target = await resolveRouteDestinationToDialplan(route)
     return target ? `${target.context},${target.exten},${target.priority}` : null
 }
 
-// Monta a expressão booleana Asterisk ($[...]) equivalente a uma regra — função pura, sem I/O,
+// Monta a expressão booleana Asterisk ($[...]) equivalente a uma regra - função pura, sem I/O,
 // testável isoladamente. `value` já vem validado pelo schema (sem aspas/backslash), então dá pra
 // interpolar direto nas strings entre aspas sem escaping em runtime.
 export function buildExpr(rule: VariableRule): string {
@@ -120,10 +120,10 @@ export function buildExpr(rule: VariableRule): string {
     }
 }
 
-// GotoIf(condition?label1:label2) — destino omitido = continua na próxima priority do mesmo exten.
+// GotoIf(condition?label1:label2) - destino omitido = continua na próxima priority do mesmo exten.
 // "or": qualquer regra batendo já pula pro "-matched" (mesmo truque de GotoIfTime em
 // timecondition.repository.ts); nenhuma bateu = cai no falseRoute.
-// "and": cada regra que falhar pula direto pro "-matched" (mesmo exten de destino do "or" — o nome
+// "and": cada regra que falhar pula direto pro "-matched" (mesmo exten de destino do "or" - o nome
 // não indica true/false, é só o alvo de convergência do loop; ver NoOp logo antes de cada Goto/Hangup
 // pra saber qual branch foi de fato tomado sem precisar interpretar o appdata do GotoIf no log)
 export function buildDialplan(
@@ -166,7 +166,7 @@ export function buildDialplan(
 
 export const VariableConditionRepository = {
     // Reconstrói o arquivo de dialplan da empresa inteira pra esse contexto, a partir do estado
-    // atual em banco — chamado depois de qualquer create/update/delete de VariableCondition.
+    // atual em banco - chamado depois de qualquer create/update/delete de VariableCondition.
     async regenerate(companyId: string) {
         const asteriskId = await resolveAsteriskId(companyId)
         return withDialplanLock(`${VARCOND_CONTEXT}:${asteriskId}`, async () => {

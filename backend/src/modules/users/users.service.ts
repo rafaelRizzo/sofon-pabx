@@ -95,7 +95,7 @@ export const createUser = async (data: CreateUserInput, createdBy?: string) => {
                 select: { id: true },
             })
         } catch (err) {
-            // extensionId é @unique — outro usuário já vinculado a esse ramal
+            // extensionId é @unique - outro usuário já vinculado a esse ramal
             if ((err as { code?: string })?.code === 'P2002') {
                 throw new AppError('Ramal já vinculado a outro usuário', 409)
             }
@@ -132,7 +132,7 @@ export const updateUser = async (id: string, data: UpdateUserInput) => {
         try {
             await tx.user.update({ where: { id }, data: updateData })
         } catch (err) {
-            // extensionId é @unique — outro usuário já vinculado a esse ramal
+            // extensionId é @unique - outro usuário já vinculado a esse ramal
             if ((err as { code?: string })?.code === 'P2002') {
                 throw new AppError('Ramal já vinculado a outro usuário', 409)
             }

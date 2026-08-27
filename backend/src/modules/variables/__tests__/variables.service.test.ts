@@ -108,7 +108,7 @@ describe('VariablesService.updateVariableSet', () => {
 describe('VariablesService.deleteVariableSet', () => {
     it('deletes variable set and regenerates dialplan', async () => {
         db.variableSet.findUnique.mockResolvedValue({ id: 'v1', companyId: 'c1' })
-        db.flowEdge.findMany.mockResolvedValue([]) // ninguém referencia — assertNotReferenced passa
+        db.flowEdge.findMany.mockResolvedValue([]) // ninguém referencia - assertNotReferenced passa
         db.variableSet.delete.mockResolvedValue(VARSET)
         await VariablesService.deleteVariableSet('v1')
         expect(VariableRepository.regenerate).toHaveBeenCalledWith('c1')

@@ -9,7 +9,7 @@ export type RestoreCompanyResult = {
     originalName: string
     newCompanyId?: string
     error?: string
-    // usuário pulado por username duplicado — não derruba o restore da empresa (ver
+    // usuário pulado por username duplicado - não derruba o restore da empresa (ver
     // backend/src/modules/backup/restore.ts)
     userWarnings?: string[]
 }
@@ -26,7 +26,7 @@ export type BackupSummary = {
     companies: { name: string; entityCount: number }[]
 }
 
-// Mesmas chaves de export.ts (backend) — usado só pra contar quantas entidades tem em cada
+// Mesmas chaves de export.ts (backend) - usado só pra contar quantas entidades tem em cada
 // empresa do arquivo, pra mostrar um resumo antes do restore de fato
 const ENTITY_KEYS = [
     "extensions",
@@ -76,7 +76,7 @@ export async function downloadBackupExport(companyId?: string) {
     URL.revokeObjectURL(url)
 }
 
-// Lançada quando o arquivo selecionado não é um JSON de backup válido — a tela mostra a
+// Lançada quando o arquivo selecionado não é um JSON de backup válido - a tela mostra a
 // mensagem direto ao usuário em vez de um erro genérico de parse
 export class InvalidBackupFileError extends Error {}
 

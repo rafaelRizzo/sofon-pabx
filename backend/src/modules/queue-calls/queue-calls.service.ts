@@ -60,7 +60,7 @@ export const getQueueCallMetrics = async (query: QueueCallMetricsQueryInput) => 
             _count: { _all: true },
             _avg: { talkSeconds: true },
         }),
-        // Prisma não tem percentile_cont nativo — mediana via raw query, mesmo where aplicado manualmente
+        // Prisma não tem percentile_cont nativo - mediana via raw query, mesmo where aplicado manualmente
         prisma.$queryRaw<Array<{ median: number | null }>>(Prisma.sql`
             SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY "waitSeconds") AS median
             FROM "queue_calls"
@@ -194,7 +194,7 @@ export async function recordAbandoned(input: AbandonedInput): Promise<void> {
     }
 }
 
-// QUEUESTATUS setado nativamente pelo Queue() quando ele RETORNA pra próxima priority — só
+// QUEUESTATUS setado nativamente pelo Queue() quando ele RETORNA pra próxima priority - só
 // acontece quando o canal do ligante sobrevive (timeout/sem agente/fila cheia). Abandono e
 // atendimento (ligante desliga ou agente desliga) já finalizam a linha via AMI antes disso, daí
 // o guard endedAt:null pra não sobrescrever um outcome já correto.

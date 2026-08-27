@@ -69,7 +69,7 @@ import { VoicePreviewDots } from "@/components/Audios/voice-preview-dots"
 const TTS_TEXT_MAX = 2500
 const ALL_LANGUAGES = "all"
 
-// Filtro de idioma restrito a português e inglês — os dois idiomas usados nesse sistema,
+// Filtro de idioma restrito a português e inglês - os dois idiomas usados nesse sistema,
 // não a lista completa suportada pela ElevenLabs
 const TTS_LANGUAGES = ["pt", "en"]
 
@@ -124,7 +124,7 @@ type Props = {
     open: boolean
     onOpenChange: (open: boolean) => void
     audio: Audio | null
-    // empresa já escolhida na tela (filtro da tabela, ou a do áudio em edição) — não dá pra
+    // empresa já escolhida na tela (filtro da tabela, ou a do áudio em edição) - não dá pra
     // trocar dentro do dialog, mesmo padrão de AnnouncementFormDialog/InboundRouteFormDialog
     companyId: string
     // null = falhou; string = audioId criado/editado (usado pra mostrar o preview após TTS)
@@ -221,7 +221,7 @@ export function AudioFormDialog({
         }
     }
 
-    // Player do áudio recém-gerado por TTS (o .wav final já convertido, via /audios/:id/file) —
+    // Player do áudio recém-gerado por TTS (o .wav final já convertido, via /audios/:id/file) -
     // diferente do togglePreview acima, que só toca a prévia curta da voz antes de gerar
     const [generatedAudioId, setGeneratedAudioId] = useState<string | null>(
         null

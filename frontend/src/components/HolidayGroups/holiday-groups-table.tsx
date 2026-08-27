@@ -100,7 +100,7 @@ export function HolidayGroupsTable({
                                 <TableCell>
                                     {hg.dates.length === 0 ? (
                                         <span className="text-muted-foreground">
-                                            —
+                                            -
                                         </span>
                                     ) : (
                                         <TooltipProvider delay={100}>

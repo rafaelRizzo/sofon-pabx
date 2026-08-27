@@ -31,7 +31,7 @@ export const callcenterRatingsRoutes = async (app: FastifyInstance) => {
         schema: {
             tags: ['Callcenter Ratings'],
             summary: 'Registrar nota de atendimento',
-            description: 'Registro interno — na Fase 2 será chamado pelo handler AGI da pesquisa IVR pós-chamada.',
+            description: 'Registro interno - na Fase 2 será chamado pelo handler AGI da pesquisa IVR pós-chamada.',
             security: [{ bearerAuth: [] }],
             body: createRatingSchema,
             response: {

@@ -111,7 +111,7 @@ type Props = {
     route: OutboundRoute | null
     trunks: Trunk[]
     extensions: Extension[]
-    // Todas as rotas da empresa (sem filtro de busca) — usadas só para checar padrão
+    // Todas as rotas da empresa (sem filtro de busca) - usadas só para checar padrão
     // duplicado em tempo real; a validação que vale mesmo é a do backend (409 no save)
     existingRoutes: OutboundRoute[]
     onSave: (form: OutboundRouteForm) => Promise<boolean>
@@ -155,7 +155,7 @@ export function OutboundRouteFormDialog({
     const patterns = watch("patterns")
 
     // Padrão => nome da rota que já usa ele, entre TODAS as rotas da empresa (exceto a que está
-    // sendo editada) — o dialplan é escrito por empresa, não por rota, então precisa ser único aqui
+    // sendo editada) - o dialplan é escrito por empresa, não por rota, então precisa ser único aqui
     const otherRoutesPatternMap = useMemo(() => {
         const map = new Map<string, string>()
         for (const r of existingRoutes) {
@@ -186,7 +186,7 @@ export function OutboundRouteFormDialog({
     )
     const hasPatternConflict = patternConflicts.some(Boolean)
 
-    // Usado pelos presets (Celular local, Fixo local...) para desabilitar quem já está em uso —
+    // Usado pelos presets (Celular local, Fixo local...) para desabilitar quem já está em uso -
     // mesma regra de "igual" do patternConflicts, não é checagem de sobreposição de padrão
     function presetConflictReason(pattern: string): string | null {
         if (patterns.some((p) => p.pattern?.trim() === pattern)) {
@@ -231,7 +231,7 @@ export function OutboundRouteFormDialog({
     })
 
     // Fechar (X, Escape, clique fora, botão Cancelar) com alterações não salvas pede confirmação
-    // antes de descartar — só fecha direto quando o form está limpo ou após salvar com sucesso
+    // antes de descartar - só fecha direto quando o form está limpo ou após salvar com sucesso
     const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false)
     function requestClose(nextOpen: boolean) {
         if (!nextOpen && isDirty) {

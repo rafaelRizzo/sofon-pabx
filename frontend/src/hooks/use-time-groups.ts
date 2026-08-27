@@ -57,7 +57,7 @@ const timeRangeFormSchema = z.object({
         .default("*"),
 })
 
-// companyId só existe no create — o PUT do backend não permite trocar a empresa de um grupo existente
+// companyId só existe no create - o PUT do backend não permite trocar a empresa de um grupo existente
 export const createTimeGroupFormSchema = z.object({
     name: z.string().min(1, "Informe o nome").max(80, "Máximo 80 caracteres"),
     companyId: z.string().min(1, "Selecione uma empresa"),
@@ -79,7 +79,7 @@ export type TimeGroupForm = z.infer<typeof createTimeGroupFormSchema>
 export type TimeGroupUpdateForm = z.infer<typeof updateTimeGroupFormSchema>
 export type TimeRangeForm = z.infer<typeof timeRangeFormSchema>
 
-// companyId opcional — enquanto não informado, a lista não é buscada (filtro de
+// companyId opcional - enquanto não informado, a lista não é buscada (filtro de
 // empresa da página exige seleção antes de consultar o backend)
 async function fetchTimeGroupsRequest(companyId: string): Promise<TimeGroup[]> {
     const { data } = await api.get("/time-groups", { params: { companyId } })

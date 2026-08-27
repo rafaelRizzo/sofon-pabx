@@ -22,7 +22,7 @@ export type RealtimeActiveCall = {
     callerNum: string
     startAt: number | null
     bridgedWith: string | null
-    // tronco por onde a ligação entrou — null se for chamada interna ou par ainda não capturado
+    // tronco por onde a ligação entrou - null se for chamada interna ou par ainda não capturado
     trunkName: string | null
 }
 
@@ -45,7 +45,7 @@ export type RealtimeTrunk = {
     type: string
     registrationMode: string
     presence: Presence
-    // Intervalo de registro configurado (segundos) — só existe pra troncos outbound com registro
+    // Intervalo de registro configurado (segundos) - só existe pra troncos outbound com registro
     expirySeconds: number | null
 }
 
@@ -72,7 +72,7 @@ export type RealtimeQueue = {
     companyId: string
     calls: number
     // média de hoje calculada a partir do CDR (não o QueueParams.Holdtime ao vivo do AMI, que
-    // zera sozinho quando a fila fica ociosa) — holdtimeSampleSize=0 é "sem chamada atendida
+    // zera sozinho quando a fila fica ociosa) - holdtimeSampleSize=0 é "sem chamada atendida
     // hoje ainda", não "média literalmente zero"
     holdtime: number
     holdtimeSampleSize: number

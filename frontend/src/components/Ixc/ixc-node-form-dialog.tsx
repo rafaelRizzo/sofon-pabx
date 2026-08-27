@@ -75,7 +75,7 @@ type Props = {
     open: boolean
     onOpenChange: (open: boolean) => void
     ixcNode: IxcNode | null
-    // true enquanto o registro ainda está sendo buscado por id (ver EditNodeDialog) — nesse caso
+    // true enquanto o registro ainda está sendo buscado por id (ver EditNodeDialog) - nesse caso
     // `ixcNode` também é null, mas não significa "criação": mostra skeleton em vez do form
     loading?: boolean
     companies: Company[]

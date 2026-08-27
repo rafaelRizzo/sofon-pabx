@@ -16,7 +16,7 @@ export interface TokenPayload {
     type?: 'access' | 'refresh'
 }
 
-// Gera access + refresh com JTIs distintos, cada um persistido no Redis com o TTL do próprio token —
+// Gera access + refresh com JTIs distintos, cada um persistido no Redis com o TTL do próprio token -
 // permite revogar o refresh no logout/rotação (antes só o access tinha JTI). Retorna refreshJti pra
 // quem precisar rastrear a sessão.
 export const generateTokens = async (payload: TokenPayload) => {

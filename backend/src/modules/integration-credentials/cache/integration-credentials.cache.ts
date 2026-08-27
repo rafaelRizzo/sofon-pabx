@@ -21,7 +21,7 @@ export class IntegrationCredentialsCache {
 
     static async invalidateByCompany(companyId: string) {
         // invalida tanto a chave sem provider quanto qualquer variante `companyId:provider`
-        // cacheada — mais simples invalidar o namespace inteiro do que rastrear providers usados
+        // cacheada - mais simples invalidar o namespace inteiro do que rastrear providers usados
         await cacheManager.invalidate(NAMESPACE)
         logger.info({ event: 'cache.invalidate', namespace: NAMESPACE, key: `company:${companyId}` })
     }

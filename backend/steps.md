@@ -1,12 +1,12 @@
-# Sofon PABX — Spec-Driven Tracker
+# Sofon PABX - Spec-Driven Tracker
 
 ## Escopo (não-negociável)
 
-**Não é micro-SaaS multi-tenant.** É centralização de provisionamento e roteamento de chamadas pra **instâncias de Asterisk isoladas, uma por VPS** (modelo MagnusBilling) — o Sofon orquestra várias instâncias via API, nunca concentra o tráfego/troncos de várias empresas numa única VPS/IP.
+**Não é micro-SaaS multi-tenant.** É centralização de provisionamento e roteamento de chamadas pra **instâncias de Asterisk isoladas, uma por VPS** (modelo MagnusBilling) - o Sofon orquestra várias instâncias via API, nunca concentra o tráfego/troncos de várias empresas numa única VPS/IP.
 
 **Motivo:** operadoras monitoram volume/padrão de chamadas por IP pra detecção de fraude (CLI spoofing, robocall, SIMbox). Um único IP com troncos de N empresas: amplia o raio de bloqueio (uma empresa com tráfego anômalo derruba o IP de todas), viola limite contratual de canais simultâneos por IP, e acopla risco de compliance entre clientes sem relação entre si. Ver seção "Escopo" do [README.md](../README.md) raiz.
 
-Qualquer feature/spec daqui pra frente deve assumir esse modelo — isolamento lógico (`asteriskId`) dentro da mesma VPS é válido, isolamento de tenants desconhecidos numa VPS compartilhada não é.
+Qualquer feature/spec daqui pra frente deve assumir esse modelo - isolamento lógico (`asteriskId`) dentro da mesma VPS é válido, isolamento de tenants desconhecidos numa VPS compartilhada não é.
 
 ## Status legend
 - `[x]` implementado e testado
@@ -120,7 +120,7 @@ Testes: `queues.routes.test.ts`, `queues.service.test.ts`
 | `[~]` | PUT | `/trunks/:id` | updateTrunk |
 | `[~]` | DELETE | `/trunks/:id` | deleteTrunk |
 
-Testes: **ausentes** — criar `trunks/__tests__/trunks.routes.test.ts` e `trunks.service.test.ts`
+Testes: **ausentes** - criar `trunks/__tests__/trunks.routes.test.ts` e `trunks.service.test.ts`
 
 #### Gaps vs spec
 - `GET /trunks` requer `?companyId=` obrigatório; spec descreve comportamento admin-sees-all (como os outros módulos). Avaliar se alinha ou se é intencional usar query explícita.

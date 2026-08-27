@@ -223,7 +223,7 @@ async function fetchIvrMenusRequest(companyId: string): Promise<IvrMenu[]> {
     return data.ivrMenus ?? []
 }
 
-// Referência estável enquanto a query ainda não resolveu (undefined) — um array literal `[]`
+// Referência estável enquanto a query ainda não resolveu (undefined) - um array literal `[]`
 // como default do destructuring recria a cada render, o que quebra useMemo/useEffect que
 // dependem de `allIvrMenus` (ver ivrById em flow-canvas.tsx) e causa loop de re-render
 // ("Maximum update depth exceeded") enquanto a query está loading/disabled.

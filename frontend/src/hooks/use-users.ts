@@ -34,12 +34,12 @@ export const createUserSchema = z.object({
     permissions: z.array(z.string()),
     // todo usuário precisa estar vinculado a >=1 empresa (ver users.schema.ts do backend)
     companyIds: z.array(z.string()).min(1, "Selecione ao menos uma empresa"),
-    // vincula o usuário a um ramal (softphone WebRTC, ver Extension.webrtc) — opcional, null = nenhum
+    // vincula o usuário a um ramal (softphone WebRTC, ver Extension.webrtc) - opcional, null = nenhum
     extensionId: z.string().nullable().optional(),
 })
 
 // Mesmo shape do create para o form; senha em branco = manter a atual.
-// O role não é enviado no PUT (backend não aceita) — omitido no updateUser.
+// O role não é enviado no PUT (backend não aceita) - omitido no updateUser.
 export const updateUserSchema = createUserSchema.extend({
     password: z
         .literal("")
@@ -54,7 +54,7 @@ async function fetchUsersRequest(): Promise<User[]> {
     return data.users ?? []
 }
 
-// Cache compartilhado via TanStack Query — mesma ideia de useCompanies()
+// Cache compartilhado via TanStack Query - mesma ideia de useCompanies()
 export function useUsers() {
     const queryClient = useQueryClient()
     const [filter, setFilter] = useState("")

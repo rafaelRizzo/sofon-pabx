@@ -56,7 +56,7 @@ function VariableConditionsPage() {
         <div className="flex flex-col gap-4">
             <PageHeader
                 title="Condições de variável"
-                description="Valida variáveis de canal (preenchida, tamanho, igualdade, regex, numérica) — o destino verdadeiro/falso se conecta pelo canvas do Flow"
+                description="Valida variáveis de canal (preenchida, tamanho, igualdade, regex, numérica) - o destino verdadeiro/falso se conecta pelo canvas do Flow"
             >
                 <Button onClick={() => setCreateOpen(true)}>
                     <PlusIcon />

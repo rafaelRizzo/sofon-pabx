@@ -26,7 +26,7 @@ type Props = {
     queues: RealtimeQueue[]
     loading: boolean
     companySelected: boolean
-    // sobrescreve a mensagem de "nenhum ramal" — usado quando o hideOffline filtrou tudo (front,
+    // sobrescreve a mensagem de "nenhum ramal" - usado quando o hideOffline filtrou tudo (front,
     // ver monitoring/page.tsx), pra não parecer que a empresa não tem ramal nenhum cadastrado
     emptyMessage?: string
 }

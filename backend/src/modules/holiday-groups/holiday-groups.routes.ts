@@ -48,7 +48,7 @@ export const holidayGroupsRoutes = async (app: FastifyInstance) => {
         onRequest: [...protectedRoute, requirePermission('holiday-groups', 'manage')],
         schema: {
             tags: ['Holiday Groups'],
-            summary: 'Criar grupo de feriados — datas manuais ou auto-atualizadas por url',
+            summary: 'Criar grupo de feriados - datas manuais ou auto-atualizadas por url',
             security: [{ bearerAuth: [] }],
             body: createHolidayGroupSchema,
             response: {

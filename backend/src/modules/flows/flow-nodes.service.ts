@@ -282,7 +282,7 @@ function withFlowEdgeLock<T>(flowId: string, fn: () => Promise<T>): Promise<T> {
 
 // Best-effort, mesmo motivo do regenerateSafely em queues.service.ts: o FlowNode/FlowNodeEdge já
 // foi commitado, e cada um desses recursos embute um GotoIf($[FLOW_NODE_ID]...) (ver
-// nodeExitCheck em flow-node-runtime.ts) que só existe no .conf dele depois de um regenerate seu —
+// nodeExitCheck em flow-node-runtime.ts) que só existe no .conf dele depois de um regenerate seu -
 // sem chamar aqui, editar o node/edge no canvas nunca atualiza o dialplan do recurso reutilizado
 // (ele só se atualizaria da próxima vez que fosse salvo pelo próprio CRUD, fora do Flow).
 const regenerateSafely = async (fn: () => Promise<void>, companyId: string) => {
@@ -329,7 +329,7 @@ async function regenerate(flowId: string, companyId: string) {
 }
 
 // Chamado pelo update() de cada módulo de recurso (ivr/queue/announcement/...) quando o nome
-// muda. FlowNode.label é uma cópia congelada capturada na conexão (ver createFlowNode) — sem
+// muda. FlowNode.label é uma cópia congelada capturada na conexão (ver createFlowNode) - sem
 // isso, o rótulo exibido nos conectores de outros nós do canvas (Conectar/Timeout/Inválido/
 // dígitos) nunca acompanha um rename feito fora do próprio nó.
 export const syncFlowNodeLabel = async (
@@ -436,7 +436,7 @@ export const updateFlowNode = async (
       });
     return result;
   });
-  // position/label são puramente visuais (mesmo motivo do createFlowNode) — só resourceId/isEntry
+  // position/label são puramente visuais (mesmo motivo do createFlowNode) - só resourceId/isEntry
   // afetam o .conf gerado e o DTO cacheado em FlowsCache. Sem esse gate, todo autosave de arraste
   // (PUT/:nodeId a cada drag-stop) dispararia um regenerate() completo da empresa (Flow + FlowNode
   // + queue/announcement/timecondition/holiday/ivr/variable/variablecondition, cada um com reload

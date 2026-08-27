@@ -42,7 +42,7 @@ export type CallRatingForm = z.infer<typeof createCallRatingFormSchema>
 
 const DEFAULT_LIMIT = 50
 
-// companyId é obrigatório na query do backend — sem opção de "todas as empresas" aqui
+// companyId é obrigatório na query do backend - sem opção de "todas as empresas" aqui
 export function useCallRatings(
     companyId?: string,
     filters: CallRatingFilters = {}

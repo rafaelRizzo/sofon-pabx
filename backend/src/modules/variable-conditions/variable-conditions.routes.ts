@@ -53,7 +53,7 @@ export const variableConditionsRoutes = async (app: FastifyInstance) => {
         schema: {
             tags: ['Variable Conditions'],
             summary: 'Criar condição de variável',
-            description: 'Valida variável(is) de canal (preenchida, tamanho, igualdade, regex, numérica) e direciona por trueRoute/falseRoute — usável como RouteDestination (type: "variable-condition") em qualquer fluxo.',
+            description: 'Valida variável(is) de canal (preenchida, tamanho, igualdade, regex, numérica) e direciona por trueRoute/falseRoute - usável como RouteDestination (type: "variable-condition") em qualquer fluxo.',
             security: [{ bearerAuth: [] }],
             body: createVariableConditionSchema,
             response: {

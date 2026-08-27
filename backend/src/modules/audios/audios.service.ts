@@ -28,7 +28,7 @@ const select = {
     updatedAt: true,
 } as const
 
-// Escreve o buffer em tmp e converte pro WAV final do Asterisk — usado tanto por upload quanto
+// Escreve o buffer em tmp e converte pro WAV final do Asterisk - usado tanto por upload quanto
 // por TTS. Em caso de falha na conversão, apaga o registro já criado (rollback).
 const persistAudioFile = async (company: Pick<CompanyDto, 'asteriskId'>, audioId: string, buffer: Buffer, ext: string) => {
     const dir = audioSoundDir(company.asteriskId)
@@ -69,7 +69,7 @@ export const getAudioById = async (id: string) => {
     return audio
 }
 
-// valida que audioId existe e pertence à empresa — usado por Announcement/IVR ao vincular áudio
+// valida que audioId existe e pertence à empresa - usado por Announcement/IVR ao vincular áudio
 export const assertAudioBelongsToCompany = async (audioId: string | null | undefined, companyId: string) => {
     if (!audioId) return
     const audio = await prisma.audio.findUnique({ where: { id: audioId }, select: { companyId: true } })
@@ -163,7 +163,7 @@ export const updateAudio = async (id: string, data: UpdateAudioInput) => {
     return audio
 }
 
-// desvincula (SetNull) de qualquer Announcement/IvrMenu que referencie esse áudio — sem isso o
+// desvincula (SetNull) de qualquer Announcement/IvrMenu que referencie esse áudio - sem isso o
 // dialplan deles ficaria com Playback/Read apontando pra um .wav que não existe mais
 export const deleteAudio = async (id: string) => {
     const existing = await prisma.audio.findUnique({
@@ -187,10 +187,10 @@ export const deleteAudio = async (id: string) => {
 
     await prisma.$transaction(async (tx) => {
         await tx.audio.delete({ where: { id } })
-        // FK onDelete:SetNull já zera Queue.announce/periodicAnnounce/agentAnnounce no Prisma —
+        // FK onDelete:SetNull já zera Queue.announce/periodicAnnounce/agentAnnounce no Prisma -
         // mas a tabela realtime do Asterisk (queues) guarda o path absoluto resolvido, não o
         // audioId, e não tem relação com Audio, então precisa ser zerada manualmente aqui.
-        // `announce` (join, tocado pro caller) não tem coluna realtime — é um Playback no
+        // `announce` (join, tocado pro caller) não tem coluna realtime - é um Playback no
         // dialplan, resolvido via regenerate() abaixo. `periodicAnnounce`/`agentAnnounce` viram
         // as colunas realtime `periodicAnnounce`/`announce`, respectivamente
         for (const q of queuesWithAudio) {

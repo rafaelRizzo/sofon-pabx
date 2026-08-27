@@ -1,3 +1,3 @@
-// Ponte de compatibilidade — implementação real em ./destinations/request-template.repository
+// Ponte de compatibilidade - implementação real em ./destinations/request-template.repository
 // (reorganizado por domínio; ver subpastas transport/dialplan/endpoints/destinations/flows)
 export * from './destinations/request-template.repository'

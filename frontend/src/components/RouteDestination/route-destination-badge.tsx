@@ -23,7 +23,7 @@ interface RouteDestinationBadgeProps {
     tone?: DestinationTone
 }
 
-// O nome legível (label) já vem resolvido do backend (ver route-destination-label.ts) — sem
+// O nome legível (label) já vem resolvido do backend (ver route-destination-label.ts) - sem
 // fetch client-side, sem estado de "carregando"/"registro não encontrado" pra gerenciar aqui.
 export function RouteDestinationBadge({
     destination,

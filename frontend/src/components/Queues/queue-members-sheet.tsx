@@ -41,7 +41,7 @@ type Props = {
     queue: Queue | null
 }
 
-// Colunas compartilhadas pelo cabeçalho e por cada MemberRow — grid (não flex com larguras
+// Colunas compartilhadas pelo cabeçalho e por cada MemberRow - grid (não flex com larguras
 // soltas) garante que rótulo e valor fiquem sempre alinhados verticalmente.
 const MEMBER_ROW_COLS = "grid-cols-[1fr_3.5rem_6rem_1.75rem]"
 
@@ -71,7 +71,7 @@ function useCompanyExtensions(companyId?: string) {
     return { extensions, loading }
 }
 
-// Tooltip explicando o campo de prioridade — reaproveitado no cabeçalho da lista e no
+// Tooltip explicando o campo de prioridade - reaproveitado no cabeçalho da lista e no
 // formulário de adicionar membro, já que o número sozinho ("penalty" do Asterisk) não é
 // autoexplicativo: quanto menor, mais cedo o ramal recebe chamadas.
 function PriorityHint() {

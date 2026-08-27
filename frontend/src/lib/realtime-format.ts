@@ -10,7 +10,7 @@ export function formatElapsed(startAt: number | null): string {
 }
 
 export function activeCallLabel(activeCall: RealtimeActiveCall): string {
-    const who = activeCall.callerNum || "—"
+    const who = activeCall.callerNum || "-"
     const via = activeCall.trunkName ? ` via ${activeCall.trunkName}` : ""
     return `${who}${via} · há ${formatElapsed(activeCall.startAt)}`
 }

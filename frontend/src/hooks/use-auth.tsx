@@ -10,7 +10,7 @@ import { api } from "@/lib/api"
 
 // Espelha o catálogo do backend (backend/src/utils/auth/permissions.ts); só relevante para
 // role "user" (admin/reseller têm acesso irrestrito, ver hasPermission abaixo).
-// `category` agrupa a lista na UI de edição de usuário (user-form-dialog.tsx) — não existe no
+// `category` agrupa a lista na UI de edição de usuário (user-form-dialog.tsx) - não existe no
 // backend, é só apresentação.
 export const PERMISSION_RESOURCES = [
   { key: "companies", label: "Empresas", category: "Administração" },

@@ -35,7 +35,7 @@ import {
 } from "./schemas/flow-export.schema";
 import { errors, deleted } from "../../schemas/responses";
 
-// Export/import embute config completa dos recursos referenciados (inclusive áudio em base64) —
+// Export/import embute config completa dos recursos referenciados (inclusive áudio em base64) -
 // mesmo motivo do bodyLimit maior em backup.routes.ts, só que num corpo tipicamente bem menor
 // (um único Flow, não a empresa inteira)
 const FLOW_TRANSFER_BODY_LIMIT = 50 * 1024 * 1024;
@@ -92,7 +92,7 @@ export const flowsRoutes = async (app: FastifyInstance) => {
         summary:
           "Grafo do flow (nós alcançáveis a partir do entryDestination + arestas)",
         description:
-          "Só leitura — percorre os destinos de cada nó visitado a partir do entryDestination (BFS, com guard de ciclo). Usado pelo canvas visual pra desenhar o grafo inteiro, não só o nó de entrada.",
+          "Só leitura - percorre os destinos de cada nó visitado a partir do entryDestination (BFS, com guard de ciclo). Usado pelo canvas visual pra desenhar o grafo inteiro, não só o nó de entrada.",
         security: [{ bearerAuth: [] }],
         params: idParamSchema,
         response: {
@@ -286,7 +286,7 @@ export const flowsRoutes = async (app: FastifyInstance) => {
         tags: ["Flows"],
         summary: "Criar flow",
         description:
-          'Alias nomeado/reaproveitável pra uma cadeia de nós — aparece como type="flow" em qualquer RouteDestination.',
+          'Alias nomeado/reaproveitável pra uma cadeia de nós - aparece como type="flow" em qualquer RouteDestination.',
         security: [{ bearerAuth: [] }],
         body: createFlowSchema,
         response: {
@@ -377,7 +377,7 @@ export const flowsRoutes = async (app: FastifyInstance) => {
         description:
           "Retorna um .json autocontido (áudios em base64) com o Flow, seus nós/conexões do canvas e a configuração completa de cada recurso referenciado " +
           "(Queue, IVR, Announcement, Request Template, Variable Set/Condition, Time Condition, Holiday Group), recursivo em nós de Flow aninhado. " +
-          "Nunca inclui credencial de integração (nó IXC) nem ramal (Extension) — esses dois exigem resolução manual no import.",
+          "Nunca inclui credencial de integração (nó IXC) nem ramal (Extension) - esses dois exigem resolução manual no import.",
         security: [{ bearerAuth: [] }],
         params: idParamSchema,
         response: {

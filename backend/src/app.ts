@@ -52,10 +52,10 @@ const env = validateEnv()
 
 const app = Fastify({
     logger: false,
-    // 1 hop confiável (nginx/NPM) — sem isso, X-Forwarded-For é ignorado e request.ip vira sempre
+    // 1 hop confiável (nginx/NPM) - sem isso, X-Forwarded-For é ignorado e request.ip vira sempre
     // o IP do proxy, fazendo rate-limit por-IP e logs de IP virarem um limite/valor global disfarçado.
     // Fastify aceita number nessa opção (ver docs), mas o .d.ts da versão instalada (5.10.0) só
-    // declara boolean|string|string[]|TrustProxyFunction — gap de tipagem upstream, comportamento
+    // declara boolean|string|string[]|TrustProxyFunction - gap de tipagem upstream, comportamento
     // em runtime é idêntico ao documentado
     trustProxy: 1 as unknown as boolean,
     logController: new LogController({ requestIdLogLabel: 'reqId' }),
@@ -83,7 +83,7 @@ app.addHook('preSerialization', async (request, reply, payload) => {
             const company = await getCompanyById(companyId)
             tzByCompanyId.set(companyId, company.timezone)
         } catch {
-            // companyId sumiu (delete concorrente) — cai no fallback env.TZ em vez de derrubar a resposta inteira
+            // companyId sumiu (delete concorrente) - cai no fallback env.TZ em vez de derrubar a resposta inteira
         }
     }))
 
@@ -115,7 +115,7 @@ app.addHook('preHandler', async (request) => {
 })
 
 // ETag pra GETs cacheáveis: revalida sempre (no-cache), mas devolve 304 sem body se o conteúdo
-// não mudou. Exclui /realtime (snapshot + SSE) — muda a todo instante, hash seria desperdício
+// não mudou. Exclui /realtime (snapshot + SSE) - muda a todo instante, hash seria desperdício
 const ETAG_EXCLUDED_PREFIXES = ['/docs', '/realtime']
 
 app.addHook('onSend', async (request, reply, payload) => {
@@ -147,7 +147,7 @@ app.addHook('onResponse', async (request, reply) => {
     })
 })
 
-// /docs (Scalar + spec OpenAPI) expõe o mapa completo de endpoints/schemas — em produção só
+// /docs (Scalar + spec OpenAPI) expõe o mapa completo de endpoints/schemas - em produção só
 // admin autenticado acessa, pra não facilitar reconhecimento por quem só tem a URL pública.
 app.addHook('onRequest', async (request, reply) => {
     if (env.NODE_ENV !== 'production' || !request.url.startsWith('/docs')) return
@@ -191,7 +191,7 @@ app.register(scalar, {
 })
 
 // Register plugins
-// CSP default do helmet pra toda resposta — API é majoritariamente JSON, então o único risco de
+// CSP default do helmet pra toda resposta - API é majoritariamente JSON, então o único risco de
 // regressão é a UI do Scalar em /docs (usa estilo/script inline), por isso ela mantém CSP
 // desligada especificamente (ver hook onSend abaixo), preservando o comportamento de sempre ali.
 app.register(helmet)
@@ -204,7 +204,7 @@ app.register(cors, {
     credentials: true,
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     // Content-Disposition: front lê o filename real da gravação (GET /cdr/:id/recording) pra
-    // nomear o download/play em vez de um nome genérico — sem isso o JS não enxerga esse header
+    // nomear o download/play em vez de um nome genérico - sem isso o JS não enxerga esse header
     // em resposta cross-origin, mesmo vindo certo do backend
     exposedHeaders: ['Content-Disposition'],
 })
@@ -291,7 +291,7 @@ app.get('/health', async (req, reply) => {
     }
 })
 
-// Config SIP/PJSIP da instância (versão do Asterisk define as portas — ver setups/install-asterisk.sh)
+// Config SIP/PJSIP da instância (versão do Asterisk define as portas - ver setups/install-asterisk.sh)
 app.register(async (router) => {
     router.get('/system/sip-config', { onRequest: protectedRoute }, async (req, reply) => {
         return reply.send({

@@ -133,7 +133,7 @@ describe('CdrService.getCdrByCompany', () => {
                     queueName: 'ast1-queue-100',
                     linkedid: '1234.1',
                     uniqueid: '1234.5',
-                    // startDate/endDate cobrem o dia inteiro; sem conversão de tz — os dígitos já batem com o storage naive local
+                    // startDate/endDate cobrem o dia inteiro; sem conversão de tz - os dígitos já batem com o storage naive local
                     startTime: {
                         gte: new Date('2026-01-01T00:00:00.000Z'),
                         lte: new Date('2026-01-31T23:59:59.999Z')
@@ -248,7 +248,7 @@ describe('CdrService.getCdrByCompany', () => {
 
         expect(result.records[0]).toMatchObject({
             queueLabel: 'Suporte (600)',
-            // destinationLabel fica null pra fila — a coluna "Fila" já cobre esse nome, repetir
+            // destinationLabel fica null pra fila - a coluna "Fila" já cobre esse nome, repetir
             // em "Destino" seria redundante (ver comentário em cdr-enrichment.ts)
             destinationLabel: null,
             answeredBy: { extensionId: 'ext1', label: '2002 - João' },

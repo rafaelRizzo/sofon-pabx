@@ -6,13 +6,13 @@ import { logger } from '../../utils/logger'
 const optionalCompanyQuery = z.object({ companyId: z.cuid2().optional() })
 
 // Rajadas de eventos AMI (ex: reconexão que reemite dezenas de ContactStatus de uma vez) colapsam
-// num único refetch por conexão — sem isso cada evento dispararia uma query Prisma+Redis por client conectado
+// num único refetch por conexão - sem isso cada evento dispararia uma query Prisma+Redis por client conectado
 const COALESCE_MS = 300
 // Mantém proxies reversos (Nginx Proxy Manager, ver backend/CLAUDE.md) de fechar a conexão por inatividade
 const HEARTBEAT_MS = 25_000
 
 // Empurra o status (extensions/trunks/queues) assim que muda, em vez do polling REST de 1s que
-// existia antes — reaproveita os mesmos service functions (getExtensionsStatus etc.), só troca o
+// existia antes - reaproveita os mesmos service functions (getExtensionsStatus etc.), só troca o
 // gatilho de "a cada 1s" pra "quando o realtime-bus avisar que esse tipo de entidade mudou"
 export async function streamRealtimeStatus<T>(
     req: FastifyRequest,
@@ -33,7 +33,7 @@ export async function streamRealtimeStatus<T>(
     const res = reply.raw
 
     // reply.header(...) (CORS, helmet etc.) só fica guardado no objeto reply até o send() de
-    // verdade rodar — como a gente escreve direto em reply.raw, precisa copiar esses headers pra cá
+    // verdade rodar - como a gente escreve direto em reply.raw, precisa copiar esses headers pra cá
     // ANTES do writeHead, senão o hijack derruba tudo isso (ex: Access-Control-Allow-Origin sumindo
     // e o browser bloqueando a resposta por CORS mesmo o backend respondendo 200)
     for (const [key, value] of Object.entries(reply.getHeaders())) {

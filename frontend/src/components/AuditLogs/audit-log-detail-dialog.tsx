@@ -1,6 +1,6 @@
 "use client"
 
-import { ArrowRight, Check, Copy } from "lucide-react"
+import { ArrowRight, Check, ChevronsUpDown, Copy } from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
 
@@ -21,7 +21,7 @@ import {
     type AuditLogModel,
 } from "@/hooks/use-audit-logs"
 
-// updatedAt sempre muda junto de qualquer edição real (Prisma @updatedAt) — não é uma mudança de
+// updatedAt sempre muda junto de qualquer edição real (Prisma @updatedAt) - não é uma mudança de
 // negócio, então some da lista mesmo quando outros campos realmente mudaram (ver IGNORED_DIFF_FIELDS
 // espelhado em backend/src/lib/prisma.ts, que usa o mesmo campo pra decidir se grava o log ou não)
 const IGNORED_DIFF_FIELDS = new Set(["updatedAt"])
@@ -53,7 +53,7 @@ function formatLeafValue(value: unknown): string {
 
 type Leaf = { groupPath: string[]; fieldLabel: string; value: unknown }
 
-// Achata objetos/arrays em pares "rótulo: valor" — arrays de objetos viram grupos (identificados por
+// Achata objetos/arrays em pares "rótulo: valor" - arrays de objetos viram grupos (identificados por
 // nodeId/id/name quando existir), pra nunca precisar mostrar chaves/colchetes de JSON cru na tela
 function flattenValue(value: unknown, path: string[] = [], out: Leaf[] = []): Leaf[] {
     if (Array.isArray(value)) {
@@ -124,6 +124,9 @@ function groupByPath<T extends { groupPath: string[] }>(leaves: T[]): { label: s
     return groups
 }
 
+// acima disso o valor não cabe numa linha só, então vale a pena oferecer o botão de expandir
+const EXPAND_THRESHOLD = 40
+
 function CopyButton({ value }: { value: string }) {
     const [copied, setCopied] = useState(false)
 
@@ -144,44 +147,84 @@ function CopyButton({ value }: { value: string }) {
     )
 }
 
+function ExpandButton({ expanded, onClick }: { expanded: boolean; onClick: () => void }) {
+    return (
+        <Button
+            variant="ghost"
+            size="icon"
+            className="size-5 shrink-0 text-muted-foreground hover:text-foreground"
+            onClick={onClick}
+        >
+            <ChevronsUpDown className="size-3" />
+            <span className="sr-only">{expanded ? "Recolher valor" : "Expandir valor"}</span>
+        </Button>
+    )
+}
+
 function DiffLeafRow({ leaf }: { leaf: DiffLeaf }) {
     const before = formatLeafValue(leaf.before)
     const after = formatLeafValue(leaf.after)
+    const [expanded, setExpanded] = useState(false)
+    const expandable = before.length > EXPAND_THRESHOLD || after.length > EXPAND_THRESHOLD
 
     return (
-        <div className="group flex items-center justify-between gap-3 py-1 text-xs">
+        <div className={cn("group flex gap-3 py-1 text-xs", expanded ? "items-start" : "items-center justify-between")}>
             <span className="shrink-0 text-muted-foreground">{leaf.fieldLabel}</span>
-            <span className="flex min-w-0 items-center gap-1.5 truncate font-mono">
-                <span className="truncate text-red-600/80 line-through dark:text-red-400/70">{before}</span>
-                <ArrowRight className="size-3 shrink-0 text-muted-foreground" />
-                <span className="truncate font-medium text-emerald-700 dark:text-emerald-400">{after}</span>
-                <span className="opacity-0 group-hover:opacity-100">
+            <div
+                className={cn(
+                    "flex min-w-0 items-center gap-1.5 font-mono",
+                    expanded && "flex-col items-stretch gap-1"
+                )}
+            >
+                <span
+                    className={cn(
+                        "min-w-0 text-red-600/80 line-through dark:text-red-400/70",
+                        expanded ? "whitespace-pre-wrap break-words" : "truncate"
+                    )}
+                >
+                    {before}
+                </span>
+                {!expanded && <ArrowRight className="size-3 shrink-0 text-muted-foreground" />}
+                <span
+                    className={cn(
+                        "min-w-0 font-medium text-emerald-700 dark:text-emerald-400",
+                        expanded ? "whitespace-pre-wrap break-words" : "truncate"
+                    )}
+                >
+                    {after}
+                </span>
+                <span className={cn("flex shrink-0 items-center", !expanded && "opacity-0 group-hover:opacity-100")}>
+                    {expandable && <ExpandButton expanded={expanded} onClick={() => setExpanded((v) => !v)} />}
                     <CopyButton value={after} />
                 </span>
-            </span>
+            </div>
         </div>
     )
 }
 
 function SnapshotLeafRow({ leaf, tone }: { leaf: Leaf; tone: "before" | "after" }) {
     const formatted = formatLeafValue(leaf.value)
+    const [expanded, setExpanded] = useState(false)
+    const expandable = formatted.length > EXPAND_THRESHOLD
 
     return (
-        <div className="group flex items-center justify-between gap-3 py-1 text-xs">
+        <div className={cn("group flex gap-3 py-1 text-xs", expanded ? "items-start" : "items-center justify-between")}>
             <span className="shrink-0 text-muted-foreground">{leaf.fieldLabel}</span>
-            <span className="flex min-w-0 items-center gap-1.5 truncate">
+            <div className={cn("flex min-w-0 items-center gap-1.5", expanded && "flex-col items-stretch gap-1")}>
                 <span
                     className={cn(
-                        "truncate font-mono",
+                        "min-w-0 font-mono",
+                        expanded ? "whitespace-pre-wrap break-words" : "truncate",
                         tone === "after" ? "text-emerald-700 dark:text-emerald-400" : "text-red-700 dark:text-red-400",
                     )}
                 >
                     {formatted}
                 </span>
-                <span className="opacity-0 group-hover:opacity-100">
+                <span className={cn("flex shrink-0 items-center", !expanded && "opacity-0 group-hover:opacity-100")}>
+                    {expandable && <ExpandButton expanded={expanded} onClick={() => setExpanded((v) => !v)} />}
                     <CopyButton value={formatted} />
                 </span>
-            </span>
+            </div>
         </div>
     )
 }
@@ -231,8 +274,8 @@ export function AuditLogDetailDialog({ log, onOpenChange }: Props) {
 
     return (
         <Dialog open={!!log} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-2xl">
-                <DialogHeader>
+            <DialogContent className="flex max-h-[85vh] max-w-2xl flex-col overflow-hidden!">
+                <DialogHeader className="shrink-0">
                     <DialogTitle>
                         {log && (AUDIT_LOG_MODEL_LABEL[log.model as AuditLogModel] ?? log.model)}
                         {" · "}
@@ -243,13 +286,18 @@ export function AuditLogDetailDialog({ log, onOpenChange }: Props) {
                             {log.actorName ?? "Usuário removido"}
                             {" · "}
                             {new Date(log.createdAt).toLocaleString("pt-BR")}
-                            {log.recordId && ` · ${log.recordId}`}
+                            {log.recordId && (
+                                <>
+                                    {" · "}
+                                    <span className="break-all">{log.recordId}</span>
+                                </>
+                            )}
                         </DialogDescription>
                     )}
                 </DialogHeader>
 
                 {isBulk ? (
-                    <ScrollArea className="max-h-96 rounded-md border bg-muted/30">
+                    <ScrollArea className="min-w-0 flex-1 overflow-x-hidden! rounded-md border bg-muted/30">
                         <pre className="p-3 text-xs">
                             {JSON.stringify({ before: log?.before, after: log?.after }, null, 2)}
                         </pre>
@@ -260,7 +308,7 @@ export function AuditLogDetailDialog({ log, onOpenChange }: Props) {
                             Nenhum campo alterado registrado
                         </p>
                     ) : (
-                        <ScrollArea className="max-h-[28rem]">
+                        <ScrollArea className="min-w-0 flex-1 overflow-x-hidden!">
                             <div className="pr-3">
                                 <GroupedList leaves={diff} renderLeaf={(leaf) => <DiffLeafRow leaf={leaf} />} />
                             </div>
@@ -269,7 +317,7 @@ export function AuditLogDetailDialog({ log, onOpenChange }: Props) {
                 ) : snapshot.length === 0 ? (
                     <p className="py-4 text-center text-sm text-muted-foreground">Nenhum dado registrado</p>
                 ) : (
-                    <ScrollArea className="h-[28rem]">
+                    <ScrollArea className="min-w-0 flex-1 overflow-x-hidden!">
                         <div className="pr-3">
                             <GroupedList
                                 leaves={snapshot}

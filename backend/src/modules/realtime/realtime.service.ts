@@ -37,7 +37,7 @@ async function safeZRangeWithScores(key: string): Promise<{ uniqueid: string; wa
     }
 }
 
-// callerNum não é gravado no sorted set (só uniqueid/score) — o Newchannel já populou
+// callerNum não é gravado no sorted set (só uniqueid/score) - o Newchannel já populou
 // rt:call:<uniqueid> antes do caller entrar na fila, então enriquece aqui na leitura
 async function withCallerInfo(waiting: { uniqueid: string; waitingSince: number }[]) {
     return Promise.all(waiting.map(async (w) => {
@@ -83,7 +83,7 @@ export const getExtensionsStatus = async (companyIds?: string[]) => {
         ])
 
         // peerChannel (gravado por handleDialBegin, ami-events.ts) é o canal de quem discou pra
-        // esse ramal — se for um tronco, extrai o nome cru removendo o prefixo `<asteriskId>-trunk-`
+        // esse ramal - se for um tronco, extrai o nome cru removendo o prefixo `<asteriskId>-trunk-`
         // (toAsteriskId em trunks.service.ts) em vez de bater no banco por tronco
         const trunkPrefix = `${company.asteriskId}-trunk-`
         const activeCallsRaw = await Promise.all(callUniqueids.map(async (uniqueid) => {
@@ -101,7 +101,7 @@ export const getExtensionsStatus = async (companyIds?: string[]) => {
                 trunkName,
             }
         }))
-        // órfão: uniqueid ainda no set mas o hash já expirou/sumiu (Hangup perdido) — descarta na leitura
+        // órfão: uniqueid ainda no set mas o hash já expirou/sumiu (Hangup perdido) - descarta na leitura
         const activeCalls = activeCallsRaw.filter((c): c is NonNullable<typeof c> => c !== null)
 
         return {
@@ -141,7 +141,7 @@ export const getTrunksStatus = async (companyIds?: string[]) => {
         return {
             ...trunk,
             presence: status.presence === 'online' || status.presence === 'offline' ? status.presence : 'unknown',
-            // Intervalo de registro configurado (segundos) — só existe pra troncos outbound PJSIP
+            // Intervalo de registro configurado (segundos) - só existe pra troncos outbound PJSIP
             // com registro (ver hydratePjsipRegistrations em ami-events.ts); null pros demais
             expirySeconds: status.expirySeconds ? Number(status.expirySeconds) : null,
         }
@@ -194,7 +194,7 @@ export const getQueuesStatus = async (companyIds?: string[]) => {
             number: queue.number,
             companyId: queue.companyId,
             // Ao vivo via QueueCallerJoin/Leave (queueWaitingKey), não o QueueParams.Calls do
-            // snapshot periódico do AMI (esse só atualizava a cada 30s/no login — parecia
+            // snapshot periódico do AMI (esse só atualizava a cada 30s/no login - parecia
             // "não tão realtime assim" enquanto "Aguardando" já era instantâneo)
             calls: waiting.length,
             holdtime: holdtime.avgHoldtimeSeconds,

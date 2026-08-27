@@ -16,7 +16,7 @@ type Props = {
 }
 
 // Botão compacto pra inserir uma variável de canal Asterisk documentada (ver asterisk-variables.ts)
-// na posição do cursor de um campo que aceita placeholder {{VAR}} — usar junto de useVariableInsert.
+// na posição do cursor de um campo que aceita placeholder {{VAR}} - usar junto de useVariableInsert.
 export function VariableInsertButton({ onSelect, className }: Props) {
     const [open, setOpen] = useState(false)
     const [query, setQuery] = useState("")

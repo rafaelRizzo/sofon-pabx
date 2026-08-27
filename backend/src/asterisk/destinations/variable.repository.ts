@@ -16,7 +16,7 @@ async function resolveTarget(dest: RouteDestination): Promise<string | null> {
     return target ? `${target.context},${target.exten},${target.priority}` : null
 }
 
-// value pode conter interpolação nativa do Asterisk (${OUTRAVAR}) — resolvida em tempo de chamada
+// value pode conter interpolação nativa do Asterisk (${OUTRAVAR}) - resolvida em tempo de chamada
 // pelo próprio Set(), sem precisar de AGI (diferente de RequestTemplate.variableMappings)
 export function buildDialplan(id: string, name: string, assignments: Assignment[], target: string | null): DialplanRow[] {
     const context = VAR_CONTEXT
@@ -38,7 +38,7 @@ export function buildDialplan(id: string, name: string, assignments: Assignment[
 
 export const VariableRepository = {
     // Reconstrói o arquivo de dialplan da empresa inteira pra esse contexto, a partir do estado
-    // atual em banco — chamado depois de qualquer create/update/delete de VariableSet.
+    // atual em banco - chamado depois de qualquer create/update/delete de VariableSet.
     async regenerate(companyId: string) {
         const asteriskId = await resolveAsteriskId(companyId)
         return withDialplanLock(`${VAR_CONTEXT}:${asteriskId}`, async () => {

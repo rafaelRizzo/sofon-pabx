@@ -67,23 +67,23 @@ export type Queue = {
     weight: number
     joinEmpty: boolean
     leaveWhenEmpty: boolean
-    // não é mais editável por aqui — só via arrastar uma conexão no canvas do Flow (ver
+    // não é mais editável por aqui - só via arrastar uma conexão no canvas do Flow (ver
     // flow-canvas.tsx), que grava direto no FlowEdge por PUT separado. Mantido no tipo só porque a
     // API ainda devolve o campo (label resolvido, usado em telas de leitura)
     postQueueDestination: RouteDestination
     usedBy: UsedByRef[]
-    // Pesquisa de satisfação pós-atendimento (módulo callcenter) — surveyAudioId é o áudio
+    // Pesquisa de satisfação pós-atendimento (módulo callcenter) - surveyAudioId é o áudio
     // vinculado (null = desligada), hasSurveyAudio é derivado (surveyAudioId !== null)
     surveyAudioId: string | null
     hasSurveyAudio: boolean
-    // Liga, só nessa fila, prioridade dinâmica (RoutingRule) e roteamento por afinidade (penalty) —
+    // Liga, só nessa fila, prioridade dinâmica (RoutingRule) e roteamento por afinidade (penalty) -
     // motor opcional do módulo Callcenter (regras/notas configuradas por empresa em /dashboard/callcenter)
     callcenterEnabled: boolean
     createdAt: string
     updatedAt: string
 }
 
-// Campos numéricos com default no backend — string vazia (campo limpo pelo usuário) cai no
+// Campos numéricos com default no backend - string vazia (campo limpo pelo usuário) cai no
 // default em vez de virar inválido
 const intWithDefault = (min: number, max: number, def: number) =>
     z.preprocess(
@@ -91,7 +91,7 @@ const intWithDefault = (min: number, max: number, def: number) =>
         z.number().int().min(min, `Mínimo ${min}`).max(max, `Máximo ${max}`)
     )
 
-// Espelha create/updateQueueSchema de backend/src/modules/queues/schemas/queue.schema.ts —
+// Espelha create/updateQueueSchema de backend/src/modules/queues/schemas/queue.schema.ts -
 // companyId só existe no create, o PUT do backend não permite trocar a empresa da fila
 const baseQueueFields = {
     name: z
@@ -105,7 +105,7 @@ const baseQueueFields = {
         .max(20, "Máximo 20 caracteres")
         .regex(/^\d+$/, "Apenas dígitos"),
     strategy: z.enum(QUEUE_STRATEGIES).default("ringall"),
-    // Sem gestão de classes de MOH no Asterisk ainda — sempre "default" (única classe configurada)
+    // Sem gestão de classes de MOH no Asterisk ainda - sempre "default" (única classe configurada)
     musicOnHold: z.string().min(1).max(128).default("default"),
     timeout: intWithDefault(1, 300, 15),
     retry: intWithDefault(1, 300, 5),
@@ -113,14 +113,14 @@ const baseQueueFields = {
     wrapupTime: intWithDefault(0, Number.MAX_SAFE_INTEGER, 5),
     // Anúncio tocado uma única vez ao entrar na fila (id de um Audio, ou null pra nenhum)
     announce: z.string().nullable(),
-    // Frequência/toggle do "diz sua posição na fila" — announceFrequency só faz efeito com
+    // Frequência/toggle do "diz sua posição na fila" - announceFrequency só faz efeito com
     // announcePosition=true
     announceFrequency: intWithDefault(0, Number.MAX_SAFE_INTEGER, 0),
     announcePosition: z.boolean().default(false),
-    // Mensagem repetida periodicamente durante a espera — diferente do announce acima
+    // Mensagem repetida periodicamente durante a espera - diferente do announce acima
     periodicAnnounce: z.string().nullable(),
     periodicAnnounceFrequency: intWithDefault(0, Number.MAX_SAFE_INTEGER, 60),
-    // Anúncio tocado pro atendente antes do bridge — diferente do announce (que é pro cliente)
+    // Anúncio tocado pro atendente antes do bridge - diferente do announce (que é pro cliente)
     agentAnnounce: z.string().nullable(),
     joinEmpty: z.boolean().default(true),
     leaveWhenEmpty: z.boolean().default(false),
@@ -141,8 +141,8 @@ export const updateQueueFormSchema = z.object(baseQueueFields)
 export type QueueForm = z.infer<typeof createQueueFormSchema>
 export type QueueUpdateForm = z.infer<typeof updateQueueFormSchema>
 
-// DTO de criação a partir do registro salvo (sem companyId — recriação sempre usa a empresa do
-// flow) — usado pelo histórico de undo/redo do Flow pra recriar o recurso quando o usuário desfaz
+// DTO de criação a partir do registro salvo (sem companyId - recriação sempre usa a empresa do
+// flow) - usado pelo histórico de undo/redo do Flow pra recriar o recurso quando o usuário desfaz
 // uma exclusão (ver flow-canvas.tsx)
 export function toQueueCreationDto(queue: Queue): QueueUpdateForm {
     return {
@@ -173,7 +173,7 @@ async function fetchQueuesRequest(companyId: string): Promise<Queue[]> {
     return data.queues ?? []
 }
 
-// companyId opcional — enquanto não informado, a lista não é buscada (filtro de
+// companyId opcional - enquanto não informado, a lista não é buscada (filtro de
 // empresa da página exige seleção antes de consultar o backend)
 export function useQueues(companyId?: string) {
     const queryClient = useQueryClient()
@@ -186,7 +186,7 @@ export function useQueues(companyId?: string) {
     })
 
     // invalida qualquer instância de useQueues montada (ex: page.tsx e o dialog do
-    // Flow ao mesmo tempo), não só a lista chamada localmente — ganho sobre o
+    // Flow ao mesmo tempo), não só a lista chamada localmente - ganho sobre o
     // fetchQueues() manual anterior, que só atualizava a própria instância do hook
     const invalidate = () =>
         queryClient.invalidateQueries({ queryKey: ["queues"] })
@@ -198,7 +198,7 @@ export function useQueues(companyId?: string) {
         },
     })
 
-    // companyId da fila vem do próprio form (campo "Empresa" do dialog), não do filtro da página —
+    // companyId da fila vem do próprio form (campo "Empresa" do dialog), não do filtro da página -
     // permite criar uma fila pra empresa X enquanto a tabela lista a empresa Y
     async function createQueue(form: QueueForm): Promise<boolean>
     async function createQueue(

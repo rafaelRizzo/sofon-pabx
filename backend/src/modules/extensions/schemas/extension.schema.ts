@@ -81,7 +81,7 @@ const sipFields = {
     rtpKeepalive: z.number().int().min(0).max(3600).optional(),
 }
 
-// md5Secret/remoteSecret são credenciais alternativas do chan_sip — graváveis só no create,
+// md5Secret/remoteSecret são credenciais alternativas do chan_sip - graváveis só no create,
 // nunca devem voltar num GET (response) nem entrar no merge de detalhes lido do sip_peers
 const { md5Secret: _md5Secret, remoteSecret: _remoteSecret, ...sipFieldsPublic } = sipFields
 
@@ -124,7 +124,7 @@ const pjsipFields = {
     // service prefixes with asteriskId before writing to ps_endpoints
     namedCallGroup: z.string().max(80).optional(),
     namedPickupGroup: z.string().max(80).optional(),
-    // Shortcut nativo do PJSIP (ICE + DTLS-SRTP + rtcp_mux) — liga o ramal pro softphone WebRTC
+    // Shortcut nativo do PJSIP (ICE + DTLS-SRTP + rtcp_mux) - liga o ramal pro softphone WebRTC
     webrtc: z.boolean().optional(),
 }
 
@@ -136,7 +136,7 @@ const baseShape = {
     allowOutbound: z.boolean().default(true),
 }
 
-// Defaults sensatos de chan_sip pra um ramal comum — só no create; update usa sipFields sem default
+// Defaults sensatos de chan_sip pra um ramal comum - só no create; update usa sipFields sem default
 // pra não sobrescrever quando o campo é omitido (ver sipFieldsForUpdate abaixo)
 const sipCreateDefaults = {
     host: sipFields.host.default('dynamic'),
@@ -161,10 +161,10 @@ const sipCreateDefaults = {
     rtpKeepalive: sipFields.rtpKeepalive.default(0),
 }
 
-// Defaults espelham os @default de ps_endpoints/ps_aors no schema.prisma — só no create; update usa
+// Defaults espelham os @default de ps_endpoints/ps_aors no schema.prisma - só no create; update usa
 // pjsipFields sem default pra não sobrescrever quando o campo é omitido
 const pjsipCreateDefaults = {
-    // Sem default: `transport` não tem @default em ps_endpoints (schema.prisma) — fixar um valor aqui
+    // Sem default: `transport` não tem @default em ps_endpoints (schema.prisma) - fixar um valor aqui
     // trava o endpoint num transport só, quebrando o qualify OPTIONS quando o contato registra por
     // outro transport (ex: client em TCP com endpoint fixado em transport-udp vira
     // PJSIP_ETPNOTSUITABLE e o contato cai como Unreachable mesmo online). Deixar unset permite o
@@ -204,9 +204,9 @@ export const createExtensionSchema = z.discriminatedUnion('type', [
     z.object({ ...baseShape, type: z.literal('pjsip'), ...pjsipFields, ...pjsipCreateDefaults }).strict(),
 ])
 
-// accountCode é sempre = company.asteriskId, controlado 100% pelo server (ver extensions.service.ts) —
+// accountCode é sempre = company.asteriskId, controlado 100% pelo server (ver extensions.service.ts) -
 // aceito no create (sobrescrito, então enviar é inofensivo) mas nunca editável via update.
-// md5Secret/remoteSecret: credenciais alternativas do chan_sip — editáveis só no create, nunca no update
+// md5Secret/remoteSecret: credenciais alternativas do chan_sip - editáveis só no create, nunca no update
 const {
     accountCode: _accountCodeNotEditable,
     md5Secret: _md5SecretNotEditable,
@@ -222,7 +222,7 @@ export const updateExtensionSchema = z
         allowOutbound: z.boolean().optional(),
         ...sipFieldsForUpdate,
         ...pjsipFields,
-        // shared fields — use most permissive constraint
+        // shared fields - use most permissive constraint
         language: z.string().max(40).optional(),
         transport: z.string().max(40).optional(),
         fromUser: z.string().max(40).nullish(),
@@ -329,7 +329,7 @@ export const pjsipFieldMap: Record<string, string> = {
 
 export const sipFieldKeys = Object.keys(sipFields)
 export const pjsipFieldKeys = Object.keys(pjsipFields)
-// Usado só na direção de leitura (GET) — exclui md5Secret/remoteSecret, ver sipFieldsPublic acima
+// Usado só na direção de leitura (GET) - exclui md5Secret/remoteSecret, ver sipFieldsPublic acima
 export const sipReadableFieldKeys = Object.keys(sipFieldsPublic)
 
 export const BATCH_LIMIT = 50
@@ -359,7 +359,7 @@ export type CreateExtensionInput = z.infer<typeof createExtensionSchema>
 export type CreateExtensionBatchInput = z.infer<typeof createExtensionBatchSchema>
 export type UpdateExtensionInput = z.infer<typeof updateExtensionSchema>
 
-// GET expõe todos os campos crus do sip_peers/ps_endpoints+ps_aors (menos senha — secret nunca entra em
+// GET expõe todos os campos crus do sip_peers/ps_endpoints+ps_aors (menos senha - secret nunca entra em
 // sipFields, md5Secret/remoteSecret são excluídos via sipFieldsPublic, e o password do pjsip vive só em
 // ps_auths, nunca consultado pra esse merge)
 export const ExtensionSchema = z.object({
@@ -376,7 +376,7 @@ export const ExtensionSchema = z.object({
     updatedAt: timestamp,
     ...sipFieldsPublic,
     ...pjsipFields,
-    // sipFields/pjsipFields divergem de tipo nessas duas chaves — mesmo tratamento do updateExtensionSchema
+    // sipFields/pjsipFields divergem de tipo nessas duas chaves - mesmo tratamento do updateExtensionSchema
     directMedia: z.union([z.string().max(10), z.boolean()]).optional(),
     allowSubscribe: z.union([z.string().max(10), z.boolean()]).optional(),
 })

@@ -16,10 +16,10 @@ readonly NC='\033[0m'
 readonly ASTERISK_VERSION="22.10.1"
 readonly PJSIP_PORT=5060
 readonly IAX_PORT=4569
-# WebRTC (softphone no browser via SIP.js) — sinalização SIP sobre WebSocket, sem TLS por enquanto
+# WebRTC (softphone no browser via SIP.js) - sinalização SIP sobre WebSocket, sem TLS por enquanto
 # (sem domínio/certificado ainda). Servida pelo HTTP embutido do próprio Asterisk (res_http_websocket),
 # path fixo /ws. Upgrade futuro pra wss (quando houver domínio) é só trocar WS_SCHEME no .env do
-# backend + adicionar [transport-wss]/tls aqui — sem tocar no resto.
+# backend + adicionar [transport-wss]/tls aqui - sem tocar no resto.
 readonly WS_PORT=8088
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PUBLIC_ADDRESS=""
@@ -257,7 +257,7 @@ sleep 1
 # ============================================================
 show_header
 show_progress 6 13 "Compilando Asterisk (5-15 min)..."
-make -j"$(nproc)" >> "$LOG_FILE" 2>&1 || err "Falha na compilação — verifique $LOG_FILE"
+make -j"$(nproc)" >> "$LOG_FILE" 2>&1 || err "Falha na compilação - verifique $LOG_FILE"
 log "Compilação concluída"
 sleep 1
 
@@ -283,7 +283,7 @@ if [[ ! -f /etc/asterisk/asterisk.conf ]]; then
     make samples >> "$LOG_FILE" 2>&1 || true
     log "Samples gerados (fresh install)"
 else
-    log "Configs existentes preservadas — samples ignorados"
+    log "Configs existentes preservadas - samples ignorados"
 fi
 
 ldconfig
@@ -302,7 +302,7 @@ sleep 1
 show_header
 show_progress 8 13 "Configurando usuário asterisk"
 
-# Timezone do sistema — sem isso o CDR e os logs gravam em UTC, difícil de ler no dia a dia
+# Timezone do sistema - sem isso o CDR e os logs gravam em UTC, difícil de ler no dia a dia
 timedatectl set-timezone America/Sao_Paulo >> "$LOG_FILE" 2>&1 || warn "Falha ao ajustar timezone"
 log "Timezone configurado: America/Sao_Paulo"
 
@@ -347,7 +347,7 @@ strictrtp=yes
 probation=4
 EOF
 
-# http.conf — servidor HTTP embutido do Asterisk, usado só pelo WebSocket do WebRTC (res_http_websocket
+# http.conf - servidor HTTP embutido do Asterisk, usado só pelo WebSocket do WebRTC (res_http_websocket
 # expõe /ws sozinho quando enabled=yes; sem TLS por enquanto, ver WS_PORT no topo do script)
 cat > /etc/asterisk/http.conf << EOF
 [general]
@@ -374,7 +374,7 @@ external_media_address=$PUBLIC_ADDRESS
 external_signaling_address=$PUBLIC_ADDRESS
 local_net=$LOCAL_NET
 
-; WebRTC (softphone no browser) — sinalização SIP sobre WebSocket, servida pelo HTTP embutido do
+; WebRTC (softphone no browser) - sinalização SIP sobre WebSocket, servida pelo HTTP embutido do
 ; Asterisk (ver http.conf, path fixo /ws). Sem TLS por enquanto (ver WS_PORT no topo do script).
 [transport-ws]
 type=transport
@@ -399,9 +399,9 @@ direct_media=no
 dtmf_mode=rfc4733
 EOF
 
-# iax.conf — só troncos (ver backend Trunk.type="iax"), sem ramal IAX2 (dispositivo raro no
+# iax.conf - só troncos (ver backend Trunk.type="iax"), sem ramal IAX2 (dispositivo raro no
 # mercado, ramais continuam 100% PJSIP). requirecalltoken=yes mitiga o DoS de amplificação/spoofing
-# conhecido do protocolo IAX2 (call token) — obrigatório dado o objetivo de segurança da migração.
+# conhecido do protocolo IAX2 (call token) - obrigatório dado o objetivo de segurança da migração.
 cat > /etc/asterisk/iax.conf << EOF
 [general]
 bindport=$IAX_PORT
@@ -416,9 +416,9 @@ EOF
 # extensions.conf
 # FIX: contexto [ramais] usa switch => Realtime/ para suportar
 # ramais com nomes arbitrários (ex: 2002_16824d1144) via tabela no PostgreSQL.
-# O padrão _1XXX foi removido — o Asterisk consulta a tabela extensions
+# O padrão _1XXX foi removido - o Asterisk consulta a tabela extensions
 # (mapeada no extconfig.conf) para resolver cada exten dinamicamente.
-# Esqueleto global do dialplan em arquivo separado (não em extensions.conf direto) — permite ao
+# Esqueleto global do dialplan em arquivo separado (não em extensions.conf direto) - permite ao
 # backend se auto-curar via ensureBaseDialplan() (src/asterisk/base-dialplan.repository.ts) se esse
 # arquivo for perdido numa reinstalação parcial, sem precisar reaplicar este script inteiro na mão.
 # Precisa ficar em sincronia manual com o conteúdo espelhado em base-dialplan.repository.ts.
@@ -428,17 +428,17 @@ cat > /etc/asterisk/sofon-managed.conf << 'EOF'
 ; Suporta qualquer formato de exten: 1001, 2002_16824d1144, etc.
 switch => Realtime/ramais@extensions
 
-; Fallbacks locais — não conflitam pois são extens exatos, não padrões
+; Fallbacks locais - não conflitam pois são extens exatos, não padrões
 exten => *97,1,VoiceMailMain(${CALLERID(num)}@default)
 exten => *43,1,Answer()
  same => n,Echo()
 exten => *60,1,Answer()
  same => n,MusicOnHold()
 
-; TRANSFER_CONTEXT das chamadas inbound (ver inboundroute.repository.ts) — resolvido em tempo real
+; TRANSFER_CONTEXT das chamadas inbound (ver inboundroute.repository.ts) - resolvido em tempo real
 ; via AGI pro ramal OU fila da MESMA empresa (CHANNEL(accountcode)), sem precisar saber de antemão
 ; se o dígito discado na transferência é um ramal ou um número de fila. O AGI já faz "EXEC Goto"
-; pro destino certo quando encontra (ver handleTransferRoute em agi-server.ts) — o Congestion()
+; pro destino certo quando encontra (ver handleTransferRoute em agi-server.ts) - o Congestion()
 ; abaixo só roda quando ele NÃO encontra nada (AGI retorna sem ter dado Goto).
 [transfer]
 exten => _X.,1,NoOp(Transferencia solicitada: ${EXTEN})
@@ -452,7 +452,7 @@ exten => s,1,Hangup()
 
 [from-trunk]
 ; Todas as trunks inbound compartilham esse contexto (ps_endpoints.context=from-trunk).
-; TRUNKID vem do setvar do endpoint — isola o dialplan por trunk mesmo com DID duplicado entre empresas.
+; TRUNKID vem do setvar do endpoint - isola o dialplan por trunk mesmo com DID duplicado entre empresas.
 exten => _X.,1,Goto(from-trunk-routed,${EXTEN}_${TRUNKID},1)
 
 [from-trunk-routed]
@@ -460,9 +460,9 @@ exten => _X.,1,Goto(from-trunk-routed,${EXTEN}_${TRUNKID},1)
 ; exten gravado como <didNumber>_<trunkId> por InboundRouteRepository
 switch => Realtime/from-trunk-routed@extensions
 
-; DID sem rota cadastrada — cause 1 (Unallocated number) -> PJSIP responde 404 Not Found
+; DID sem rota cadastrada - cause 1 (Unallocated number) -> PJSIP responde 404 Not Found
 ; HANGUPCAUSE é função read-only (${HANGUPCAUSE}); a cause real só é setada via argumento do Hangup()
-; FIX: NÃO declarar um catch-all _X. estático aqui — padrão estático tem prioridade
+; FIX: NÃO declarar um catch-all _X. estático aqui - padrão estático tem prioridade
 ; sobre "switch => Realtime/..." no mesmo contexto, então _X. bloquearia TODA rota
 ; realtime válida (qualquer exten <didNumber>_<trunkId> começa com dígito). O "i"
 ; já cobre o caso de nenhuma rota (estática ou realtime) ser encontrada.
@@ -471,14 +471,14 @@ exten => i,1,Noop(DID sem rota: ${EXTEN})
 
 ; queues-app, timeconditions, announcements, ivrs, holidays, request-templates, variables,
 ; variable-conditions, callcenter-surveys e flows/flow-nodes são contextos compartilhados de BAIXA
-; escrita (só mudam por CRUD via API, nunca por ligação) — em vez de Realtime (query no Postgres a
+; escrita (só mudam por CRUD via API, nunca por ligação) - em vez de Realtime (query no Postgres a
 ; cada Goto, pbx_realtime não tem cache), o dialplan é materializado em arquivo estático por empresa
 ; em /etc/asterisk/dialplan-extra/<contexto>/<asteriskId>.conf, regenerado + reload (`dialplan reload`)
 ; a cada CRUD (ver src/asterisk/dialplan-file.repository.ts). `ramais`/`from-trunk-routed` continuam
 ; via Realtime (alta escrita, fora desse escopo).
-; #tryinclude (não #include) — não erra quando a empresa ainda não gerou nenhum .conf pra esse
+; #tryinclude (não #include) - não erra quando a empresa ainda não gerou nenhum .conf pra esse
 ; contexto (glob sem match); #include exige que exista pelo menos 1 arquivo. Caminho relativo é
-; resolvido a partir de /etc/asterisk (astetcdir), não deste arquivo — funciona igual incluído
+; resolvido a partir de /etc/asterisk (astetcdir), não deste arquivo - funciona igual incluído
 ; a partir de extensions.conf ou direto.
 [queues-app]
 #tryinclude "dialplan-extra/queues-app/*.conf"
@@ -523,18 +523,18 @@ writeprotect=no
 LANGUAGE=pt_BR
 
 ; Esqueleto global (ramais/transfer/from-trunk/from-trunk-routed + tryinclude dos contextos
-; estáticos por empresa) mora em arquivo próprio — ver sofon-managed.conf acima. Mantém este
+; estáticos por empresa) mora em arquivo próprio - ver sofon-managed.conf acima. Mantém este
 ; arquivo estável e livre pra edição manual do cliente sem risco de sobrescrita pelo backend.
 #include sofon-managed.conf
 EOF
 
-# features.conf — transferência DTMF atendida durante a chamada. Códigos: *2 atendida, *1 grava,
+# features.conf - transferência DTMF atendida durante a chamada. Códigos: *2 atendida, *1 grava,
 # parkcall #72. Quem pode
 # de fato disparar (opção t/T no Dial()/Queue()) é controlado no dialplan. Chamadas inbound usam
 # "t" para só o ramal transferir, chamadas outbound usam "T" para o ramal chamador transferir.
 cat > /etc/asterisk/features.conf << 'EOF'
 [general]
-; tempo entre dígitos ao discar o destino da transferência DTMF (depois do #1/*2) — 3s
+; tempo entre dígitos ao discar o destino da transferência DTMF (depois do #1/*2) - 3s
 ; original estourava com discagem manual normal (ramal de 4-6 dígitos), tratando cada
 ; dígito isolado como tentativa própria (ex: discar "1002" virava "1@transfer" +
 ; "0@transfer" etc, cada um "does not exist")
@@ -558,12 +558,12 @@ parkcall => #72
 [applicationmap]
 EOF
 
-# cdr.conf — o sample padrão do Asterisk (make samples) vem com unanswered/congestion=yes,
+# cdr.conf - o sample padrão do Asterisk (make samples) vem com unanswered/congestion=yes,
 # o que faz o motor de CDR logar uma linha A MAIS por chamada sempre que um Dial() termina em
 # BUSY/CONGESTION/NOANSWER (a tentativa em si vira 1 registro, e a continuação do dialplan depois
-# do Dial() — Set/NoOp/Hangup — vira um 2º registro "fantasma" com o mesmo linkedid/uniqueid,
+# do Dial() - Set/NoOp/Hangup - vira um 2º registro "fantasma" com o mesmo linkedid/uniqueid,
 # sem dstchannel). Aqui só existe UM Dial() por extensão (sem retry pra outro destino), então não
-# há cenário legítimo pra esses 2 registros — unanswered/congestion=no elimina a duplicata.
+# há cenário legítimo pra esses 2 registros - unanswered/congestion=no elimina a duplicata.
 cat > /etc/asterisk/cdr.conf << 'EOF'
 [general]
 enable=yes
@@ -572,7 +572,7 @@ congestion=no
 endbeforehexten=no
 EOF
 
-# modules.conf — garante chan_sip nunca carregado, chan_iax2 sempre carregado
+# modules.conf - garante chan_sip nunca carregado, chan_iax2 sempre carregado
 sed -i '/noload.*res_pjsip/d' /etc/asterisk/modules.conf 2>/dev/null || true
 grep -q "noload => chan_sip.so" /etc/asterisk/modules.conf 2>/dev/null || \
     printf '\nnoload => chan_sip.so\nload => res_pjsip.so\nload => res_pjsip_session.so\nload => chan_pjsip.so\nload => chan_iax2.so\nload => res_http_websocket.so\nload => res_pjsip_websocket.so\n' >> /etc/asterisk/modules.conf
@@ -591,7 +591,7 @@ systemctl enable asterisk >> "$LOG_FILE" 2>&1 || true
 systemctl restart asterisk >> "$LOG_FILE" 2>&1 || err "Falha ao iniciar Asterisk"
 sleep 4
 
-systemctl is-active --quiet asterisk || err "Asterisk não iniciou — verifique: journalctl -u asterisk -n 50"
+systemctl is-active --quiet asterisk || err "Asterisk não iniciou - verifique: journalctl -u asterisk -n 50"
 
 asterisk -rx "core reload"     >> "$LOG_FILE" 2>&1 || true
 asterisk -rx "dialplan reload" >> "$LOG_FILE" 2>&1 || true
@@ -602,11 +602,11 @@ sleep 1
 # ============================================================
 # STEP 11 - FIREWALL (nftables + Fail2Ban + manage-fw)
 # Clona o manage-fw (https://github.com/rafaelRizzo/manage-fw) e delega pro
-# firewall.sh dele — em vez de duplicar aqui a lógica de nftables/Fail2Ban/
+# firewall.sh dele - em vez de duplicar aqui a lógica de nftables/Fail2Ban/
 # manage-fw, reusa o script genérico (backup+diff automático do nftables.conf,
 # --update, --reload, restore do Docker). --update mescla com o config salvo
 # numa reinstalação (mantém portas já liberadas + adiciona as novas do
-# installer) em vez de sobrescrever — só é passado se já existir config
+# installer) em vez de sobrescrever - só é passado se já existir config
 # anterior, senão o próprio firewall.sh recusa --update (sem baseline salva).
 # ============================================================
 show_header
@@ -626,7 +626,7 @@ FIREWALL_MODE_FLAG=()
 
 # --local-tcp 5038 cobre o modelo padrão (bindaddr 127.0.0.1). --private-tcp 5038 é pro caso do
 # backend rodar em rede bridge (Dokploy/Swarm, ver backend/CLAUDE.md "Produção atual"), onde
-# bindaddr precisa virar 0.0.0.0 manualmente — sem essa liberação o AMI nunca é alcançável a
+# bindaddr precisa virar 0.0.0.0 manualmente - sem essa liberação o AMI nunca é alcançável a
 # partir do container mesmo com o ACL do manager.conf certo (SYN cai no policy drop do host).
 bash "$MANAGE_FW_DIR/firewall.sh" \
     "${FIREWALL_MODE_FLAG[@]}" \
@@ -670,7 +670,7 @@ chmod 755 /var/lib/asterisk/sounds
 log "Diretório de anúncios criado → /var/lib/asterisk/sounds"
 
 # --- Dialplan estático por empresa (queues-app/timeconditions/announcements/ivrs/holidays/
-# request-templates/variables/variable-conditions/callcenter-surveys) — arquivos gerados pela API, incluídos via #include em extensions.conf
+# request-templates/variables/variable-conditions/callcenter-surveys) - arquivos gerados pela API, incluídos via #include em extensions.conf
 # (ver src/asterisk/dialplan-file.repository.ts) ---
 mkdir -p /etc/asterisk/dialplan-extra/{queues-app,timeconditions,announcements,ivrs,holidays,request-templates,variables,variable-conditions,callcenter-surveys,flows,flow-nodes}
 chown -R asterisk:asterisk /etc/asterisk/dialplan-extra
@@ -707,7 +707,7 @@ cat > /etc/asterisk/manager.conf << EOF
 enabled            = yes
 port               = 5038
 bindaddr           = 127.0.0.1
-# "no" derruba com SessionLimit qualquer 2ª conexão do mesmo usuário — o backend mantém uma
+# "no" derruba com SessionLimit qualquer 2ª conexão do mesmo usuário - o backend mantém uma
 # conexão AMI persistente (ami-events.ts, monitoramento em tempo real) o tempo todo logada como
 # "admin", e QUALQUER reload de dialplan (ami-client.ts) abre uma 2ª conexão com o mesmo usuário
 # em paralelo. Sem "yes" aqui, esse reload é rejeitado silenciosamente (best-effort, só loga
@@ -736,7 +736,7 @@ log "Hardening aplicado"
 # ============================================================
 # STEP 13 - SINCRONIZAR .ENV DO BACKEND
 # Sem chan_sip: SIP_LEGACY_ENABLED sempre false, sem SIP_PORT
-# (ver ASTERISK_VERSION/PJSIP_PORT em src/config/env.ts) — o backend
+# (ver ASTERISK_VERSION/PJSIP_PORT em src/config/env.ts) - o backend
 # expõe isso pro frontend via GET /system/sip-config.
 # ============================================================
 show_header
@@ -751,7 +751,7 @@ set_env_var() {
     fi
 }
 
-# SCRIPT_DIR é backend/setups — o .env do backend está sempre um nível acima,
+# SCRIPT_DIR é backend/setups - o .env do backend está sempre um nível acima,
 # independente do diretório de onde o installer foi chamado.
 BACKEND_ENV_FILE="$SCRIPT_DIR/../.env"
 
@@ -762,9 +762,9 @@ if [[ -f "$BACKEND_ENV_FILE" ]]; then
     set_env_var "$BACKEND_ENV_FILE" "PUBLIC_ADDRESS" "$PUBLIC_ADDRESS"
     set_env_var "$BACKEND_ENV_FILE" "WS_SCHEME" "ws"
     set_env_var "$BACKEND_ENV_FILE" "WS_PORT" "$WS_PORT"
-    log "Backend .env atualizado (${BACKEND_ENV_FILE}) — reinicie o serviço do backend para aplicar"
+    log "Backend .env atualizado (${BACKEND_ENV_FILE}) - reinicie o serviço do backend para aplicar"
 else
-    warn "Backend .env não encontrado em ${BACKEND_ENV_FILE} — adicione manualmente:"
+    warn "Backend .env não encontrado em ${BACKEND_ENV_FILE} - adicione manualmente:"
     echo "    ASTERISK_VERSION=${ASTERISK_VERSION}"
     echo "    SIP_LEGACY_ENABLED=false"
     echo "    PJSIP_PORT=${PJSIP_PORT}"
@@ -787,8 +787,8 @@ echo ""
 echo -e "  Sistema    : ${CYAN}${OS_NAME} ${OS_VERSION}${NC}"
 echo -e "  IP Público : ${CYAN}${PUBLIC_ADDRESS}${NC}"
 echo -e "  Rede Local : ${CYAN}${LOCAL_NET}${NC}"
-echo -e "  PJSIP      : ${CYAN}${PJSIP_PORT}${NC} (UDP/TCP) — chan_sip ausente do build"
-echo -e "  WebRTC     : ${CYAN}ws://${PUBLIC_ADDRESS}:${WS_PORT}/ws${NC} — sem TLS (sem domínio ainda); trocar pra wss depois é só mudar WS_SCHEME no .env do backend"
+echo -e "  PJSIP      : ${CYAN}${PJSIP_PORT}${NC} (UDP/TCP) - chan_sip ausente do build"
+echo -e "  WebRTC     : ${CYAN}ws://${PUBLIC_ADDRESS}:${WS_PORT}/ws${NC} - sem TLS (sem domínio ainda); trocar pra wss depois é só mudar WS_SCHEME no .env do backend"
 echo -e "  IAX2       : ${CYAN}${IAX_PORT}${NC} (UDP, troncos)"
 echo -e "  RTP        : ${CYAN}10000-20000${NC} (UDP)"
 echo -e "  Proxy Web  : ${CYAN}80, 443${NC} (HTTP/HTTPS) + ${CYAN}81${NC} (painel Nginx Proxy Manager)"

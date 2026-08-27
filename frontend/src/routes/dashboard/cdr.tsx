@@ -83,7 +83,7 @@ function CdrPage() {
 
     // originExtension é o alias/número do ramal (CALLERID(num) setado via dialplan), não o id do registro
     const [extensionAlias, setExtensionAlias] = useState("")
-    // src/dst: colunas nativas do Asterisk, sempre preenchidas — diferente de originExtension/dialedNumber,
+    // src/dst: colunas nativas do Asterisk, sempre preenchidas - diferente de originExtension/dialedNumber,
     // que só existem quando a chamada passa pelo dialplan enriquecido (ver use-cdr.ts)
     const [src, setSrc] = useState("")
     const [dst, setDst] = useState("")

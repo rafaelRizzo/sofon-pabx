@@ -112,7 +112,7 @@ async function exportHolidayResource(resourceId: string) {
     }
 }
 
-// credencial NUNCA é exportada (nem id, nem token) — só um hint pro import sugerir/exigir a
+// credencial NUNCA é exportada (nem id, nem token) - só um hint pro import sugerir/exigir a
 // escolha de uma IntegrationCredential já existente na empresa de destino
 async function exportIxcResource(resourceId: string) {
     const n = await prisma.ixcNode.findUnique({ where: { id: resourceId } })

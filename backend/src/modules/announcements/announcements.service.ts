@@ -26,7 +26,7 @@ const toDto = <T extends { audioId: string | null; destination: RouteDestination
 const _byId = () => prisma.announcement.findUnique({ where: { id: '' }, select })
 type AnnouncementRow = NonNullable<Awaited<ReturnType<typeof _byId>>> & { destination: RouteDestination }
 
-// Anexa o nome legível de destination (resolvido no backend, cache-first — ver
+// Anexa o nome legível de destination (resolvido no backend, cache-first - ver
 // route-destination-label.ts). Todas as chamadas aqui são de uma única empresa por vez.
 async function withDestinationLabels<T extends { destination: unknown }>(announcements: T[], companyId: string): Promise<T[]> {
     if (announcements.length === 0) return announcements

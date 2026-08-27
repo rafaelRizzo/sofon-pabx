@@ -65,7 +65,7 @@ export async function downloadFlowExport(flowId: string, flowName: string) {
     URL.revokeObjectURL(url)
 }
 
-// Lançada quando o arquivo selecionado não é um JSON de export de flow válido — a tela mostra a
+// Lançada quando o arquivo selecionado não é um JSON de export de flow válido - a tela mostra a
 // mensagem direto ao usuário em vez de um erro genérico de parse
 export class InvalidFlowExportFileError extends Error {}
 

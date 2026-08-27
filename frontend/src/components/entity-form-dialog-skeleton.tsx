@@ -17,7 +17,7 @@ type Props = {
 // renderiza com a entidade ainda null e é indistinguível do modo de criação (título "Novo X",
 // campos vazios) até o fetch resolver.
 // Renderiza só o conteúdo (sem <Dialog>/<DialogContent> própria) para ser usado dentro do
-// DialogContent já montado pelo form real — troca o <Dialog> raiz entre loading/carregado faz o
+// DialogContent já montado pelo form real - troca o <Dialog> raiz entre loading/carregado faz o
 // React desmontar e remontar o Popup, o que repete a animação de abertura (lê como "piscar").
 export function EntityFormDialogSkeletonContent({ fieldCount = 3 }: Props) {
     return (

@@ -8,7 +8,7 @@ export const loginSchema = z.object({
 
 export type LoginInput = z.infer<typeof loginSchema>
 
-// Primeiro usuário do sistema — sempre criado como admin, sem vínculo de empresa (admin bypassa escopo)
+// Primeiro usuário do sistema - sempre criado como admin, sem vínculo de empresa (admin bypassa escopo)
 export const registerSchema = z.object({
     name: z.string().min(1),
     username: z.email(),

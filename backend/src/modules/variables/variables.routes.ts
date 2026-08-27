@@ -52,7 +52,7 @@ export const variablesRoutes = async (app: FastifyInstance) => {
         schema: {
             tags: ['Variables'],
             summary: 'Criar variable set',
-            description: 'Seta 1+ variáveis de canal (Set) e segue pro destino configurado — usável como RouteDestination (type: "variable-set") em qualquer fluxo.',
+            description: 'Seta 1+ variáveis de canal (Set) e segue pro destino configurado - usável como RouteDestination (type: "variable-set") em qualquer fluxo.',
             security: [{ bearerAuth: [] }],
             body: createVariableSetSchema,
             response: {

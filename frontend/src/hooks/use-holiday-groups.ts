@@ -21,7 +21,7 @@ export type HolidayGroup = {
     name: string
     companyId: string
     url: string | null
-    // não são mais editáveis por aqui — só via arrastar uma conexão no canvas do Flow (ver
+    // não são mais editáveis por aqui - só via arrastar uma conexão no canvas do Flow (ver
     // flow-canvas.tsx), que grava direto no FlowEdge por PUT separado. Mantidos no tipo só porque a
     // API ainda devolve os campos (label resolvido, usado em telas de leitura)
     trueRoute: RouteDestination
@@ -42,7 +42,7 @@ const holidayDateFormSchema = z.object({
     day: z.coerce.number().int().min(1, "Dia inválido").max(31, "Dia inválido"),
 })
 
-// "mode" é só de UI (decide se manda url ou dates pro backend) — não existe no schema do backend,
+// "mode" é só de UI (decide se manda url ou dates pro backend) - não existe no schema do backend,
 // que valida url/dates como mutuamente exclusivos (ver create/updateHolidayGroupSchema)
 export const createHolidayGroupFormSchema = z
     .object({
@@ -62,12 +62,12 @@ export const createHolidayGroupFormSchema = z
 
 export type HolidayGroupForm = z.infer<typeof createHolidayGroupFormSchema>
 // dialog sempre lida com o shape de criação (companyId incluso, mesmo escondido/desabilitado em
-// edição) — update só ignora companyId na hora de montar o payload, mesmo padrão de
+// edição) - update só ignora companyId na hora de montar o payload, mesmo padrão de
 // time-conditions.tsx (page.tsx monta o objeto reduzido na hora de chamar updateX)
 export type HolidayGroupUpdateForm = Omit<HolidayGroupForm, "companyId">
 
-// DTO de criação a partir do registro salvo (sem companyId — recriação sempre usa a empresa do
-// flow) — usado pelo histórico de undo/redo do Flow pra recriar o recurso quando o usuário desfaz
+// DTO de criação a partir do registro salvo (sem companyId - recriação sempre usa a empresa do
+// flow) - usado pelo histórico de undo/redo do Flow pra recriar o recurso quando o usuário desfaz
 // uma exclusão (ver flow-canvas.tsx). `dates` da entidade tem `id` (HolidayDate.id); o form de
 // criação não tem esse campo, então é descartado aqui.
 export function toHolidayGroupCreationDto(
@@ -85,7 +85,7 @@ export function toHolidayGroupCreationDto(
     }
 }
 
-// payload real da API — "mode" nunca é enviado, só decide se url ou dates vai no corpo
+// payload real da API - "mode" nunca é enviado, só decide se url ou dates vai no corpo
 function toApiPayload(form: HolidayGroupUpdateForm) {
     return {
         name: form.name,
@@ -94,7 +94,7 @@ function toApiPayload(form: HolidayGroupUpdateForm) {
     }
 }
 
-// companyId opcional — enquanto não informado, a lista não é buscada (filtro de
+// companyId opcional - enquanto não informado, a lista não é buscada (filtro de
 // empresa da página exige seleção antes de consultar o backend)
 async function fetchHolidayGroupsRequest(
     companyId: string

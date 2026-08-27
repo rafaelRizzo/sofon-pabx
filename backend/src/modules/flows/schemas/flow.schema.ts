@@ -93,7 +93,7 @@ export const batchFlowNodeEdgesSchema = z.object({
 const layoutNodeSchema = z.object({
   nodeType: z.string().min(1),
   nodeId: z.string().min(1),
-  // nome capturado no momento em que o nó foi colocado no canvas — usado só pra exibir um card
+  // nome capturado no momento em que o nó foi colocado no canvas - usado só pra exibir um card
   // "solto" (ainda sem nenhuma conexão, então fora do GET /flows/:id/graph) sem precisar de outro
   // fetch por tipo/id; nó alcançável pelo grafo usa o nome resolvido ali, mais atual
   name: z.string().min(1).optional(),
@@ -133,7 +133,7 @@ export const updateFlowSchema = z
     message: "At least one field is required: name, entryDestination, layout",
   });
 
-// PUT /flows/:id/layout — separado do update geral pra permitir autosave de posição no canvas
+// PUT /flows/:id/layout - separado do update geral pra permitir autosave de posição no canvas
 // sem revalidar/reprocessar entryDestination a cada arraste de nó.
 export const updateFlowLayoutSchema = z.object({
   layout: z.array(layoutNodeSchema).max(200),
@@ -165,7 +165,7 @@ export const CreateFlowResponse = ok({
 });
 export const UpdateFlowResponse = ok({ message: z.string() });
 
-// GET /flows/:id/graph — nós alcançados a partir do entryDestination (BFS) + arestas entre eles,
+// GET /flows/:id/graph - nós alcançados a partir do entryDestination (BFS) + arestas entre eles,
 // pro canvas desenhar o grafo inteiro, não só o nó de entrada.
 const graphNodeSchema = z.object({
   type: z.string(),

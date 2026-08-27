@@ -98,7 +98,7 @@ describe('buildExpr', () => {
 })
 
 describe('buildDialplan', () => {
-    it('or combinator: each rule GotoIf jumps to -matched, falls through to falseRoute — both branches NoOp before the final Goto', () => {
+    it('or combinator: each rule GotoIf jumps to -matched, falls through to falseRoute - both branches NoOp before the final Goto', () => {
         const rows = buildDialplan('c1', 'Tem CPF valido', 'or', [
             { variable: 'CPF', operator: 'filled' },
         ], 'ramais,1001,1', 'ramais,1002,1')
@@ -111,7 +111,7 @@ describe('buildDialplan', () => {
         expect(rows[5]).toMatchObject({ exten: 'varcond-c1-matched', priority: 2, app: 'Goto', appdata: 'ramais,1001,1' })
     })
 
-    it('and combinator: each rule GotoIf jumps to -matched on false, falls through to trueRoute — both branches NoOp before the final Goto', () => {
+    it('and combinator: each rule GotoIf jumps to -matched on false, falls through to trueRoute - both branches NoOp before the final Goto', () => {
         const rows = buildDialplan('c2', 'CPF valido e preenchido', 'and', [
             { variable: 'CPF', operator: 'filled' },
             { variable: 'CPF', operator: 'length_eq', value: '11' },

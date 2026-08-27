@@ -69,7 +69,7 @@ const TRUNK_TYPES = [
     { value: "iax", label: "IAX2" },
 ]
 
-// Sentinela pra representar "não definido" em selects opcionais — base-ui não aceita value=""
+// Sentinela pra representar "não definido" em selects opcionais - base-ui não aceita value=""
 const UNSET = "__unset__"
 
 const TRANSPORT_OPTIONS = [
@@ -359,7 +359,7 @@ export function TrunkFormDialog({
     })
 
     // registrationMode "custom" não compartilha campos com outbound/inbound no discriminated
-    // union — any evita a união impossível de resolver estaticamente (mesmo padrão já usado
+    // union - any evita a união impossível de resolver estaticamente (mesmo padrão já usado
     // no resolver/defaultValues dos dois useForm acima)
     const r = (isEdit ? updateForm.register : createForm.register) as any
     const control = (isEdit ? updateForm.control : createForm.control) as any
@@ -565,7 +565,7 @@ export function TrunkFormDialog({
                                         Ao usar esse tronco numa Outbound Route,
                                         em vez de discar via PJSIP a chamada faz{" "}
                                         <code>Goto(&lt;contexto&gt;,...)</code>{" "}
-                                        pra esse contexto — você escreve o
+                                        pra esse contexto - você escreve o
                                         dialplan (inclusive o Dial, se precisar)
                                         diretamente no Asterisk. Não recebe
                                         chamadas (sem Inbound Route).

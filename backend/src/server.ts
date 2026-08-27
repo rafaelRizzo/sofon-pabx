@@ -19,23 +19,23 @@ async function start() {
         const runsWorker = env.PROCESS_ROLE === 'worker' || env.PROCESS_ROLE === 'all'
 
         // Redis: JTI + cache de entidades (lado web) e cache de presence AMI (lado worker,
-        // ver ami-events.ts/writePresence) — precisa estar conectado nos dois papéis, senão
+        // ver ami-events.ts/writePresence) - precisa estar conectado nos dois papéis, senão
         // toda escrita de presence no worker falha silenciosa com "The client is closed"
         // (engolida por ami.events.handler.failed) e o status ao vivo nunca chega no Redis
         await connectRedis()
 
         if (runsWorker) {
-            // Autocura config estática do Asterisk (sofon-managed.conf/features.conf) a cada boot —
+            // Autocura config estática do Asterisk (sofon-managed.conf/features.conf) a cada boot -
             // deploy vira só "git pull + rebuild", sem precisar chamar resyncDialplan manualmente nem
             // reinstalar o Asterisk pra propagar ajustes como transferdigittimeout. Nunca lança.
             await ensureStaticAsteriskConfig()
 
             // Correções de cache que só precisam rodar uma vez por ambiente (marca no Redis que
-            // já rodou) — ver src/lib/cache-migrations.ts
+            // já rodou) - ver src/lib/cache-migrations.ts
             await runCacheMigrations()
 
             // AGI/AMI/jobs são singleton por natureza (porta fixa, listener de evento único, jobs
-            // idempotentes mas redundantes se duplicados) — nunca rodam em réplica 'web'
+            // idempotentes mas redundantes se duplicados) - nunca rodam em réplica 'web'
             startAgiServer(env.AGI_HOST, env.AGI_PORT)
             startAmiEvents()
             startHolidayResyncJob()

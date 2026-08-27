@@ -30,7 +30,7 @@ async function fetchScopesRequest(companyId: string): Promise<AgentScope[]> {
 }
 
 // Sem filtro "todas as empresas": o backend só lista por empresa (path param), não há
-// endpoint de listagem geral — companyId é sempre obrigatório aqui
+// endpoint de listagem geral - companyId é sempre obrigatório aqui
 export function useAgentScopes(companyId?: string) {
     const queryClient = useQueryClient()
 

@@ -57,7 +57,7 @@ export class InboundRoutesCache {
         logger.info({ event: 'cache.invalidate', namespace: NAMESPACE, key: 'all' })
     }
 
-    // Lista de /inbound-routes escopada por usuário não-admin com MAIS DE UMA empresa vinculada —
+    // Lista de /inbound-routes escopada por usuário não-admin com MAIS DE UMA empresa vinculada -
     // getByCompany (1 empresa) e getAll (admin) não cobrem esse caso. Invalidada de forma
     // ampla por invalidateNamespace() (prefixo "inbound-routes:"), como os demais.
     static async getForScope(userId: string) {

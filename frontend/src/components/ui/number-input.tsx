@@ -50,7 +50,7 @@ function NumberInput({
             }}
             onChange={(e) => {
                 // max/min do input[type=number] só marcam :invalid, não impedem digitar além do
-                // limite (dá pra digitar 999999999999999 mesmo com max=20) — clampa aqui pra o
+                // limite (dá pra digitar 999999999999999 mesmo com max=20) - clampa aqui pra o
                 // valor nunca ficar fora do intervalo que o backend aceita, sem depender do
                 // usuário perceber o erro só no submit
                 if (e.target.value !== "") {

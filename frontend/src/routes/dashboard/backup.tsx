@@ -93,7 +93,7 @@ function BackupPage() {
                         selecionada
                         {isAdmin && ", ou de todas as empresas de uma vez"}.
                         O arquivo contém segredos em texto puro (senha de
-                        tronco, token de integração) — trate-o como um
+                        tronco, token de integração) - trate-o como um
                         segredo.
                     </CardDescription>
                 </CardHeader>
@@ -121,7 +121,7 @@ function BackupPage() {
                         <CardTitle>Restaurar</CardTitle>
                         <CardDescription>
                             Recria empresa(s) a partir de um arquivo de
-                            backup. Nunca sobrescreve uma empresa existente —
+                            backup. Nunca sobrescreve uma empresa existente -
                             sempre cria uma nova, com todos os ids
                             remapeados. Senha de ramal é sempre regenerada
                             (nunca preservada); usuários do painel vinculados

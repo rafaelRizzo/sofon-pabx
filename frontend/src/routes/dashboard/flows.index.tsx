@@ -51,7 +51,7 @@ function FlowsPage() {
         return deleteFlow(deleteTarget.id)
     }
 
-    // Cria e já leva pro canvas — o flow recém-criado só tem nome/empresa, conectar nós é o
+    // Cria e já leva pro canvas - o flow recém-criado só tem nome/empresa, conectar nós é o
     // próximo passo natural.
     async function handleCreate(form: Parameters<typeof createFlow>[0]) {
         const flowId = await createFlow(form)

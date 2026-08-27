@@ -10,23 +10,23 @@ import {
     extKey, extCallsKey, callKey, trunkKey, queueMembersKey, queueWaitingKey, bridgeMembersKey, queueHoldtimeKey,
 } from './realtime-keys'
 
-// Conexão AMI PERSISTENTE com eventos (Events: on) — popula o cache de estado ao vivo em Redis
+// Conexão AMI PERSISTENTE com eventos (Events: on) - popula o cache de estado ao vivo em Redis
 // (ramal/tronco online-offline, em chamada, filas). Independente do ami-client.ts existente
-// (fire-and-forget, usado só pra "dialplan reload") — nunca deve derrubar o processo.
+// (fire-and-forget, usado só pra "dialplan reload") - nunca deve derrubar o processo.
 
 const CRLF = '\r\n'
 const BACKOFF_STEPS_MS = [1000, 2000, 5000, 10000, 30000]
-// Registro outbound (PJSIP) não dispara evento de mudança em tempo real no Asterisk — só dá pra
+// Registro outbound (PJSIP) não dispara evento de mudança em tempo real no Asterisk - só dá pra
 // saber o status atual reconsultando a action periodicamente
 const REGISTRATIONS_POLL_MS = 30_000
-// Endpoint PJSIP sem qualify_frequency configurado no AOR nunca dispara ContactStatus ao vivo —
+// Endpoint PJSIP sem qualify_frequency configurado no AOR nunca dispara ContactStatus ao vivo -
 // sem isso presence ficava travada no valor do snapshot do connect pra sempre
 const ENDPOINTS_POLL_MS = 30_000
-// Reconcilia contra o Asterisk quais canais estão de fato ativos — fecha o gap de Hangup perdido
+// Reconcilia contra o Asterisk quais canais estão de fato ativos - fecha o gap de Hangup perdido
 // (reconexão do AMI, exceção engolida no handler) que deixaria uma chamada fantasma presa no card
 const CHANNELS_POLL_MS = 30_000
 // queue_members é escrito direto via Prisma (AsteriskQueueRepository), sem passar por nenhuma
-// action AMI — um membro adicionado/removido depois que este processo já conectou nunca dispara
+// action AMI - um membro adicionado/removido depois que este processo já conectou nunca dispara
 // QueueMemberAdded/Removed sozinho, então sem repoll ele ficava "unknown" pra sempre no card até o
 // próximo restart do backend (que refaz o QueueStatus no login)
 const QUEUE_STATUS_POLL_MS = 30_000
@@ -63,7 +63,7 @@ export function extensionNumberFrom(raw: string): string {
     return parsed ? parsed.number : raw
 }
 
-// Nome de canal ("PJSIP/2002_ast1-00000012") tem sufixo de sequência que MEMBERINTERFACE não tem — precisa stripar
+// Nome de canal ("PJSIP/2002_ast1-00000012") tem sufixo de sequência que MEMBERINTERFACE não tem - precisa stripar
 export function extensionNumberFromChannel(channel: string): string | null {
     const idx = channel.indexOf('/')
     if (idx === -1) return null
@@ -80,7 +80,7 @@ export function mapPeerPresence(raw: string | undefined): Presence {
 }
 
 // Cobre tanto o State de DeviceStateChange ("NOT_INUSE") quanto o DeviceState textual de
-// PJSIPShowEndpoints ("Not in use") — substring match em vez de igualdade exata pra não depender
+// PJSIPShowEndpoints ("Not in use") - substring match em vez de igualdade exata pra não depender
 // de formatação exata por versão do Asterisk. Ordem importa: checar NOT_INUSE antes de INUSE, e
 // RINGINUSE antes de RINGING.
 export function mapDeviceState(raw: string | undefined): CallState {
@@ -96,7 +96,7 @@ export function mapDeviceState(raw: string | undefined): CallState {
 }
 
 // QueueMember/QueueMemberStatus.Status vem como código numérico de device state do Asterisk
-// (AST_DEVICE_*), não texto — confirmado via AMI_DEBUG contra Asterisk real (Status: "5" =
+// (AST_DEVICE_*), não texto - confirmado via AMI_DEBUG contra Asterisk real (Status: "5" =
 // Unavailable). Mesmo enum CallState dos ramais, pra reaproveitar o CallStateBadge no front.
 const QUEUE_MEMBER_STATUS_MAP: Record<string, CallState> = {
     '0': 'unknown',
@@ -159,7 +159,7 @@ async function handleNewchannel(block: AmiBlock) {
 }
 
 // Dial(Begin) liga as duas pernas ANTES do bridge existir (BridgeEnter só roda depois que atende)
-// — Channel/CallerIDNum aqui são de quem está DISCANDO (quase sempre o canal do tronco que trouxe
+// - Channel/CallerIDNum aqui são de quem está DISCANDO (quase sempre o canal do tronco que trouxe
 // a ligação), mais confiável que o CallerIDNum do próprio Newchannel da perna do ramal (que em
 // alguns fluxos reflete o identificador do próprio ramal, não de quem chama). Permite mostrar
 // tronco/número de quem liga já tocando, não só depois de atendido.
@@ -183,7 +183,7 @@ async function handleHangup(block: AmiBlock) {
     emitRealtimeChange('extension')
 }
 
-// "Quem fala com quem" rastreado só par a par via bridge — sem tentar reconstruir topologia N-way
+// "Quem fala com quem" rastreado só par a par via bridge - sem tentar reconstruir topologia N-way
 // (conferência); suficiente pro escopo "em chamada: sim/não" + par simples (ver plano)
 async function handleBridgeEnter(block: AmiBlock) {
     if (!block.BridgeUniqueid || !block.Uniqueid) return
@@ -217,7 +217,7 @@ async function patchQueueMember(queueName: string, iface: string, patch: Record<
 }
 
 // QueueMemberStatus/Pause/Added/Removed (eventos "ao vivo" de mudança) mandam a interface do
-// membro em `Interface`, não `Location` — confirmado via AMI_DEBUG contra Asterisk 22.7 real.
+// membro em `Interface`, não `Location` - confirmado via AMI_DEBUG contra Asterisk 22.7 real.
 // `Location` é só do sub-evento QueueMember dentro da resposta da action QueueStatus (snapshot
 // cold-start/poll periódico, ver writeQueueSnapshot). Sem esse fallback, todo evento ao vivo de
 // membro batia no guard `!interface` e voltava silenciosamente, deixando o status sempre "unknown".
@@ -272,7 +272,7 @@ async function handleQueueCallerJoin(block: AmiBlock) {
     })
 }
 
-// Fila responde quando o cliente desliga esperando (sem ter sido conectado a nenhum agente) —
+// Fila responde quando o cliente desliga esperando (sem ter sido conectado a nenhum agente) -
 // único caso em que não há AGI queue-outcome subsequente (o canal do ligante morre, Queue()
 // nunca retorna pra próxima priority nesse fluxo)
 async function handleQueueCallerAbandon(block: AmiBlock) {
@@ -287,7 +287,7 @@ async function handleQueueCallerAbandon(block: AmiBlock) {
     })
 }
 
-// Dispara quando o bridge com um agente é estabelecido de fato — Uniqueid aqui é o do LIGANTE
+// Dispara quando o bridge com um agente é estabelecido de fato - Uniqueid aqui é o do LIGANTE
 // (mesmo vocabulário de QueueCallerJoin), Interface é quem atendeu
 async function handleAgentConnect(block: AmiBlock) {
     if (!block.Queue || !block.Uniqueid || !block.Interface) return
@@ -301,7 +301,7 @@ async function handleAgentConnect(block: AmiBlock) {
 }
 
 // Dispara quando a chamada JÁ CONECTADA a um agente termina, independente de quem desligou
-// primeiro (Reason: "caller"|"agent") — cobre o caso em que o ligante desliga durante o
+// primeiro (Reason: "caller"|"agent") - cobre o caso em que o ligante desliga durante o
 // atendimento, quando o Queue() também nunca retorna pra próxima priority
 async function handleAgentComplete(block: AmiBlock) {
     if (!block.Queue || !block.Uniqueid) return
@@ -315,7 +315,7 @@ async function handleAgentComplete(block: AmiBlock) {
 }
 
 // Data local (fuso do env.TZ) usada como partição diária do agregado de holdtime (ver
-// getQueueHoldtimeToday em realtime.service.ts) — não dá pra usar CDR pra essa métrica: Queue()
+// getQueueHoldtimeToday em realtime.service.ts) - não dá pra usar CDR pra essa métrica: Queue()
 // atende o canal do ligante já na entrada da fila (pra tocar MOH), então answer≈start no CDR e
 // duration-billsec fica sempre ~0, não reflete o tempo até o agente atender de verdade.
 function todayKey(): string {
@@ -324,7 +324,7 @@ function todayKey(): string {
 }
 
 // QueueCallerLeave fecha o par de QueueCallerJoin (join foi quem gravou o score = timestamp de
-// entrada em queueWaitingKey) — a diferença é exatamente quanto tempo esse ligante ficou
+// entrada em queueWaitingKey) - a diferença é exatamente quanto tempo esse ligante ficou
 // esperando, dá igual se saiu por ter sido atendido ou por ter desistido.
 async function handleQueueCallerLeave(block: AmiBlock) {
     if (!block.Queue || !block.Uniqueid) return
@@ -340,7 +340,7 @@ async function handleQueueCallerLeave(block: AmiBlock) {
     emitRealtimeChange('queue')
 }
 
-// Qualquer evento fora desta lista é ignorado de propósito — não modelar every single Asterisk event
+// Qualquer evento fora desta lista é ignorado de propósito - não modelar every single Asterisk event
 async function routeEvent(block: AmiBlock): Promise<void> {
     switch (block.Event) {
         case 'PeerStatus': return handlePeerStatus(block)
@@ -386,7 +386,7 @@ function requestSnapshot() {
     requestSnapshotKind('core-channels', 'CoreShowChannels')
 
     // Repolling pra registro outbound (sem evento de mudança nativo), presence de endpoint sem
-    // qualify (idem) e reconciliação de canais ativos (fecha gap de Hangup perdido) — iniciados
+    // qualify (idem) e reconciliação de canais ativos (fecha gap de Hangup perdido) - iniciados
     // uma única vez, sobrevivem a reconexões (guard por loggedIn evita escrever num socket morto)
     if (!registrationsPollTimer) {
         registrationsPollTimer = setInterval(() => {
@@ -432,7 +432,7 @@ async function hydratePjsipEndpoints(items: AmiBlock[]) {
         await redisClient.expire(extKey(item.ObjectName), STATUS_TTL_SECONDS)
         changed = true
     }
-    // 1 emit pro snapshot inteiro, não por endpoint — hydrate roda a cada 30s (ENDPOINTS_POLL_MS)
+    // 1 emit pro snapshot inteiro, não por endpoint - hydrate roda a cada 30s (ENDPOINTS_POLL_MS)
     // e pode ter dezenas de itens, coalescer aqui evita disparar o mesmo tanto de emits à toa
     if (changed) emitRealtimeChange('extension')
 }
@@ -458,7 +458,7 @@ async function writeQueueSnapshot(queueName: string, entry: { members: AmiBlock[
     await redisClient.del(waitingKey)
     for (const c of entry.callers) {
         if (!c.Uniqueid) continue
-        // QueueEntry.Wait é quanto tempo esse ligante JÁ esperou (segundos) — usa isso pra
+        // QueueEntry.Wait é quanto tempo esse ligante JÁ esperou (segundos) - usa isso pra
         // reconstruir o timestamp real de entrada em vez de carimbar Date.now() aqui. Sem isso,
         // todo poll periódico (30s) reseta o relógio de quem já está esperando há mais tempo,
         // subestimando tanto o "há Xs" do Aguardando quanto o holdtime calculado no Leave.
@@ -468,7 +468,7 @@ async function writeQueueSnapshot(queueName: string, entry: { members: AmiBlock[
 }
 
 async function hydrateQueueStatus(items: AmiBlock[]) {
-    // QueueParams (Calls/Holdtime) não é mais gravado — `calls` da API agora vem ao vivo do
+    // QueueParams (Calls/Holdtime) não é mais gravado - `calls` da API agora vem ao vivo do
     // tamanho de queueWaitingKey (ver getQueuesStatus em realtime.service.ts), não desse
     // snapshot periódico; e `holdtime` vem do agregado join/leave (queueHoldtimeKey, ver
     // handleQueueCallerLeave acima). O evento só serve aqui pra garantir que a fila apareça em
@@ -485,9 +485,9 @@ async function hydrateQueueStatus(items: AmiBlock[]) {
     if (byQueue.size > 0) emitRealtimeChange('queue')
 }
 
-// ObjectName é o astId do tronco (mesmo id de PJSIPShowEndpoints pra trunks) — isTrunkId dentro de
+// ObjectName é o astId do tronco (mesmo id de PJSIPShowEndpoints pra trunks) - isTrunkId dentro de
 // writePresence já roteia pra rt:trunk:<astId>. "Expiration" é o intervalo de registro configurado
-// (segundos) — confirmado via AMI_DEBUG contra Asterisk real; não é uma contagem regressiva ao
+// (segundos) - confirmado via AMI_DEBUG contra Asterisk real; não é uma contagem regressiva ao
 // vivo (isso a CLI computa por conta própria, não vem exposto por essa action) nem RTT/ping.
 async function hydratePjsipRegistrations(items: AmiBlock[]) {
     for (const item of items) {
@@ -497,7 +497,7 @@ async function hydratePjsipRegistrations(items: AmiBlock[]) {
     }
 }
 
-// Ground truth do que está de fato ativo agora, contra o que o Redis acha que está em chamada —
+// Ground truth do que está de fato ativo agora, contra o que o Redis acha que está em chamada -
 // qualquer uniqueid marcado num rt:ext:calls:* que o Asterisk não listou mais é lixo (Hangup
 // perdido: reconexão do AMI, exceção engolida no handler etc.) e ficaria preso até o TTL de 4h
 // sem essa reconciliação. Também recria o hash da chamada se ela já estava em andamento quando

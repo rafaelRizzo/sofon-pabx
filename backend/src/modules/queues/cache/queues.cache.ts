@@ -57,7 +57,7 @@ export class QueuesCache {
         logger.info({ event: 'cache.invalidate', namespace: NAMESPACE, key: 'all' })
     }
 
-    // Lista de /queues escopada por usuário não-admin com MAIS DE UMA empresa vinculada —
+    // Lista de /queues escopada por usuário não-admin com MAIS DE UMA empresa vinculada -
     // getByCompany (1 empresa) e getAll (admin) não cobrem esse caso. Invalidada de forma
     // ampla por invalidateNamespace() (prefixo "queues:"), como os demais.
     static async getForScope(userId: string) {

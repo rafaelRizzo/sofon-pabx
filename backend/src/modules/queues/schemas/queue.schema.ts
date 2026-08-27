@@ -53,10 +53,10 @@ export const createQueueSchema = z.object({
     leaveWhenEmpty: z.boolean().default(false),
     weight: z.number().int().min(0).default(0),
     postQueueDestination: routeDestinationSchema.optional(),
-    // Áudio da pesquisa de satisfação pós-atendimento ("digite uma nota de 1 a 5") — null/omitido =
+    // Áudio da pesquisa de satisfação pós-atendimento ("digite uma nota de 1 a 5") - null/omitido =
     // pesquisa desligada. Mesmo padrão hasAudio de Announcement/IvrMenu.
     surveyAudioId: z.cuid2().nullable().optional(),
-    // Liga prioridade dinâmica (RoutingRule) e roteamento por afinidade (penalty) pra essa fila —
+    // Liga prioridade dinâmica (RoutingRule) e roteamento por afinidade (penalty) pra essa fila -
     // ver seção "Callcenter (Queue Engine)" no CLAUDE.md
     callcenterEnabled: z.boolean().default(false),
 })

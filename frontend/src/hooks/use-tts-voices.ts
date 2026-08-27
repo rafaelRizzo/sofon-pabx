@@ -23,7 +23,7 @@ async function fetchVoicesRequest(
     return data.voices ?? []
 }
 
-// Cache via TanStack Query (staleTime 5min) — evita refetch a cada vez que o dialog "Gerar
+// Cache via TanStack Query (staleTime 5min) - evita refetch a cada vez que o dialog "Gerar
 // áudio por voz" reabre; o backend já cacheia a mesma lista por 1h (Redis, ver audios.cache.ts),
 // isso só evita o round-trip HTTP repetido enquanto o usuário navega pela mesma sessão.
 export function useTtsVoices(
@@ -40,7 +40,7 @@ export function useTtsVoices(
         staleTime: 5 * 60 * 1000,
     })
 
-    // Ignora o cache de 1h do backend — pra quando a voz foi adicionada/removida agora mesmo
+    // Ignora o cache de 1h do backend - pra quando a voz foi adicionada/removida agora mesmo
     // na conta ElevenLabs e ainda não bateu o TTL
     const refreshVoices = async () => {
         if (!companyId) return

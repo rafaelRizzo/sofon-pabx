@@ -121,7 +121,7 @@ describe('RealtimeService.getQueuesStatus', () => {
         redisMock.hGetAll.mockImplementation((key: string) => {
             if (key === 'rt:queue:members:ast1-600') return Promise.resolve({ 'PJSIP/2002_ast1': JSON.stringify({ status: 'idle', paused: false }) })
             if (key === 'rt:call:uid-1') return Promise.resolve({ callerNum: '5511999999999' })
-            // Agregado join/leave do dia (handleQueueCallerLeave, ami-events.ts) — sum=50s/2 saídas = média 25s
+            // Agregado join/leave do dia (handleQueueCallerLeave, ami-events.ts) - sum=50s/2 saídas = média 25s
             if (key.startsWith('rt:queue:holdtime:ast1-600:')) return Promise.resolve({ sum: '50', count: '2' })
             return Promise.resolve({})
         })

@@ -1,4 +1,4 @@
-// Placeholder pra rotas ainda não portadas do frontend Next.js — cada uma vira uma página
+// Placeholder pra rotas ainda não portadas do frontend Next.js - cada uma vira uma página
 // real conforme a migração incremental avança
 export function PagePlaceholder({ title }: { title: string }) {
   return (

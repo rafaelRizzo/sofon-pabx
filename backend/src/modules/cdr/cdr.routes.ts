@@ -69,7 +69,7 @@ export const cdrRoutes = async (app: FastifyInstance) => {
                 tags: ['CDR'],
                 summary: 'Exportar registros de chamadas (CSV)',
                 description:
-                    'Query obrigatória: ?companyId. Aceita os mesmos filtros da listagem, exceto paginação — faz streaming de todos os registros que batem com o filtro como CSV (sem limite de linhas).',
+                    'Query obrigatória: ?companyId. Aceita os mesmos filtros da listagem, exceto paginação - faz streaming de todos os registros que batem com o filtro como CSV (sem limite de linhas).',
                 security: [{ bearerAuth: [] }],
                 querystring: cdrExportQuerySchema,
                 response: {

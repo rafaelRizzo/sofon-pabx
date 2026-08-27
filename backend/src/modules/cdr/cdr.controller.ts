@@ -16,7 +16,7 @@ import { handleError } from '../../utils/errors/handler.error'
 import { AppError } from '../../utils/errors/app.error'
 
 // MixMonitor sempre grava sob esse diretório (ver dialplan.repository.ts/outbound-routes.service.ts)
-// — guard contra path traversal, mesmo o valor vindo do banco (nunca de input HTTP direto)
+// - guard contra path traversal, mesmo o valor vindo do banco (nunca de input HTTP direto)
 const MONITOR_BASE_DIR = '/var/spool/asterisk/monitor'
 
 export const getCdr = async (req: FastifyRequest, reply: FastifyReply) => {
@@ -88,7 +88,7 @@ function formatDuration(seconds: number | null): string {
 }
 
 // startTime já vem formatado como "YYYY-MM-DDTHH:mm:ss±HH:mm" (hora local naive do CDR, ver
-// formatNaiveLocalISOString) — extrai direto da string, sem reconverter via Date/tz do processo
+// formatNaiveLocalISOString) - extrai direto da string, sem reconverter via Date/tz do processo
 function formatDateTimeBR(value: string | null): string {
     const match = value?.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/)
     if (!match) return '-'
@@ -128,7 +128,7 @@ export const exportCdr = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
         const query = cdrExportQuerySchema.parse(req.query)
         req.scope.assertAccess(query.companyId)
-        // Resolve a empresa (404 se não existir) antes de abrir o stream — precisa acontecer
+        // Resolve a empresa (404 se não existir) antes de abrir o stream - precisa acontecer
         // fora do generator, senão o erro estoura no meio de uma resposta já iniciada como 200
         const company = await getCompanyById(query.companyId)
 

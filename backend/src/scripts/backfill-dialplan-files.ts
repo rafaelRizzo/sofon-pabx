@@ -1,5 +1,5 @@
 // One-off: gera os arquivos estáticos de dialplan (/etc/asterisk/dialplan-extra/**) pra todas as
-// empresas já existentes no banco — necessário depois do deploy que trocou holidays/timeconditions/
+// empresas já existentes no banco - necessário depois do deploy que trocou holidays/timeconditions/
 // announcements/ivrs/queues-app/request-templates/variables/variable-conditions/callcenter-surveys
 // de Realtime pra arquivo, já que `regenerate()` só roda automaticamente em create/update/delete
 // daqui pra frente (também útil depois de reinstalação do Asterisk que apagou dialplan-extra/
@@ -18,7 +18,7 @@ import { CallcenterSurveyRepository } from '../asterisk/callcenter-survey.reposi
 
 async function main() {
     const companies = await prisma.company.findMany({ select: { id: true, name: true } })
-    console.log(`Backfill de dialplan estático — ${companies.length} empresa(s)`)
+    console.log(`Backfill de dialplan estático - ${companies.length} empresa(s)`)
 
     for (const company of companies) {
         console.log(`→ ${company.name} (${company.id})`)

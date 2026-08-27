@@ -48,7 +48,7 @@ export const createUser = async (req: FastifyRequest, reply: FastifyReply) => {
         const { role: requesterRole, id: requesterId } = req.user!
         const data = createUserSchema.parse(req.body)
 
-        // só admin/reseller criam usuários; não-admin só cria role "user" —
+        // só admin/reseller criam usuários; não-admin só cria role "user" -
         // sem isso, um "user" comum criava admin via POST /users (escalação de privilégio)
         if (requesterRole !== 'admin' && requesterRole !== 'reseller') {
             throw new AppError('Forbidden', 403)
@@ -85,7 +85,7 @@ export const updateUser = async (req: FastifyRequest, reply: FastifyReply) => {
             throw new AppError('Forbidden', 403)
         }
 
-        // extensionId governa pause/unpause em filas — não-admin não pode vincular ramal fora do seu
+        // extensionId governa pause/unpause em filas - não-admin não pode vincular ramal fora do seu
         // escopo de empresa (IDOR). Admin (companyIds null) pode qualquer um.
         if (data.extensionId && !req.scope.isAdmin) {
             const ext = await prisma.extension.findUnique({ where: { id: data.extensionId }, select: { companyId: true } })

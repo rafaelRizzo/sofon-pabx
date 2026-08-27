@@ -88,7 +88,7 @@ export class CompaniesCache {
         })
     }
 
-    // Lista de /companies já filtrada pelo escopo (req.scope.companyIds) de um usuário não-admin —
+    // Lista de /companies já filtrada pelo escopo (req.scope.companyIds) de um usuário não-admin -
     // getAllCompanies() com companyIds preenchido não bate no cache "list:all" (que é só pra admin)
     static async getCompaniesForScope(userId: string) {
         const cached = await cacheManager.get(`${NAMESPACE}:scope`, userId)

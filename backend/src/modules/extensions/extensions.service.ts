@@ -58,9 +58,9 @@ function toPjsipDbFields(data: Record<string, any>): Record<string, any> {
     return result
 }
 
-// Reverso de toSipDbFields/toPjsipDbFields — usado no GET pra devolver os campos crus do sip_peers/ps_endpoints
+// Reverso de toSipDbFields/toPjsipDbFields - usado no GET pra devolver os campos crus do sip_peers/ps_endpoints
 // já traduzidos de volta pro nome camelCase da API. Usa sipReadableFieldKeys (não sipFieldKeys) pra excluir
-// md5Secret/remoteSecret — colunas internas (secret, id, aors, auth, accountcode...) nunca entram em sipFields.
+// md5Secret/remoteSecret - colunas internas (secret, id, aors, auth, accountcode...) nunca entram em sipFields.
 const sipDbToApi: Record<string, string> = Object.fromEntries(sipReadableFieldKeys.map((k) => [sipFieldMap[k] ?? k, k]))
 const pjsipDbToApi: Record<string, string> = Object.fromEntries(pjsipFieldKeys.map((k) => [pjsipFieldMap[k] ?? k, k]))
 
@@ -74,7 +74,7 @@ function fromDbFields(row: Record<string, any>, dbToApi: Record<string, string>)
     return result
 }
 
-// ps_aors não tem prefixo "aor_" nas colunas — reconstrói o nome usado em pjsipFieldMap antes de traduzir de volta
+// ps_aors não tem prefixo "aor_" nas colunas - reconstrói o nome usado em pjsipFieldMap antes de traduzir de volta
 function fromAorDbFields(row: Record<string, any>, dbToApi: Record<string, string>): Record<string, any> {
     const result: Record<string, any> = {}
     for (const [column, value] of Object.entries(row)) {
@@ -108,7 +108,7 @@ async function checkAsteriskSync(number: string, type: string): Promise<boolean>
     return !!r
 }
 
-// Campos crus do sip_peers/ps_endpoints+ps_aors pro GET de detalhe — sempre lido ao vivo (nunca cacheado junto
+// Campos crus do sip_peers/ps_endpoints+ps_aors pro GET de detalhe - sempre lido ao vivo (nunca cacheado junto
 // com o dto), já que reflete config do Asterisk que pode mudar fora da API (ex: CLI, reset de senha)
 async function getAsteriskDetails(number: string, type: string): Promise<Record<string, any>> {
     if (type === 'pjsip') {
@@ -153,7 +153,7 @@ async function provisionMissingAsteriskRecord(
 export const getAllExtensions = async (companyIds?: string[], userId?: string) => {
     const singleCompanyId = companyIds?.length === 1 ? companyIds[0] : null
     const isAll = companyIds === undefined
-    // Não-admin com mais de uma empresa vinculada — nem singleCompanyId nem isAll cobrem esse caso
+    // Não-admin com mais de uma empresa vinculada - nem singleCompanyId nem isAll cobrem esse caso
     const isMultiCompanyScope = !singleCompanyId && !isAll && (companyIds?.length ?? 0) > 1
 
     type GroupedExtensions = { sip: any[]; pjsip: any[] }
@@ -201,7 +201,7 @@ export const getAllExtensions = async (companyIds?: string[], userId?: string) =
     const sipSynced = new Set(sipSync.map((e: any) => e.name))
 
     // usedBy é resolvido por empresa (query de FlowEdgeRepository.getReferencesToMany é global,
-    // mas o nome de quem referencia precisa ser buscado escopado à empresa de cada extensão —
+    // mas o nome de quem referencia precisa ser buscado escopado à empresa de cada extensão -
     // ver resolveUsedByLabels). Nas listagens cross-empresa (isAll/isMultiCompanyScope) as
     // extensões podem pertencer a empresas diferentes, então agrupa por companyId antes de resolver.
     const idsByCompany = new Map<string, string[]>()
@@ -228,7 +228,7 @@ export const getAllExtensions = async (companyIds?: string[], userId?: string) =
     return grouped
 }
 
-// Export em massa — única leitura que expõe secret/password de propósito, então nunca passa
+// Export em massa - única leitura que expõe secret/password de propósito, então nunca passa
 // pelo ExtensionsCache (que guarda o DTO público) e consulta sip_peers/ps_auths direto
 export const getExtensionsForExport = async (companyIds?: string[], userId?: string) => {
     const grouped = await getAllExtensions(companyIds, userId)
@@ -295,7 +295,7 @@ type ExtensionDto = {
 
 // Lookup cacheado usado por outros módulos que só precisam de companyId/type/username pra
 // checagem de ownership ou validação de destino (ex: time-conditions, inbound-routes,
-// outbound-routes, queue-members) — evita repetir prisma.extension.findUnique em cada um
+// outbound-routes, queue-members) - evita repetir prisma.extension.findUnique em cada um
 export const getExtensionDto = async (id: string): Promise<ExtensionDto> => {
     const cached = await ExtensionsCache.getExtension<ExtensionDto>(id)
     if (cached) return cached
@@ -314,7 +314,7 @@ export const getExtensionDto = async (id: string): Promise<ExtensionDto> => {
 export const getExtensionById = async (id: string): Promise<ExtensionDto & { synced: boolean; usedBy: UsedByRef[] }> => {
     const dto = await getExtensionDto(id)
 
-    // Não cacheado junto com live details — resolvido fresco a cada leitura (mesma decisão de
+    // Não cacheado junto com live details - resolvido fresco a cada leitura (mesma decisão de
     // flow-reference-label.ts, indicador não crítico o bastante pra justificar cache próprio).
     const usedByMap = await resolveUsedByLabels('extension', [id], dto.companyId)
     const usedBy = usedByMap.get(id) ?? []
@@ -354,7 +354,7 @@ export const createExtension = async (data: CreateExtensionInput) => {
     if (type === 'pjsip') {
         const { alias: _a, type: _t, name: _n, companyId: _c, context: _ctx, allowOutbound: _ao, ...pjsipExtras } = data
         const mappedExtras = toPjsipDbFields(pjsipExtras)
-        // accountcode sempre = asteriskId da empresa — isola CDR por empresa, sobrepõe accountCode enviado pelo cliente
+        // accountcode sempre = asteriskId da empresa - isola CDR por empresa, sobrepõe accountCode enviado pelo cliente
         const pjsipExtrasWithGroups = applyGroupPrefixes(
             { ...mappedExtras, setvar: allowOutboundSetvar, accountcode: company.asteriskId },
             company.asteriskId,
@@ -371,9 +371,9 @@ export const createExtension = async (data: CreateExtensionInput) => {
         const sipData: Record<string, any> = toSipDbFields(sipExtras)
         if (peerType) sipData.type = peerType
         sipData.setvar = sipData.setvar ? `${allowOutboundSetvar}\n${sipData.setvar}` : allowOutboundSetvar
-        // callerid default = name do ramal — pjsip já faz isso automaticamente (pjsip.repository.ts), sip não tinha
+        // callerid default = name do ramal - pjsip já faz isso automaticamente (pjsip.repository.ts), sip não tinha
         if (sipData.callerid === undefined) sipData.callerid = `${name} <${number}>`
-        // accountcode sempre = asteriskId da empresa — isola CDR por empresa, sobrepõe accountCode enviado pelo cliente
+        // accountcode sempre = asteriskId da empresa - isola CDR por empresa, sobrepõe accountCode enviado pelo cliente
         sipData.accountcode = company.asteriskId
 
         await prisma.$transaction(async (tx) => {
@@ -520,7 +520,7 @@ export const resetExtensionPassword = async (id: string) => {
 }
 
 // Self-service: usuário logado busca as credenciais do PRÓPRIO ramal pra registrar o softphone
-// WebRTC no browser (ver User.extensionId) — sem gate de permissão de extensions, é identidade,
+// WebRTC no browser (ver User.extensionId) - sem gate de permissão de extensions, é identidade,
 // não CRUD de terceiro (mesma lógica de /auth/me)
 export const getMyWebrtcCredentials = async (userId: string) => {
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { extensionId: true } })

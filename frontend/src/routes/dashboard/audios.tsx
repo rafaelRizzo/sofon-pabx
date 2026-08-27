@@ -29,7 +29,7 @@ function AudiosPage() {
     const [playAudio, setPlayAudio] = useState<Audio | null>(null)
 
     // Empresa usada no dialog (não deixa escolher empresa lá dentro): a do áudio em edição, ou
-    // o filtro da tabela — mesmo padrão de Announcements/InboundRoutes
+    // o filtro da tabela - mesmo padrão de Announcements/InboundRoutes
     const formCompanyId = editAudio?.companyId ?? companyFilter
 
     const {

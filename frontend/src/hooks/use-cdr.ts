@@ -40,15 +40,15 @@ export type CdrRecord = {
     trunkId: string | null
     recordingFile: string | null
     hangupCause: string | null
-    // Resolvidos pelo backend em tempo de leitura (cdr-enrichment.ts) — cobrem chamadas roteadas
+    // Resolvidos pelo backend em tempo de leitura (cdr-enrichment.ts) - cobrem chamadas roteadas
     // por Flow, onde queueName/direction/trunkId do dialplan nem sempre sobrevivem até o fim
     queueLabel: string | null
     destinationLabel: string | null
     answeredBy: { extensionId: string; label: string } | null
     // originExtension "cru" (CALLERID(num), formato <alias>_<asteriskId>) resolvido pro nome
-    // amigável do ramal via join com Extension — null quando a origem é externa (chamada de entrada)
+    // amigável do ramal via join com Extension - null quando a origem é externa (chamada de entrada)
     originLabel: string | null
-    // Tempo de espera na fila (até o agente atender) e tempo em ligação após atendida — vem do
+    // Tempo de espera na fila (até o agente atender) e tempo em ligação após atendida - vem do
     // QueueCall associado; null pra chamadas que não passaram por fila
     queueWaitSeconds: number | null
     queueTalkSeconds: number | null
@@ -89,7 +89,7 @@ function filterParams(companyId: string, filters: CdrFilters, extra?: object) {
     }
 }
 
-// companyId é obrigatório na query do backend — sem opção de "todas as empresas" aqui
+// companyId é obrigatório na query do backend - sem opção de "todas as empresas" aqui
 export function useCdrRecords(
     companyId?: string,
     filters: CdrFilters = {},
@@ -134,7 +134,7 @@ export function useCdrRecords(
                 setLoading(false)
             }
         },
-        // filters é recriado a cada render do caller — usar os campos primitivos como deps reais
+        // filters é recriado a cada render do caller - usar os campos primitivos como deps reais
         // eslint-disable-next-line react-hooks/exhaustive-deps
         [
             companyId,
@@ -175,7 +175,7 @@ export function useCdrRecords(
     }
 }
 
-// Streaming CSV do backend (/cdr/export) — sem limite de linhas, sem carregar tudo em memória
+// Streaming CSV do backend (/cdr/export) - sem limite de linhas, sem carregar tudo em memória
 // como objeto antes de gerar o CSV no client (ver cdr.controller.ts/exportCdr)
 export async function downloadCdrExport(companyId: string, filters: CdrFilters = {}) {
     const res = await api.get("/cdr/export", {
@@ -263,7 +263,7 @@ function extractFilename(disposition: unknown, fallback: string): string {
 }
 
 // Precisa ser via api.get (axios injeta o Bearer token no interceptor) e não <a href>/<audio src>
-// direto — o backend autentica por header, não cookie de sessão, então uma URL pura não carrega nada
+// direto - o backend autentica por header, não cookie de sessão, então uma URL pura não carrega nada
 async function fetchCdrRecordingBlob(id: string, companyId: string) {
     const res = await api.get(`/cdr/${id}/recording`, {
         params: { companyId },
@@ -288,7 +288,7 @@ export async function downloadCdrRecording(id: string, companyId: string) {
     }
 }
 
-// Retorna a blob URL pra tocar inline (<audio>) — chamador é responsável por revogar via
+// Retorna a blob URL pra tocar inline (<audio>) - chamador é responsável por revogar via
 // URL.revokeObjectURL quando parar de usar
 export async function loadCdrRecordingAudio(
     id: string,

@@ -95,7 +95,7 @@ export type VariableCondition = {
     companyId: string
     combinator: Combinator
     rules: VariableRule[]
-    // não são mais editáveis por aqui — só via arrastar uma conexão no canvas do Flow (ver
+    // não são mais editáveis por aqui - só via arrastar uma conexão no canvas do Flow (ver
     // flow-canvas.tsx), que grava direto no FlowEdge por PUT separado. Mantidos no tipo só porque a
     // API ainda devolve os campos (label resolvido, usado em telas de leitura)
     trueRoute: RouteDestination
@@ -145,7 +145,7 @@ const ruleFieldSchema = z
         }
     )
 
-// Espelha create/updateVariableConditionSchema de backend/src/modules/variable-conditions/schemas/variable-condition.schema.ts —
+// Espelha create/updateVariableConditionSchema de backend/src/modules/variable-conditions/schemas/variable-condition.schema.ts -
 // companyId só existe no create, o PUT do backend não permite trocar empresa
 export const createVariableConditionFormSchema = z.object({
     name: z.string().min(1, "Informe o nome").max(80, "Máximo 80 caracteres"),
@@ -167,8 +167,8 @@ export type VariableConditionUpdateForm = z.infer<
     typeof updateVariableConditionFormSchema
 >
 
-// DTO de criação a partir do registro salvo (sem companyId — recriação sempre usa a empresa do
-// flow) — usado pelo histórico de undo/redo do Flow pra recriar o recurso quando o usuário desfaz
+// DTO de criação a partir do registro salvo (sem companyId - recriação sempre usa a empresa do
+// flow) - usado pelo histórico de undo/redo do Flow pra recriar o recurso quando o usuário desfaz
 // uma exclusão (ver flow-canvas.tsx)
 export function toVariableConditionCreationDto(
     variableCondition: VariableCondition
@@ -180,7 +180,7 @@ export function toVariableConditionCreationDto(
     }
 }
 
-// companyId opcional — enquanto não informado, a lista não é buscada (filtro de
+// companyId opcional - enquanto não informado, a lista não é buscada (filtro de
 // empresa da página exige seleção antes de consultar o backend)
 async function fetchVariableConditionsRequest(
     companyId: string

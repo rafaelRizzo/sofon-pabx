@@ -5,7 +5,7 @@ export const isAdmin = (role: string) => role === 'admin'
 
 const SCOPE_NAMESPACE = 'scope:companyIds'
 
-// Resolve o escopo (empresas do usuário) em toda rota protegida — cacheado pois roda em TODA
+// Resolve o escopo (empresas do usuário) em toda rota protegida - cacheado pois roda em TODA
 // requisição de usuário não-admin, mesmo quando o endpoint em si não bate no banco
 export const getUserCompanyIds = async (userId: string): Promise<string[]> => {
     const cached = await cacheManager.get<string[]>(SCOPE_NAMESPACE, userId)

@@ -64,7 +64,7 @@ const ROLES: { value: UserRole; label: string }[] = [
 ]
 
 // CDR é só-leitura no backend (sem ação "manage", ver PERMISSION_KEYS em
-// backend/src/utils/auth/permissions.ts) — entra na mesma lista/categoria pra render unificado
+// backend/src/utils/auth/permissions.ts) - entra na mesma lista/categoria pra render unificado
 const PERMISSION_ROWS = [
     { key: "cdr", label: "CDR", category: "Relatórios", manageable: false },
     ...PERMISSION_RESOURCES.map((r) => ({ ...r, manageable: true as const })),
@@ -126,7 +126,7 @@ export function UserFormDialog({
     const watchedRole = useWatch({ control, name: "role" })
     const showPermissions = (isEdit ? user?.role : watchedRole) === "user"
 
-    // ramal pra vincular (softphone WebRTC) — disponível no create e no update; useExtensions só
+    // ramal pra vincular (softphone WebRTC) - disponível no create e no update; useExtensions só
     // busca 1 empresa por vez, então usa a primeira selecionada (caso comum de 1 empresa só)
     const watchedCompanyIds = useWatch({ control, name: "companyIds" })
     const { extensions } = useExtensions(watchedCompanyIds?.[0])
@@ -349,7 +349,7 @@ export function UserFormDialog({
                                                 items={pjsipExtensions}
                                                 value={sel}
                                                 itemToStringLabel={(e) =>
-                                                    `${e.alias} — ${e.name}`
+                                                    `${e.alias} - ${e.name}`
                                                 }
                                                 isItemEqualToValue={(a, b) =>
                                                     a.id === b.id
@@ -375,7 +375,7 @@ export function UserFormDialog({
                                                                 key={ext.id}
                                                                 value={ext}
                                                             >
-                                                                {ext.alias} —{" "}
+                                                                {ext.alias} -{" "}
                                                                 {ext.name}
                                                             </ComboboxItem>
                                                         )}
@@ -429,7 +429,7 @@ export function UserFormDialog({
                                     <p className="text-xs text-muted-foreground">
                                         Ver libera consultar o recurso.
                                         Gerenciar libera criar, editar e
-                                        excluir — e já inclui Ver.
+                                        excluir - e já inclui Ver.
                                     </p>
                                     <Controller
                                         control={control}
@@ -657,7 +657,7 @@ export function UserFormDialog({
                                                                                                     />
                                                                                                 ) : (
                                                                                                     <span className="text-muted-foreground">
-                                                                                                        —
+                                                                                                        -
                                                                                                     </span>
                                                                                                 )}
                                                                                             </div>

@@ -7,7 +7,7 @@ import { z } from "zod"
 
 import { api, apiError } from "@/lib/api"
 
-// Espelha INTEGRATION_PROVIDERS de backend/src/modules/integration-credentials/schemas/integration-credential.schema.ts —
+// Espelha INTEGRATION_PROVIDERS de backend/src/modules/integration-credentials/schemas/integration-credential.schema.ts -
 // cresce a cada integração nova, sem precisar de um hook/model por provedor
 export const INTEGRATION_PROVIDERS = ["ixc"] as const
 export type IntegrationProvider = (typeof INTEGRATION_PROVIDERS)[number]

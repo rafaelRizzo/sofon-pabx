@@ -8,7 +8,7 @@ async function runRecalc() {
     if (result.agents > 0) logger.info({ event: 'callcenter.affinity.recalc', ...result })
 }
 
-// Roda mais frequente que holiday-resync (diário) — afinidade deve refletir notas recentes rápido,
+// Roda mais frequente que holiday-resync (diário) - afinidade deve refletir notas recentes rápido,
 // e recalcular é barato (poucas linhas por empresa). Mesmo padrão: setInterval puro, roda no boot +
 // fixo, fire-and-forget com .catch() em cada execução.
 export function startAgentAffinityRecalcJob() {

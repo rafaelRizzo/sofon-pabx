@@ -2,7 +2,7 @@ import { prisma } from '../../lib/prisma'
 
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 
-// chan_iax2 realtime (iaxfriends/iaxusers/iaxpeers, ver setups/odbc-realtime.sh) — tabela única,
+// chan_iax2 realtime (iaxfriends/iaxusers/iaxpeers, ver setups/odbc-realtime.sh) - tabela única,
 // pré-sorcery como chan_sip. Sem "register =>" dinâmico: Asterisk não tem equivalente ao
 // ps_registrations do PJSIP pra IAX2, então "outbound" aqui é sempre peer estático IP-autenticado,
 // nunca um REGISTER de verdade (ver trunks.service.ts).
@@ -25,7 +25,7 @@ type IaxTrunkOpts = {
     jitterbuffer?: boolean | null
 }
 
-// name é a PK (mesmo lookup key usado pelo Asterisk pra REGISTER/auth) — igual identifyBy='username'
+// name é a PK (mesmo lookup key usado pelo Asterisk pra REGISTER/auth) - igual identifyBy='username'
 // do PjsipRepository, quando o inbound tem username explícito o "name" vira o próprio username
 const nameFor = (astId: string, opts: Pick<IaxTrunkOpts, 'registrationMode' | 'identifyBy' | 'username'>) =>
     opts.registrationMode === 'inbound' && opts.identifyBy === 'username' ? opts.username! : astId

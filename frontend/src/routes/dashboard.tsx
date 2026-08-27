@@ -18,7 +18,7 @@ import { AuthProvider } from "@/hooks/use-auth"
 import { hasAuthToken } from "@/lib/auth-cookie"
 import { cn } from "@/lib/utils"
 
-// Layout route pra tudo em /dashboard/** — equivalente a app/dashboard/layout.tsx +
+// Layout route pra tudo em /dashboard/** - equivalente a app/dashboard/layout.tsx +
 // proxy.ts (matcher "/dashboard/:path*") do frontend Next, mas o guard roda no client
 export const Route = createFileRoute("/dashboard")({
   beforeLoad: () => {

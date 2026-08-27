@@ -49,7 +49,7 @@ export type CdrEnrichment = {
 
 // Enriquece em tempo de leitura, sem depender do dialplan ter sobrevivido até o fim da chamada:
 // - queueLabel/destinationLabel resolvidos por padrão de string (fila ou node de Flow)
-// - answeredBy via QueueCall (alimentado por eventos AMI, independente do CDR nativo) —
+// - answeredBy via QueueCall (alimentado por eventos AMI, independente do CDR nativo) -
 //   QueueCall.callerUniqueid é o mesmo Uniqueid do canal do chamador, igual a cdr.uniqueid
 export async function enrichCdrRecords<T extends EnrichableRecord>(
     records: T[],
@@ -66,7 +66,7 @@ export async function enrichCdrRecords<T extends EnrichableRecord>(
     const uniqueids = [...new Set(records.map((r) => r.uniqueid).filter((u): u is string => !!u))]
     // src entra no mesmo lookup de originExtension: quando a chamada cai no fallback `_X.`
     // (sem match no dialplan ramal-a-ramal), `CDR(origin_extension)` nunca é setado e o único
-    // dado de origem disponível é o `src` nativo do Asterisk — que já é o mesmo CALLERID(num)
+    // dado de origem disponível é o `src` nativo do Asterisk - que já é o mesmo CALLERID(num)
     // sufixado (`Extension.number`) usado em origin_extension, então bate no mesmo mapa
     const originNumbers = [
         ...new Set(
@@ -132,7 +132,7 @@ export async function enrichCdrRecords<T extends EnrichableRecord>(
         if (parsed?.kind === 'queue') {
             const q = queueByNumber.get(parsed.queueNumber)
             queueLabel = q ? `${q.name} (${q.number})` : `Fila ${parsed.queueNumber}`
-            // destinationLabel fica null de propósito aqui — a coluna "Fila" já mostra esse
+            // destinationLabel fica null de propósito aqui - a coluna "Fila" já mostra esse
             // mesmo nome, repetir em "Destino" só duplica informação sem agregar nada
         } else if (parsed?.kind === 'flowNode') {
             const node = flowNodeById.get(parsed.flowNodeId)

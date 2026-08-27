@@ -29,7 +29,7 @@ import { AppError } from '../../utils/errors/app.error'
 import { logger } from '../../utils/logger'
 
 // Regenerar o dialplan (arquivo estático) é best-effort: se falhar aqui (disco, permissão, etc.),
-// o registro já foi commitado no Postgres (fonte da verdade) — deixar a exceção subir faria a API
+// o registro já foi commitado no Postgres (fonte da verdade) - deixar a exceção subir faria a API
 // responder erro sobre uma operação que na prática já foi persistida. O próximo CRUD dessa empresa
 // regenera o arquivo do zero a partir do estado atual do banco, então a inconsistência se autocorrige.
 const regenerateSafely = async (fn: () => Promise<void>, companyId: string) => {
@@ -80,8 +80,8 @@ const toDto = <T extends { surveyAudioId: string | null; usedBy: UsedByRef[] }>(
 const _byId = () => prisma.queue.findUnique({ where: { id: '' }, select: queueSelect })
 type QueueRow = NonNullable<Awaited<ReturnType<typeof _byId>>> & { postQueueDestination: RouteDestination }
 
-// Anexa o nome legível de postQueueDestination (resolvido no backend, cache-first — ver
-// route-destination-label.ts). Agrupa por companyId — getAllQueues pode misturar empresas
+// Anexa o nome legível de postQueueDestination (resolvido no backend, cache-first - ver
+// route-destination-label.ts). Agrupa por companyId - getAllQueues pode misturar empresas
 // diferentes na mesma lista (visão admin).
 async function withDestinationLabels<
     T extends { postQueueDestination: unknown; companyId: string }
@@ -114,7 +114,7 @@ async function withDestinationLabels<
 }
 
 // Anexa o indicador "usado por" (resolveUsedByLabels, reverse lookup de FlowEdge). Agrupa por
-// companyId pelo mesmo motivo de withDestinationLabels acima — getAllQueues mistura empresas.
+// companyId pelo mesmo motivo de withDestinationLabels acima - getAllQueues mistura empresas.
 async function withUsedBy<T extends { id: string; companyId: string }>(
     rows: T[]
 ): Promise<(T & { usedBy: UsedByRef[] })[]> {
@@ -244,10 +244,10 @@ export const createQueue = async (data: CreateQueueInput) => {
 
     const asteriskName = toAsteriskQueueName(company.asteriskId, data.number)
 
-    // App guarda o audioId (data.periodicAnnounce/agentAnnounce) — a tabela realtime do Asterisk
+    // App guarda o audioId (data.periodicAnnounce/agentAnnounce) - a tabela realtime do Asterisk
     // precisa do path absoluto do arquivo (ver AsteriskQueueRepository/audioSoundPath). `announce`
     // (join announcement, tocado ao caller uma única vez ao entrar) NÃO vai pra cá: vira um
-    // Playback no dialplan (ver AsteriskQueueRepository.regenerate) — quem grava na coluna
+    // Playback no dialplan (ver AsteriskQueueRepository.regenerate) - quem grava na coluna
     // realtime `announce` (nativa do Asterisk, tocada pro AGENTE antes do bridge) é agentAnnounce
     const asteriskData = {
         ...data,
@@ -382,7 +382,7 @@ export const updateQueue = async (id: string, data: UpdateQueueInput) => {
     if (data.maxLen !== undefined) asteriskUpdate.maxlen = data.maxLen
     if (data.wrapupTime !== undefined)
         asteriskUpdate.wrapuptime = data.wrapupTime
-    // `announce` (join announcement) não vai pra tabela realtime (ver comentário em createQueue) —
+    // `announce` (join announcement) não vai pra tabela realtime (ver comentário em createQueue) -
     // só dispara regenerate do dialplan via announceChanged, abaixo. Quem grava na coluna nativa
     // `announce` é agentAnnounce (agent announcement, tocado pro atendente antes do bridge)
     if (data.announceFrequency !== undefined)

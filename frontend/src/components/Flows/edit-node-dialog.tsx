@@ -73,22 +73,22 @@ type Props = {
     onOpenChange: (open: boolean) => void
     companyId: string
     companies: Company[]
-    // dispara depois de salvar com sucesso — o canvas usa isso pra refazer o grafo (o nome exibido
+    // dispara depois de salvar com sucesso - o canvas usa isso pra refazer o grafo (o nome exibido
     // no nó, ou uma conexão feita através do próprio form, pode ter mudado)
     onSaved: () => void
     // recebe o DTO de criação montado a partir do registro carregado no editor (não do buffer não
-    // salvo do form) — o histórico de undo/redo do canvas usa isso pra poder recriar o recurso caso
+    // salvo do form) - o histórico de undo/redo do canvas usa isso pra poder recriar o recurso caso
     // o usuário desfaça a exclusão (ver flow-canvas.tsx)
     onDeleteResource?: (creationDto: unknown) => void
 }
 
-// Busca genérica por id — usada por todo tipo que não tem hook de leitura única própria. A resposta
+// Busca genérica por id - usada por todo tipo que não tem hook de leitura única própria. A resposta
 // HTTP de GET/:id sempre é { success, message, <recurso singular> } (ver CLAUDE.md do backend), daí
 // extrair a única chave que não é success/message em vez de repetir o nome em cada branch abaixo.
 // Expõe `loading` separado de `entity` porque `entity` começa null tanto durante o fetch quanto se
-// ele falhar — sem essa distinção, o *-form-dialog não tem como saber que ainda é edição (e não
+// ele falhar - sem essa distinção, o *-form-dialog não tem como saber que ainda é edição (e não
 // criação) enquanto o registro não chega (ver isEdit nesses dialogs).
-// queryKey [apiPath, id] cacheia/dedupa por cache do TanStack Query — StrictMode não dispara mais
+// queryKey [apiPath, id] cacheia/dedupa por cache do TanStack Query - StrictMode não dispara mais
 // o GET duas vezes (a segunda montagem do efeito só lê o resultado em voo da primeira).
 function useEntityById<T>(apiPath: string, id: string) {
     const { data: entity = null, isLoading: loading } = useQuery({
@@ -111,11 +111,11 @@ function useEntityById<T>(apiPath: string, id: string) {
 }
 
 // Duplo-clique num nó do canvas (ver flow-node.tsx) abre o form de edição do módulo dono do
-// registro — reaproveita o mesmo dialog usado na tela de listagem daquele recurso, sem recriar
+// registro - reaproveita o mesmo dialog usado na tela de listagem daquele recurso, sem recriar
 // formulário nenhum. O grafo do canvas só traz {type,id,name} (ver flow-canvas.tsx), então busca o
 // registro completo por id ao abrir. extension/flow usam hook próprio de leitura única (o resto
 // passa por useEntityById acima).
-// IMPORTANTE: montar com `key={`${type}:${id}`}` no chamador — mesma regra de CreateNodeDialog:
+// IMPORTANTE: montar com `key={`${type}:${id}`}` no chamador - mesma regra de CreateNodeDialog:
 // os hooks chamados aqui variam por `type`/`id` num switch, só seguro porque o componente é
 // remontado do zero a cada nó diferente, não re-renderizado com as props mudando.
 export function EditNodeDialog({
@@ -365,7 +365,7 @@ export function EditNodeDialog({
             )
         }
         case "extension": {
-            // ExtensionFormDialog aceita o id direto (string) e busca o registro internamente —
+            // ExtensionFormDialog aceita o id direto (string) e busca o registro internamente -
             // não precisa passar por useEntityById
             const { updateExtension } = useExtensions()
             return (
@@ -383,7 +383,7 @@ export function EditNodeDialog({
             )
         }
         case "flow": {
-            // nó "flow" = referência a outro Flow dentro deste — edita só nome/empresa aqui; a
+            // nó "flow" = referência a outro Flow dentro deste - edita só nome/empresa aqui; a
             // cadeia de nós desse flow aninhado se edita abrindo ele mesmo (ver /dashboard/flows/:id)
             const { flow, loading } = useFlow(id)
             const { updateFlow } = useFlows()

@@ -55,7 +55,7 @@ type Props = {
     open: boolean
     onOpenChange: (open: boolean) => void
     timeCondition: TimeCondition | null
-    // true enquanto o registro ainda está sendo buscado por id (ver EditNodeDialog) — nesse caso
+    // true enquanto o registro ainda está sendo buscado por id (ver EditNodeDialog) - nesse caso
     // `timeCondition` também é null, mas não significa "criação": mostra skeleton em vez do form
     loading?: boolean
     companies: Company[]
@@ -96,7 +96,7 @@ export function TimeConditionFormDialog({
     const groupIds = watch("groupIds")
     const selectedCompany = companies.find((c) => c.id === companyId) ?? null
 
-    // Grupos de horário disponíveis pra vincular — dependem da empresa escolhida no próprio form,
+    // Grupos de horário disponíveis pra vincular - dependem da empresa escolhida no próprio form,
     // não do filtro da página (o dialog é independente da empresa que está sendo listada na tabela)
     const { timeGroups } = useTimeGroups(companyId || undefined)
 
@@ -111,7 +111,7 @@ export function TimeConditionFormDialog({
     }, [open, timeCondition, reset, defaultCompanyId])
 
     // Ao trocar de empresa na criação, grupos escolhidos pra empresa anterior não fazem mais
-    // sentido (IDs de outra empresa) — reseta pra evitar enviar referências inválidas
+    // sentido (IDs de outra empresa) - reseta pra evitar enviar referências inválidas
     function handleCompanyChange(nextCompanyId: string) {
         setValue("companyId", nextCompanyId, {
             shouldValidate: true,

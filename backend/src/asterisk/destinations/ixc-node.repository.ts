@@ -8,7 +8,7 @@ const env = validateEnv()
 const buildAgiUrl = (id: string) => `agi://${env.AGI_HOST}:${env.AGI_PORT}/ixc,${id}`
 
 // Mesmo padrão de RequestTemplateRepository: dialplan de um IxcNode é sempre o mesmo par fixo
-// (AGI + Hangup) — quem varia é o registro no banco (action/params/credential), lido pelo AGI
+// (AGI + Hangup) - quem varia é o registro no banco (action/params/credential), lido pelo AGI
 // server em tempo de chamada via o id no agiUrl.
 export const IxcNodeRepository = {
     async regenerate(companyId: string) {

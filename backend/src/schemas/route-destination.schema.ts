@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 /**
- * Destino de roteamento — shape compartilhado por:
+ * Destino de roteamento - shape compartilhado por:
  *   - Inbound Routes      → `destination`
  *   - Time Conditions     → `trueRoute` / `falseRoute`
  *   - Queues              → `postQueueDestination`
@@ -29,19 +29,19 @@ import { z } from 'zod'
  * |                 |                | (preenchida/tamanho/igualdade/regex/numérica), trueRoute/falseRoute |                                             |
  * | flow            | ✔              | Goto(flows,flow-<id>,1) → resolve recursivamente o             | mesma empresa; guard de ciclo em               |
  * |                 |                | entryDestination do Flow (mesmo switch, ver resolver)          | resolveRouteDestinationToDialplan               |
- * | hangup          | ✗              | Hangup()                                                       | —                                               |
+ * | hangup          | ✗              | Hangup()                                                       | -                                               |
  *
  * `null` ou campo omitido equivale a `{ type: "hangup" }`.
  *
  * Validação de existência/posse centralizada em `validateRouteDestination()`
- * (src/schemas/route-destination.validate.ts) — não duplicar o switch-case.
+ * (src/schemas/route-destination.validate.ts) - não duplicar o switch-case.
  */
 export const ROUTE_DEST_TYPES = [
     'extension', 'queue', 'voicemail', 'timecondition', 'holiday', 'announcement', 'ivr', 'request', 'ixc',
     'variable-set', 'variable-condition', 'flow', 'hangup',
 ] as const
 
-// extraShape entra só na resposta (routeDestinationResponseSchema) — carrega o `label` resolvido
+// extraShape entra só na resposta (routeDestinationResponseSchema) - carrega o `label` resolvido
 // no backend (ver src/schemas/route-destination-label.ts). Input (routeDestinationSchema) nunca
 // recebe/aceita label, só type+id.
 const variants = <T extends z.ZodTypeAny>(idSchema: T, extraShape: z.ZodRawShape = {}) => [
@@ -71,18 +71,18 @@ const variants = <T extends z.ZodTypeAny>(idSchema: T, extraShape: z.ZodRawShape
         ...extraShape,
     }),
     z.object({
-        type: z.literal('announcement').describe('Toca um anúncio de áudio (Playback) e encerra a chamada — requer áudio já enviado'),
+        type: z.literal('announcement').describe('Toca um anúncio de áudio (Playback) e encerra a chamada - requer áudio já enviado'),
         id: idSchema,
         ...extraShape,
     }),
     z.object({
-        type: z.literal('ivr').describe('Direciona a chamada para um menu de URA (IVR) — requer áudio já enviado'),
+        type: z.literal('ivr').describe('Direciona a chamada para um menu de URA (IVR) - requer áudio já enviado'),
         id: idSchema,
         ...extraShape,
     }),
     z.object({
         type: z.literal('request').describe(
-            'Executa um Request Template via AGI (síncrono, trava a chamada até a resposta HTTP) — ' +
+            'Executa um Request Template via AGI (síncrono, trava a chamada até a resposta HTTP) - ' +
             'variáveis extraídas do response ficam disponíveis no canal; roteamento continua por onSuccess/onError do template',
         ),
         id: idSchema,
@@ -90,7 +90,7 @@ const variants = <T extends z.ZodTypeAny>(idSchema: T, extraShape: z.ZodRawShape
     }),
     z.object({
         type: z.literal('ixc').describe(
-            'Executa um nó IXCsoft via AGI (síncrono, trava a chamada até a resposta) — ' +
+            'Executa um nó IXCsoft via AGI (síncrono, trava a chamada até a resposta) - ' +
             'variáveis extraídas do response ficam disponíveis no canal; roteamento continua por onSuccess/onError do nó',
         ),
         id: idSchema,

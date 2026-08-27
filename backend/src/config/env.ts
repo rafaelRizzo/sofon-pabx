@@ -3,7 +3,7 @@ import { z } from 'zod'
 const envSchema = z.object({
     NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
     // Controla o que esse processo sobe: 'web' (só API HTTP, escalável em N réplicas), 'worker'
-    // (AGI + AMI events + cron jobs, sempre 1 instância só) ou 'all' (tudo junto, default —
+    // (AGI + AMI events + cron jobs, sempre 1 instância só) ou 'all' (tudo junto, default -
     // preserva o comportamento de sempre em dev local/single-instance)
     PROCESS_ROLE: z.enum(['web', 'worker', 'all']).default('all'),
     PORT: z.coerce.number().default(3333),
@@ -28,11 +28,11 @@ const envSchema = z.object({
     DATABASE_POOL_SIZE: z.coerce.number().default(10),
     REDIS_URL: z.string().default('redis://localhost:6379'),
     TZ: z.string().default('America/Sao_Paulo'),
-    // FastAGI server (src/asterisk/agi-server.ts) — host/porta que o Asterisk usa pra conectar via
+    // FastAGI server (src/asterisk/agi-server.ts) - host/porta que o Asterisk usa pra conectar via
     // AGI(agi://AGI_HOST:AGI_PORT/run,<requestTemplateId>) ao executar um RouteDestination type: "request"
     AGI_HOST: z.string().default('127.0.0.1'),
     AGI_PORT: z.coerce.number().default(4573),
-    // AMI (Asterisk Manager Interface, src/asterisk/ami-client.ts) — usado pra mandar comandos tipo
+    // AMI (Asterisk Manager Interface, src/asterisk/ami-client.ts) - usado pra mandar comandos tipo
     // "dialplan reload" sem depender do binário CLI do Asterisk instalado no host/container do backend.
     // setups/install-asterisk.sh já habilita manager.conf com esse host/porta/usuário por padrão; o
     // secret é gerado por instalação e precisa ser copiado manualmente pro .env (AMI_SECRET indefinido
@@ -42,44 +42,44 @@ const envSchema = z.object({
     AMI_USER: z.string().default('admin'),
     AMI_SECRET: z.string().optional(),
     // Diagnóstico do ami-events.ts: loga cada bloco cru (Event/Response + todos os campos) via
-    // logger.warn (visível mesmo em produção, onde o nível default é 'warn') — usado pra confirmar
+    // logger.warn (visível mesmo em produção, onde o nível default é 'warn') - usado pra confirmar
     // nomes de campo reais contra a versão de Asterisk instalada quando o mapeamento não bate.
-    // Fica bem verboso (DeviceStateChange dispara muito) — ligar só durante uma investigação pontual.
+    // Fica bem verboso (DeviceStateChange dispara muito) - ligar só durante uma investigação pontual.
     AMI_DEBUG: z.coerce.boolean().default(false),
     // Diretório onde dialplan-file.repository.ts materializa os contextos estáticos (timeconditions,
     // announcements, ivrs, holidays, queues-app, request-templates). Default é o caminho real do
-    // Asterisk — testes de integração sobrescrevem via .env.test pra um dir gravável sem Asterisk instalado.
+    // Asterisk - testes de integração sobrescrevem via .env.test pra um dir gravável sem Asterisk instalado.
     DIALPLAN_EXTRA_DIR: z.string().default('/etc/asterisk/dialplan-extra'),
     // Diretório de config do Asterisk onde base-dialplan.repository.ts materializa sofon-managed.conf
-    // (esqueleto global: ramais/transfer/from-trunk/from-trunk-routed + #tryinclude, ver instalador) —
+    // (esqueleto global: ramais/transfer/from-trunk/from-trunk-routed + #tryinclude, ver instalador) -
     // testes de integração sobrescrevem via .env.test pro mesmo dir gravável do DIALPLAN_EXTRA_DIR.
     ASTERISK_CONF_DIR: z.string().default('/etc/asterisk'),
     // Espelham a escolha feita em setups/install-asterisk.sh (versão do Asterisk define as portas
-    // SIP/PJSIP) — o instalador grava esses valores no .env do backend. Expostos via GET /system/sip-config
+    // SIP/PJSIP) - o instalador grava esses valores no .env do backend. Expostos via GET /system/sip-config
     // pro frontend exibir a configuração correta (ex: instruções de provisionamento de ramal).
     ASTERISK_VERSION: z.string().optional(),
     SIP_LEGACY_ENABLED: z.coerce.boolean().default(false),
     SIP_PORT: z.coerce.number().optional(),
     PJSIP_PORT: z.coerce.number().default(5060),
-    // WebRTC (softphone no browser via SIP.js) — sinalização SIP sobre WebSocket. Sem domínio/TLS
+    // WebRTC (softphone no browser via SIP.js) - sinalização SIP sobre WebSocket. Sem domínio/TLS
     // ainda, WS_SCHEME fica "ws" (sem criptografia no transporte); trocar pra "wss" quando houver
     // certificado é só mudar essas 3 vars, sem deploy de código novo (ver GET /system/sip-config).
     // PUBLIC_ADDRESS é o mesmo IP/domínio informado no install-asterisk.sh (external_media_address).
     PUBLIC_ADDRESS: z.string().optional(),
     WS_SCHEME: z.enum(['ws', 'wss']).default('ws'),
     WS_PORT: z.coerce.number().default(8088),
-    // TTS via ElevenLabs (src/modules/audios/providers/elevenlabs.provider.ts) — a API key é por
+    // TTS via ElevenLabs (src/modules/audios/providers/elevenlabs.provider.ts) - a API key é por
     // empresa (Company.elevenLabsApiKey), não global; aqui só a config não-secreta compartilhada
     ELEVENLABS_API_URL: z.string().default('https://api.elevenlabs.io'),
     ELEVENLABS_MODEL_ID: z.string().default('eleven_v3'),
     ELEVENLABS_TIMEOUT_MS: z.coerce.number().int().min(1000).max(60000).default(30000),
     // Master key pra derivar (HKDF, por companyId) a chave AES-256-GCM de segredos de terceiro
-    // cifrados em repouso — ver src/lib/crypto.ts. Hoje só usada por IxcCredential.token.
+    // cifrados em repouso - ver src/lib/crypto.ts. Hoje só usada por IxcCredential.token.
     ENCRYPTION_MASTER_KEY: z.string().default('your-encryption-master-key-change-in-production'),
 }).superRefine((cfg, ctx) => {
     // Defaults públicos de JWT_SECRET/REFRESH_SECRET/ENCRYPTION_MASTER_KEY são inaceitáveis fora de
     // teste (tokens forjáveis e segredos de terceiro descriptografáveis por quem lê o repo). Checa em
-    // qualquer NODE_ENV que não seja 'test' — gatear só por 'production' permitiria rodar em produção
+    // qualquer NODE_ENV que não seja 'test' - gatear só por 'production' permitiria rodar em produção
     // com os defaults públicos caso alguém suba com NODE_ENV=development por engano (ex: copiando
     // .env.example sem trocar essa linha).
     if (cfg.NODE_ENV === 'test') return

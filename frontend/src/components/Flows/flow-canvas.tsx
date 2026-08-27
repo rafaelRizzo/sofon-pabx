@@ -146,9 +146,9 @@ const EDGE_SYNC_MAX_DELAY_MS = 30000
 const NODE_PANEL_STORAGE_KEY = "flow-canvas:node-panel-open"
 const NODE_ACTION_DRAG_TYPE = "application/flow-node-action"
 
-// Handles dos nós são Top (target) / Bottom (source) — o flow lê de cima pra baixo, então o
+// Handles dos nós são Top (target) / Bottom (source) - o flow lê de cima pra baixo, então o
 // auto-layout roda na mesma direção pra não gerar setas em ziguezague ou de baixo pra cima.
-// elkjs é pesado (~500kB) e só serve pro botão "Auto Layout" — import dinâmico evita que ele
+// elkjs é pesado (~500kB) e só serve pro botão "Auto Layout" - import dinâmico evita que ele
 // entre no bundle inicial da rota, só carrega quando alguém de fato clica no botão.
 type ElkInstance = InstanceType<
     (typeof import("elkjs/lib/elk.bundled.js"))["default"]
@@ -281,7 +281,7 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
         name: string
         creationDto: unknown
     } | null>(null)
-    // "Início do flow" é sintético (não é um FlowNode no banco, não tem id real) — a posição dele
+    // "Início do flow" é sintético (não é um FlowNode no banco, não tem id real) - a posição dele
     // não cabe no PUT /nodes/:nodeId. Usa o campo Flow.layout (já existia no schema, sem uso até
     // agora) só pra esse único item.
     const [startPosition, setStartPosition] = useState<{
@@ -307,7 +307,7 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
     const miniMapTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
     const [isMiniMapVisible, setIsMiniMapVisible] = useState(true)
     const [isSyncingEdges, setIsSyncingEdges] = useState(false)
-    // contador em vez de boolean — deletar vários nós de uma vez (seleção múltipla + teclado)
+    // contador em vez de boolean - deletar vários nós de uma vez (seleção múltipla + teclado)
     // dispara várias chamadas deleteNodeCore em paralelo; um boolean simples desligaria o
     // indicador assim que a primeira terminasse, mesmo com outras ainda em voo.
     const [deletingNodeCount, setDeletingNodeCount] = useState(0)
@@ -315,11 +315,11 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
     const flowInstanceRef = useRef<ReactFlowInstance | null>(null)
     const contextPositionRef = useRef<{ x: number; y: number } | null>(null)
 
-    // Histórico undo/redo (ver flow-history.ts) — em memória, zerado ao desmontar (trocar de flow
+    // Histórico undo/redo (ver flow-history.ts) - em memória, zerado ao desmontar (trocar de flow
     // ou recarregar a página).
     const history = useFlowHistory()
 
-    // Ids de nó recriados por undo/redo (o backend nunca restaura o id excluído — recriar sempre
+    // Ids de nó recriados por undo/redo (o backend nunca restaura o id excluído - recriar sempre
     // gera um id novo). Encadeia ida->novo pra qualquer outra ação da pilha (ex. um move-node ou
     // connect-edge anterior) resolver pro id vivo atual em vez do id histórico já morto.
     const nodeIdMapRef = useRef(new Map<string, string>())
@@ -333,7 +333,7 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
         return current
     }, [])
 
-    // Espelhos em ref do estado corrente — usados pelos comandos de mutação (commitNodePosition,
+    // Espelhos em ref do estado corrente - usados pelos comandos de mutação (commitNodePosition,
     // deleteNode, deleteResource, connectNodes) pra ler o valor mais recente sem precisar desses
     // valores na lista de dependências do useCallback (evita recriar esses comandos, e portanto
     // onNodesChange/rfNodes, a cada mudança de estado).
@@ -350,7 +350,7 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
         entryNodeIdRef.current = entryNodeId
     }, [entryNodeId])
 
-    // Hooks de criação por tipo de recurso — usados só pra recriar um recurso excluído/desfeito
+    // Hooks de criação por tipo de recurso - usados só pra recriar um recurso excluído/desfeito
     // (ver recreateResource abaixo). O form de edição/criação de cada tipo já usa esses mesmos
     // hooks em edit-node-dialog.tsx/create-node-dialog.tsx.
     const { createAnnouncement } = useAnnouncements()
@@ -418,7 +418,7 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
         )
     }, [nodeActionSearch])
 
-    // referência sempre atual dos ids de nó válidos — usada dentro de callbacks memoizados
+    // referência sempre atual dos ids de nó válidos - usada dentro de callbacks memoizados
     // (persistPositions) pra não reenfileirar posição de um nó já deletado numa race entre o PUT
     // em voo e um delete concorrente.
     const nodeIdsRef = useRef<Set<string>>(new Set())
@@ -479,7 +479,7 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
             if (pendingEdgeOperations.current.size > 0) scheduleEdgeSync(0)
         } catch (err) {
             const permanent = isValidationError(err)
-            // 4xx nunca vai vingar de tentar de novo (self-loop, ciclo, nó inexistente) — descarta
+            // 4xx nunca vai vingar de tentar de novo (self-loop, ciclo, nó inexistente) - descarta
             // a operação de vez. Só erro transiente (rede/5xx) volta pra fila de retry.
             if (permanent)
                 for (const operation of operations)
@@ -518,7 +518,7 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
                 if (pendingEdgeOperations.current.size > 0) scheduleEdgeSync(0)
                 return
             }
-            // backoff exponencial — sem isso, uma falha transiente persistente (rota fora do ar)
+            // backoff exponencial - sem isso, uma falha transiente persistente (rota fora do ar)
             // vira retry imediato em loop infinito martelando o backend.
             const delay = edgeSyncBackoff.current
             edgeSyncBackoff.current = Math.min(
@@ -587,7 +587,7 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
     }, [flow.id, setEntryNodeId, setFlowEdges, setFlowNodes])
 
     const persistPositions = useCallback(async () => {
-        // Nó recém-criado ainda não tem id real do backend (pending:<uuid>) — manda a posição dele
+        // Nó recém-criado ainda não tem id real do backend (pending:<uuid>) - manda a posição dele
         // pro PUT/:nodeId 400 na validação (regex de cuid). Segura essa entrada até createNode
         // resolver o id de verdade e remapear (ver .then() de createNode).
         const entries = [...pendingPositions.current.entries()].filter(
@@ -597,7 +597,7 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
         for (const [id] of entries) pendingPositions.current.delete(id)
 
         // allSettled, não all: um único id "zumbi" (nó deletado/nunca criado) não pode arrastar de
-        // volta pro retry as posições que salvaram com sucesso no mesmo lote — Promise.all rejeitaria
+        // volta pro retry as posições que salvaram com sucesso no mesmo lote - Promise.all rejeitaria
         // o array inteiro por causa de 1 falha, fazendo entries que já deram 200 serem reenviadas
         // pra sempre junto do id que nunca vai vingar.
         const results = await Promise.allSettled(
@@ -615,7 +615,7 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
                 continue
             }
             firstError ??= result.reason
-            // se o nó foi deletado enquanto o PUT estava em voo, não reenfileira a posição dele —
+            // se o nó foi deletado enquanto o PUT estava em voo, não reenfileira a posição dele -
             // senão o retry martela pra sempre um nodeId que não existe mais.
             if (nodeIdsRef.current.has(id) || pendingNodeIds.current.has(id))
                 pendingPositions.current.set(id, position)
@@ -626,7 +626,7 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
             positionRetryBackoff.current = POSITION_RETRY_BASE_DELAY_MS
             positionErrorNotified.current = false
         } else {
-            // backoff exponencial — sem isso, uma falha persistente (rota fora do ar, 404) vira
+            // backoff exponencial - sem isso, uma falha persistente (rota fora do ar, 404) vira
             // retry imediato em loop infinito martelando o backend.
             const delay = positionRetryBackoff.current
             positionRetryBackoff.current = Math.min(
@@ -675,7 +675,7 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
         [flow.id, setEntryNodeId, setFlowEdges, setFlowNodes]
     )
 
-    // Chamada crua de exclusão de nó, sem snapshot/histórico — reaproveitada tanto pela exclusão
+    // Chamada crua de exclusão de nó, sem snapshot/histórico - reaproveitada tanto pela exclusão
     // interativa (deleteNode abaixo) quanto pelo replay de undo/redo (applyHistoryAction), que já
     // fez seu próprio removeNodeFromCanvas e só precisa do resultado awaitable da chamada HTTP.
     const deleteNodeCore = useCallback(
@@ -725,7 +725,7 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
     )
 
     // Idem deleteNodeCore, mas pros 3 passos de exclusão de recurso (check + delete node + delete
-    // recurso) — reaproveitado pela exclusão interativa (deleteResource) e pelo replay de
+    // recurso) - reaproveitado pela exclusão interativa (deleteResource) e pelo replay de
     // undo/redo (redo de delete-resource, undo de create-resource-node).
     const deleteResourceCore = useCallback(
         async (target: {
@@ -812,7 +812,7 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
         [queueEdgeOperation, history]
     )
 
-    // Retornam Promise<boolean> (nunca rejeitam) — o replay de undo/redo (applyHistoryAction)
+    // Retornam Promise<boolean> (nunca rejeitam) - o replay de undo/redo (applyHistoryAction)
     // precisa saber se a chamada deu certo pra decidir se a ação volta pra pilha; os chamadores
     // interativos (onConnect etc.) seguem ignorando o retorno como antes.
     const setEntry = useCallback(
@@ -867,10 +867,10 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
 
     // Recria um recurso a partir do DTO de criação capturado antes da exclusão (ver
     // toXCreationDto nos hooks use-*.ts e onDeleteResource em edit-node-dialog.tsx/create-node-dialog.tsx)
-    // — usado só pelo histórico de undo/redo (recriar recurso excluído, ou recriar recurso cuja
+    // - usado só pelo histórico de undo/redo (recriar recurso excluído, ou recriar recurso cuja
     // criação foi desfeita). companyId nunca vem do DTO: a recriação sempre cai na empresa do
     // próprio flow. extension/flow nunca chegam aqui (creatable:false e sem exclusão de recurso,
-    // ver NODE_TYPE_CONFIG/edit-node-dialog.tsx) — cobertos só pra exaustividade do switch.
+    // ver NODE_TYPE_CONFIG/edit-node-dialog.tsx) - cobertos só pra exaustividade do switch.
     const recreateResource = useCallback(
         async (
             type: CanvasNodeType,
@@ -970,7 +970,7 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
     )
 
     // Retorna o id local otimista imediatamente (contrato síncrono já usado pelos chamadores
-    // interativos, ex. conectar na sequência) e, à parte, `result` — promise que resolve o
+    // interativos, ex. conectar na sequência) e, à parte, `result` - promise que resolve o
     // sucesso/falha da criação de verdade. `applyHistoryAction` usa `result` pra saber se um
     // redo/undo de criação deu certo; os chamadores interativos seguem ignorando `result`.
     const createNode = useCallback(
@@ -1082,7 +1082,7 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
                 })
                 .catch(async (err) => {
                     pendingNodeIds.current.delete(localId)
-                    // criação falhou — o nó nunca existiu no backend, então qualquer posição
+                    // criação falhou - o nó nunca existiu no backend, então qualquer posição
                     // enfileirada pra ele (arraste rápido antes do erro) precisa sumir junto, senão
                     // persistPositions fica retentando PUT /nodes/pending:<uuid> pra sempre.
                     pendingPositions.current.delete(localId)
@@ -1280,7 +1280,7 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
         ivrById,
     ])
 
-    // Aplica e persiste a posição de um nó comum, com o mesmo debounce/pending-queue de sempre —
+    // Aplica e persiste a posição de um nó comum, com o mesmo debounce/pending-queue de sempre -
     // reaproveitado tanto pelo settle do arraste interativo (onNodesChange abaixo) quanto pelo
     // replay de undo/redo (applyHistoryAction), que chama com flushDelay:0 (ação explícita do
     // usuário, sem motivo pra esperar mais 450ms). Só registra histórico (move-node) quando a
@@ -1323,7 +1323,7 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
     )
 
     // Idem, pro nó sintético Início (posição guardada à parte, ver comentário de startPosition
-    // acima) — mesmo padrão de flushDelay/push de histórico.
+    // acima) - mesmo padrão de flushDelay/push de histórico.
     const commitStartPosition = useCallback(
         (
             position: { x: number; y: number },
@@ -1370,7 +1370,7 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
 
     // Auto-layout (ELK, algoritmo "layered"): recalcula a posição de todos os nós a partir das
     // conexões, sem mexer em quem-liga-com-quem. Usa as dimensões já medidas pelo React Flow
-    // (node.measured) — nó recém-criado ainda sem medição cai no tamanho padrão do card. Persiste
+    // (node.measured) - nó recém-criado ainda sem medição cai no tamanho padrão do card. Persiste
     // como um replay (flushDelay:0) e sem gerar histórico por nó (senão um layout de 20 nós vira
     // 20 undos); o fitView só roda depois de dois rAF pra garantir que o novo rfNodes já pintou.
     const handleAutoLayout = useCallback(async () => {
@@ -1424,7 +1424,7 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
     const onNodesChange = useCallback(
         (changes: NodeChange[]) => {
             setRfNodes((current) => applyNodeChanges(changes, current))
-            // dragging=true dispara em toda posição intermediária do arraste — só commitamos em
+            // dragging=true dispara em toda posição intermediária do arraste - só commitamos em
             // flowNodes (o que retrigger o rebuild do canvas inteiro) quando o gesto termina, senão
             // pisca a cada frame brigando com a própria animação do React Flow.
             const settled = changes.filter(
@@ -1451,17 +1451,17 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
 
     // Sem isso, clicar numa aresta pra selecioná-la não tinha efeito nenhum: o array `edges` é
     // controlado (vem de `rfEdges`), e sem `onEdgesChange` o React Flow não tem como persistir a
-    // mudança de seleção nele — no próximo render o próprio prop (sem `selected`) sobrescrevia de
+    // mudança de seleção nele - no próximo render o próprio prop (sem `selected`) sobrescrevia de
     // volta o estado interno da lib, então nem o destaque visual nem o Backspace/Delete (que só
     // olha pras arestas marcadas `selected`) funcionavam. Mesmo padrão de onNodesChange acima.
     const onEdgesChange = useCallback((changes: EdgeChange[]) => {
         setRfEdges((current) => applyEdgeChanges(changes, current))
     }, [])
 
-    // Executor central do histórico — traduz uma HistoryAction em undo/redo replaying os mesmos
+    // Executor central do histórico - traduz uma HistoryAction em undo/redo replaying os mesmos
     // comandos usados interativamente (por isso nenhum deles registra histórico de novo: history.push
     // é no-op enquanto useFlowHistory está processando undo/redo). Rejeita (lança) só quando o
-    // comando de fato falhou no backend — aí useFlowHistory devolve a ação pra pilha de origem, sem
+    // comando de fato falhou no backend - aí useFlowHistory devolve a ação pra pilha de origem, sem
     // mexer na pilha oposta (ver flow-history.ts). resolveNodeId sempre traduz um id histórico pro
     // id vivo atual, mesmo depois de vários ciclos de recriação (ver nodeIdMapRef).
     const applyHistoryAction = useCallback(
@@ -1712,7 +1712,7 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
         history.setApplyAction(applyHistoryAction)
     }, [applyHistoryAction, history])
 
-    // Atalhos de undo/redo — só quando o foco está no canvas (ou em lugar nenhum, caso comum logo
+    // Atalhos de undo/redo - só quando o foco está no canvas (ou em lugar nenhum, caso comum logo
     // após abrir a página e nunca ter clicado num input). Diálogos (base-ui) fazem portal fora da
     // subárvore de canvasRootRef, então o teste de containment já basta pra nunca disparar com um
     // diálogo aberto; o teste de input/textarea/contentEditable é defesa extra caso um campo de
@@ -1830,7 +1830,7 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
         async ({ source, sourceHandle, target }: Connection) => {
             if (!source || !sourceHandle || !target) return
             // o backend também barra isso (self-loop), mas checar aqui evita a viagem de ida e
-            // volta pro caso mais comum — ciclos mais profundos (A→B→C→A) continuam só sendo
+            // volta pro caso mais comum - ciclos mais profundos (A→B→C→A) continuam só sendo
             // pegos no backend, ver tratamento de erro 4xx em flushEdgeOperations.
             if (source === target) {
                 toast.warning("Um nó não pode se conectar a si mesmo")
@@ -1852,7 +1852,7 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
         [clearEntry, deleteEdge, entryNodeId]
     )
 
-    // Mesmo caminho do X do card (deleteNode) — sem isso, apagar pelo Backspace/Delete do teclado
+    // Mesmo caminho do X do card (deleteNode) - sem isso, apagar pelo Backspace/Delete do teclado
     // só some visualmente (via applyNodeChanges em onNodesChange) e nunca manda a exclusão pro
     // backend, já que remover node não passa por onNodesChange nenhuma chamada de API.
     const onNodesDelete = useCallback(
@@ -2118,7 +2118,7 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
                                             onClick={() => {
                                                 // painel fixo não passa por onContextMenu, então
                                                 // limpa uma posição de clique-direito que possa
-                                                // ter sobrado — senão o nó nasce lá em vez do
+                                                // ter sobrado - senão o nó nasce lá em vez do
                                                 // fallback em grade
                                                 contextPositionRef.current =
                                                     null

@@ -6,11 +6,11 @@
 # ============================================================
 #
 # Patentes do G.729/G.729A expiraram em nov/2016 (ITU + Sipro/G.729
-# Consortium) — bcg729 é GPLv3, sem custo de licenciamento hoje.
+# Consortium) - bcg729 é GPLv3, sem custo de licenciamento hoje.
 # https://github.com/BelledonneCommunications/bcg729
 #
 # Instala só o módulo codec_g729.so em /usr/lib/asterisk/modules.
-# Não mexe em pjsip.conf/iax.conf/dialplan — teste isolado antes
+# Não mexe em pjsip.conf/iax.conf/dialplan - teste isolado antes
 # de liberar "g729" no allow= de algum endpoint via painel.
 
 set -euo pipefail
@@ -45,7 +45,7 @@ ASTERISK_FULL_VERSION=$(asterisk -V 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9
 [[ -z "$ASTERISK_FULL_VERSION" ]] && err "Não consegui detectar a versão do Asterisk rodando."
 
 ASTERISK_SRC="/usr/src/asterisk-${ASTERISK_FULL_VERSION}"
-[[ -d "$ASTERISK_SRC/include/asterisk" ]] || err "Headers não encontrados em ${ASTERISK_SRC}/include — a source do Asterisk foi apagada. Recompile o Asterisk (install-asterisk.sh) sem limpar /usr/src depois."
+[[ -d "$ASTERISK_SRC/include/asterisk" ]] || err "Headers não encontrados em ${ASTERISK_SRC}/include - a source do Asterisk foi apagada. Recompile o Asterisk (install-asterisk.sh) sem limpar /usr/src depois."
 
 log "Asterisk ${ASTERISK_FULL_VERSION} detectado, headers em ${ASTERISK_SRC}/include"
 
@@ -86,18 +86,18 @@ make -j"$(nproc)" >> "$LOG_FILE" 2>&1 || err "Falha ao compilar codec_g729"
 make install >> "$LOG_FILE" 2>&1 || err "Falha ao instalar codec_g729"
 
 MODULE_PATH="/usr/lib/asterisk/modules/codec_g729.so"
-[[ -f "$MODULE_PATH" ]] || err "Build terminou mas ${MODULE_PATH} não apareceu — veja $LOG_FILE"
+[[ -f "$MODULE_PATH" ]] || err "Build terminou mas ${MODULE_PATH} não apareceu - veja $LOG_FILE"
 log "Módulo instalado: ${MODULE_PATH}"
 
 # ============================================================
 # STEP 5 - CARREGAR NO ASTERISK RODANDO
 # ============================================================
-asterisk -rx "module load codec_g729.so" >> "$LOG_FILE" 2>&1 || warn "Não consegui carregar via AMI/CLI — reinicie o Asterisk manualmente"
+asterisk -rx "module load codec_g729.so" >> "$LOG_FILE" 2>&1 || warn "Não consegui carregar via AMI/CLI - reinicie o Asterisk manualmente"
 sleep 1
 if asterisk -rx "core show translation" 2>/dev/null | grep -qi g729; then
     log "codec_g729 carregado e ativo"
 else
-    warn "Módulo instalado mas não confirmado ativo — rode: asterisk -rx 'module show like g729'"
+    warn "Módulo instalado mas não confirmado ativo - rode: asterisk -rx 'module show like g729'"
 fi
 
 echo ""

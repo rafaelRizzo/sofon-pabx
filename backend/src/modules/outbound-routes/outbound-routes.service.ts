@@ -59,7 +59,7 @@ function buildDialplanEntries(
     const destVar = hasTransform ? '${ODEST}' : '${EXTEN}'
 
     // Pre-compute start priority of each trunk block
-    const noopOffset = 1 // NoOp de debug (rota/pattern/origem/destino) — sempre a priority 1
+    const noopOffset = 1 // NoOp de debug (rota/pattern/origem/destino) - sempre a priority 1
     const transformOffset = hasTransform ? 1 : 0
     const recFileOffset = 1
     const mixmonitorOffset = 1
@@ -77,7 +77,7 @@ function buildDialplanEntries(
     const entries: any[] = []
     let p = 1
 
-    // Debug de roteamento — mostra qual rota/pattern casou e origem/destino no CLI/log
+    // Debug de roteamento - mostra qual rota/pattern casou e origem/destino no CLI/log
     entries.push({
         context, exten, priority: p++, app: 'NoOp',
         appdata: 'Saida outbound: rota=' + routeName + ' pattern=' + exten
@@ -99,7 +99,7 @@ function buildDialplanEntries(
     })
     entries.push({ context, exten, priority: p++, app: 'MixMonitor', appdata: '${REC_FILE},b' })
 
-    // Enriquecimento de CDR — uma vez só por chamada (não por tronco tentado)
+    // Enriquecimento de CDR - uma vez só por chamada (não por tronco tentado)
     entries.push({ context, exten, priority: p++, app: 'Set', appdata: 'CDR(direction)=outbound' })
     entries.push({ context, exten, priority: p++, app: 'Set', appdata: 'CDR(origin_extension)=${CALLERID(num)}' })
     entries.push({ context, exten, priority: p++, app: 'Set', appdata: `CDR(dialed_number)=${destVar}` })
@@ -119,7 +119,7 @@ function buildDialplanEntries(
             continue
         }
 
-        // PJSIP_HEADER não existe em IAX2 — sem headers SIP customizados nesse tech
+        // PJSIP_HEADER não existe em IAX2 - sem headers SIP customizados nesse tech
         if (type === 'pjsip') {
             for (const h of customHeaders ?? []) {
                 entries.push({
@@ -178,7 +178,7 @@ async function syncPatternDialplan(
 }
 
 // Reservado pro contexto global 'ramais': ensureGenericRoutingPattern (aliases de ramal) + ensureFallback
-// (destino não encontrado) — ver dialplan.repository.ts. Um outbound route usando um desses patterns
+// (destino não encontrado) - ver dialplan.repository.ts. Um outbound route usando um desses patterns
 // sobrescreve/apaga esse dialplan do sistema (já aconteceu em produção: pattern "_X." de um outbound
 // route apagou o fallback global de "destino não encontrado" pra TODAS as empresas).
 const RESERVED_RAMAIS_PATTERNS = new Set<string>([
@@ -186,7 +186,7 @@ const RESERVED_RAMAIS_PATTERNS = new Set<string>([
     ...RAMAL_ALIAS_LENGTHS.map((len) => `_${'X'.repeat(len)}`),
 ])
 
-// O dialplan é escrito em context='ramais' + exten=pattern (ver syncPatternDialplan) — duas rotas da
+// O dialplan é escrito em context='ramais' + exten=pattern (ver syncPatternDialplan) - duas rotas da
 // mesma empresa com o mesmo padrão se sobrescrevem silenciosamente no Asterisk, então o padrão precisa
 // ser único por empresa. exclude.routeId ignora TODOS os padrões de uma rota (replace completo, ex:
 // updateOutboundRoute); exclude.patternId ignora só um registro específico (edição pontual, updatePattern).
@@ -228,7 +228,7 @@ async function assertPatternsAvailable(
     }
 }
 
-// Sequential queries inside transaction — avoids concurrent client.query() from multi-relation include
+// Sequential queries inside transaction - avoids concurrent client.query() from multi-relation include
 async function getRouteContext(tx: Tx, routeId: string) {
     const route = await tx.outboundRoute.findUnique({
         where: { id: routeId },
@@ -241,7 +241,7 @@ async function getRouteContext(tx: Tx, routeId: string) {
         orderBy: { position: 'asc' },
     })
 
-    // trunk is many-to-one → JOIN within findMany — single query
+    // trunk is many-to-one → JOIN within findMany - single query
     const trunks = await tx.outboundRouteTrunk.findMany({
         where: { routeId },
         select: {
@@ -278,7 +278,7 @@ export async function resyncAllPatterns(tx: Tx, routeId: string) {
     }
 }
 
-// Mesmo motivo de InboundRouteRepository.regenerateAll — rotas criadas antes de uma mudança de
+// Mesmo motivo de InboundRouteRepository.regenerateAll - rotas criadas antes de uma mudança de
 // template (novos campos de CDR, gravação) nunca são regeradas sozinhas, só via update() manual de
 // cada pattern. Usado por resyncDialplan (companies.service.ts).
 export async function regenerateAllPatterns(companyId: string) {
@@ -293,7 +293,7 @@ export async function regenerateAllPatterns(companyId: string) {
     return routes.length
 }
 
-// Sequential: 4 queries (no multi-relation include) — avoids concurrent client.query()
+// Sequential: 4 queries (no multi-relation include) - avoids concurrent client.query()
 async function fetchRoute(id: string) {
     const base = await prisma.outboundRoute.findUnique({
         where: { id },
@@ -520,7 +520,7 @@ export const updateOutboundRoute = async (id: string, data: UpdateOutboundRouteI
 
     const { name, position, trunkIds, patterns } = data
 
-    // Fetch existing patterns separately (only when needed) — sequential, no multi-include
+    // Fetch existing patterns separately (only when needed) - sequential, no multi-include
     const existingPatterns = patterns
         ? await prisma.outboundDialPattern.findMany({ where: { routeId: id }, select: { pattern: true } })
         : []

@@ -17,7 +17,7 @@ import { useAuth } from "@/hooks/use-auth"
 
 export type CallState = "idle" | "calling" | "ringing" | "in-call"
 
-// navegadores só liberam getUserMedia em contexto seguro (https ou localhost) — sem domínio/TLS
+// navegadores só liberam getUserMedia em contexto seguro (https ou localhost) - sem domínio/TLS
 // ainda (ver install-asterisk.sh), o áudio real só funciona acessando o painel via localhost/VPN
 const MIC_BLOCKED_MESSAGE =
     "Não foi possível acessar o microfone. Navegadores bloqueiam isso fora de HTTPS/localhost."
@@ -139,7 +139,7 @@ export function useWebphone() {
             } catch (err) {
                 // eslint-disable-next-line no-console
                 console.error("[webphone] falha ao abrir o WebSocket", server, err)
-                fail(`Não foi possível abrir o WebSocket (${server}) — veja o console pro erro completo`)
+                fail(`Não foi possível abrir o WebSocket (${server}) - veja o console pro erro completo`)
                 return
             }
             if (disposed) return
@@ -168,7 +168,7 @@ export function useWebphone() {
             } catch (err) {
                 // eslint-disable-next-line no-console
                 console.error("[webphone] falha ao registrar", err)
-                fail("Falha ao enviar REGISTER — veja o console pro erro completo")
+                fail("Falha ao enviar REGISTER - veja o console pro erro completo")
             }
         }
 

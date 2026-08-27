@@ -14,7 +14,7 @@ const PRESENCE_CONFIG: Record<Presence, { label: string; className: string }> = 
             "border-transparent bg-red-500/15 text-red-600 dark:bg-red-400/20 dark:text-red-300",
     },
     unknown: {
-        label: "—",
+        label: "-",
         className: "border-transparent bg-muted text-muted-foreground",
     },
 }
@@ -46,7 +46,7 @@ const CALL_STATE_CONFIG: Record<CallState, { label: string; className: string }>
             "border-transparent bg-red-500/15 text-red-600 dark:bg-red-400/20 dark:text-red-300",
     },
     unknown: {
-        label: "—",
+        label: "-",
         className: "border-transparent bg-muted text-muted-foreground",
     },
 }

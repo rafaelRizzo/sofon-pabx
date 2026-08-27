@@ -12,10 +12,10 @@ const buildSurveyResultAgiUrl = (queueId: string, score: number) =>
 const DIGIT_TIMEOUT_SECONDS = 5
 const INVALID_RETRIES = 2
 
-// Pesquisa de satisfação pós-atendimento: Read() de 1 dígito (1-5) + AGI que persiste a nota —
+// Pesquisa de satisfação pós-atendimento: Read() de 1 dígito (1-5) + AGI que persiste a nota -
 // mesma técnica de máquina de estados por prioridade numérica de ivr.repository.ts, só sem o branch
 // de maxDigits > 1 (nota é sempre 1 dígito fixo). Regenerado sempre que Queue.surveyAudioId muda
-// (ver QueuesService) — fila com surveyAudioId nulo não entra no arquivo (pesquisa desligada).
+// (ver QueuesService) - fila com surveyAudioId nulo não entra no arquivo (pesquisa desligada).
 function buildSurveyDialplan(queueId: string, soundPath: string): DialplanRow[] {
     const context = SURVEY_CONTEXT
     const exten = surveyExten(queueId)
@@ -57,10 +57,10 @@ function buildSurveyDialplan(queueId: string, soundPath: string): DialplanRow[] 
 }
 
 export const CallcenterSurveyRepository = {
-    // Reconstrói o arquivo de dialplan da empresa inteira pra esse contexto — chamado sempre que
+    // Reconstrói o arquivo de dialplan da empresa inteira pra esse contexto - chamado sempre que
     // Queue.surveyAudioId muda (create/update). Fila sem surveyAudioId não gera exten nenhuma:
     // se o AGI de pós-fila (handleQueueSurvey) tentar dar Goto pra um exten inexistente aqui, o
-    // Asterisk simplesmente falha o Goto (segue pro postQueueDestination normal) — fail-safe.
+    // Asterisk simplesmente falha o Goto (segue pro postQueueDestination normal) - fail-safe.
     async regenerate(companyId: string) {
         const asteriskId = await resolveAsteriskId(companyId)
         return withDialplanLock(`${SURVEY_CONTEXT}:${asteriskId}`, async () => {

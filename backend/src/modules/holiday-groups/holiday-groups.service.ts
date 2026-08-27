@@ -42,7 +42,7 @@ async function datesFromUrl(url: string, year: number): Promise<DateInput[]> {
     return remote
 }
 
-// Chamado só pelo job de resync (src/jobs/holiday-resync.job.ts) — busca a URL configurada e
+// Chamado só pelo job de resync (src/jobs/holiday-resync.job.ts) - busca a URL configurada e
 // SUBSTITUI as datas do grupo. Não-op se o grupo não tiver url (grupo manual, fora do escopo do job).
 export async function resyncHolidayGroupFromUrl(tx: Tx, id: string, year: number) {
     const hg = await tx.holidayGroup.findUnique({
@@ -53,7 +53,7 @@ export async function resyncHolidayGroupFromUrl(tx: Tx, id: string, year: number
 
     const dates = await datesFromUrl(hg.url, year)
     // dates.length === 0 cobre tanto falha de rede/timeout quanto resposta vazia do provider (ver
-    // fetchHolidaysFromUrl, retorna null nos dois casos) — sem dado novo confiável, mantém o calendário
+    // fetchHolidaysFromUrl, retorna null nos dois casos) - sem dado novo confiável, mantém o calendário
     // atual em vez de apagar (senão uma instabilidade transitória do provider zera o grupo de feriados)
     if (dates.length === 0) {
         logger.warn({ event: 'holidays.resync.skipped', holidayGroupId: id, year })
@@ -79,8 +79,8 @@ export async function resyncAllHolidayGroupsFromUrl(year: number) {
     return groups.length
 }
 
-// Anexa o nome legível de trueRoute/falseRoute (resolvido no backend, cache-first — ver
-// route-destination-label.ts). Todas as chamadas aqui são de uma única empresa por vez —
+// Anexa o nome legível de trueRoute/falseRoute (resolvido no backend, cache-first - ver
+// route-destination-label.ts). Todas as chamadas aqui são de uma única empresa por vez -
 // sem visão cross-empresa nesse módulo (sem getAllHolidayGroups).
 async function withDestinationLabels<T extends { trueRoute: unknown; falseRoute: unknown }>(
     groups: T[],
@@ -199,7 +199,7 @@ export const updateHolidayGroup = async (id: string, data: UpdateHolidayGroupInp
     const effectiveDates: DateInput[] = newDates ?? existing.dates.map((d) => ({ name: d.name, month: d.month, day: d.day }))
 
     // urlJustSet + fetch falho/vazio (fetchHolidaysFromUrl retorna null nos dois casos) não deve apagar
-    // as datas manuais que já existiam — mantém o grupo como estava até um resync bem-sucedido
+    // as datas manuais que já existiam - mantém o grupo como estava até um resync bem-sucedido
     const shouldReplaceDates = newDates !== undefined && !(urlJustSet && newDates.length === 0)
     if (urlJustSet && newDates?.length === 0) {
         logger.warn({ event: 'holidays.url_set.fetch_empty', holidayGroupId: id, url: newUrl })

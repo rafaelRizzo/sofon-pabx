@@ -15,7 +15,7 @@ import type { UsedByRef } from "@/components/RouteDestination/used-by-badge"
 export type FlowLayoutNode = {
     nodeType: string
     nodeId: string
-    // nome capturado ao colocar o nó no canvas — só usado pra exibir um card ainda sem nenhuma
+    // nome capturado ao colocar o nó no canvas - só usado pra exibir um card ainda sem nenhuma
     // conexão (fora do GET /flows/:id/graph); nó alcançável usa o nome resolvido ali, mais atual
     name?: string
     x: number
@@ -63,7 +63,7 @@ export type FlowNodeEdge = {
 export const createFlowFormSchema = z.object({
     name: z.string().min(1, "Informe o nome").max(80, "Máximo 80 caracteres"),
     companyId: z.string().min(1, "Selecione uma empresa"),
-    // opcional — na lista só se cria com nome/empresa, o entryDestination é montado depois no
+    // opcional - na lista só se cria com nome/empresa, o entryDestination é montado depois no
     // canvas (conectar o nó "Início" a algum nó real, ver flow-canvas.tsx)
     entryDestination: routeDestinationSchema.optional(),
 })
@@ -75,7 +75,7 @@ async function fetchFlowsRequest(companyId: string): Promise<Flow[]> {
     return data.flows ?? []
 }
 
-// companyId opcional — enquanto não informado, a lista não é buscada (filtro de
+// companyId opcional - enquanto não informado, a lista não é buscada (filtro de
 // empresa da página exige seleção antes de consultar o backend)
 export function useFlows(companyId?: string) {
     const queryClient = useQueryClient()
@@ -133,7 +133,7 @@ export function useFlows(companyId?: string) {
         }
     }
 
-    // autosave de posição no canvas — silencioso (sem toast), não refaz o fetch da lista
+    // autosave de posição no canvas - silencioso (sem toast), não refaz o fetch da lista
     const updateFlowLayout = async (
         flowId: string,
         layout: FlowLayoutNode[]
@@ -182,10 +182,10 @@ export function useFlows(companyId?: string) {
     }
 }
 
-// Busca 1 flow por id — usado pela página do editor (canvas), separado da lista paginada de
+// Busca 1 flow por id - usado pela página do editor (canvas), separado da lista paginada de
 // useFlows pra não precisar carregar todos os flows da empresa só pra abrir 1.
 //
-// `loading` só fica true na primeira busca — refetchFlow (chamado a cada save de layout/entry, ver
+// `loading` só fica true na primeira busca - refetchFlow (chamado a cada save de layout/entry, ver
 // flow-canvas.tsx e page.tsx) não pode voltar a marcar loading=true, senão a página desmonta o
 // <FlowCanvas> (troca por "Carregando...") e remonta do zero a cada ação do usuário no canvas.
 export function useFlow(flowId?: string) {
@@ -219,11 +219,11 @@ export function useFlow(flowId?: string) {
     return { flow, loading, refetchFlow: fetchFlow }
 }
 
-// Só leitura — grafo inteiro alcançável a partir do entryDestination do Flow (ver GET /flows/:id/graph
+// Só leitura - grafo inteiro alcançável a partir do entryDestination do Flow (ver GET /flows/:id/graph
 // no backend). Usado pelo canvas pra desenhar todos os nós, não só o de entrada.
 //
 // `loading` só fica true na primeira busca (tela cheia de "Carregando..." faz sentido aqui, ainda
-// não há nada desenhado) — refetches disparados por conectar/desconectar nós usam `refreshing` em
+// não há nada desenhado) - refetches disparados por conectar/desconectar nós usam `refreshing` em
 // vez disso, pra não tampar o canvas inteiro a cada pequena mudança (sensação de "recarregou tudo").
 export function useFlowGraph(flowId?: string) {
     const [nodes, setNodes] = useState<GraphNode[]>([])

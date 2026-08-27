@@ -5,7 +5,7 @@ export const idParamSchema = z.object({ id: cuidParam })
 export const companyQuerySchema = z.object({ companyId: z.cuid2() })
 export const optionalCompanyQuery = z.object({ companyId: z.cuid2().optional() })
 
-// Catálogo de provedores suportados — cresce a cada integração nova sem precisar de um model
+// Catálogo de provedores suportados - cresce a cada integração nova sem precisar de um model
 // próprio por provedor (ver IntegrationCredential no schema.prisma).
 export const INTEGRATION_PROVIDERS = ['ixc'] as const
 export const providerQuerySchema = z.object({ provider: z.enum(INTEGRATION_PROVIDERS).optional() })
@@ -15,7 +15,7 @@ export const createIntegrationCredentialSchema = z.object({
     name: z.string().min(1).max(80),
     companyId: z.cuid2(),
     baseUrl: z.string().url().max(255),
-    // token da API do provedor — nunca armazenado em texto puro (ver src/lib/crypto.ts) e nunca
+    // token da API do provedor - nunca armazenado em texto puro (ver src/lib/crypto.ts) e nunca
     // retornado em GET; pra trocar, reenviar o campo inteiro
     token: z.string().min(1).max(500),
 })

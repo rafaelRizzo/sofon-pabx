@@ -60,7 +60,7 @@ export class UsersCache {
         })
     }
 
-    // Lista de /users filtrada por createdBy (reseller só vê quem ele mesmo criou) —
+    // Lista de /users filtrada por createdBy (reseller só vê quem ele mesmo criou) -
     // getAllUsers({ createdBy }) não bate no cache "list:all" (que é só pra admin)
     static async getUsersByCreatedBy(createdBy: string) {
         const cached = await cacheManager.get(`${NAMESPACE}:createdBy`, createdBy)

@@ -52,13 +52,13 @@ export type RestoreCompanyResult = {
     originalName: string
     newCompanyId?: string
     error?: string
-    // usuário pulado (username já existe) não derruba o restore da empresa — cada linha aqui é
+    // usuário pulado (username já existe) não derruba o restore da empresa - cada linha aqui é
     // um aviso não-fatal, diferente de `error` (que aborta a empresa inteira)
     userWarnings?: string[]
 }
 
 // Cada empresa do backup é restaurada isoladamente: se qualquer passo falhar, a empresa criada
-// nesta mesma operação é apagada (cascade cobre tudo) e o erro é reportado só pra ela — as demais
+// nesta mesma operação é apagada (cascade cobre tudo) e o erro é reportado só pra ela - as demais
 // empresas do arquivo continuam sendo restauradas.
 export async function restoreBackup(companies: Raw[], userId: string, generatedAt: string): Promise<RestoreCompanyResult[]> {
     const results: RestoreCompanyResult[] = []
@@ -91,12 +91,12 @@ async function restoreOneCompany(
     })
 
     // Company.name não tem @@unique no schema (múltiplas empresas podiam legitimamente compartilhar
-    // nome antes desta feature) — sem esse guard, restaurar o mesmo backup 2x (ou um backup antigo
+    // nome antes desta feature) - sem esse guard, restaurar o mesmo backup 2x (ou um backup antigo
     // de uma empresa que já existe) criaria uma cópia duplicada silenciosa a cada vez
     const existing = await prisma.company.findFirst({ where: { name: companyInput.name }, select: { id: true } })
     if (existing)
         throw new AppError(
-            `Empresa "${companyInput.name}" já existe (id ${existing.id}) — restore cancelado pra essa empresa. Renomeie ou apague a empresa existente antes de restaurar este backup.`,
+            `Empresa "${companyInput.name}" já existe (id ${existing.id}) - restore cancelado pra essa empresa. Renomeie ou apague a empresa existente antes de restaurar este backup.`,
             409
         )
 
@@ -107,7 +107,7 @@ async function restoreOneCompany(
         userWarnings = await restoreCompanyEntities(raw, company.id)
     } catch (error) {
         // Se a limpeza da empresa parcialmente criada também falhar, isso NÃO pode ser engolido
-        // silenciosamente — o admin precisa saber que sobrou uma empresa "pela metade" no banco
+        // silenciosamente - o admin precisa saber que sobrou uma empresa "pela metade" no banco
         // pra remover manualmente, senão o erro reportado (só o da causa original) sugere que
         // nada foi criado quando na verdade ficou lixo
         const cleanupFailed = await deleteCompany(company.id).then(
@@ -117,7 +117,7 @@ async function restoreOneCompany(
         const message = error instanceof AppError ? error.message : error instanceof Error ? error.message : String(error)
         if (cleanupFailed) {
             throw new AppError(
-                `${message} — além disso, a limpeza automática da empresa criada parcialmente (id ${company.id}) também falhou. Remova-a manualmente antes de tentar restaurar de novo.`,
+                `${message} - além disso, a limpeza automática da empresa criada parcialmente (id ${company.id}) também falhou. Remova-a manualmente antes de tentar restaurar de novo.`,
                 500
             )
         }
@@ -125,7 +125,7 @@ async function restoreOneCompany(
     }
 
     // Cada entidade criada durante o restore já vira uma linha de audit log automática (extensão
-    // do Prisma em lib/prisma.ts) — este registro extra é só um resumo fácil de achar ("essa
+    // do Prisma em lib/prisma.ts) - este registro extra é só um resumo fácil de achar ("essa
     // empresa nasceu de um restore, a partir deste backup"), não substitui as linhas granulares
     await prisma.auditLog
         .create({
@@ -166,7 +166,7 @@ async function restoreCompanyEntities(raw: Raw, companyId: string): Promise<stri
         idMap.set(`extension:${ext.id}`, created.id)
     }
 
-    // username é único globalmente (não por empresa) — colisão pula só aquele usuário (vira
+    // username é único globalmente (não por empresa) - colisão pula só aquele usuário (vira
     // warning) em vez de abortar a empresa inteira, mesmo espírito do guard de Company.name.
     // password já é hash argon2 do arquivo, restaurado direto sem re-hash (ver export.ts)
     const userWarnings: string[] = []
@@ -175,7 +175,7 @@ async function restoreCompanyEntities(raw: Raw, companyId: string): Promise<stri
         if (!username) continue
         const existingUser = await prisma.user.findUnique({ where: { username }, select: { id: true } })
         if (existingUser) {
-            userWarnings.push(`Usuário "${username}" já existe (id ${existingUser.id}) — não restaurado.`)
+            userWarnings.push(`Usuário "${username}" já existe (id ${existingUser.id}) - não restaurado.`)
             continue
         }
         try {
@@ -242,7 +242,7 @@ async function restoreCompanyEntities(raw: Raw, companyId: string): Promise<stri
     }
 
     for (const a of arr(raw.audios)) {
-        if (!a.wavBase64) continue // arquivo já estava ausente no momento do export — sem o que restaurar
+        if (!a.wavBase64) continue // arquivo já estava ausente no momento do export - sem o que restaurar
         const buffer = Buffer.from(a.wavBase64, 'base64')
         const created = await createAudio(companyId, a.name, buffer, 'restore.wav')
         idMap.set(`audio:${a.id}`, created.id)
@@ -531,7 +531,7 @@ async function restoreCompanyEntities(raw: Raw, companyId: string): Promise<stri
         )
     }
 
-    // Membros de fila depois de AgentCompanyScope — addMember() rejeita a extensão se a empresa
+    // Membros de fila depois de AgentCompanyScope - addMember() rejeita a extensão se a empresa
     // já tiver algum scope cadastrado e ela não tiver um scope ativo (ver queue-members.service.ts)
     for (const { newQueueId, members } of queueMembersToRestore) {
         for (const m of members) {
@@ -542,7 +542,7 @@ async function restoreCompanyEntities(raw: Raw, companyId: string): Promise<stri
         }
     }
 
-    // ─── Fase 1c: Flows — por último, todo recurso que um FlowNode possa referenciar já existe ──
+    // ─── Fase 1c: Flows - por último, todo recurso que um FlowNode possa referenciar já existe ──
 
     for (const f of arr(raw.flows)) {
         const created = await createFlow({ name: f.name, companyId })

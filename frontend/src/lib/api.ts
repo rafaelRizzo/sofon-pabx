@@ -67,7 +67,7 @@ api.interceptors.response.use(
   }
 )
 
-// mensagens técnicas padrão que vazam em inglês de middlewares (auth/role/scope) — sempre
+// mensagens técnicas padrão que vazam em inglês de middlewares (auth/role/scope) - sempre
 // as mesmas strings, então dá pra traduzir com segurança sem mexer em cada controller
 const KNOWN_MESSAGES: Record<string, string> = {
   Unauthorized: "Sessão expirada. Faça login novamente.",
@@ -127,7 +127,7 @@ export function getErrorMessage(err: unknown): string | undefined {
     if (messages.length) return messages.join(" | ")
   }
 
-  // "Route GET:/foo not found" — 404 padrão do Fastify pra rota inexistente (endpoint não
+  // "Route GET:/foo not found" - 404 padrão do Fastify pra rota inexistente (endpoint não
   // registrado, typo na URL); nunca uma mensagem pensada pro usuário final, sempre cai no fallback
   const isRawRouteNotFound = status === 404 && /^Route .+ not found$/i.test(body?.message ?? "")
 
@@ -139,7 +139,7 @@ export function getErrorMessage(err: unknown): string | undefined {
 export const apiError = (err: unknown, fallback: string): string =>
   getErrorMessage(err) ?? fallback
 
-// 4xx = rejeição definitiva do backend (validação, permissão, recurso inexistente) — nunca vai
+// 4xx = rejeição definitiva do backend (validação, permissão, recurso inexistente) - nunca vai
 // vingar só de tentar de novo. 5xx/rede seguem sendo tratados como transiente por quem chama.
 export const isValidationError = (err: unknown): boolean => {
   const status = axios.isAxiosError(err) ? err.response?.status : undefined

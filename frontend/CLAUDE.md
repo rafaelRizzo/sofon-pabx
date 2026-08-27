@@ -1,4 +1,4 @@
-# Sofon PABX — Frontend
+# Sofon PABX - Frontend
 
 ## Stack
 - Vite + React 19 + TanStack Router (file-based, `autoCodeSplitting`) + TanStack Query
@@ -7,9 +7,9 @@
 - Build/typecheck: `pnpm build` | `pnpm exec tsc --noEmit`
 
 ## Convenções
-- Nunca fetch direto num componente/rota — sempre via hook (`hooks/use-<recurso>.ts`)
-- Zod schema do hook deve espelhar `create<Nome>Schema`/`update<Nome>Schema` do backend — **não há geração automática de tipos**, é duplicação manual disciplinada, mantida em sincronia pelo subagent `api-contract-reviewer`. Ponto de risco de drift: ao mudar um schema no backend, revisar o hook correspondente.
-- Nunca cor de paleta bruta (`text-gray-500`) nem `border` colorido + `bg/10` — usar a recipe de badge (ver seção shadcn abaixo)
+- Nunca fetch direto num componente/rota - sempre via hook (`hooks/use-<recurso>.ts`)
+- Zod schema do hook deve espelhar `create<Nome>Schema`/`update<Nome>Schema` do backend - **não há geração automática de tipos**, é duplicação manual disciplinada, mantida em sincronia pelo subagent `api-contract-reviewer`. Ponto de risco de drift: ao mudar um schema no backend, revisar o hook correspondente.
+- Nunca cor de paleta bruta (`text-gray-500`) nem `border` colorido + `bg/10` - usar a recipe de badge (ver seção shadcn abaixo)
 - Componente shadcn novo só via `pnpm dlx shadcn@latest add <nome>`; variante nova estende o `cva` existente, nunca cria componente irmão do zero
 - Ao criar tela/recurso novo, rodar `pnpm exec tsc --noEmit` (agent `build-checker`) pra validar
 
@@ -27,13 +27,13 @@ src/
   lib/                                         # api.ts, sse.ts, realtime-format.ts, utils.ts, auth-cookie.ts
 ```
 
-`modules/` existe só pra um caso hoje (`modules/audit-logs`) — não é o padrão dominante, não seguir como referência.
+`modules/` existe só pra um caso hoje (`modules/audit-logs`) - não é o padrão dominante, não seguir como referência.
 
 ## Padrão de feature (referência literal: `Companies`)
 
 - **Rota** (`routes/dashboard/companies.tsx`): `createFileRoute("/dashboard/companies")({ component: CompaniesPage })`. A página só orquestra estado local (`formOpen`, `editing`, `deleting`) e monta `PageHeader` + tabela + form-dialog + `ConfirmDeleteDialog`. Sem lógica de fetch/negócio aqui.
 - **Hook** (`hooks/use-companies.ts`):
-  - `type Company` — espelha o shape de resposta do backend
+  - `type Company` - espelha o shape de resposta do backend
   - `companyFormSchema` (Zod) com comentário `// Espelha create/updateCompanySchema do backend`
   - `fetchCompaniesRequest` + `useQuery({ queryKey: ["companies", ...escopo] })`
   - `useMutation` por operação (create/update/delete), cada uma envolta numa função que faz `toast.loading → mutateAsync → toast.success/error` via `apiError()` e retorna `Promise<boolean>`
@@ -46,7 +46,7 @@ Outros exemplos do mesmo trio hook + tabela + form-dialog + rota: `Trunks/`, `Qu
 Instância axios única, `baseURL` de `VITE_API_URL`:
 - Interceptor de request injeta `Authorization: Bearer` a partir de cookie
 - Interceptor de response faz refresh de token compartilhado em 401 (evita múltiplos refreshes concorrentes disparados por requests simultâneos)
-- `KNOWN_MESSAGES`/`STATUS_FALLBACK` traduzem erro do backend pra pt-BR — usar sempre `getErrorMessage`/`apiError` em vez de expor `error.message` cru
+- `KNOWN_MESSAGES`/`STATUS_FALLBACK` traduzem erro do backend pra pt-BR - usar sempre `getErrorMessage`/`apiError` em vez de expor `error.message` cru
 
 ## Roteamento (TanStack Router)
 
@@ -55,9 +55,9 @@ File-based via `@tanstack/router-plugin/vite` (`vite.config.ts`). Convenções o
 - Rota aninhada com layout + índice + detalhe: `dashboard/flows.tsx` (layout) + `dashboard/flows.index.tsx` + `dashboard/flows.$id.tsx` (param dinâmico)
 - Componente de página no mesmo arquivo da definição da rota (`export const Route = createFileRoute(...)` no fim do arquivo)
 
-## shadcn — recipe de badge/status
+## shadcn - recipe de badge/status
 
-Referência literal: `components/presence-badge.tsx` — `PRESENCE_CONFIG`/`CALL_STATE_CONFIG` como `Record<Enum, {label, className}>`, exportando `PresenceBadge`/`CallStateBadge` que envolvem `Badge variant="outline"` com `cn()`.
+Referência literal: `components/presence-badge.tsx` - `PRESENCE_CONFIG`/`CALL_STATE_CONFIG` como `Record<Enum, {label, className}>`, exportando `PresenceBadge`/`CallStateBadge` que envolvem `Badge variant="outline"` com `cn()`.
 
 Padrão de classe pra paleta fixa de domínio:
 ```
@@ -67,15 +67,15 @@ Nunca `border` colorido + `bg/10`.
 
 ## Realtime (SSE)
 
-Não é WebSocket nem polling do cliente — é Server-Sent Events, e o push só acontece quando o AMI reporta mudança no backend (ver `backend/src/asterisk/transport/ami-events.ts` + `realtime-bus.ts`), nunca por iniciativa do frontend.
+Não é WebSocket nem polling do cliente - é Server-Sent Events, e o push só acontece quando o AMI reporta mudança no backend (ver `backend/src/asterisk/transport/ami-events.ts` + `realtime-bus.ts`), nunca por iniciativa do frontend.
 
 - `lib/sse.ts`: como `EventSource` nativo não aceita header `Authorization`, a implementação usa `fetch()` + `ReadableStream` manual, parseando frames `data: ...\n\n`. Reconecta com backoff progressivo e reautentica via refresh de token em 401.
-- `hooks/use-realtime.ts`: `useRealtimeExtensions/useRealtimeTrunks/useRealtimeQueues(companyId)`, cada um abre `openEventStream` pra `/realtime/<recurso>/stream` num `useEffect`. Tipos (`Presence`, `CallState`, `RealtimeExtension`, `RealtimeQueue`) espelham `backend/src/modules/realtime/schemas/realtime.schema.ts` — mesmo risco de drift do item de contrato acima.
+- `hooks/use-realtime.ts`: `useRealtimeExtensions/useRealtimeTrunks/useRealtimeQueues(companyId)`, cada um abre `openEventStream` pra `/realtime/<recurso>/stream` num `useEffect`. Tipos (`Presence`, `CallState`, `RealtimeExtension`, `RealtimeQueue`) espelham `backend/src/modules/realtime/schemas/realtime.schema.ts` - mesmo risco de drift do item de contrato acima.
 - Consumo em componente: recebe os dados já resolvidos via hook (ex: `components/Monitoring/realtime-extension-cards.tsx`), renderiza com `PresenceBadge`/`CallStateBadge`. Sem fetch/stream dentro do componente apresentacional.
 
 ## Convenções de review
 
 Ao terminar uma tela/recurso novo (skill `new-resource`), passar por:
-1. `component-reviewer` — estrutura de pasta, `Props` como `type`, hook retornando objeto plano, `queryKey` com escopo completo, form sempre com `zodResolver`
-2. `api-contract-reviewer` — compara `hooks/use-<recurso>.ts` com `backend/src/modules/<recurso>/schemas/<recurso>.schema.ts` (campos, enums, rota/verbo, `RouteDestination` compartilhado)
-3. `build-checker` — `pnpm exec tsc --noEmit`
+1. `component-reviewer` - estrutura de pasta, `Props` como `type`, hook retornando objeto plano, `queryKey` com escopo completo, form sempre com `zodResolver`
+2. `api-contract-reviewer` - compara `hooks/use-<recurso>.ts` com `backend/src/modules/<recurso>/schemas/<recurso>.schema.ts` (campos, enums, rota/verbo, `RouteDestination` compartilhado)
+3. `build-checker` - `pnpm exec tsc --noEmit`

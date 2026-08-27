@@ -49,7 +49,7 @@ import type { CreateExtensionInput } from '../schemas/extension.schema'
 const COMPANY = { id: 'c1', asteriskId: 'ast1' }
 const EXT_DB = { id: 'e1', alias: '2001', number: '2001_ast1', type: 'pjsip', name: 'Test', context: 'ramais', allowOutbound: true, companyId: 'c1', createdAt: new Date(), updatedAt: new Date() }
 
-// campos pjsip com default no schema Zod (transport/disallow/allow/...) só existem no output pós-parse —
+// campos pjsip com default no schema Zod (transport/disallow/allow/...) só existem no output pós-parse -
 // os testes chamam o service direto, sem passar pelo validatorCompiler, por isso o cast
 const pjsip = (data: object) => data as CreateExtensionInput
 
@@ -80,7 +80,7 @@ describe('ExtensionsService.createExtension', () => {
             .mockResolvedValueOnce(null)            // Asterisk number conflict check
             .mockResolvedValueOnce({ id: '2001_ast1' }) // checkAsteriskSync
         db.extension.create.mockResolvedValue(EXT_DB)
-        db.flowEdge.findMany.mockResolvedValue([]) // ninguém referencia — resolveUsedByLabels em getExtensionById
+        db.flowEdge.findMany.mockResolvedValue([]) // ninguém referencia - resolveUsedByLabels em getExtensionById
 
         const ext = await ExtensionsService.createExtension(pjsip({ alias: '2001', type: 'pjsip', name: 'Test', companyId: 'c1', context: 'ramais', allowOutbound: true })) as any
         expect(ext).toHaveProperty('password')
@@ -161,7 +161,7 @@ describe('ExtensionsService.deleteExtension', () => {
 
     it('deletes extension when not referenced by any flow', async () => {
         db.extension.findUnique.mockResolvedValue(EXT_DB)
-        db.flowEdge.findMany.mockResolvedValue([]) // ninguém referencia — assertNotReferenced passa
+        db.flowEdge.findMany.mockResolvedValue([]) // ninguém referencia - assertNotReferenced passa
         const result = await ExtensionsService.deleteExtension('e1')
         expect(result).toEqual({ id: 'e1', alias: '2001', companyId: 'c1' })
         expect(db.extension.delete).toHaveBeenCalledWith({ where: { id: 'e1' } })

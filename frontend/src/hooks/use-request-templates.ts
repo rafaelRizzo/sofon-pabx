@@ -24,7 +24,7 @@ export type RequestTemplate = {
     body: Record<string, unknown> | null
     timeoutMs: number
     variableMappings: VariableMapping[]
-    // não são mais editáveis por aqui — só via arrastar uma conexão no canvas do Flow (ver
+    // não são mais editáveis por aqui - só via arrastar uma conexão no canvas do Flow (ver
     // flow-canvas.tsx), que grava direto no FlowEdge por PUT separado. Mantidos no tipo só porque a
     // API ainda devolve os campos (label resolvido, usado em telas de leitura)
     onSuccess: RouteDestination
@@ -65,7 +65,7 @@ const variableMappingFieldSchema = z.object({
         ),
 })
 
-// body é digitado como JSON cru no textarea — validado aqui, convertido pra objeto só no payload
+// body é digitado como JSON cru no textarea - validado aqui, convertido pra objeto só no payload
 const bodyFieldSchema = z
     .string()
     .max(20000, "Máximo 20000 caracteres")
@@ -79,7 +79,7 @@ const bodyFieldSchema = z
         }
     }, "JSON inválido")
 
-// Espelha create/updateRequestTemplateSchema de backend/src/modules/request-templates/schemas/request-template.schema.ts —
+// Espelha create/updateRequestTemplateSchema de backend/src/modules/request-templates/schemas/request-template.schema.ts -
 // companyId só existe no create, o PUT do backend não permite trocar empresa
 export const createRequestTemplateFormSchema = z.object({
     name: z.string().min(1, "Informe o nome").max(80, "Máximo 80 caracteres"),
@@ -104,8 +104,8 @@ export type RequestTemplateUpdateForm = z.infer<
     typeof updateRequestTemplateFormSchema
 >
 
-// DTO de criação a partir do registro salvo (sem companyId — recriação sempre usa a empresa do
-// flow) — usado pelo histórico de undo/redo do Flow pra recriar o recurso quando o usuário desfaz
+// DTO de criação a partir do registro salvo (sem companyId - recriação sempre usa a empresa do
+// flow) - usado pelo histórico de undo/redo do Flow pra recriar o recurso quando o usuário desfaz
 // uma exclusão (ver flow-canvas.tsx). headers/body vêm da entidade como Record/objeto; o form
 // espera array de {key,value} e o body como string JSON crua (mesmo shape que o form de criação já
 // usa antes de passar por toPayload).
@@ -149,7 +149,7 @@ function toPayload(form: RequestTemplateUpdateForm, isEdit: boolean) {
     }
 }
 
-// companyId opcional — enquanto não informado, a lista não é buscada (filtro de
+// companyId opcional - enquanto não informado, a lista não é buscada (filtro de
 // empresa da página exige seleção antes de consultar o backend)
 async function fetchRequestTemplatesRequest(
     companyId: string

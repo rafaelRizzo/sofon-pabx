@@ -28,8 +28,8 @@ type VariableConditionRow = NonNullable<Awaited<ReturnType<typeof _byId>>> & { t
 const validateRoute = (route: RouteDest | undefined | null, companyId: string, label: string) =>
     validateRouteDestination(route ?? null, companyId, label)
 
-// Anexa o nome legível de trueRoute/falseRoute (resolvido no backend, cache-first — ver
-// route-destination-label.ts). Agrupa por companyId — getAllVariableConditions pode misturar
+// Anexa o nome legível de trueRoute/falseRoute (resolvido no backend, cache-first - ver
+// route-destination-label.ts). Agrupa por companyId - getAllVariableConditions pode misturar
 // empresas diferentes na mesma lista (visão admin).
 async function withDestinationLabels<T extends { trueRoute: unknown; falseRoute: unknown; companyId: string }>(
     conditions: T[],
@@ -54,7 +54,7 @@ async function withDestinationLabels<T extends { trueRoute: unknown; falseRoute:
     })
 }
 
-// Resolve "usado por" em lote — agrupa por companyId pelo mesmo motivo de withDestinationLabels
+// Resolve "usado por" em lote - agrupa por companyId pelo mesmo motivo de withDestinationLabels
 // acima (getAllVariableConditions pode misturar empresas na mesma lista).
 async function resolveUsedByLabelsBatched(rows: { id: string; companyId: string }[]): Promise<Map<string, UsedByRef[]>> {
     if (rows.length === 0) return new Map()

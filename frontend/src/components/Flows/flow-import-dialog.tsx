@@ -173,7 +173,7 @@ export function FlowImportDialog({ open, onOpenChange, companyId, onImported }: 
                                     <Alert>
                                         <AlertTitle>Pronto para importar</AlertTitle>
                                         <AlertDescription>
-                                            Nenhum ramal ou credencial precisa ser escolhido — todo
+                                            Nenhum ramal ou credencial precisa ser escolhido - todo
                                             o resto é recriado automaticamente.
                                         </AlertDescription>
                                     </Alert>
@@ -182,7 +182,7 @@ export function FlowImportDialog({ open, onOpenChange, companyId, onImported }: 
                             {preview.pendingExtensions.length > 0 && (
                                 <div className="flex flex-col gap-2">
                                     <p className="text-sm font-medium">
-                                        Ramais usados pelo flow — escolha o ramal desta empresa
+                                        Ramais usados pelo flow - escolha o ramal desta empresa
                                         que corresponde a cada um
                                     </p>
                                     {preview.pendingExtensions.map((p) => (
@@ -219,7 +219,7 @@ export function FlowImportDialog({ open, onOpenChange, companyId, onImported }: 
                             {preview.pendingCredentials.length > 0 && (
                                 <div className="flex flex-col gap-2">
                                     <p className="text-sm font-medium">
-                                        Credenciais de integração — escolha a credencial já
+                                        Credenciais de integração - escolha a credencial já
                                         configurada nesta empresa
                                     </p>
                                     {credentialsWithoutOptions.length > 0 && (

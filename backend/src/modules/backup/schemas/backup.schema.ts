@@ -10,7 +10,7 @@ export const backupExportQuerySchema = z.object({
 
 export type BackupExportQuery = z.infer<typeof backupExportQuerySchema>
 
-// Envelope só — cada bloco de empresa é validado entidade por entidade, contra o próprio schema
+// Envelope só - cada bloco de empresa é validado entidade por entidade, contra o próprio schema
 // de create de cada módulo, dentro de restore.ts (não duplicar aqui os ~15 schemas existentes)
 export const backupRestoreSchema = z.object({
     backupVersion: z.literal(BACKUP_VERSION),

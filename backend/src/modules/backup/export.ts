@@ -40,7 +40,7 @@ async function exportExtensions(companyId: string) {
 }
 
 async function exportAudios(companyId: string, asteriskId: string) {
-    // AudiosCache.getByCompany não tipa o retorno cacheado (infere {} sem generic explícito) —
+    // AudiosCache.getByCompany não tipa o retorno cacheado (infere {} sem generic explícito) -
     // o shape real é sempre o de AudioSchema, ver audios.service.ts::select
     const audios = (await getAudiosByCompany(companyId)) as Array<{ id: string; name: string }>
     return Promise.all(
@@ -64,7 +64,7 @@ async function exportIntegrationCredentials(companyId: string) {
     }))
 }
 
-// Só role="user" vinculado via UserCompany — admin/reseller são conta de plataforma, não dado
+// Só role="user" vinculado via UserCompany - admin/reseller são conta de plataforma, não dado
 // de empresa. password já é o hash argon2 armazenado (ver users.service.ts), restaurado 1:1 sem
 // re-hash, então o login continua funcionando com a senha original depois do restore
 async function exportUsers(companyId: string) {
@@ -115,7 +115,7 @@ async function exportFlows(companyId: string) {
 }
 
 // Mirror do que cada GET já devolve, com 2 acréscimos: bytes de áudio (base64) e token de
-// integração decriptado — o resto é o próprio DTO de cada módulo, sem transformação.
+// integração decriptado - o resto é o próprio DTO de cada módulo, sem transformação.
 export async function exportCompanyBackup(companyId: string) {
     const company = await getCompanyById(companyId)
 

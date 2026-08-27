@@ -33,7 +33,7 @@ type Props = {
     payload: BackupPayload | null
     restoring: boolean
     onConfirm: () => void
-    // backup de segurança do estado ATUAL (todas as empresas) — obrigatório antes de liberar
+    // backup de segurança do estado ATUAL (todas as empresas) - obrigatório antes de liberar
     // o "Continuar", pra sempre ter como reverter manualmente se o restore der problema
     onDownloadCurrent: () => Promise<void>
     downloadingCurrent: boolean
@@ -52,7 +52,7 @@ export function RestoreBackupDialog({
     const [confirmText, setConfirmText] = useState("")
     const [downloadedCurrent, setDownloadedCurrent] = useState(false)
 
-    // reabrir sempre volta pro passo 1 e exige baixar o backup atual de novo — evita pular a
+    // reabrir sempre volta pro passo 1 e exige baixar o backup atual de novo - evita pular a
     // etapa de revisão/segurança se o dialog for fechado e reaberto (com o mesmo arquivo ou não)
     useEffect(() => {
         if (open) {
@@ -112,7 +112,7 @@ export function RestoreBackupDialog({
                             <p className="text-sm text-muted-foreground">
                                 Antes de continuar, baixe um backup de tudo
                                 que existe agora no sistema (todas as
-                                empresas) — assim você tem como reverter
+                                empresas) - assim você tem como reverter
                                 manualmente se algo der errado.
                             </p>
                             <Button
@@ -171,7 +171,7 @@ export function RestoreBackupDialog({
                                 empresa específica é pulada e reportada como
                                 erro, sem criar duplicata. Usuários do painel
                                 vinculados à empresa são restaurados com a
-                                senha original — se o username já existir, só
+                                senha original - se o username já existir, só
                                 aquele usuário é pulado (não afeta o resto da
                                 empresa).
                             </AlertDescription>

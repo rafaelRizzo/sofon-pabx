@@ -110,7 +110,7 @@ describe('RequestTemplatesService.updateRequestTemplate', () => {
 describe('RequestTemplatesService.deleteRequestTemplate', () => {
     it('deletes template and removes dialplan entry', async () => {
         db.requestTemplate.findUnique.mockResolvedValue(TEMPLATE)
-        db.flowEdge.findMany.mockResolvedValue([]) // ninguém referencia — assertNotReferenced passa
+        db.flowEdge.findMany.mockResolvedValue([]) // ninguém referencia - assertNotReferenced passa
         db.requestTemplate.delete.mockResolvedValue(TEMPLATE)
         await RequestTemplatesService.deleteRequestTemplate('t1')
         expect(RequestTemplateRepository.regenerate).toHaveBeenCalledWith('c1')

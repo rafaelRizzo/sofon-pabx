@@ -4,7 +4,7 @@ import {
     mapPeerPresence, mapDeviceState, mapQueueMemberStatus, memberInterfaceOf,
 } from '../transport/ami-events'
 
-// Valores confirmados via AMI_DEBUG contra Asterisk real (ver conversa) — trava regressão contra
+// Valores confirmados via AMI_DEBUG contra Asterisk real (ver conversa) - trava regressão contra
 // os nomes/formatos de campo reais, não só o que a doc sugere.
 
 describe('isTrunkId', () => {
@@ -93,7 +93,7 @@ describe('mapQueueMemberStatus', () => {
 })
 
 describe('memberInterfaceOf', () => {
-    it('usa Interface, confirmado real no QueueMemberStatus (Asterisk 22.7) — sem Location nenhum', () => {
+    it('usa Interface, confirmado real no QueueMemberStatus (Asterisk 22.7) - sem Location nenhum', () => {
         expect(memberInterfaceOf({
             Event: 'QueueMemberStatus', Queue: '45d3a31d32-600',
             Interface: 'PJSIP/1000_45d3a31d32', StateInterface: 'PJSIP/1000_45d3a31d32',

@@ -84,7 +84,7 @@ export const announcementsRoutes = async (app: FastifyInstance) => {
         schema: {
             tags: ['Announcements'],
             summary: 'Remover anúncio',
-            description: 'Remove o registro e o dialplan — o Audio vinculado não é apagado.',
+            description: 'Remove o registro e o dialplan - o Audio vinculado não é apagado.',
             security: [{ bearerAuth: [] }],
             params: idParamSchema,
             response: {

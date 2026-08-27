@@ -5,13 +5,13 @@ import { logger } from '../utils/logger'
 // Rotina de correção de cache que só precisa rodar uma vez por ambiente (ex: mudou o shape do
 // que fica cacheado e o cache antigo, sem TTL, quebraria a validação de response). Cada entrada
 // roda no boot do processo worker (singleton, ver server.ts) e marca no próprio Redis que já
-// rodou — reboot/deploy seguintes pulam direto. Pra forçar rodar de novo, apague a chave
+// rodou - reboot/deploy seguintes pulam direto. Pra forçar rodar de novo, apague a chave
 // `cache-migration:<id>` no Redis.
 type CacheMigration = { id: string; run: () => Promise<void> }
 
 const MIGRATIONS: CacheMigration[] = [
     {
-        // Adicionado `company: {id, name}` ao select/schema de IntegrationCredential — cache
+        // Adicionado `company: {id, name}` ao select/schema de IntegrationCredential - cache
         // antigo (sem TTL) não tem esse campo e falha a validação Zod de response ("Response
         // doesn't match the schema").
         id: 'integration-credentials-add-company-field',
@@ -19,7 +19,7 @@ const MIGRATIONS: CacheMigration[] = [
     },
 ]
 
-// Nunca lança — uma falha aqui (ex: Redis instável no boot) não pode derrubar o worker inteiro,
+// Nunca lança - uma falha aqui (ex: Redis instável no boot) não pode derrubar o worker inteiro,
 // só deixa a migração pendente pra tentar de novo no próximo boot.
 export async function runCacheMigrations() {
     for (const migration of MIGRATIONS) {

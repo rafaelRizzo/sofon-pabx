@@ -25,7 +25,7 @@ export type InboundRoute = {
 }
 
 // Espelha create/updateInboundRouteSchema de backend/src/modules/inbound-routes/schemas/inbound-route.schema.ts
-// didId/trunkId só existem no create — o PUT do backend só aceita name/destination
+// didId/trunkId só existem no create - o PUT do backend só aceita name/destination
 export const createInboundRouteFormSchema = z.object({
     name: z.string().min(1, "Informe o nome").max(80, "Máximo 80 caracteres"),
     didId: z.string().min(1, "Selecione um DID"),
@@ -43,7 +43,7 @@ export type InboundRouteUpdateForm = z.infer<
     typeof updateInboundRouteFormSchema
 >
 
-// companyId opcional — enquanto não informado, a lista não é buscada (filtro de empresa
+// companyId opcional - enquanto não informado, a lista não é buscada (filtro de empresa
 // da página exige seleção antes de consultar o backend). Diferente da empresa do formulário
 // de criação (que é passada explicitamente para createRoute, pois pode divergir deste filtro
 // ao editar uma rota específica)

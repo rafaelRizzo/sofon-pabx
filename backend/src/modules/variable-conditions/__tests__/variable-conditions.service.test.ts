@@ -113,7 +113,7 @@ describe('VariableConditionsService.updateVariableCondition', () => {
 describe('VariableConditionsService.deleteVariableCondition', () => {
     it('deletes condition and regenerates dialplan', async () => {
         db.variableCondition.findUnique.mockResolvedValue({ id: 'vc1', companyId: 'c1' })
-        db.flowEdge.findMany.mockResolvedValue([]) // ninguém referencia — assertNotReferenced passa
+        db.flowEdge.findMany.mockResolvedValue([]) // ninguém referencia - assertNotReferenced passa
         db.variableCondition.delete.mockResolvedValue(VARCOND)
         await VariableConditionsService.deleteVariableCondition('vc1')
         expect(VariableConditionRepository.regenerate).toHaveBeenCalledWith('c1')

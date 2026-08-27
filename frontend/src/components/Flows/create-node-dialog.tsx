@@ -28,8 +28,8 @@ type Props = {
     onOpenChange: (open: boolean) => void
     companyId: string
     companies: Company[]
-    // creationDto é o form validado (sem companyId — recriação sempre usa a empresa do flow) do
-    // recurso recém-criado — o histórico de undo/redo do canvas guarda isso pra poder recriar o
+    // creationDto é o form validado (sem companyId - recriação sempre usa a empresa do flow) do
+    // recurso recém-criado - o histórico de undo/redo do canvas guarda isso pra poder recriar o
     // recurso caso o usuário desfaça essa criação (ver flow-canvas.tsx)
     onCreated: (
         option: DestinationOption,
@@ -37,13 +37,13 @@ type Props = {
     ) => Promise<void>
 }
 
-// Cada tipo criável no canvas reaproveita o form dialog + hook já existentes daquele módulo — sem
+// Cada tipo criável no canvas reaproveita o form dialog + hook já existentes daquele módulo - sem
 // recriar formulário nenhum. Sempre dentro da mesma empresa do flow, e o retorno da API permite
 // inserir a configuração recém-criada no canvas sem um segundo passo manual. companies vem filtrado pra
 // só ela (evita o usuário escolher outra empresa por engano no combobox de criação). Alguns
 // módulos (Announcement, Request Template) pedem a empresa como argumento separado do form em vez
-// de dentro do form — ver createAnnouncement/createRequestTemplate abaixo.
-// IMPORTANTE: montar com `key={type}` no chamador — os hooks chamados aqui variam por `type` num
+// de dentro do form - ver createAnnouncement/createRequestTemplate abaixo.
+// IMPORTANTE: montar com `key={type}` no chamador - os hooks chamados aqui variam por `type` num
 // switch, o que só é seguro porque o componente é remontado do zero (não re-renderizado com `type`
 // mudando) a cada troca de tipo selecionado no painel.
 export function CreateNodeDialog({

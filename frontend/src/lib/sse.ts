@@ -12,7 +12,7 @@ type EventStreamOptions<T> = {
 }
 
 // EventSource nativo não deixa mandar header Authorization, e a API não aceita cookie (só Bearer,
-// ver lib/api.ts) — por isso usa fetch()+ReadableStream (mesmo padrão de auth do resto do app, sem
+// ver lib/api.ts) - por isso usa fetch()+ReadableStream (mesmo padrão de auth do resto do app, sem
 // vazar token na query string) e reimplementa reconexão com backoff, que o EventSource faria sozinho.
 // Retorna uma função pra fechar a conexão (chamar no cleanup do useEffect).
 export function openEventStream<T>({ url, params, onMessage }: EventStreamOptions<T>): () => void {

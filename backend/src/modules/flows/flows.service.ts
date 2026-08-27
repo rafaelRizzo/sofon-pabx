@@ -23,7 +23,7 @@ const toDto = <T extends { entryDestination: RouteDestination; usedBy: UsedByRef
 
 type FlowRow = { id: string; name: string; companyId: string; layout: unknown; createdAt: Date; updatedAt: Date; entryDestination: RouteDestination }
 
-// Anexa o nome legível de entryDestination (resolvido no backend, cache-first — ver
+// Anexa o nome legível de entryDestination (resolvido no backend, cache-first - ver
 // route-destination-label.ts). Todas as chamadas aqui são de uma única empresa por vez.
 async function withDestinationLabels<T extends { entryDestination: unknown }>(flows: T[], companyId: string): Promise<T[]> {
     if (flows.length === 0) return flows
@@ -31,7 +31,7 @@ async function withDestinationLabels<T extends { entryDestination: unknown }>(fl
     return flows.map((f) => ({ ...f, entryDestination: withDestinationLabel(f.entryDestination as RouteDestination, labelMap) }))
 }
 
-// FlowsCache guarda só o dado bruto (sem label/usedBy) — labels vêm de entidades de outros
+// FlowsCache guarda só o dado bruto (sem label/usedBy) - labels vêm de entidades de outros
 // módulos (Extension/Queue/TimeCondition/...) e usedBy é referência reversa; nenhum dos dois é
 // invalidado por quem os altera (ex: renomear uma Extension não invalida FlowsCache). Resolver os
 // dois fora do cache, sempre fresh, evita servir nome desatualizado indefinidamente (TTL do
@@ -143,7 +143,7 @@ export const updateFlow = async (id: string, data: UpdateFlowInput) => {
     return toDto({ ...flow, entryDestination, usedBy: usedByMap.get(id) ?? [] })
 }
 
-// Autosave de posição no canvas — não toca em entryDestination/nome, não precisa regenerar
+// Autosave de posição no canvas - não toca em entryDestination/nome, não precisa regenerar
 // dialplan (layout é só visual, não afeta nenhuma linha do .conf gerado).
 export const updateFlowLayout = async (id: string, data: UpdateFlowLayoutInput) => {
     const existing = await prisma.flow.findUnique({ where: { id }, select: { companyId: true } })
@@ -176,7 +176,7 @@ export const deleteFlow = async (id: string) => {
 
 // ─── Grafo (GET /flows/:id/graph) ──────────────────────────────────────────────
 // Percorre a partir do entryDestination seguindo os destinos de saída de cada nó visitado (BFS,
-// com guard de ciclo) — devolve todos os nós alcançáveis + as arestas entre eles, pro canvas
+// com guard de ciclo) - devolve todos os nós alcançáveis + as arestas entre eles, pro canvas
 // desenhar o grafo inteiro do Flow, não só o nó de entrada.
 
 async function resolveNodeName(type: string, id: string): Promise<string | null> {
@@ -231,7 +231,7 @@ async function resolveNodeName(type: string, id: string): Promise<string | null>
 type OutgoingEdge = { slot: string; dest: RouteDestination }
 
 // sourceType usado em FlowEdge difere do targetType (RouteDestination) pra holiday/ivr/request/
-// variable-set/variable-condition — ver flow-edge.repository.ts::FlowSourceType.
+// variable-set/variable-condition - ver flow-edge.repository.ts::FlowSourceType.
 async function resolveOutgoingEdges(type: string, id: string): Promise<OutgoingEdge[]> {
     const one = (sourceType: FlowSourceType, slot: string) =>
         FlowEdgeRepository.getOne(sourceType, id, slot).then((dest) => ({ slot, dest }))
@@ -292,7 +292,7 @@ export const getFlowGraph = async (id: string) => {
         visited.add(key)
 
         const name = await resolveNodeName(current.type, current.id)
-        if (name === null) continue // registro sumiu (deletado) — não lista nó órfão
+        if (name === null) continue // registro sumiu (deletado) - não lista nó órfão
 
         nodes.push({ type: current.type, id: current.id, name })
 

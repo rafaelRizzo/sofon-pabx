@@ -71,7 +71,7 @@ export type AuditLogFilters = {
     endDate?: string
 }
 
-const DEFAULT_LIMIT = 50
+const DEFAULT_LIMIT = 10
 
 function filterParams(companyId: string | undefined, filters: AuditLogFilters, extra?: object) {
     return {

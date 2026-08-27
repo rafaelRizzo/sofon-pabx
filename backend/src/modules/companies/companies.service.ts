@@ -155,7 +155,7 @@ export const updateCompany = async (id: string, data: UpdateCompanyInput) => {
     return company
 }
 
-// regenera todo dialplan estático (/etc/asterisk/dialplan-extra/**) da empresa a partir do banco —
+// regenera todo dialplan estático (/etc/asterisk/dialplan-extra/**) da empresa a partir do banco -
 // mesma lista de contextos de DIALPLAN_FILE_CONTEXTS acima, usado quando os arquivos em disco somem
 // (ex: reinstalação do Asterisk que manteve o banco intacto) sem precisar salvar módulo por módulo
 //
@@ -167,18 +167,18 @@ export const resyncDialplan = async (id: string) => {
 
     return withDialplanLock(`resync:${company.id}`, async () => {
         // Esqueleto global (ramais/transfer/from-trunk/from-trunk-routed) + tunáveis globais de
-        // features.conf (ver ensure-static-config.ts) — mesma rotina chamada no boot do backend,
+        // features.conf (ver ensure-static-config.ts) - mesma rotina chamada no boot do backend,
         // reusada aqui pra um admin conseguir forçar a correção sem esperar o próximo restart.
         const staticConfig = await ensureStaticAsteriskConfig()
         if (staticConfig.baseDialplanRewritten && !staticConfig.dialplanReloadApplied) {
             throw new AppError(
-                'sofon-managed.conf regenerado, mas o reload via AMI falhou ou não foi confirmado — verifique AMI_HOST/AMI_SECRET e rode "dialplan reload" manualmente no Asterisk',
+                'sofon-managed.conf regenerado, mas o reload via AMI falhou ou não foi confirmado - verifique AMI_HOST/AMI_SECRET e rode "dialplan reload" manualmente no Asterisk',
                 502,
             )
         }
         if (staticConfig.restartRequired) {
             throw new AppError(
-                'transferdigittimeout ajustado em features.conf, mas essa config não recarrega a quente nessa versão do Asterisk — rode "systemctl restart asterisk" manualmente pra aplicar (derruba chamadas ativas)',
+                'transferdigittimeout ajustado em features.conf, mas essa config não recarrega a quente nessa versão do Asterisk - rode "systemctl restart asterisk" manualmente pra aplicar (derruba chamadas ativas)',
                 502,
             )
         }
@@ -191,7 +191,7 @@ export const resyncDialplan = async (id: string) => {
             : false
         if (blindTransferRemoved && !blindTransferReloadApplied) {
             throw new AppError(
-                'Transferência cega #1 removida de features.conf, mas o reload de res_features via AMI falhou ou não foi confirmado — reinicie/recarregue o Asterisk manualmente',
+                'Transferência cega #1 removida de features.conf, mas o reload de res_features via AMI falhou ou não foi confirmado - reinicie/recarregue o Asterisk manualmente',
                 502,
             )
         }
@@ -208,7 +208,7 @@ export const resyncDialplan = async (id: string) => {
         await FlowRepository.regenerate(company.id)
         await CallcenterSurveyRepository.regenerate(company.id)
 
-        // Padrão genérico de "ramais" (Realtime, não é arquivo estático) — compartilhado entre TODAS
+        // Padrão genérico de "ramais" (Realtime, não é arquivo estático) - compartilhado entre TODAS
         // as empresas por contexto, não só a desta. Refeito aqui (delete+recreate, ver
         // dialplan.repository.ts) pra garantir que instalações antigas peguem mudanças de template
         // (novas prioridades de CDR, formato de gravação) sem precisar recriar cada ramal manualmente.
@@ -225,7 +225,7 @@ export const resyncDialplan = async (id: string) => {
         })
 
         // Mesma lógica: inbound routes criadas antes de uma mudança de template (novos campos de
-        // CDR, gravação) nunca são regeradas sozinhas — só via update() manual de cada rota. Isso força.
+        // CDR, gravação) nunca são regeradas sozinhas - só via update() manual de cada rota. Isso força.
         const inboundRoutes = await InboundRouteRepository.regenerateAll(company.id) ?? 0
 
         // Drift: InboundRoute apagada por fora do fluxo normal (tamper manual, bug, restore parcial)
@@ -234,18 +234,18 @@ export const resyncDialplan = async (id: string) => {
         const orphansPruned = await InboundRouteRepository.pruneOrphans(company.id)
 
         // Mesma lógica: outbound route patterns criados antes de uma mudança de template (novos
-        // campos de CDR, gravação) nunca são regerados sozinhos — só via update() manual de cada pattern.
+        // campos de CDR, gravação) nunca são regerados sozinhos - só via update() manual de cada pattern.
         const outboundRoutes = await regenerateAllOutboundPatterns(company.id) ?? 0
 
         // Ação explícita de admin, diferente do reload debounced/fire-and-forget usado pelos CRUDs
         // individuais (reloadDialplan() em dialplan-file.repository.ts): aqui o chamador precisa do
         // resultado real. Arquivos/Realtime já estão corretos em disco/banco neste ponto, mas sem
-        // reload confirmado o Asterisk continua rodando o dialplan antigo em memória — o admin
+        // reload confirmado o Asterisk continua rodando o dialplan antigo em memória - o admin
         // precisa saber disso, não receber sucesso falso (200) com o reload nunca confirmado.
         const reloadApplied = await reloadDialplanNow()
         if (!reloadApplied) {
             throw new AppError(
-                'Dialplan regenerado no banco/disco, mas o reload via AMI falhou ou não foi confirmado — verifique AMI_HOST/AMI_SECRET e rode "dialplan reload" manualmente no Asterisk',
+                'Dialplan regenerado no banco/disco, mas o reload via AMI falhou ou não foi confirmado - verifique AMI_HOST/AMI_SECRET e rode "dialplan reload" manualmente no Asterisk',
                 502,
             )
         }
@@ -265,9 +265,9 @@ export const resyncDialplan = async (id: string) => {
 }
 
 // Não roda em paralelo: cada resyncDialplan já serializa por empresa (withDialplanLock) e mexe no
-// esqueleto global (ensureStaticAsteriskConfig, features.conf) — rodar N empresas ao mesmo tempo só
+// esqueleto global (ensureStaticAsteriskConfig, features.conf) - rodar N empresas ao mesmo tempo só
 // faria essas etapas globais colidirem entre si sem ganho real de tempo. Uma empresa que falhar não
-// interrompe as demais — erro é capturado e reportado por empresa no resultado final.
+// interrompe as demais - erro é capturado e reportado por empresa no resultado final.
 export const resyncAllCompaniesDialplan = async () => {
     const companies = await prisma.company.findMany({ select: { id: true, name: true } })
 
@@ -355,7 +355,7 @@ export const deleteCompany = async (id: string) => {
         await tx.company.delete({ where: { id } })
     })
 
-    // pasta de áudios + arquivos de dialplan da empresa — fora do banco, best-effort após o commit
+    // pasta de áudios + arquivos de dialplan da empresa - fora do banco, best-effort após o commit
     await rm(audioSoundDir(existing.asteriskId), { recursive: true, force: true })
     await removeCompanyDialplanFiles(existing.asteriskId, DIALPLAN_FILE_CONTEXTS)
 

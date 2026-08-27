@@ -52,7 +52,7 @@ const patternFieldSchema = z.object({
 })
 
 // Espelha create/updateOutboundRouteSchema de backend/src/modules/outbound-routes/schemas/outbound-route.schema.ts
-// A posição de cada pattern/trunk é derivada da ordem no array (índice) — não exposta no form
+// A posição de cada pattern/trunk é derivada da ordem no array (índice) - não exposta no form
 export const outboundRouteFormSchema = z.object({
     name: z.string().min(1, "Informe o nome").max(80, "Máximo 80 caracteres"),
     position: optNumber(0),
@@ -62,7 +62,7 @@ export const outboundRouteFormSchema = z.object({
     extensionIds: z.array(z.string()).optional(),
 })
 
-// Presets de padrões de discagem comuns no Brasil — apenas preenche o campo "pattern",
+// Presets de padrões de discagem comuns no Brasil - apenas preenche o campo "pattern",
 // prefix/prepend ficam a critério do usuário (dependem do tronco/operadora)
 export const DIAL_PATTERN_PRESETS = [
     { label: "Celular local (9 dígitos)", pattern: `_9${"X".repeat(8)}` },
@@ -97,7 +97,7 @@ const toPayload = (form: OutboundRouteForm) => ({
     })),
 })
 
-// companyId opcional — enquanto não informado, a lista não é buscada (filtro de empresa
+// companyId opcional - enquanto não informado, a lista não é buscada (filtro de empresa
 // da página exige seleção antes de consultar o backend). Diferente da empresa do formulário
 // de criação (que é passada explicitamente para createRoute, pois pode divergir deste filtro
 // ao editar uma rota específica)
@@ -159,7 +159,7 @@ export function useOutboundRoutes(companyId?: string) {
         try {
             await api.put(`/outbound-routes/${routeId}`, toPayload(form))
 
-            // Restrição a ramais não faz parte do PUT em lote — endpoints próprios de add/remove
+            // Restrição a ramais não faz parte do PUT em lote - endpoints próprios de add/remove
             const existing = routes.find((r) => r.id === routeId)
             const currentExtensionIds =
                 existing?.extensions.map((e) => e.extensionId) ?? []

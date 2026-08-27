@@ -1,3 +1,3 @@
-// Ponte de compatibilidade — implementação real em ./destinations/variable.repository
+// Ponte de compatibilidade - implementação real em ./destinations/variable.repository
 // (reorganizado por domínio; ver subpastas transport/dialplan/endpoints/destinations/flows)
 export * from './destinations/variable.repository'

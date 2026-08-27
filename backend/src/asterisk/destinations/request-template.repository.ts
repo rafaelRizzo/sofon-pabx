@@ -7,9 +7,9 @@ const env = validateEnv()
 
 const buildAgiUrl = (id: string) => `agi://${env.AGI_HOST}:${env.AGI_PORT}/run,${id}`
 
-// Dialplan de um RequestTemplate é sempre o mesmo par fixo (AGI + Hangup) — quem varia é o registro
+// Dialplan de um RequestTemplate é sempre o mesmo par fixo (AGI + Hangup) - quem varia é o registro
 // no banco, lido pelo AGI server em tempo de chamada via o id no agiUrl. Por isso só depende do id
-// (nunca muda com method/url/headers/etc — ver RequestTemplatesService).
+// (nunca muda com method/url/headers/etc - ver RequestTemplatesService).
 export const RequestTemplateRepository = {
     async regenerate(companyId: string) {
         const asteriskId = await resolveAsteriskId(companyId)

@@ -102,18 +102,18 @@ export const companiesRoutes = async (app: FastifyInstance) => {
                 'empresa a partir do banco (time conditions, announcements, ivrs, queues-app, request ' +
                 'templates, holidays, variables, variable conditions, callcenter surveys, flows), o padrão ' +
                 'genérico de "ramais" (Realtime, compartilhado entre empresas), as inbound routes e os ' +
-                'patterns de outbound routes — garante que o dialplan em produção reflita o template ' +
+                'patterns de outbound routes - garante que o dialplan em produção reflita o template ' +
                 'atual do código mesmo em instalações antigas, e remove linhas Realtime órfãs de ' +
                 'inbound routes deletadas fora do fluxo normal. Útil depois de reinstalar o Asterisk ' +
                 'mantendo o banco intacto, ou depois de uma mudança no template de dialplan (ex: novos ' +
                 'campos de CDR/gravação), sem precisar recriar cada ramal/rota manualmente. Também recria ' +
                 '/etc/asterisk/sofon-managed.conf (esqueleto global: ramais/transfer/from-trunk/' +
                 'from-trunk-routed) se ele tiver sido perdido e remove o atalho legado de transferência ' +
-                'cega #1 de /etc/asterisk/features.conf, recarregando res_features via AMI — não precisa ' +
+                'cega #1 de /etc/asterisk/features.conf, recarregando res_features via AMI - não precisa ' +
                 'mais reaplicar o instalador ' +
                 'inteiro pra isso. Serializado por empresa (chamadas concorrentes pra mesma empresa ' +
                 'enfileiram). Ao final aguarda o "dialplan reload" via AMI e retorna erro real (502) se o ' +
-                'reload não puder ser confirmado — arquivos/banco já ficam corretos mesmo nesse caso, mas o ' +
+                'reload não puder ser confirmado - arquivos/banco já ficam corretos mesmo nesse caso, mas o ' +
                 'Asterisk só aplica após um reload bem-sucedido. Requer role admin.',
             security: [{ bearerAuth: [] }],
             params: idParamSchema,
@@ -133,7 +133,7 @@ export const companiesRoutes = async (app: FastifyInstance) => {
             summary: 'Resincronizar dialplan de todas as empresas',
             description:
                 'Roda o mesmo resync-dialplan (ver POST /companies/:id/resync-dialplan) pra CADA empresa ' +
-                'cadastrada, sequencialmente. Uma empresa que falhar não interrompe as demais — o resultado ' +
+                'cadastrada, sequencialmente. Uma empresa que falhar não interrompe as demais - o resultado ' +
                 'traz o sucesso/erro individual de cada empresa em "results". Requer role admin.',
             security: [{ bearerAuth: [] }],
             response: {

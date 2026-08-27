@@ -4,7 +4,7 @@ import { ok } from '../../../schemas/responses'
 export const FLOW_EXPORT_KIND = 'sofon-flow-export'
 export const FLOW_EXPORT_VERSION = 1
 
-// Envelope só — cada nó é validado contra o próprio create schema do recurso que ele referencia,
+// Envelope só - cada nó é validado contra o próprio create schema do recurso que ele referencia,
 // dentro de flow-import.service.ts (mesmo espírito do backup: não duplicar aqui os ~10 schemas
 // de recurso já existentes, ver backup/schemas/backup.schema.ts)
 export const flowExportBundleSchema = z.object({

@@ -53,7 +53,7 @@ export const integrationCredentialsRoutes = async (app: FastifyInstance) => {
             description:
                 'Guarda base URL + token de acesso à API de um provedor (ex: IXCsoft), reutilizável ' +
                 'por N nós sem precisar recadastrar. Token é criptografado em repouso (AES-256-GCM, ' +
-                'chave por empresa) e nunca retorna em GET — pra trocar, reenviar o campo inteiro.',
+                'chave por empresa) e nunca retorna em GET - pra trocar, reenviar o campo inteiro.',
             security: [{ bearerAuth: [] }],
             body: createIntegrationCredentialSchema,
             response: {

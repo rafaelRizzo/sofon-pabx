@@ -11,12 +11,12 @@ export type StaticAsteriskConfigResult = {
 }
 
 // Autocura da config estática global do Asterisk (fora do escopo por-empresa de
-// dialplan-file.repository.ts) sem depender de um admin chamar resyncDialplan manualmente —
+// dialplan-file.repository.ts) sem depender de um admin chamar resyncDialplan manualmente -
 // chamado no boot do backend (server.ts) e reusado por resyncDialplan. Cada etapa é isolada:
-// uma falha de reload não impede a próxima etapa nem derruba o boot, só fica logada como warn —
+// uma falha de reload não impede a próxima etapa nem derruba o boot, só fica logada como warn -
 // quem precisa de garantia forte (resyncDialplan) lê o resultado e decide se lança erro.
 //
-// Propositalmente NÃO inclui removeBlindTransferFeature() (features.repository.ts) — migração
+// Propositalmente NÃO inclui removeBlindTransferFeature() (features.repository.ts) - migração
 // ainda sem decisão sobre o substituto do #1 global, continua só no fluxo manual de resyncDialplan.
 export async function ensureStaticAsteriskConfig(): Promise<StaticAsteriskConfigResult> {
     const result: StaticAsteriskConfigResult = {
@@ -42,11 +42,11 @@ export async function ensureStaticAsteriskConfig(): Promise<StaticAsteriskConfig
     }
 
     try {
-        // features.conf não recarrega a quente nessa versão do Asterisk — nem "module reload
+        // features.conf não recarrega a quente nessa versão do Asterisk - nem "module reload
         // features.so" (retorna sucesso mas não aplica) nem "core reload" pegam o featuremap/
         // general em memória, só um "systemctl restart asterisk" completo (descoberto debugando
         // *2/atxfer não funcionar mesmo com o arquivo correto). Não tem AMI action pra restart de
-        // processo — só reporta que precisa de restart manual, nunca finge reload bem-sucedido.
+        // processo - só reporta que precisa de restart manual, nunca finge reload bem-sucedido.
         result.transferDigitTimeoutBumped = await bumpTransferDigitTimeout()
         if (result.transferDigitTimeoutBumped) {
             result.restartRequired = true

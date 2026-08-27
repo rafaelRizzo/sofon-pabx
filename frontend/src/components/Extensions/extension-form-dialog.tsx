@@ -772,7 +772,7 @@ function PjsipSections({ r, c }: { r: any; c: any }) {
 
 const TYPES = [
     { value: "pjsip", label: "PJSIP" },
-    // SIP legado desativado — instalação PJSIP-only (chan_sip removido do Asterisk)
+    // SIP legado desativado - instalação PJSIP-only (chan_sip removido do Asterisk)
     // { value: "sip", label: "SIP (legado)" },
 ]
 

@@ -11,7 +11,7 @@ import { IxcNodesCache } from '../modules/ixc-nodes/cache/ixc-nodes.cache'
 import { VariablesCache } from '../modules/variables/cache/variables.cache'
 import { VariableConditionsCache } from '../modules/variable-conditions/cache/variable-conditions.cache'
 
-// Resolve o nome legível de cada tipo de destino, cache-first — reaproveita o cache de listagem
+// Resolve o nome legível de cada tipo de destino, cache-first - reaproveita o cache de listagem
 // já mantido/invalidado por cada módulo (XxxCache.getByCompany), sem criar um cache novo pra
 // manter em dia. No miss faz uma query direta mínima, mas NUNCA popula esse cache aqui: gravar um
 // shape parcial (só id/nome) por cima da chave usada pelo DTO completo do módulo corromperia a
@@ -21,7 +21,7 @@ type LabelFetcher = (companyId: string) => Promise<Map<string, string>>
 
 // Mocks parciais de Cache em testes de OUTROS módulos (ex: só { getExtension, setExtension })
 // vazam pra cá porque bun test compartilha o module registry entre arquivos do mesmo processo
-// (mock.module não é escopado por arquivo) — sem essa guarda, um teste que nem toca destino tipo
+// (mock.module não é escopado por arquivo) - sem essa guarda, um teste que nem toca destino tipo
 // "extension" quebra por causa do mock de outro arquivo faltar getByCompany.
 async function safeGetByCompany<T>(cache: { getByCompany?: (companyId: string) => Promise<T | null> }, companyId: string): Promise<T | null> {
     if (typeof cache.getByCompany !== 'function') return null
@@ -96,7 +96,7 @@ const variableConditionLabels: LabelFetcher = async (companyId) => {
     return new Map(list.map((v) => [v.id, v.name]))
 }
 
-// voicemail não entra aqui — id livre sem FK (ver route-destination.validate.ts), não há registro
+// voicemail não entra aqui - id livre sem FK (ver route-destination.validate.ts), não há registro
 // pra resolver nome
 const LABEL_FETCHERS: Partial<Record<string, LabelFetcher>> = {
     extension: extensionLabels,
@@ -111,7 +111,7 @@ const LABEL_FETCHERS: Partial<Record<string, LabelFetcher>> = {
     'variable-condition': variableConditionLabels,
 }
 
-// Resolve o label de N destinos de uma vez, batcheando por tipo — 1 lookup (cache-first) por
+// Resolve o label de N destinos de uma vez, batcheando por tipo - 1 lookup (cache-first) por
 // tipo presente entre os destinos passados, não 1 por destino. Chave do Map é "type:id", mesmo
 // formato que o frontend usava antes de o backend passar a resolver isso (route-destination-badge.tsx).
 export async function resolveDestinationLabels(
@@ -135,7 +135,7 @@ export async function resolveDestinationLabels(
     return map
 }
 
-// Aplica o label resolvido a um destino — usado no toDto de cada módulo. hangup/sem id não tem
+// Aplica o label resolvido a um destino - usado no toDto de cada módulo. hangup/sem id não tem
 // o que resolver, passa direto.
 export function withDestinationLabel<T extends RouteDestination>(
     dest: T,

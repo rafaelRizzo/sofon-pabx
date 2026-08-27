@@ -70,7 +70,7 @@ function buildDialplan(
 
 export const HolidayGroupRepository = {
     // Reconstrói o arquivo de dialplan da empresa inteira pra esse contexto, a partir do estado
-    // atual em banco — chamado depois de qualquer create/update/delete de HolidayGroup (fora da tx,
+    // atual em banco - chamado depois de qualquer create/update/delete de HolidayGroup (fora da tx,
     // já que é I/O de arquivo + spawn de subprocesso). Sempre consistente com o banco, mesmo se uma
     // regeneração concorrente for perdida (a próxima chamada corrige).
     async regenerate(companyId: string) {

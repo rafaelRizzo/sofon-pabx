@@ -62,7 +62,7 @@ const BRANCH_PAIRS: BranchSlot[][] = [
     ["error", "success"],
 ]
 
-// Ordem fixa de exibição das saídas de exceção da URA — independe da ordem em que os slots chegam
+// Ordem fixa de exibição das saídas de exceção da URA - independe da ordem em que os slots chegam
 // (staticSlots + edges já existentes), sempre lida da mesma forma da esquerda pra direita.
 const IVR_EXCEPTION_ORDER = ["invalid", "timeout", "long"]
 
@@ -82,9 +82,9 @@ function slotLabel(slot: string) {
 }
 
 // Handle de saída aninhado dentro do próprio chip (não mais distribuído por porcentagem na base
-// inteira do card) — cada bolinha de conexão fica exatamente junto ao botão a que pertence. Em
+// inteira do card) - cada bolinha de conexão fica exatamente junto ao botão a que pertence. Em
 // linhas empilhadas verticalmente (teclado da URA), a bolinha fica na borda direita de CADA linha
-// (não embaixo) — assim todas as bolinhas alinham numa única coluna vertical do lado de fora,
+// (não embaixo) - assim todas as bolinhas alinham numa única coluna vertical do lado de fora,
 // evitando o emaranhado de linhas cruzando quando várias teclas apontam pro mesmo destino.
 function SlotHandle({
     slot,
@@ -118,7 +118,7 @@ type SlotChipProps = {
     companyId: string
     align?: "start" | "end" | "center"
     icon?: LucideIcon
-    // selo pequeno persistente à esquerda (dígito da tecla) — mostrado nos dois estados (vazio/conectado)
+    // selo pequeno persistente à esquerda (dígito da tecla) - mostrado nos dois estados (vazio/conectado)
     badge?: ReactNode
     // "row": linha cheia com o handle na borda direita (teclado da URA, uma tecla por linha)
     layout?: "default" | "row"
@@ -127,10 +127,10 @@ type SlotChipProps = {
     onCreateSlot?: FlowNodeData["onCreateSlot"]
 }
 
-// Chip clicável de saída — vazio abre o picker de destino (BranchConnectPopover) sem precisar
+// Chip clicável de saída - vazio abre o picker de destino (BranchConnectPopover) sem precisar
 // arrastar uma linha; conectado mostra o destino real (ícone+nome) e um "x" pra desconectar. O
 // handle de drag do React Flow continua funcionando em paralelo, aninhado no próprio chip (ver
-// SlotHandle) — isso é aditivo, não substitui a conexão por arraste.
+// SlotHandle) - isso é aditivo, não substitui a conexão por arraste.
 function SlotChip({
     slot,
     label,
@@ -154,7 +154,7 @@ function SlotChip({
                 ? "justify-end"
                 : "justify-center"
 
-    // Layout "row" (teclado da URA): 1 grupo só, como um input-group — selo do dígito com contraste
+    // Layout "row" (teclado da URA): 1 grupo só, como um input-group - selo do dígito com contraste
     // forte (bg sólida), colado sem gap na borda do próprio controle, dividido só por um traço
     // interno. Layout "default" (bifurcação/genérico): chip isolado como antes.
     if (isRow) {
@@ -169,7 +169,7 @@ function SlotChip({
                 )}
                 {target ? (
                     <div className="group/slot relative flex min-w-0 flex-1 items-stretch gap-1 p-1">
-                        {/* espaçador invisível do mesmo tamanho do botão de remover — mesmo motivo
+                        {/* espaçador invisível do mesmo tamanho do botão de remover - mesmo motivo
                         do layout "default": mantém o texto centralizado na caixa toda em vez de só
                         no espaço que sobra ao lado do botão (reservado mesmo com opacity-0). */}
                         <span aria-hidden className="w-6 shrink-0" />
@@ -253,7 +253,7 @@ function SlotChip({
         <div
             className={`group/slot relative flex min-h-8 min-w-0 flex-1 items-stretch gap-1 rounded-md border border-border/70 bg-card p-1 shadow-xs ${colorText}`}
         >
-            {/* espaçador invisível do mesmo tamanho do botão de remover — sem ele o texto só
+            {/* espaçador invisível do mesmo tamanho do botão de remover - sem ele o texto só
             centraliza no espaço que sobra ao lado do botão (reservado mesmo com opacity-0),
             ficando puxado pra esquerda do centro real da caixa. Com o espaçador nos dois lados
             o espaço reservado é sempre simétrico, então nada precisa se mover/truncar no hover. */}
@@ -335,7 +335,7 @@ type ExceptionRowProps = Pick<
     "companyId" | "slotTargets" | "onConnectSlot" | "onDisconnectSlot" | "onCreateSlot"
 > & { slots: string[] }
 
-// Saídas de exceção da URA (inválido/timeout/coleta) — visualmente secundárias em relação ao
+// Saídas de exceção da URA (inválido/timeout/coleta) - visualmente secundárias em relação ao
 // teclado: rótulo pequeno acima de cada uma (já que a conexão troca o texto do botão pelo nome do
 // destino) em vez do selo numérico usado nas teclas.
 function ExceptionRow({
@@ -378,7 +378,7 @@ type KeypadProps = Pick<
     "companyId" | "slotTargets" | "onConnectSlot" | "onDisconnectSlot" | "onCreateSlot"
 > & { slots: string[] }
 
-// Lista de teclas da URA — 1 coluna, uma linha por tecla, dígito num selo fixo à esquerda (sempre
+// Lista de teclas da URA - 1 coluna, uma linha por tecla, dígito num selo fixo à esquerda (sempre
 // visível, conectado ou não) e a bolinha de conexão na borda direita de cada linha. Lida em ordem
 // crescente (não na ordem de chegada das edges). Coluna única em vez de grid evita o emaranhado de
 // linhas cruzando quando várias teclas apontam pro mesmo destino (bolinhas ficam todas alinhadas
@@ -415,8 +415,8 @@ function Keypad({
     )
 }
 
-// Nó genérico do canvas — 1 handle de entrada (topo) + N handles de saída, um por slot (ex:
-// "true"/"false" pra Time Condition, "success"/"error" pra Request Template, teclado pra URA) —
+// Nó genérico do canvas - 1 handle de entrada (topo) + N handles de saída, um por slot (ex:
+// "true"/"false" pra Time Condition, "success"/"error" pra Request Template, teclado pra URA) -
 // resolvido antes de montar os nós, ver flow-canvas.tsx.
 export function FlowNode({
     id,
@@ -599,13 +599,13 @@ export function FlowNode({
     )
 }
 
-// Nó sintético fixo — representa o próprio entryDestination do Flow (por onde a chamada entra).
-// Não tem entidade por trás, só 1 handle de saída — conectar dele pra outro nó chama
+// Nó sintético fixo - representa o próprio entryDestination do Flow (por onde a chamada entra).
+// Não tem entidade por trás, só 1 handle de saída - conectar dele pra outro nó chama
 // updateFlow(flowId, { entryDestination }) em vez do dispatcher genérico por tipo.
 export function StartNode() {
     return (
         <div className="relative min-w-56 overflow-visible rounded-xl border border-emerald-500/40 bg-card text-card-foreground shadow-sm">
-            {/* wrapper separado do handle — overflow-hidden aqui clipa o fundo das seções nos
+            {/* wrapper separado do handle - overflow-hidden aqui clipa o fundo das seções nos
             cantos arredondados do card sem cortar o círculo do handle (que fica metade fora) */}
             <div className="overflow-hidden rounded-xl">
                 <div className="flex items-center gap-2.5 px-3 py-3">

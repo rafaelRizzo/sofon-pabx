@@ -58,7 +58,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
     // DELETE /companies/:id já limpa cascata completa (dialplan de patterns no contexto ramais
-    // inclusive) — evita deixar dialplan órfão em `extensions` como o cleanup manual fazia
+    // inclusive) - evita deixar dialplan órfão em `extensions` como o cleanup manual fazia
     await app.inject({ method: 'DELETE', url: `/companies/${companyId}`, headers: auth() })
     await prisma.user.deleteMany({ where: { username: { startsWith: PREFIX } } })
     await prisma.$disconnect()

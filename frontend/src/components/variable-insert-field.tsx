@@ -25,7 +25,7 @@ type Props<T extends FieldValues> = {
 }
 
 // Input/Textarea com um botão de inserir variável de canal Asterisk (ver variable-insert-button.tsx)
-// acoplado — usar em qualquer campo que aceite placeholder {{VAR}} (Request Templates, nó IXCsoft).
+// acoplado - usar em qualquer campo que aceite placeholder {{VAR}} (Request Templates, nó IXCsoft).
 export function VariableInsertField<T extends FieldValues>({
     name,
     register,

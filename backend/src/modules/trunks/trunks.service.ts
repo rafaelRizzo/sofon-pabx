@@ -165,7 +165,7 @@ export const createTrunk = async (data: CreateTrunkInput) => {
             },
         })
 
-        // contexto único (from-trunk) — TRUNKID via setvar isola o dialplan por trunk no from-trunk-routed
+        // contexto único (from-trunk) - TRUNKID via setvar isola o dialplan por trunk no from-trunk-routed
         await tx.trunk.update({ where: { id: created.id }, data: { context: TRUNK_ENTRY_CONTEXT } })
 
         if (data.type === 'iax') {
@@ -275,7 +275,7 @@ export const updateTrunk = async (id: string, data: UpdateTrunkInput) => {
     const maxInChanged = 'maxInChannels' in data && data.maxInChannels !== existing.maxInChannels
     const maxOutChanged = 'maxOutChannels' in data && data.maxOutChannels !== existing.maxOutChannels
     const customHeadersChanged = 'customHeaders' in data
-    // techPrefix vai direto pro Dial() do outbound route (ver outbound-routes.service.ts) — sem resync
+    // techPrefix vai direto pro Dial() do outbound route (ver outbound-routes.service.ts) - sem resync
     // aqui a trunk fica com prefixo velho gravado no dialplan, silenciosamente
     const techPrefixChanged = 'techPrefix' in data && data.techPrefix !== existing.techPrefix
 
@@ -311,7 +311,7 @@ export const updateTrunk = async (id: string, data: UpdateTrunkInput) => {
                 where: { trunkId: id },
                 select: { id: true, did: { select: { number: true } } },
             })
-            // destination não é mais coluna de InboundRoute (migrou pra FlowEdge) — resolvida
+            // destination não é mais coluna de InboundRoute (migrou pra FlowEdge) - resolvida
             // por id, mesmo padrão de InboundRouteRepository.regenerateAll
             const edges = await FlowEdgeRepository.getBySourceIds(
                 'inboundroute',

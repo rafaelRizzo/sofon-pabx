@@ -42,7 +42,7 @@ function StatTile({
     loading: boolean
     icon: LucideIcon
     tone: keyof typeof TONE
-    // pulso reservado pra métrica que exige ação humana agora (espera > 0) — as outras duas
+    // pulso reservado pra métrica que exige ação humana agora (espera > 0) - as outras duas
     // ficam quietas, senão a tela inteira pisca e o pulso perde o significado
     urgent?: boolean
 }) {
@@ -77,8 +77,8 @@ function StatTile({
     )
 }
 
-// Derivado só do que já está na tela (extensions/queues do SSE) — sem request adicional.
-// "Em andamento" conta só callState "in_call" (atendida/bridged) — NÃO inclui "ringing": no
+// Derivado só do que já está na tela (extensions/queues do SSE) - sem request adicional.
+// "Em andamento" conta só callState "in_call" (atendida/bridged) - NÃO inclui "ringing": no
 // Asterisk o caller continua em queue.waiting até atender ou desligar, então enquanto toca no
 // ramal ele já está em "espera" (ver Filas). Contar ringing aqui também somaria a mesma chamada
 // duas vezes (1 tocando apareceria como 1 em andamento + 1 em espera ao mesmo tempo).

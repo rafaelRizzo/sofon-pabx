@@ -28,8 +28,8 @@ type InboundRouteRow = InboundRouteDto
 const validateDestination = (dest: InboundDest | undefined | null, companyId: string) =>
     validateRouteDestination(dest ?? null, companyId)
 
-// Anexa o nome legível de destination (resolvido no backend, cache-first — ver
-// route-destination-label.ts). Agrupa por companyId — getAllInboundRoutes pode misturar
+// Anexa o nome legível de destination (resolvido no backend, cache-first - ver
+// route-destination-label.ts). Agrupa por companyId - getAllInboundRoutes pode misturar
 // empresas diferentes na mesma lista (visão admin).
 async function withDestinationLabels<T extends { destination: unknown; companyId: string }>(routes: T[]): Promise<T[]> {
     if (routes.length === 0) return routes

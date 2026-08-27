@@ -22,14 +22,14 @@ const offsetSuffix = (date: Date, timeZone: string): string => {
 }
 
 // Formata um Date como ISO 8601 com offset fixo do timezone informado (ex: -03:00),
-// em vez do "Z" (UTC) padrão do toISOString — evita reparse de encode no zod (ver src/schemas/responses.ts)
+// em vez do "Z" (UTC) padrão do toISOString - evita reparse de encode no zod (ver src/schemas/responses.ts)
 export function toTzISOString(date: Date, timeZone: string): string {
     const map = dateTimeParts(date, timeZone)
     return `${map.year}-${map.month}-${map.day}T${map.hour}:${map.minute}:${map.second}${offsetSuffix(date, timeZone)}`
 }
 
 // CDR do Asterisk grava start/answer/endtime como TIMESTAMP sem timezone, com a hora LOCAL do SO
-// (America/Sao_Paulo, ver setups/install-asterisk.sh) — o driver pg lê esses dígitos como se fossem UTC,
+// (America/Sao_Paulo, ver setups/install-asterisk.sh) - o driver pg lê esses dígitos como se fossem UTC,
 // então o Date resultante já carrega a hora local "disfarçada" de UTC. Formata direto pelos dígitos naive
 // em vez de toTzISOString, que reconverteria assumindo (incorretamente) que o Date é um instante UTC real.
 export function formatNaiveLocalISOString(date: Date, timeZone: string): string {
@@ -57,7 +57,7 @@ export function collectCompanyIds(value: unknown, ids: Set<string> = new Set()):
     return ids
 }
 
-// Um registro é a própria Company quando carrega seu próprio campo timezone — nesse caso ele já é a fonte, sem precisar de lookup no tzByCompanyId
+// Um registro é a própria Company quando carrega seu próprio campo timezone - nesse caso ele já é a fonte, sem precisar de lookup no tzByCompanyId
 function resolveTimeZone(obj: Record<string, unknown>, tzByCompanyId: Map<string, string>, inherited: string): string {
     if (typeof obj.id === 'string' && typeof obj.timezone === 'string') return obj.timezone
     if (typeof obj.companyId === 'string') return tzByCompanyId.get(obj.companyId) ?? inherited

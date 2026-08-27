@@ -13,7 +13,7 @@ async function resolveTarget(dest: Awaited<ReturnType<typeof FlowEdgeRepository.
 
 export const FlowRepository = {
     // Reconstrói o arquivo de dialplan da empresa inteira pra esse contexto, a partir do estado
-    // atual em banco — chamado depois de qualquer create/update/delete de Flow. 1 linha por Flow:
+    // atual em banco - chamado depois de qualquer create/update/delete de Flow. 1 linha por Flow:
     // Goto pro entryDestination resolvido, ou Hangup se ainda não configurado.
     async regenerate(companyId: string) {
         const asteriskId = await resolveAsteriskId(companyId)

@@ -55,7 +55,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
     // DELETE /companies/:id já limpa cascata completa (queues-app, queue realtime, dialplan de
-    // extension, etc.) — evita deixar dialplan órfão em `extensions` como o cleanup manual fazia
+    // extension, etc.) - evita deixar dialplan órfão em `extensions` como o cleanup manual fazia
     await app.inject({ method: 'DELETE', url: `/companies/${companyId}`, headers: auth() })
     await prisma.user.deleteMany({ where: { username: { startsWith: PREFIX } } })
     await prisma.$disconnect()

@@ -22,7 +22,7 @@ const NUMERIC_VALUE_OPS: readonly string[] = ['length_eq', 'length_neq', 'length
 // grupo de filled/empty (ver checksumExpr em asterisk/variablecondition.repository.ts)
 const NO_VALUE_OPS: readonly string[] = ['filled', 'empty', 'cpf', 'cnpj']
 
-// operadores cujo `value` é interpolado cru (sem escaping) direto numa expressão Asterisk —
+// operadores cujo `value` é interpolado cru (sem escaping) direto numa expressão Asterisk -
 // "${...}" literal aqui dispara a substituição de variável do dialplan antes da app rodar,
 // mesmo dentro de aspas (contains é seguro porque escapeRegex() já quebra a sequência "${" em
 // variablecondition.repository.ts). Ver isSafeDialplanValue/SAFE_VARIABLE_REF_REGEX pro mesmo
@@ -30,7 +30,7 @@ const NO_VALUE_OPS: readonly string[] = ['filled', 'empty', 'cpf', 'cnpj']
 const RAW_INTERPOLATED_VALUE_OPS: readonly string[] = ['eq', 'neq', 'regex']
 
 const ruleSchema = z.object({
-    variable: z.string().min(1).max(80).regex(SAFE_VARIABLE_REF_REGEX, 'Invalid variable — use a plain identifier, CALLERID(num|name|ani|rdnis|dnid) or DB(family/key)'),
+    variable: z.string().min(1).max(80).regex(SAFE_VARIABLE_REF_REGEX, 'Invalid variable - use a plain identifier, CALLERID(num|name|ani|rdnis|dnid) or DB(family/key)'),
     operator: z.enum(VARIABLE_RULE_OPERATORS),
     value: z.string().max(200).regex(/^[^"\\]*$/, 'Cannot contain double quotes or backslash').optional(),
 }).refine((r) => NO_VALUE_OPS.includes(r.operator) || (r.value !== undefined && r.value.length > 0), {
@@ -40,7 +40,7 @@ const ruleSchema = z.object({
     message: 'value must be numeric for this operator',
     path: ['value'],
 }).refine((r) => !RAW_INTERPOLATED_VALUE_OPS.includes(r.operator) || !(r.value ?? '').includes('${'), {
-    message: 'Cannot contain "${" — would trigger dialplan variable interpolation (e.g. ${SHELL(...)})',
+    message: 'Cannot contain "${" - would trigger dialplan variable interpolation (e.g. ${SHELL(...)})',
     path: ['value'],
 })
 

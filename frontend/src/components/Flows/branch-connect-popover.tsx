@@ -50,7 +50,7 @@ type Props = {
 }
 
 // Picker compacto pra conectar um slot (true/false/success/error/default) direto a um destino já
-// configurado, sem precisar arrastar uma linha no canvas — mesmos helpers do painel lateral
+// configurado, sem precisar arrastar uma linha no canvas - mesmos helpers do painel lateral
 // (add-node-panel.tsx), sem filtro de "já usado": reusar o mesmo destino em vários pontos do flow
 // é permitido (ver plano).
 export function BranchConnectPopover({
@@ -70,10 +70,10 @@ export function BranchConnectPopover({
     const [options, setOptions] = useState<DestinationOption[]>([])
     const [loading, setLoading] = useState(false)
 
-    // Reidrata tipo + valor selecionado toda vez que o popover abre — sem isso ele sempre
+    // Reidrata tipo + valor selecionado toda vez que o popover abre - sem isso ele sempre
     // reabria em "queue"/vazio, ignorando o destino já conectado no slot (defaultType e
     // currentOption só importam no instante da abertura, por isso o dep array é só [open]).
-    // query também é resetado aqui — sem isso o texto digitado numa abertura anterior (que
+    // query também é resetado aqui - sem isso o texto digitado numa abertura anterior (que
     // não bateu com nenhum item e por isso não chamou onSelect) ficava "grudado" no input,
     // dando a falsa impressão de que dava pra renomear o destino digitando ali.
     // eslint-disable-next-line react-hooks/exhaustive-deps

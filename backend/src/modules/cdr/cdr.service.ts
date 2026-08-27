@@ -7,11 +7,11 @@ import { enrichCdrRecords } from './cdr-enrichment'
 import type { CdrExportQueryInput, CdrMetricsQueryInput, CdrQueryInput } from './schemas/cdr.schema'
 import type { CompanyDto } from '../companies/companies.service'
 
-// timezone do SO onde o Asterisk roda (setups/install-asterisk.sh) — ver comentário em schema.prisma no model cdr
+// timezone do SO onde o Asterisk roda (setups/install-asterisk.sh) - ver comentário em schema.prisma no model cdr
 const TZ = process.env.TZ || 'America/Sao_Paulo'
 
 // queueId é friendly-facing (o front não sabe o formato interno "<asteriskId>-<number>" do
-// queue_name gravado pelo dialplan) — resolve pro nome real antes de montar o where. 404 se o id
+// queue_name gravado pelo dialplan) - resolve pro nome real antes de montar o where. 404 se o id
 // não existir ou for de outra empresa, mesmo padrão de validação de posse usado em outros filtros
 async function resolveQueueNameFilter(
     company: { id: string; asteriskId: string },
@@ -45,7 +45,7 @@ const buildWhere = async (company: { id: string; asteriskId: string }, query: Cd
         ...((queueNameFromId ?? query.queueName) && { queueName: queueNameFromId ?? query.queueName }),
         ...(query.linkedid && { linkedid: query.linkedid }),
         ...(query.uniqueid && { uniqueid: query.uniqueid }),
-        // startDate/endDate são datas soltas (YYYY-MM-DD) — cobrem o dia inteiro, 00:00:00 a 23:59:59.999.
+        // startDate/endDate são datas soltas (YYYY-MM-DD) - cobrem o dia inteiro, 00:00:00 a 23:59:59.999.
         // Sem conversão de timezone: a coluna já guarda dígitos naive na hora local do servidor (ver schema.prisma),
         // e a data recebida já representa esse mesmo dia local, então os dígitos batem 1:1.
         ...((query.startDate || query.endDate) && {
@@ -128,7 +128,7 @@ export const getCdrByCompany = async (query: CdrQueryInput) => {
 
 const EXPORT_BATCH_SIZE = 500
 
-// Company já resolvida (e posse validada) pelo controller antes de abrir o stream — 404 precisa
+// Company já resolvida (e posse validada) pelo controller antes de abrir o stream - 404 precisa
 // acontecer antes do primeiro byte da resposta ser escrito, nunca no meio de um generator já
 // consumido pelo Readable
 export async function* iterateCdrExportRecords(

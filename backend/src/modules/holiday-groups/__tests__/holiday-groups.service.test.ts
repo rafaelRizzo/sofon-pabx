@@ -99,7 +99,7 @@ describe('HolidayGroupsService.createHolidayGroup', () => {
         expect(fetchHolidaysFromUrl).not.toHaveBeenCalled()
     })
 
-    it('creates group with url — fetches initial dates instead of using local dates', async () => {
+    it('creates group with url - fetches initial dates instead of using local dates', async () => {
         db.company.findUnique.mockResolvedValue(COMPANY)
         db.holidayGroup.findUnique.mockResolvedValue(null)
         db.holidayGroup.create.mockResolvedValue({ ...HG, url: 'https://example.com/feriados' })
@@ -188,7 +188,7 @@ describe('HolidayGroupsService.updateHolidayGroup', () => {
 describe('HolidayGroupsService.deleteHolidayGroup', () => {
     it('deletes holiday group', async () => {
         db.holidayGroup.findUnique.mockResolvedValue(HG)
-        db.flowEdge.findMany.mockResolvedValue([]) // ninguém referencia — assertNotReferenced passa
+        db.flowEdge.findMany.mockResolvedValue([]) // ninguém referencia - assertNotReferenced passa
         db.holidayGroup.delete.mockResolvedValue(HG)
         await HolidayGroupsService.deleteHolidayGroup('hg1')
         expect(db.holidayGroup.delete).toHaveBeenCalled()

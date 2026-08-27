@@ -92,7 +92,7 @@ export const deleteIntegrationCredential = async (id: string) => {
     if (!existing) throw new AppError('Integration credential not found', 404)
 
     const inUse = await prisma.ixcNode.count({ where: { credentialId: id } })
-    if (inUse > 0) throw new AppError(`Still used by ${inUse} node(s) — update or remove those nodes first`, 409)
+    if (inUse > 0) throw new AppError(`Still used by ${inUse} node(s) - update or remove those nodes first`, 409)
 
     await prisma.integrationCredential.delete({ where: { id } })
     await IntegrationCredentialsCache.invalidateByCompany(existing.companyId)

@@ -9,7 +9,7 @@ async function runSync() {
     if (count > 0) logger.info({ event: 'holidays.resync', year, groups: count })
 }
 
-// Só mexe em HolidayGroup com `url` configurada — grupos manuais (sem url) não são tocados por esse
+// Só mexe em HolidayGroup com `url` configurada - grupos manuais (sem url) não são tocados por esse
 // job, o usuário edita as datas direto pela API. Roda no boot + polling diário: cobre restart e
 // uptime longo, e re-tenta a URL caso ela tenha falhado numa rodada anterior. Sem cron externo.
 export function startHolidayResyncJob() {

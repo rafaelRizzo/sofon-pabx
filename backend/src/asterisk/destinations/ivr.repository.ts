@@ -28,7 +28,7 @@ type MenuConfig = {
 }
 
 // Máquina de estados construída só com prioridades numéricas dentro do MESMO exten (Goto/GotoIf
-// aceitam um número puro como alvo = "essa prioridade, mesmo contexto/exten") — sem depender de
+// aceitam um número puro como alvo = "essa prioridade, mesmo contexto/exten") - sem depender de
 // labels do extensions.conf, que não existem no dialplan estático gerado por entidade (mesma
 // limitação de tc-<id>).
 //
@@ -104,7 +104,7 @@ export function buildDialplan(
 
 export const IvrRepository = {
     // Reconstrói o arquivo de dialplan da empresa inteira pra esse contexto, a partir do estado
-    // atual em banco — chamado depois de qualquer create/update/delete de IvrMenu. Menu sem áudio
+    // atual em banco - chamado depois de qualquer create/update/delete de IvrMenu. Menu sem áudio
     // vinculado ainda entra no arquivo como Hangup (evita "invalid extension" se usado como destino
     // de rota antes de ter áudio configurado).
     async regenerate(companyId: string) {

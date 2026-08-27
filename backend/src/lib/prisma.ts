@@ -9,7 +9,7 @@ const connectionString = `${process.env.DATABASE_URL}`
 const adapter = new PrismaPg({ connectionString })
 const basePrisma = new PrismaClient({ adapter })
 
-// Recursos de configuração expostos por módulo (ver CLAUDE.md "Estrutura de módulo") — o que um
+// Recursos de configuração expostos por módulo (ver CLAUDE.md "Estrutura de módulo") - o que um
 // usuário efetivamente cria/edita/exclui pela API. Fora da lista: tabelas realtime do Asterisk
 // (ps_*, sip_peers, cdr...), que são espelho de escrita interna de outro model já auditado aqui, e
 // join tables sem id próprio (UserCompany, OutboundRouteTrunk/Extension, TimeConditionTimeGroup),
@@ -49,7 +49,7 @@ const redact = (model: string, data: any): any => {
     return copy
 }
 
-// Prisma sempre rebate updatedAt (@updatedAt) mesmo sem mudança de negócio — ignorado aqui pra
+// Prisma sempre rebate updatedAt (@updatedAt) mesmo sem mudança de negócio - ignorado aqui pra
 // não logar "Atualizado" em todo PUT idempotente (ex: form de edição reenviando os mesmos valores)
 const IGNORED_DIFF_FIELDS = new Set(['updatedAt'])
 

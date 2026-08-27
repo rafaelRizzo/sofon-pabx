@@ -2,7 +2,7 @@ import { prisma } from '../../lib/prisma'
 import type { AuditLogQueryInput } from './schemas/audit-log.schema'
 
 const buildWhere = (query: AuditLogQueryInput, companyIds: string[] | null) => ({
-    // query.companyId já foi validado contra companyIds em listAuditLogs — pode sobrepor o `in`
+    // query.companyId já foi validado contra companyIds em listAuditLogs - pode sobrepor o `in`
     ...(query.companyId ? { companyId: query.companyId } : companyIds ? { companyId: { in: companyIds } } : {}),
     ...(query.actorId && { actorId: query.actorId }),
     ...(query.model && { model: query.model }),
@@ -17,7 +17,7 @@ const buildWhere = (query: AuditLogQueryInput, companyIds: string[] | null) => (
 })
 
 // companyIds: null pra admin (sem restrição); array pro resto (só empresas do escopo, mesmo
-// quando query.companyId já filtra uma delas — evita vazar auditoria de empresa fora do escopo)
+// quando query.companyId já filtra uma delas - evita vazar auditoria de empresa fora do escopo)
 export const listAuditLogs = async (query: AuditLogQueryInput, companyIds: string[] | null) => {
     if (companyIds) {
         if (query.companyId && !companyIds.includes(query.companyId)) {

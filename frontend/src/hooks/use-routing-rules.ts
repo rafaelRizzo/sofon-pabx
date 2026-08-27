@@ -28,7 +28,7 @@ export type RoutingRule = {
     updatedAt: string
 }
 
-// Campo de texto opcional — string vazia (campo não preenchido no form) vira undefined em vez
+// Campo de texto opcional - string vazia (campo não preenchido no form) vira undefined em vez
 // de cair na validação de formato (regex/max), que só é aplicada quando o campo é usado
 const optionalText = (inner: z.ZodString) =>
     z.preprocess(
@@ -53,7 +53,7 @@ const routingConditionsFormSchema = z.object({
     ),
 })
 
-// companyId só existe no create — o PUT do backend não permite trocar a empresa da regra
+// companyId só existe no create - o PUT do backend não permite trocar a empresa da regra
 export const createRoutingRuleFormSchema = z.object({
     name: z.string().min(1, "Informe o nome").max(80, "Máximo 80 caracteres"),
     companyId: z.string().min(1, "Selecione uma empresa"),
@@ -77,7 +77,7 @@ export const updateRoutingRuleFormSchema = z.object({
 export type RoutingRuleForm = z.infer<typeof createRoutingRuleFormSchema>
 export type RoutingRuleUpdateForm = z.infer<typeof updateRoutingRuleFormSchema>
 
-// companyId é obrigatório — o backend só lista regras por empresa (path param), sem opção de
+// companyId é obrigatório - o backend só lista regras por empresa (path param), sem opção de
 // "todas as empresas"
 async function fetchRoutingRulesRequest(
     companyId: string

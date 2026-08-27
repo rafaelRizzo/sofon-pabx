@@ -1,7 +1,7 @@
 import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from 'crypto'
 import { validateEnv } from '../config/env'
 
-// Segredo próprio de terceiro (ex: token de API do IXCsoft, ver IxcCredential) — primeiro dado
+// Segredo próprio de terceiro (ex: token de API do IXCsoft, ver IxcCredential) - primeiro dado
 // deste projeto que precisa de criptografia real em repouso (campos legados como Trunk.password/
 // Company.elevenLabsApiKey são texto puro, não seguir esse padrão aqui). Chave derivada por empresa
 // via HKDF a partir de uma master key só em env: comprometer a chave de uma empresa nunca expõe as

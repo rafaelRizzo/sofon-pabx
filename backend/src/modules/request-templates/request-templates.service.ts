@@ -33,8 +33,8 @@ type RequestTemplateRow = NonNullable<Awaited<ReturnType<typeof _byId>>> & { onS
 const validateDest = (dest: RouteDestination | undefined | null, companyId: string, label: string) =>
     validateRouteDestination(dest ?? null, companyId, label)
 
-// Anexa o nome legível de onSuccess/onError (resolvido no backend, cache-first — ver
-// route-destination-label.ts). Agrupa por companyId — getAllRequestTemplates pode misturar
+// Anexa o nome legível de onSuccess/onError (resolvido no backend, cache-first - ver
+// route-destination-label.ts). Agrupa por companyId - getAllRequestTemplates pode misturar
 // empresas diferentes na mesma lista (visão admin).
 async function withDestinationLabels<T extends { onSuccess: unknown; onError: unknown; companyId: string }>(templates: T[]): Promise<T[]> {
     if (templates.length === 0) return templates
@@ -57,7 +57,7 @@ async function withDestinationLabels<T extends { onSuccess: unknown; onError: un
     })
 }
 
-// Anexa "usado por" agrupando por companyId — getAllRequestTemplates pode misturar empresas
+// Anexa "usado por" agrupando por companyId - getAllRequestTemplates pode misturar empresas
 // diferentes na mesma lista (visão admin), e resolveUsedByLabels resolve só 1 empresa por vez.
 async function withUsedBy<T extends { id: string; companyId: string }>(templates: T[]): Promise<(T & { usedBy: UsedByRef[] })[]> {
     if (templates.length === 0) return []

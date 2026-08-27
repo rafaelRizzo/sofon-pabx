@@ -61,7 +61,7 @@ export async function listVoices(apiKey: string): Promise<ElevenLabsVoice[]> {
 
 // Ajuste moderado a partir do default da ElevenLabs (0.5/0.75), válido pra qualquer tamanho de
 // texto (saudação curta, menu de URA, anúncio longo): stability um pouco mais alta reduz a
-// variação errática de entonação — mais perceptível em frases curtas (poucas sílabas = pouco
+// variação errática de entonação - mais perceptível em frases curtas (poucas sílabas = pouco
 // contexto pro modelo), mas sem travar a prosódia de textos longos (stability extrema, tipo
 // 0.85+, é que soaria monótona ali). similarity_boost mais alto mantém o timbre fiel à voz
 // original em qualquer duração. style em 0 (exagero emocional só soma risco de distorção, sem
@@ -71,7 +71,7 @@ const VOICE_SETTINGS = { stability: 0.65, similarity_boost: 0.85, style: 0, use_
 
 export async function textToSpeech(apiKey: string, voiceId: string, text: string, language: 'pt' | 'en'): Promise<Buffer> {
     return withTimeout(async (signal) => {
-        // language_code (ISO 639-1) força o idioma em vez de depender de auto-detecção — evita
+        // language_code (ISO 639-1) força o idioma em vez de depender de auto-detecção - evita
         // ambiguidade em textos curtos, mas não distingue variante (pt-BR vs pt-PT, sem suporte
         // na API). Não suportado em multilingual_v2, só nos modelos mais novos (v3, turbo/flash).
         const requestBody: Record<string, unknown> = { text, model_id: env.ELEVENLABS_MODEL_ID, voice_settings: VOICE_SETTINGS }

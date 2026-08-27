@@ -47,7 +47,7 @@ function OutboundRoutesPage() {
         updateRoute,
         deleteRoute,
     } = useOutboundRoutes(companyFilter)
-    // allRoutes já vem escopado pelo companyId da própria requisição (fetch por companyFilter) —
+    // allRoutes já vem escopado pelo companyId da própria requisição (fetch por companyFilter) -
     // conflito de padrão de discagem é validado dentro dessa mesma empresa
     const companyAllRoutes = allRoutes.filter(
         (r) => r.companyId === formCompanyId

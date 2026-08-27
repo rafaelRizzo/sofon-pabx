@@ -22,7 +22,7 @@ export type Trunk = {
     type: TrunkType
     registrationMode: RegistrationMode
     // Derivado pelo backend a partir de username (inbound: "username" se informado, senão "ip"; outbound: sempre null)
-    // — não é enviado no create/update; no PUT inbound, enviar username muda para "username", enviar username: null volta para "ip"
+    // - não é enviado no create/update; no PUT inbound, enviar username muda para "username", enviar username: null volta para "ip"
     identifyBy: IdentifyBy | null
     host: string | null
     port: number | null
@@ -224,7 +224,7 @@ export const createTrunkSchema = z.discriminatedUnion("registrationMode", [
         username: z.string().max(80).optional(),
         password: z.string().max(80).optional(),
     }),
-    // Sem PJSIP nenhum — vira Goto(context,...) na Outbound Route, sem receber chamadas
+    // Sem PJSIP nenhum - vira Goto(context,...) na Outbound Route, sem receber chamadas
     z.object({
         ...minimalTrunkFields,
         registrationMode: z.literal("custom"),
@@ -249,7 +249,7 @@ export const updateTrunkSchema = z.object({
 export type TrunkCreateForm = z.infer<typeof createTrunkSchema>
 export type TrunkUpdateForm = z.infer<typeof updateTrunkSchema>
 
-// companyId opcional — enquanto não informado, a lista não é buscada (filtro de
+// companyId opcional - enquanto não informado, a lista não é buscada (filtro de
 // empresa da página exige seleção antes de consultar o backend)
 async function fetchTrunksRequest(companyId: string): Promise<Trunk[]> {
     const { data } = await api.get("/trunks", { params: { companyId } })
@@ -272,7 +272,7 @@ export function useTrunks(companyId?: string) {
     const createMutation = useMutation({
         mutationFn: (form: TrunkCreateForm) => {
             // Campos opcionais (host/username/password no inbound) exigem
-            // min(1) no backend quando informados — "" precisa virar omissão
+            // min(1) no backend quando informados - "" precisa virar omissão
             const payload = Object.fromEntries(
                 Object.entries(form).filter(
                     ([, v]) => v !== undefined && v !== ""

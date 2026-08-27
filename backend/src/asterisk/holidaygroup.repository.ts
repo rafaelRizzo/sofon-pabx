@@ -1,3 +1,3 @@
-// Ponte de compatibilidade — implementação real em ./destinations/holidaygroup.repository
+// Ponte de compatibilidade - implementação real em ./destinations/holidaygroup.repository
 // (reorganizado por domínio; ver subpastas transport/dialplan/endpoints/destinations/flows)
 export * from './destinations/holidaygroup.repository'

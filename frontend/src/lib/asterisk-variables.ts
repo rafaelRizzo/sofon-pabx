@@ -1,5 +1,5 @@
 // Catálogo documentado de variáveis de canal Asterisk disponíveis via placeholder {{VAR}} em
-// campos resolvidos por AGI GET VARIABLE (Request Templates, nó IXCsoft) — ver
+// campos resolvidos por AGI GET VARIABLE (Request Templates, nó IXCsoft) - ver
 // backend/src/asterisk/transport/agi-server.ts (resolvePlaceholders). Lista curada e fixa (v1):
 // cobre só o que já é lido nativamente pelo AGI em qualquer ponto do dialplan, sem depender do
 // que um flow específico define (variáveis criadas por nós "Definir variável" não entram aqui).

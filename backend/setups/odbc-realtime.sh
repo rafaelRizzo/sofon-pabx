@@ -50,8 +50,8 @@ CONN_MODE="docker"
 # ============================================================
 echo -e "${BOLD}Conexão com o PostgreSQL:${NC}"
 echo ""
-echo -e "  [1] Padrão   — Docker local deste projeto (${CYAN}${DOCKER_CONTAINER}${NC}, ${CYAN}${PG_HOST}:${PG_PORT}${NC}, db ${CYAN}${PG_DB}${NC})"
-echo -e "  [2] Custom   — outro host/porta/banco/usuário admin"
+echo -e "  [1] Padrão   - Docker local deste projeto (${CYAN}${DOCKER_CONTAINER}${NC}, ${CYAN}${PG_HOST}:${PG_PORT}${NC}, db ${CYAN}${PG_DB}${NC})"
+echo -e "  [2] Custom   - outro host/porta/banco/usuário admin"
 echo ""
 echo -ne "  Escolha [1/2] (default 1): "
 read -r CONN_CHOICE
@@ -101,8 +101,8 @@ fi
 
 # ============================================================
 # HELPERS PSQL
-# FIX: pg_admin opera no DB padrão (postgres) — usado para DDL global
-#      pg_admin_db opera explicitamente no DB de destino — usado para GRANT em schema/tables
+# FIX: pg_admin opera no DB padrão (postgres) - usado para DDL global
+#      pg_admin_db opera explicitamente no DB de destino - usado para GRANT em schema/tables
 # ============================================================
 if [[ "$CONN_MODE" == "direct" ]]; then
     pg_admin()    { PGPASSWORD="$PG_ADMIN_PASS" psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_ADMIN" "$@"; }
@@ -112,7 +112,7 @@ else
     pg_admin_db() { docker exec "$DOCKER_CONTAINER" psql -U "$PG_ADMIN" -d "$PG_DB" "$@"; }
 fi
 
-# Senha gerada automaticamente pro role dedicado do Asterisk — só usada internamente
+# Senha gerada automaticamente pro role dedicado do Asterisk - só usada internamente
 # (role do Postgres + odbc.ini/res_odbc.conf, ambos lidos só pelo Asterisk); ninguém
 # precisa digitar nem guardar esse valor.
 PG_PASS="$(openssl rand -base64 24)"
@@ -149,18 +149,18 @@ show_header
 echo -e "${BOLD}[2/5]${NC} Criando usuário e database..."
 echo ""
 
-# Usuário — opera no catálogo global (sem -d, correto)
+# Usuário - opera no catálogo global (sem -d, correto)
 USER_EXISTS=$(pg_admin -tAc "SELECT 1 FROM pg_roles WHERE rolname='${PG_USER}';" 2>>"$LOG_FILE" || true)
 if [[ "$USER_EXISTS" == "1" ]]; then
     pg_admin -c "ALTER USER ${PG_USER} WITH PASSWORD '${PG_PASS}';" >> "$LOG_FILE" 2>&1 || true
-    log "Usuário '${PG_USER}' já existe — senha atualizada"
+    log "Usuário '${PG_USER}' já existe - senha atualizada"
 else
     pg_admin -c "CREATE USER ${PG_USER} WITH PASSWORD '${PG_PASS}';" >> "$LOG_FILE" 2>&1 \
         || err "Falha ao criar usuário"
     log "Usuário '${PG_USER}' criado"
 fi
 
-# Database — GRANT ON DATABASE opera no catálogo global (sem -d, correto)
+# Database - GRANT ON DATABASE opera no catálogo global (sem -d, correto)
 DB_EXISTS=$(pg_admin -tAc "SELECT 1 FROM pg_database WHERE datname='${PG_DB}';" 2>>"$LOG_FILE" || true)
 if [[ "$DB_EXISTS" == "1" ]]; then
     log "Database '${PG_DB}' já existe"
@@ -170,7 +170,7 @@ else
     log "Database '${PG_DB}' criada"
 fi
 
-# GRANT ON DATABASE — catálogo global, pg_admin sem -d
+# GRANT ON DATABASE - catálogo global, pg_admin sem -d
 pg_admin -c "GRANT ALL PRIVILEGES ON DATABASE ${PG_DB} TO ${PG_USER};" >> "$LOG_FILE" 2>&1 || true
 
 # FIX: GRANT ON SCHEMA e ALTER SCHEMA precisam rodar no contexto do DB asterisk
@@ -178,12 +178,12 @@ pg_admin_db -c "GRANT ALL ON SCHEMA public TO ${PG_USER};"   >> "$LOG_FILE" 2>&1
 pg_admin_db -c "ALTER SCHEMA public OWNER TO ${PG_USER};"    >> "$LOG_FILE" 2>&1 || true
 
 # FIX: ALTER DEFAULT PRIVILEGES faz o grant persistir pra tabelas FUTURAS criadas
-# pelo ${PG_ADMIN} (usuário do Prisma) — sem isso, toda migration que recria uma
+# pelo ${PG_ADMIN} (usuário do Prisma) - sem isso, toda migration que recria uma
 # tabela derruba os grants do asterisk e exige correção manual de novo
 pg_admin_db -c "ALTER DEFAULT PRIVILEGES FOR ROLE ${PG_ADMIN} IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO ${PG_USER};" >> "$LOG_FILE" 2>&1 || true
 
 # FIX: sequences (colunas @default(autoincrement()), ex: cdr.id) não são cobertas pelo
-# default privilege de TABLES acima — sem isso, INSERT falha com "permission denied for
+# default privilege de TABLES acima - sem isso, INSERT falha com "permission denied for
 # sequence" mesmo com a tabela já liberada
 pg_admin_db -c "ALTER DEFAULT PRIVILEGES FOR ROLE ${PG_ADMIN} IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO ${PG_USER};" >> "$LOG_FILE" 2>&1 || true
 pg_admin_db -c "GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO ${PG_USER};" >> "$LOG_FILE" 2>&1 || true
@@ -231,7 +231,7 @@ log "ODBC configurado"
 
 echo "quit" | isql -v asterisk "$PG_USER" "$PG_PASS" >> "$LOG_FILE" 2>&1 \
     && log "DSN testado: OK" \
-    || warn "DSN falhou — verifique $LOG_FILE"
+    || warn "DSN falhou - verifique $LOG_FILE"
 
 # ============================================================
 # STEP 4 - CONFIGURAR ASTERISK
@@ -252,7 +252,7 @@ pre-connect => yes
 EOF
 
 # FIX: adicionado "extensions" para suportar switch => Realtime/ no dialplan
-# FIX: ps_endpoint_id_ips é o nome de família que res_pjsip_endpoint_identifier_ip espera —
+# FIX: ps_endpoint_id_ips é o nome de família que res_pjsip_endpoint_identifier_ip espera -
 #      mapeado pra nossa tabela real ps_identifies via 3º argumento
 cat > /etc/asterisk/extconfig.conf << 'EOF'
 [settings]
@@ -304,9 +304,9 @@ object_lifetime_maximum=60
 expire_on_reload=yes
 EOF
 
-# CDR direto no Postgres via ODBC — tabela cdr usa os nomes de coluna nativos do Asterisk
+# CDR direto no Postgres via ODBC - tabela cdr usa os nomes de coluna nativos do Asterisk
 # (dcontext, clid, channel, dstchannel, lastapp, lastdata, start, answer, accountcode), exceto
-# "end", que é palavra reservada no Postgres (CASE...END) e quebra o INSERT sem aspas — por isso
+# "end", que é palavra reservada no Postgres (CASE...END) e quebra o INSERT sem aspas - por isso
 # a coluna física é "endtime" e precisa do alias abaixo.
 cat > /etc/asterisk/cdr.conf << 'EOF'
 [general]
@@ -410,7 +410,7 @@ ENDSQL2
     log "Grants aplicados"
 fi
 
-# Restart incondicional — cdr.conf, cdr_adaptive_odbc.conf, sorcery.conf, extconfig.conf e
+# Restart incondicional - cdr.conf, cdr_adaptive_odbc.conf, sorcery.conf, extconfig.conf e
 # res_odbc.conf foram escritos no STEP 4 independente da resposta acima, e um simples
 # "module reload" não é suficiente pra ativar o subsistema de CDR pela primeira vez.
 systemctl restart asterisk >> "$LOG_FILE" 2>&1 || err "Falha ao reiniciar Asterisk"

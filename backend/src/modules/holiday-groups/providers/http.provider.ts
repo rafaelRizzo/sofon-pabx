@@ -3,14 +3,14 @@ import { safeFetch } from '../../../utils/net/safe-url'
 
 const TIMEOUT_MS = 3000
 
-// Shape esperado da URL configurada em HolidayGroup.url — mesmo contrato da BrasilAPI
+// Shape esperado da URL configurada em HolidayGroup.url - mesmo contrato da BrasilAPI
 // (https://brasilapi.com.br/api/feriados/v1/{ano}): [{ date: "YYYY-MM-DD", name, type? }]
 type ApiHoliday = { date: string; name: string; type?: string }
 
 export type RemoteHoliday = { name: string; month: number; day: number }
 
 // Busca os feriados do ano numa URL externa (BrasilAPI, custom, o que o usuário configurar em
-// HolidayGroup.url) — usado só pelo job de resync (src/jobs/holiday-resync.job.ts). Retorna null em
+// HolidayGroup.url) - usado só pelo job de resync (src/jobs/holiday-resync.job.ts). Retorna null em
 // qualquer falha (rede, timeout, resposta inválida); quem chama decide o que fazer no fallback.
 export async function fetchHolidaysFromUrl(baseUrl: string, year: number): Promise<RemoteHoliday[] | null> {
     const controller = new AbortController()

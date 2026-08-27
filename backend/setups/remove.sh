@@ -195,7 +195,7 @@ if [[ $REMOVE_FW =~ ^[SsYy]$ ]]; then
         nft delete table inet f2b-table >> "$LOG_FILE" 2>&1 || true
         printf '#!/usr/sbin/nft -f\n\nadd table inet filter\nflush table inet filter\n' > /etc/nftables.conf
         systemctl disable nftables >> "$LOG_FILE" 2>&1 || true
-        log "nftables resetado — tabela inet filter e f2b-asterisk removidas, Docker preservado"
+        log "nftables resetado - tabela inet filter e f2b-asterisk removidas, Docker preservado"
 
         # Reload/delete de tabelas nftables derruba as regras de NAT/MASQUERADE do Docker
         if systemctl is-active --quiet docker 2>/dev/null; then
@@ -203,7 +203,7 @@ if [[ $REMOVE_FW =~ ^[SsYy]$ ]]; then
             log "Docker reiniciado (recria regras de NAT/MASQUERADE)"
         fi
     else
-        warn "nft não encontrado — firewall não resetado"
+        warn "nft não encontrado - firewall não resetado"
     fi
 
 else

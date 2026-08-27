@@ -4,7 +4,7 @@ import { ok, timestamp } from '../../../schemas/responses'
 export const DEFAULT_LIMIT = 50
 export const MAX_LIMIT = 200
 
-// Espelha AUDITED_MODELS (src/lib/prisma.ts) — mantido separado pra não vazar detalhe de
+// Espelha AUDITED_MODELS (src/lib/prisma.ts) - mantido separado pra não vazar detalhe de
 // implementação do extension pro schema de resposta/filtro da API
 export const AUDIT_LOG_MODELS = [
     'Company', 'User', 'Did', 'Extension', 'Queue', 'QueueMember', 'Trunk',

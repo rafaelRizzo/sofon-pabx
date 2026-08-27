@@ -2,18 +2,18 @@ import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 import { FlowEdgeRepository, type FlowSourceType } from '../asterisk/flow-edge.repository'
 
-// Shape de resposta compartilhado por todo módulo que expõe o indicador "usado por" — ver
+// Shape de resposta compartilhado por todo módulo que expõe o indicador "usado por" - ver
 // resolveUsedByLabels abaixo.
 export const usedBySchema = z.array(z.object({
     sourceType: z.string(),
     sourceId: z.string(),
     slot: z.string(),
     label: z.string(),
-})).describe('Fluxos que apontam pra este registro como destino — vazio quando não referenciado')
+})).describe('Fluxos que apontam pra este registro como destino - vazio quando não referenciado')
 
 // Espelha route-destination-label.ts, mas na direção inversa: resolve o nome de quem APONTA pra
 // um destino (sourceType/sourceId), não o nome do destino em si. Sem cache-first aqui de propósito
-// — misturar com o cache de cada módulo (shape de DTO completo, não só id/nome) arriscaria a mesma
+// - misturar com o cache de cada módulo (shape de DTO completo, não só id/nome) arriscaria a mesma
 // contaminação entre testes que route-destination-label.ts evita com safeGetByCompany; esse
 // indicador é carregado 1x por tabela, não em request quente o bastante pra justificar a
 // complexidade extra.
@@ -95,7 +95,7 @@ const flowNames: NameFetcher = (companyId, ids) =>
         companyId, ids, (r) => r.name,
     )
 
-// IvrOption não tem nome próprio — identifica pelo menu pai + dígito ("Menu Principal, opção 3")
+// IvrOption não tem nome próprio - identifica pelo menu pai + dígito ("Menu Principal, opção 3")
 const ivrOptionNames: NameFetcher = async (companyId, ids) => {
     const options = await prisma.ivrOption.findMany({
         where: { id: { in: ids }, ivrMenu: { companyId } },
@@ -134,7 +134,7 @@ const TYPE_LABELS: Record<FlowSourceType, string> = {
     flow: 'Flow',
 }
 
-// slot 'default' não aparece no label — só existe 1 destino nessa origem, não precisa desambiguar
+// slot 'default' não aparece no label - só existe 1 destino nessa origem, não precisa desambiguar
 const SLOT_LABELS: Partial<Record<string, string>> = {
     true: 'verdadeiro',
     false: 'falso',
@@ -148,7 +148,7 @@ const SLOT_LABELS: Partial<Record<string, string>> = {
 export type UsedByRef = z.infer<typeof usedBySchema>[number]
 
 // Resolve o label de exibição de cada referência reversa de um lote de ids (mesmo targetType),
-// batcheando por sourceType — 1 query por tipo de origem presente, não 1 por referência.
+// batcheando por sourceType - 1 query por tipo de origem presente, não 1 por referência.
 export async function resolveUsedByLabels(
     targetType: string,
     targetIds: string[],

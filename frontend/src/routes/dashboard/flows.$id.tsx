@@ -11,7 +11,7 @@ function FlowEditorPage() {
     const navigate = useNavigate()
     const { companies } = useCompanies()
     // Flow (metadados) e nós/edges são buscados em paralelo (ambos só dependem do id da rota, não
-    // um do outro) — evita a tela mostrar "carregou o flow" e só depois "carregou os nós" em
+    // um do outro) - evita a tela mostrar "carregou o flow" e só depois "carregou os nós" em
     // sequência, um loading visível de cada vez.
     const { flow, loading: flowLoading } = useFlow(id)
     const flowNodesState = useFlowNodes(id)

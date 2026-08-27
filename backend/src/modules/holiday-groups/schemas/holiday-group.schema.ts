@@ -24,7 +24,7 @@ export const createHolidayGroupSchema = z.object({
     falseRoute: routeDestSchema.optional(),
     dates:      z.array(holidayDateSchema).max(50).optional(),
 }).refine((d) => !(d.url && d.dates), {
-    message: 'Cannot set dates manually when url is configured — dates are managed automatically by the resync job',
+    message: 'Cannot set dates manually when url is configured - dates are managed automatically by the resync job',
     path: ['dates'],
 })
 
@@ -36,7 +36,7 @@ export const updateHolidayGroupSchema = z.object({
     dates:      z.array(holidayDateSchema).max(50).optional(),
 }).refine((d) => Object.keys(d).length > 0, { message: 'At least one field is required: name, url, trueRoute, falseRoute, dates' })
   .refine((d) => !(d.url && d.dates), {
-      message: 'Cannot set dates manually when url is configured — dates are managed automatically by the resync job',
+      message: 'Cannot set dates manually when url is configured - dates are managed automatically by the resync job',
       path: ['dates'],
   })
 

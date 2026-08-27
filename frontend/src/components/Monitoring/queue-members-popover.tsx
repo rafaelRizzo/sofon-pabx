@@ -21,7 +21,7 @@ import type {
 type Props = {
     members: RealtimeQueueMember[]
     // ligação ativa mostrada por membro vem do estado do ramal (rt:ext:calls:*), não é escopada
-    // à fila — mas como um ramal só atende uma chamada por vez na prática, já resolve "quem esse
+    // à fila - mas como um ramal só atende uma chamada por vez na prática, já resolve "quem esse
     // membro está atendendo agora"
     extensions: RealtimeExtension[]
 }

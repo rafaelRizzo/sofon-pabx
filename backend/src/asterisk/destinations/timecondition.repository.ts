@@ -75,7 +75,7 @@ function buildDialplan(
 
 export const TimeConditionRepository = {
     // Reconstrói o arquivo de dialplan da empresa inteira pra esse contexto, a partir do estado
-    // atual em banco (TimeCondition + ranges agregados via TimeGroups vinculados) — chamado depois
+    // atual em banco (TimeCondition + ranges agregados via TimeGroups vinculados) - chamado depois
     // de qualquer create/update/delete de TimeCondition, ou de mudança num TimeGroup vinculado.
     async regenerate(companyId: string) {
         const asteriskId = await resolveAsteriskId(companyId)

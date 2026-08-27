@@ -191,7 +191,7 @@ export function IntegrationCredentialFormDialog({ open, onOpenChange, integratio
                                 <Input type="password" placeholder={isEdit ? "Deixe em branco para manter o atual" : ""} {...register("token")} />
                                 {errors.token && <FieldError>{errors.token.message}</FieldError>}
                                 <FieldDescription>
-                                    Gerado no painel do provedor. Nunca é exibido novamente após salvo — para trocar, informe um novo.
+                                    Gerado no painel do provedor. Nunca é exibido novamente após salvo - para trocar, informe um novo.
                                 </FieldDescription>
                             </Field>
                         </FieldGroup>

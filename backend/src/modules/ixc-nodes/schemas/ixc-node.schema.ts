@@ -9,7 +9,7 @@ export const optionalCompanyQuery = z.object({ companyId: z.cuid2().optional() }
 
 export const IXC_NODE_ACTIONS = ['listar_cliente', 'listar_boleto'] as const
 
-// path avaliado sobre o JSON de resposta (ex: "cliente[0].id") — mesmo mecanismo de RequestTemplate
+// path avaliado sobre o JSON de resposta (ex: "cliente[0].id") - mesmo mecanismo de RequestTemplate
 const variableMappingSchema = z.object({
     path: z.string().min(1).max(200),
     variable: z.string().min(1).max(80).regex(/^[A-Za-z_][A-Za-z0-9_]*$/, 'Only letters, digits and underscore, starting with a letter or underscore'),

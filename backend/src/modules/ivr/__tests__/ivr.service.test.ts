@@ -25,7 +25,7 @@ mock.module('../../../asterisk/ivr.repository', () => ({
 
 // NÃO mockar '../../audios/audios.service' aqui: esse módulo é compartilhado (mesmo caminho
 // resolvido) com audios.service.test.ts, que precisa da implementação REAL de
-// assertAudioBelongsToCompany — um mock.module parcial nesse specifier vaza pro outro arquivo
+// assertAudioBelongsToCompany - um mock.module parcial nesse specifier vaza pro outro arquivo
 // quando o bun roda a suíte inteira no mesmo processo. Em vez disso, deixamos a função real rodar
 // contra o `db.audio.findUnique` já mockado abaixo.
 import * as IvrService from '../ivr.service'

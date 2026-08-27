@@ -264,7 +264,7 @@ describe('QueuesService.deleteQueue', () => {
 
     it('deletes queue when not referenced', async () => {
         db.queue.findUnique.mockResolvedValue(QUEUE)
-        db.flowEdge.findMany.mockResolvedValue([]) // ninguém referencia — assertNotReferenced passa
+        db.flowEdge.findMany.mockResolvedValue([]) // ninguém referencia - assertNotReferenced passa
         await QueuesService.deleteQueue('q1')
         expect(db.queue.delete).toHaveBeenCalledWith({ where: { id: 'q1' } })
     })

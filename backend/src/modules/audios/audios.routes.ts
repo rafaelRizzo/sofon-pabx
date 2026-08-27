@@ -78,9 +78,9 @@ export const audiosRoutes = async (app: FastifyInstance) => {
             tags: ['Audios'],
             summary: 'Enviar novo áudio',
             description:
-                'multipart/form-data com os campos `name` e `companyId` (texto) seguidos do arquivo — ' +
+                'multipart/form-data com os campos `name` e `companyId` (texto) seguidos do arquivo - ' +
                 'nessa ordem, o cliente precisa enviar os campos de texto antes do arquivo no form. ' +
-                'Converte automaticamente pra WAV PCM 16-bit mono 8kHz (slin) — qualidade sem perdas e ' +
+                'Converte automaticamente pra WAV PCM 16-bit mono 8kHz (slin) - qualidade sem perdas e ' +
                 'compatível com os codecs das trunks (ulaw/alaw), sem resample na chamada. Retorna o ' +
                 '`audioId` pra ser referenciado em Announcements, IVR Menus etc.',
             security: [{ bearerAuth: [] }],
@@ -102,7 +102,7 @@ export const audiosRoutes = async (app: FastifyInstance) => {
         schema: {
             tags: ['Audios'],
             summary: 'Listar vozes disponíveis na ElevenLabs (da conta configurada na empresa)',
-            description: 'Cacheado por 1h (Redis). Passe `refresh=true` pra ignorar o cache e buscar direto da ElevenLabs — útil logo após adicionar/remover voz na conta.',
+            description: 'Cacheado por 1h (Redis). Passe `refresh=true` pra ignorar o cache e buscar direto da ElevenLabs - útil logo após adicionar/remover voz na conta.',
             security: [{ bearerAuth: [] }],
             querystring: listVoicesQuerySchema,
             response: {
@@ -146,7 +146,7 @@ export const audiosRoutes = async (app: FastifyInstance) => {
             summary: 'Prévia de voz da ElevenLabs em pt/en',
             description:
                 'Gera (ou reaproveita do cache) uma frase curta de demonstração na voz e idioma ' +
-                'escolhidos — diferente de `previewUrl` de `/audios/tts/voices`, que vem fixo da ' +
+                'escolhidos - diferente de `previewUrl` de `/audios/tts/voices`, que vem fixo da ' +
                 'ElevenLabs (geralmente em inglês). Retorna o áudio bruto (audio/mpeg), cacheado por ' +
                 '7 dias por empresa+voz+idioma pra não gastar cota da ElevenLabs a cada clique.',
             security: [{ bearerAuth: [] }],

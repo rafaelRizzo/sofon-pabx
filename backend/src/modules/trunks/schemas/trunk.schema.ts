@@ -1,12 +1,12 @@
 import { z } from 'zod'
 import { timestamp, ok } from '../../../schemas/responses'
 
-// Headers reservados pelo protocolo SIP — sobrescrever via PJSIP_HEADER quebraria o sinalização da chamada
+// Headers reservados pelo protocolo SIP - sobrescrever via PJSIP_HEADER quebraria o sinalização da chamada
 const RESERVED_SIP_HEADERS = new Set([
     'via', 'from', 'to', 'call-id', 'cseq', 'contact', 'content-length', 'content-type', 'max-forwards',
 ])
 
-// value é literal (sem interpolação de variável do Asterisk) — injetado via
+// value é literal (sem interpolação de variável do Asterisk) - injetado via
 // Set(PJSIP_HEADER(add,name)=value) antes do Dial() de saída (outbound-routes.service.ts)
 export const customHeaderSchema = z.object({
     name: z
@@ -18,7 +18,7 @@ export const customHeaderSchema = z.object({
     value: z.string().max(200).regex(/^[^"\\]*$/, 'Cannot contain double quotes or backslash'),
 })
 
-// Contextos gerenciados pela plataforma — um trunk custom não pode apontar pra eles, senão colide
+// Contextos gerenciados pela plataforma - um trunk custom não pode apontar pra eles, senão colide
 // com o dialplan estático/realtime que os outros módulos já escrevem nesses nomes
 const RESERVED_CONTEXTS = new Set([
     'ramais', 'from-trunk', 'from-trunk-routed', 'queues-app', 'timeconditions', 'holidays',
@@ -41,7 +41,7 @@ const minimalTrunkShape = {
     companyId: z.cuid2(),
 }
 
-// Só se aplica a type="pjsip" — sem equivalente em IAX2 (SIP headers, 100rel, session timers etc.)
+// Só se aplica a type="pjsip" - sem equivalente em IAX2 (SIP headers, 100rel, session timers etc.)
 const advancedTrunkShape = {
     transport: z.enum(['transport-udp', 'transport-tcp']).optional(),
     dtmfMode: z.enum(['rfc4733', 'inband', 'info', 'auto']).optional(),
@@ -58,7 +58,7 @@ const advancedTrunkShape = {
     customHeaders: z.array(customHeaderSchema).max(10).optional(),
 }
 
-// Só se aplica a type="iax" — espelha as diretivas do iax.conf (ver iax.repository.ts)
+// Só se aplica a type="iax" - espelha as diretivas do iax.conf (ver iax.repository.ts)
 const iaxAdvancedShape = {
     qualify: z.enum(['yes', 'no']).optional(),
     trunkMode: z.boolean().optional(),
@@ -97,7 +97,7 @@ export const createTrunkSchema = z.discriminatedUnion('registrationMode', [
         username: z.string().min(1).max(80).optional(),
         password: z.string().min(1).max(80).optional(),
     }),
-    // Sem endpoint PJSIP nenhum — ao ser usado numa Outbound Route, o Dial() vira um
+    // Sem endpoint PJSIP nenhum - ao ser usado numa Outbound Route, o Dial() vira um
     // Goto(context,${EXTEN},1) pro contexto informado (ver outbound-routes.service.ts). Não recebe
     // chamadas (sem InboundRoute possível) e nenhum campo de PJSIP/codec/canal se aplica.
     z.object({

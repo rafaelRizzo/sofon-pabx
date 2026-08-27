@@ -49,7 +49,7 @@ export const updateScope = async (id: string, data: UpdateAgentScopeInput) => {
 }
 
 // Gate opt-in por empresa: só passa a exigir AgentCompanyScope se a empresa já tiver pelo menos 1
-// scope cadastrado (indica que ela adotou a feature) — empresa sem nenhum scope continua sem
+// scope cadastrado (indica que ela adotou a feature) - empresa sem nenhum scope continua sem
 // restrição, 100% retrocompatível com quem já usa QueueMember sem elegibilidade. Usado por
 // QueueMembersService.addMember antes de vincular a extensão à fila.
 export const assertAgentEligible = async (extensionId: string, companyId: string) => {

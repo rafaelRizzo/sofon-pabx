@@ -36,10 +36,10 @@ export async function removeBlindTransferFeature(): Promise<boolean> {
     })
 }
 
-// Tempo entre dígitos ao discar o destino de uma transferência DTMF (depois do #1/*2) — valor
+// Tempo entre dígitos ao discar o destino de uma transferência DTMF (depois do #1/*2) - valor
 // original do instalador (3s) estourava com discagem manual normal de um ramal de 4-6 dígitos,
 // tratando cada dígito isolado como tentativa própria (ver histórico de debug: "1002" virava
-// "1@transfer" + "0@transfer" etc, cada um "does not exist"). Não cria a linha se não existir —
+// "1@transfer" + "0@transfer" etc, cada um "does not exist"). Não cria a linha se não existir -
 // o instalador sempre a cria dentro de [general], então ausência aqui é sinal de outra coisa.
 const TRANSFER_DIGIT_TIMEOUT = /^([ \t]*transferdigittimeout\s*=\s*)(\d+)/mi
 const TRANSFER_DIGIT_TIMEOUT_VALUE = '8'

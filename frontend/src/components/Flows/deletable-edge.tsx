@@ -12,7 +12,7 @@ import { Trash2Icon } from "lucide-react"
 
 export type DeletableEdgeData = { onDelete: () => void }
 
-// Alinhamento manual por arrasto nunca é pixel-perfeito — poucos px de diferença em X já bastam
+// Alinhamento manual por arrasto nunca é pixel-perfeito - poucos px de diferença em X já bastam
 // pro smoothstep desenhar um micro-degrau em vez de uma linha reta. Dentro dessa tolerância,
 // tratamos como alinhado.
 const ALIGN_TOLERANCE_PX = 8
@@ -48,7 +48,7 @@ export function DeletableEdge({
     const onDelete = (data as DeletableEdgeData | undefined)?.onDelete
 
     // Sem isso, clicar numa aresta pra selecioná-la (pré-requisito pro Backspace/Delete apagar,
-    // ver deleteKeyCode em flow-canvas.tsx) não dava nenhum retorno visual — parecia que a seleção
+    // ver deleteKeyCode em flow-canvas.tsx) não dava nenhum retorno visual - parecia que a seleção
     // simplesmente não acontecia.
     const selectedStyle = selected
         ? { stroke: "var(--color-indigo-500)", strokeWidth: 3 }

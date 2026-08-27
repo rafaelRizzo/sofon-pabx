@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { useWebphone } from "@/hooks/use-webphone"
 
-// Widget flutuante montado uma vez no layout do dashboard (ver routes/dashboard.tsx) — só
+// Widget flutuante montado uma vez no layout do dashboard (ver routes/dashboard.tsx) - só
 // renderiza se o usuário logado tiver um ramal vinculado (User.extensionId) e o softphone
 // não estiver "unavailable" (ramal sem WebRTC habilitado, ou sem config de WS no backend)
 export function WebphoneWidget() {
@@ -37,7 +37,7 @@ export function WebphoneWidget() {
 
     if (!enabled) return null
 
-    // não escondemos totalmente quando indisponível — sem isso, "não aconteceu nada" é a única
+    // não escondemos totalmente quando indisponível - sem isso, "não aconteceu nada" é a única
     // pista que o usuário vinculado a um ramal tem pra saber que o softphone não conectou
     if (unavailable) {
         return (
@@ -115,7 +115,7 @@ export function WebphoneWidget() {
                 <div className="mt-2">
                     <p className="text-sm">
                         {callState === "calling" ? "Chamando" : "Em chamada"}
-                        {remoteIdentity ? ` — ${remoteIdentity}` : ""}
+                        {remoteIdentity ? ` - ${remoteIdentity}` : ""}
                     </p>
                     <div className="mt-2 flex gap-2">
                         {callState === "in-call" && (

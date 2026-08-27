@@ -37,7 +37,7 @@ export const extensionsRoutes = async (app: FastifyInstance) => {
         schema: {
             tags: ['Extensions'],
             summary: 'Exportar ramais com usuário e senha',
-            description: 'Filtra por empresa via ?companyId. Expõe a senha em texto puro — uso restrito.',
+            description: 'Filtra por empresa via ?companyId. Expõe a senha em texto puro - uso restrito.',
             security: [{ bearerAuth: [] }],
             querystring: optionalCompanyQuery,
             response: {
@@ -52,7 +52,7 @@ export const extensionsRoutes = async (app: FastifyInstance) => {
         schema: {
             tags: ['Extensions'],
             summary: 'Credenciais WebRTC do usuário logado',
-            description: 'Busca as credenciais SIP do ramal vinculado ao usuário logado (User.extensionId), pra registrar o softphone no browser. Sem gate de permissão de extensions — é identidade, não CRUD de terceiro.',
+            description: 'Busca as credenciais SIP do ramal vinculado ao usuário logado (User.extensionId), pra registrar o softphone no browser. Sem gate de permissão de extensions - é identidade, não CRUD de terceiro.',
             security: [{ bearerAuth: [] }],
             response: {
                 200: MyWebrtcResponse,

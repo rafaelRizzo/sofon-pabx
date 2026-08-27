@@ -9,7 +9,7 @@ const activeCallSchema = z.object({
     callerNum: z.string(),
     startAt: z.number().nullable(),
     bridgedWith: z.string().nullable(),
-    // nome do tronco por onde a ligação entrou — null se for chamada interna (ramal->ramal) ou se
+    // nome do tronco por onde a ligação entrou - null se for chamada interna (ramal->ramal) ou se
     // o par ainda não foi capturado (ver handleDialBegin em ami-events.ts)
     trunkName: z.string().nullable(),
 })
@@ -60,7 +60,7 @@ const queueStatusSchema = z.object({
     calls: z.number(),
     // Média de hoje calculada a partir do próprio par QueueCallerJoin/Leave (ver
     // handleQueueCallerLeave em ami-events.ts), não o QueueParams.Holdtime ao vivo do AMI nem o
-    // CDR — o CDR não serve pra isso (Queue() atende o canal do ligante já na entrada, pra MOH,
+    // CDR - o CDR não serve pra isso (Queue() atende o canal do ligante já na entrada, pra MOH,
     // então duration-billsec fica sempre ~0). holdtimeSampleSize=0 quer dizer "ninguém saiu da
     // fila hoje ainda", não "média literalmente zero".
     holdtime: z.number(),

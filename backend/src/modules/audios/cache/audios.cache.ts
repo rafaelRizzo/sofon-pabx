@@ -49,7 +49,7 @@ export class AudiosCache {
         logger.info({ event: 'cache.invalidate', namespace: NAMESPACE, key: 'all' })
     }
 
-    // Vozes da ElevenLabs — cada empresa tem sua própria conta/key, então cacheado por companyId
+    // Vozes da ElevenLabs - cada empresa tem sua própria conta/key, então cacheado por companyId
     static async getVoices(companyId: string) {
         const cached = await cacheManager.get(`${NAMESPACE}:voices`, companyId)
         logger.info({ event: cached ? 'cache.hit' : 'cache.miss', namespace: NAMESPACE, key: `voices:${companyId}` })
@@ -61,7 +61,7 @@ export class AudiosCache {
         logger.info({ event: 'cache.set', namespace: NAMESPACE, key: `voices:${companyId}` })
     }
 
-    // Prévia de voz em base64 (frase curta gerada sob demanda) — cacheada por 7 dias por
+    // Prévia de voz em base64 (frase curta gerada sob demanda) - cacheada por 7 dias por
     // empresa+voz+idioma pra não gastar cota da ElevenLabs a cada clique no play da lista
     static async getVoicePreview(companyId: string, voiceId: string, language: string) {
         const key = `${companyId}:${voiceId}:${language}`

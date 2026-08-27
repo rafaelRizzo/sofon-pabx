@@ -21,7 +21,7 @@ function getAudioContext(): AudioContext {
     return sharedAudioContext
 }
 
-// Amostra a amplitude média em BAR_COUNT blocos do primeiro canal — decodificação é só pra
+// Amostra a amplitude média em BAR_COUNT blocos do primeiro canal - decodificação é só pra
 // desenhar as barras, a reprodução em si roda por fora, no <audio> nativo (currentTime/play/pause)
 async function extractPeaks(src: string): Promise<number[]> {
     const buffer = await fetch(src).then((r) => r.arrayBuffer())
@@ -66,7 +66,7 @@ export function AudioWaveform({ src, autoPlay, className }: Props) {
         setPeaks(null)
         extractPeaks(src)
             .then((result) => !cancelled && setPeaks(result))
-            // visualização é cosmética — se decodificar falhar, toca normal com barras neutras
+            // visualização é cosmética - se decodificar falhar, toca normal com barras neutras
             .catch(() => !cancelled && setPeaks(Array(BAR_COUNT).fill(0.4)))
         return () => {
             cancelled = true

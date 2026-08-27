@@ -37,7 +37,7 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 
-// Espelha routeDestinationSchema de backend/src/schemas/route-destination.schema.ts —
+// Espelha routeDestinationSchema de backend/src/schemas/route-destination.schema.ts -
 // compartilhado por Inbound Routes, Time Conditions, Queues, IVR e Request Templates.
 export const ROUTE_DEST_TYPES = [
     "hangup",
@@ -71,7 +71,7 @@ export const ROUTE_DEST_LABELS: Record<RouteDestinationType, string> = {
     flow: "Flow",
 }
 
-// Passado como `items` pro Select — sem isso o trigger mostra o value cru (ex: "extension")
+// Passado como `items` pro Select - sem isso o trigger mostra o value cru (ex: "extension")
 // em vez do label traduzido enquanto o SelectContent ainda não foi montado
 const SELECT_ITEMS = ROUTE_DEST_TYPES.map((t) => ({
     value: t,
@@ -96,7 +96,7 @@ export const ROUTE_DEST_ICONS: Record<RouteDestinationType, LucideIcon> = {
 const idSchema = z.string().min(1, "Campo obrigatório")
 
 // label é preenchido só pelo backend (nome legível resolvido no GET, ver
-// route-destination-label.ts) — nunca setado pelo form; ignorado (strip) se vier no submit.
+// route-destination-label.ts) - nunca setado pelo form; ignorado (strip) se vier no submit.
 const labelSchema = z.string().nullable().optional()
 
 export const routeDestinationSchema = z
@@ -164,7 +164,7 @@ export type FetchableDestinationType = Exclude<RouteDestinationType, "hangup">
 type FetchableType = FetchableDestinationType
 
 // Mensagem exibida no combobox quando a empresa ainda não tem nenhum registro desse
-// recurso — evita parecer erro quando na verdade é só "ainda não cadastrou nada"
+// recurso - evita parecer erro quando na verdade é só "ainda não cadastrou nada"
 export const ROUTE_DEST_EMPTY_MESSAGES: Record<
     FetchableDestinationType,
     string
@@ -182,7 +182,7 @@ export const ROUTE_DEST_EMPTY_MESSAGES: Record<
     flow: "Nenhum flow cadastrado ainda",
 }
 
-// Cada tipo com FK busca sua própria lista (filtrada por empresa) — sem hook de CRUD
+// Cada tipo com FK busca sua própria lista (filtrada por empresa) - sem hook de CRUD
 // dedicado pra cada recurso, só o necessário pro combobox de destino.
 // announcement/ivr sem áudio ficam desabilitados (backend exige áudio pra usar como destino).
 export async function fetchDestinationOptions(
@@ -322,7 +322,7 @@ function useDestinationOptions(type: RouteDestinationType, companyId: string) {
     const [loading, setLoading] = useState(false)
 
     useEffect(() => {
-        // Zera antes de buscar — sem isso, ao trocar de tipo a lista antiga (ex: filas)
+        // Zera antes de buscar - sem isso, ao trocar de tipo a lista antiga (ex: filas)
         // continua visível até a nova requisição resolver
         setOptions([])
         if (type === "hangup" || !companyId) {
@@ -384,10 +384,10 @@ export function RouteDestinationField({
         onChange({ type, id: nextId } as RouteDestination)
     }
 
-    // hangup é o único tipo sem segundo campo (id) — nesse caso o select de tipo ocupa a linha
+    // hangup é o único tipo sem segundo campo (id) - nesse caso o select de tipo ocupa a linha
     // inteira em vez de dividir espaço com um campo vazio
     const hasIdField = type !== "hangup"
-    // com um único tipo permitido não há o que escolher — mostra só o rótulo fixo em vez de
+    // com um único tipo permitido não há o que escolher - mostra só o rótulo fixo em vez de
     // um select de opção única (ex: nó "Verificar horário" só aceita "timecondition")
     const singleType = allowedTypes.length === 1 ? allowedTypes[0] : null
 
@@ -445,7 +445,7 @@ export function RouteDestinationField({
                 )}
 
                 {type !== "hangup" && (
-                    // key={type} força remontar ao trocar de tipo — sem isso o combobox mantém
+                    // key={type} força remontar ao trocar de tipo - sem isso o combobox mantém
                     // o texto do item selecionado anteriormente (ex: nome da fila) mesmo depois
                     // de trocar pra um tipo sem nenhuma opção ainda
                     <Combobox<DestinationOption>

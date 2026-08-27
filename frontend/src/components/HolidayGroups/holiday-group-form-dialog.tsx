@@ -69,7 +69,7 @@ type Props = {
     open: boolean
     onOpenChange: (open: boolean) => void
     holidayGroup: HolidayGroup | null
-    // true enquanto o registro ainda está sendo buscado por id (ver EditNodeDialog) — nesse caso
+    // true enquanto o registro ainda está sendo buscado por id (ver EditNodeDialog) - nesse caso
     // `holidayGroup` também é null, mas não significa "criação": mostra skeleton em vez do form
     loading?: boolean
     companies: Company[]
@@ -278,7 +278,7 @@ export function HolidayGroupFormDialog({
                                             <FieldDescription>
                                                 Automático via URL busca as
                                                 datas periodicamente de um
-                                                endpoint externo — nesse modo as
+                                                endpoint externo - nesse modo as
                                                 datas não são editáveis aqui.
                                             </FieldDescription>
                                         </Field>

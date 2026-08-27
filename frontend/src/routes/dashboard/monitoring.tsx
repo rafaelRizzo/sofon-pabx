@@ -37,7 +37,7 @@ function MonitoringPage() {
     const { trunks, loading: loadingTrunks } = useRealtimeTrunks(companyId)
     const { queues, loading: loadingQueues } = useRealtimeQueues(companyId)
 
-    // alias é sempre numérico (2-6 dígitos, validação do backend) — comparação numérica direta
+    // alias é sempre numérico (2-6 dígitos, validação do backend) - comparação numérica direta
     const sortedExtensions = useMemo(
         () =>
             [...extensions].sort((a, b) =>
@@ -56,7 +56,7 @@ function MonitoringPage() {
         [sortedExtensions, hideOffline]
     )
 
-    // distingue "sem ramal cadastrado" de "todos offline e ocultos" — sem isso o hideOffline some
+    // distingue "sem ramal cadastrado" de "todos offline e ocultos" - sem isso o hideOffline some
     // com a lista inteira e parece que a empresa não tem nenhum ramal
     const extensionsEmptyMessage =
         hideOffline && sortedExtensions.length > 0

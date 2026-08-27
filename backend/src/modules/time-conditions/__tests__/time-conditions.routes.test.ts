@@ -48,7 +48,7 @@ beforeAll(async () => {
 }, 30000)
 
 afterAll(async () => {
-    // DELETE /companies/:id já limpa cascata completa (dialplan de timeconditions inclusive) —
+    // DELETE /companies/:id já limpa cascata completa (dialplan de timeconditions inclusive) -
     // evita deixar dialplan órfão em `extensions` como o cleanup manual fazia
     await app.inject({ method: 'DELETE', url: `/companies/${companyId}`, headers: auth() })
     await prisma.user.deleteMany({ where: { username: { startsWith: PREFIX } } })
@@ -98,7 +98,7 @@ describe('POST /time-conditions', () => {
         expect(res.statusCode).toBe(409)
     })
 
-    it('400 invalid route format — string instead of object', async () => {
+    it('400 invalid route format - string instead of object', async () => {
         const res = await app.inject({
             method: 'POST', url: '/time-conditions',
             headers: auth(),

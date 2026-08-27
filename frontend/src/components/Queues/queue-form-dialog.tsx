@@ -71,13 +71,13 @@ type Props = {
     open: boolean
     onOpenChange: (open: boolean) => void
     queue: Queue | null
-    // true enquanto o registro ainda está sendo buscado por id (ver EditNodeDialog) — nesse caso
+    // true enquanto o registro ainda está sendo buscado por id (ver EditNodeDialog) - nesse caso
     // `queue` também é null, mas não significa "criação": mostra skeleton em vez do form
     loading?: boolean
     companies: Company[]
     onSave: (form: QueueForm) => Promise<boolean>
     onDelete?: () => void
-    // abre o QueueMembersSheet — só passado por quem tem acesso à fila fora do fluxo normal da
+    // abre o QueueMembersSheet - só passado por quem tem acesso à fila fora do fluxo normal da
     // página de filas (ex: EditNodeDialog, que edita a fila a partir do canvas de Flows e não tem
     // outro jeito de chegar no gerenciador de membros)
     onManageMembers?: () => void
@@ -139,7 +139,7 @@ export function QueueFormDialog({
     const surveyAudioId = watch("surveyAudioId")
     const selectedCompany = companies.find((c) => c.id === companyId) ?? null
 
-    // Anúncios referenciam um Audio já cadastrado pra essa empresa — depende do companyId do
+    // Anúncios referenciam um Audio já cadastrado pra essa empresa - depende do companyId do
     // form, não do filtro da página (mesmo padrão do RouteDestinationField)
     const { audios } = useAudios(companyId)
     const selectedAnnounce = audios.find((a) => a.id === announce) ?? null
@@ -177,7 +177,7 @@ export function QueueFormDialog({
     }, [open, queue, reset, defaultCompanyId])
 
     // Ao trocar de empresa na criação, destino/música/anúncios escolhidos pra empresa anterior não
-    // fazem mais sentido (IDs de outra empresa) — reseta pra evitar enviar referências inválidas
+    // fazem mais sentido (IDs de outra empresa) - reseta pra evitar enviar referências inválidas
     function handleCompanyChange(nextCompanyId: string) {
         setValue("companyId", nextCompanyId, {
             shouldValidate: true,

@@ -9,7 +9,7 @@ import { errors } from '../../schemas/responses'
 
 const optionalCompanyQuery = z.object({ companyId: z.cuid2().optional() })
 
-// Reaproveita as permissões já existentes de extensions/trunks/queues — sem recurso "realtime" novo
+// Reaproveita as permissões já existentes de extensions/trunks/queues - sem recurso "realtime" novo
 export const realtimeRoutes = async (app: FastifyInstance) => {
     const router = app.withTypeProvider<ZodTypeProvider>()
 
@@ -59,7 +59,7 @@ export const realtimeRoutes = async (app: FastifyInstance) => {
     }, RealtimeController.getQueuesStatus as any)
 
     // Rotas de stream (SSE) abaixo: sem `response` no schema (a reply é hijackada, nunca passa por
-    // reply.send/serializerCompiler) — cada uma empurra um novo snapshot só quando o realtime-bus
+    // reply.send/serializerCompiler) - cada uma empurra um novo snapshot só quando o realtime-bus
     // avisa que essa entidade mudou, substituindo o polling de 1s que os hooks do front faziam antes
     router.get('/realtime/extensions/stream', {
         onRequest: [...protectedRoute, requirePermission('extensions', 'view')],

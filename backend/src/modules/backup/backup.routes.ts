@@ -7,7 +7,7 @@ import { backupExportQuerySchema, backupRestoreSchema, RestoreBackupResponse } f
 import { errors } from '../../schemas/responses'
 
 // Backup embute segredo em texto puro (senha de tronco, token de integração, .wav de áudio em
-// base64) — corpo de restore pode ficar grande com várias empresas/áudios, então essa rota tem
+// base64) - corpo de restore pode ficar grande com várias empresas/áudios, então essa rota tem
 // bodyLimit próprio, maior que o default de 1MB do Fastify (ver app.ts)
 const RESTORE_BODY_LIMIT = 100 * 1024 * 1024
 
@@ -23,7 +23,7 @@ export const backupRoutes = async (app: FastifyInstance) => {
                 summary: 'Exportar backup de configuração (por empresa ou de todas)',
                 description:
                     'Query opcional: ?companyId. Com companyId, exporta só aquela empresa (reseller/user com permissão só acessam empresas do próprio escopo). ' +
-                    'Sem companyId, exporta TODAS as empresas do sistema — admin only, já que o arquivo inclui segredo (senha de tronco, token de integração) ' +
+                    'Sem companyId, exporta TODAS as empresas do sistema - admin only, já que o arquivo inclui segredo (senha de tronco, token de integração) ' +
                     'de toda empresa. Retorna um .json autocontido (áudios em base64) com todas as configs, incluindo fluxos (Flows).',
                 security: [{ bearerAuth: [] }],
                 querystring: backupExportQuerySchema,
@@ -47,7 +47,7 @@ export const backupRoutes = async (app: FastifyInstance) => {
                 summary: 'Restaurar backup de configuração (cria empresa(s) nova(s))',
                 description:
                     'Recebe o .json gerado por GET /backup/export. Cada empresa do arquivo é recriada do zero (nunca sobrescreve uma empresa existente) ' +
-                    'com todos os ids remapeados internamente — inclusive referências cruzadas entre entidades (destinos de rota, nós de Flow). ' +
+                    'com todos os ids remapeados internamente - inclusive referências cruzadas entre entidades (destinos de rota, nós de Flow). ' +
                     'Falha em uma empresa não interrompe o restore das demais; a empresa que falhou é apagada (cascade) e reportada em `results`. ' +
                     'Admin only. Limitações: senha de ramal (Extension) é sempre regenerada, nunca preservada 1:1.',
                 security: [{ bearerAuth: [] }],

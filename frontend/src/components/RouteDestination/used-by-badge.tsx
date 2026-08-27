@@ -21,9 +21,9 @@ interface UsedByBadgeProps {
     usedBy: UsedByRef[]
 }
 
-// Indicador de reaproveitamento — quantos outros fluxos apontam pra este registro como destino.
+// Indicador de reaproveitamento - quantos outros fluxos apontam pra este registro como destino.
 // Vazio = nada renderizado (não polui a tabela quando não há uso). Label já vem resolvido do
-// backend (ver flow-reference-label.ts), sem fetch client-side nem estado de loading por linha —
+// backend (ver flow-reference-label.ts), sem fetch client-side nem estado de loading por linha -
 // mesma filosofia do RouteDestinationBadge.
 export function UsedByBadge({ usedBy }: UsedByBadgeProps) {
     if (usedBy.length === 0) return null

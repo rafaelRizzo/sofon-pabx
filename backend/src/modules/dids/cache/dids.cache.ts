@@ -69,7 +69,7 @@ export class DidsCache {
         logger.info({ event: 'cache.invalidate', namespace: NAMESPACE, key: 'all' })
     }
 
-    // Lista de /dids escopada por usuário não-admin com MAIS DE UMA empresa vinculada —
+    // Lista de /dids escopada por usuário não-admin com MAIS DE UMA empresa vinculada -
     // getDidsByCompany (1 empresa) e getAll (admin) não cobrem esse caso. Invalidada de forma
     // ampla por invalidateNamespace() (prefixo "dids:"), como os demais.
     static async getForScope(userId: string) {

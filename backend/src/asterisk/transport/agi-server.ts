@@ -15,17 +15,17 @@ import type { VariableMapping } from '../../modules/request-templates/schemas/re
 import { decryptForCompany } from '../../lib/crypto'
 import { runIxcAction, type IxcAction } from '../../integrations/ixc/client'
 
-// Servidor FastAGI — Asterisk conecta via AGI(agi://AGI_HOST:AGI_PORT/<script>,<args>) em 5 pontos:
-// - /run,<requestTemplateId> — RouteDestination type: "request"
-// - /ixc,<ixcNodeId>         — RouteDestination type: "ixc"
-// - /queue-route,<queueId>   — antes do Queue() nativo, seta QUEUE_PRIO a partir de RoutingRule
-// - /queue-outcome,<queueId> — depois do Queue(), lê QUEUESTATUS pra finalizar queue_calls
-//   (timeout/sem agente/fila cheia — únicos casos sem evento AMI terminal, ver ami-events.ts)
-// - /queue-survey,<queueId> — depois do Queue(), captura MEMBERINTERFACE pra pesquisa de satisfação
-// - /survey-result,<queueId>,<score> — fim da pesquisa (callcenter-surveys), persiste a nota
-// - /transfer-route (sem arg) — contexto estático [transfer], resolve EXTEN discado (ramal ou fila)
+// Servidor FastAGI - Asterisk conecta via AGI(agi://AGI_HOST:AGI_PORT/<script>,<args>) em 5 pontos:
+// - /run,<requestTemplateId> - RouteDestination type: "request"
+// - /ixc,<ixcNodeId>         - RouteDestination type: "ixc"
+// - /queue-route,<queueId>   - antes do Queue() nativo, seta QUEUE_PRIO a partir de RoutingRule
+// - /queue-outcome,<queueId> - depois do Queue(), lê QUEUESTATUS pra finalizar queue_calls
+//   (timeout/sem agente/fila cheia - únicos casos sem evento AMI terminal, ver ami-events.ts)
+// - /queue-survey,<queueId> - depois do Queue(), captura MEMBERINTERFACE pra pesquisa de satisfação
+// - /survey-result,<queueId>,<score> - fim da pesquisa (callcenter-surveys), persiste a nota
+// - /transfer-route (sem arg) - contexto estático [transfer], resolve EXTEN discado (ramal ou fila)
 //   pro accountcode do canal, chamado via TRANSFER_CONTEXT em toda transferência DTMF atendida (*2)
-// Protocolo AGI é estritamente request/response — nunca disparar dois comandos concorrentes no mesmo
+// Protocolo AGI é estritamente request/response - nunca disparar dois comandos concorrentes no mesmo
 // socket, a ordem das respostas quebra.
 
 type AgiConn = {
@@ -36,7 +36,7 @@ type AgiConn = {
 }
 
 // Quando o Asterisk envia o ambiente AGI inteiro em um único pacote TCP, todas as linhas chegam
-// de uma vez antes dos awaits seguintes registrarem resolvers — lineQueue armazena as linhas
+// de uma vez antes dos awaits seguintes registrarem resolvers - lineQueue armazena as linhas
 // chegadas sem resolver pendente para entrega síncrona no próximo readLine.
 function feedData(conn: AgiConn, chunk: string) {
     conn.buffer += chunk
@@ -67,7 +67,7 @@ async function readAgiEnv(conn: AgiConn): Promise<Record<string, string>> {
     return env
 }
 
-// AGI exige valor entre aspas quando contém espaço — sempre quotar é seguro mesmo sem espaço
+// AGI exige valor entre aspas quando contém espaço - sempre quotar é seguro mesmo sem espaço
 function agiQuote(value: string): string {
     return `"${value.replace(/"/g, '\\"')}"`
 }
@@ -95,7 +95,7 @@ async function agiExecGoto(conn: AgiConn, target: { context: string; exten: stri
 
 const PLACEHOLDER_RE = /\{\{([^}]+)\}\}/g
 
-// {{CALLERID(num)}}, {{EXTEN}}, {{qualquer_var_de_canal}} — resolvido via AGI GET VARIABLE, que já
+// {{CALLERID(num)}}, {{EXTEN}}, {{qualquer_var_de_canal}} - resolvido via AGI GET VARIABLE, que já
 // avalia funções de dialplan quando a expressão tem a forma FUNC(args)
 async function resolvePlaceholders(conn: AgiConn, input: string): Promise<string> {
     const matches = [...input.matchAll(PLACEHOLDER_RE)]
@@ -108,7 +108,7 @@ async function resolvePlaceholders(conn: AgiConn, input: string): Promise<string
     return result
 }
 
-// Sequencial de propósito (nunca Promise.all) — comandos AGI não podem ser concorrentes no mesmo socket
+// Sequencial de propósito (nunca Promise.all) - comandos AGI não podem ser concorrentes no mesmo socket
 async function resolvePlaceholdersDeep(conn: AgiConn, value: unknown): Promise<unknown> {
     if (typeof value === 'string') return resolvePlaceholders(conn, value)
     if (Array.isArray(value)) {
@@ -194,7 +194,7 @@ async function handleRequestTemplate(conn: AgiConn, templateId: string) {
         }
     }
 
-    // unresolved.length > 0 sobe pra warn (visível em produção) com o body truncado — sem isso
+    // unresolved.length > 0 sobe pra warn (visível em produção) com o body truncado - sem isso
     // não dá pra saber se o path da mapping está errado ou se a API devolveu um shape diferente
     if (unresolved.length > 0) {
         logger.warn({
@@ -290,7 +290,7 @@ async function handleIxcNode(conn: AgiConn, nodeId: string) {
 }
 
 // Seta QUEUE_PRIO (lido nativamente pelo Queue() nativo pra furar a fila) a partir da RoutingRule
-// ativa de maior priority cujas conditions batem (trunk/callerId/weekday/horário) — ver
+// ativa de maior priority cujas conditions batem (trunk/callerId/weekday/horário) - ver
 // RoutingRulesService.resolveActiveRule. Sem regra ativa/nenhuma bate, não seta nada (comportamento
 // padrão do Queue() inalterado). ROUTING_TRUNK_ID vem setado desde o entry point de
 // from-trunk-routed (inboundroute.repository.ts) e sobrevive a qualquer Goto intermediário.
@@ -304,7 +304,7 @@ async function handleQueueRoute(conn: AgiConn, queueId: string) {
     if (rule) await agiSetVariable(conn, 'QUEUE_PRIO', String(rule.priority))
 }
 
-// Roda logo após o Queue() retornar (antes da pesquisa) — QUEUESTATUS só vem preenchido quando
+// Roda logo após o Queue() retornar (antes da pesquisa) - QUEUESTATUS só vem preenchido quando
 // o canal do ligante sobrevive e o Queue() segue pra próxima priority (timeout/sem agente/fila
 // cheia); vazio quando a chamada foi de fato atendida (nesse caso AgentComplete via AMI já
 // finalizou queue_calls, ver finalizeByQueueStatus que ignora QUEUESTATUS vazio).
@@ -315,10 +315,10 @@ async function handleQueueOutcome(conn: AgiConn, queueId: string) {
     await finalizeByQueueStatus({ queueId, callerUniqueid, queueStatus })
 }
 
-// Roda depois do Queue() (só é alcançado quando o AGENTE desliga primeiro — ver comentário em
+// Roda depois do Queue() (só é alcançado quando o AGENTE desliga primeiro - ver comentário em
 // resolvePostQueueDestination de queue.repository.ts; se o cliente desligar primeiro, esse AGI nunca
 // roda, limitação física de qualquer pesquisa por IVR pós-chamada). MEMBERINTERFACE só vem populado
-// se houve bridge real com um agente (vazio em timeout/sem agente) — nesse caso segue sem fazer nada.
+// se houve bridge real com um agente (vazio em timeout/sem agente) - nesse caso segue sem fazer nada.
 async function handleQueueSurvey(conn: AgiConn, queueId: string) {
     const memberInterface = await agiGetVariable(conn, 'MEMBERINTERFACE')
     if (!memberInterface) return
@@ -338,9 +338,9 @@ async function handleQueueSurvey(conn: AgiConn, queueId: string) {
 }
 
 // Chamado pelo dialplan gerado em callcenter-survey.repository.ts quando o cliente digita a nota
-// (1-5) — lê de volta o contexto setado por handleQueueSurvey no mesmo canal (Set/Goto preservam
+// (1-5) - lê de volta o contexto setado por handleQueueSurvey no mesmo canal (Set/Goto preservam
 // variáveis de canal, não precisa de variável herdada com prefixo __) e persiste via RatingsService,
-// mesma validação/persistência já testada na Fase 1 — chamado direto em processo, sem HTTP.
+// mesma validação/persistência já testada na Fase 1 - chamado direto em processo, sem HTTP.
 async function handleSurveyResult(conn: AgiConn, queueId: string, scoreRaw: string) {
     const score = Number(scoreRaw)
     if (!Number.isInteger(score) || score < 1 || score > 5) return
@@ -366,7 +366,7 @@ async function handleSurveyResult(conn: AgiConn, queueId: string, scoreRaw: stri
     }
 }
 
-// Lê o mesmo cache de presença do módulo realtime (rt:ext:<number>, ver ami-events.ts) — falha aberta
+// Lê o mesmo cache de presença do módulo realtime (rt:ext:<number>, ver ami-events.ts) - falha aberta
 // (retorna 'unknown') se o Redis estiver fora do ar ou a chave ainda não existir, pra nunca bloquear
 // uma transferência válida por causa de infraestrutura de monitoramento indisponível.
 async function getExtensionPresence(number: string): Promise<'online' | 'offline' | 'unknown'> {
@@ -384,12 +384,12 @@ async function getExtensionPresence(number: string): Promise<'online' | 'offline
 }
 
 // Chamado pelo contexto estático [transfer] (extensions.conf) quando um agente/cliente dispara uma
-// transferência DTMF atendida (*2, ver features.conf) — TRANSFER_CONTEXT=transfer é setado desde a entrada
+// transferência DTMF atendida (*2, ver features.conf) - TRANSFER_CONTEXT=transfer é setado desde a entrada
 // da chamada (ver inboundroute.repository.ts). EXTEN é o número discado pela parte que transferiu
 // (alias de ramal OU number de fila); CHANNEL(accountcode) já identifica a empresa (setado nativamente
-// pelo endpoint PJSIP de origem, sem precisar de Set()) — resolve pro mesmo Company.asteriskId usado
+// pelo endpoint PJSIP de origem, sem precisar de Set()) - resolve pro mesmo Company.asteriskId usado
 // em todo o resto do dialplan multi-tenant. Ramal tem prioridade sobre fila em caso de colisão de
-// número (nunca deveria colidir de fato — aliases e queue numbers não têm unicidade cruzada hoje).
+// número (nunca deveria colidir de fato - aliases e queue numbers não têm unicidade cruzada hoje).
 async function handleTransferRoute(conn: AgiConn) {
     const exten = (await agiGetVariable(conn, 'EXTEN')) ?? ''
     const accountcode = (await agiGetVariable(conn, 'CHANNEL(accountcode)')) ?? ''
@@ -459,7 +459,7 @@ async function handleConnection(conn: AgiConn) {
     const script = env['agi_network_script']
     const arg1 = env['agi_arg_1']
 
-    // Único script sem argumento — resolve tudo via variáveis do canal (EXTEN/accountcode)
+    // Único script sem argumento - resolve tudo via variáveis do canal (EXTEN/accountcode)
     if (script === 'transfer-route') { await handleTransferRoute(conn); return }
     if (!arg1) return
 

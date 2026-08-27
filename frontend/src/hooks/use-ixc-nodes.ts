@@ -28,7 +28,7 @@ export type IxcNode = {
     params: Record<string, string>
     timeoutMs: number
     variableMappings: IxcVariableMapping[]
-    // não são mais editáveis por aqui — só via arrastar uma conexão no canvas do Flow (mesmo
+    // não são mais editáveis por aqui - só via arrastar uma conexão no canvas do Flow (mesmo
     // padrão de RequestTemplate, ver use-request-templates.ts)
     onSuccess: RouteDestination
     onError: RouteDestination
@@ -74,7 +74,7 @@ export const updateIxcNodeFormSchema = createIxcNodeFormSchema.omit({ companyId:
 export type IxcNodeForm = z.infer<typeof createIxcNodeFormSchema>
 export type IxcNodeUpdateForm = z.infer<typeof updateIxcNodeFormSchema>
 
-// DTO de criação a partir do registro salvo — usado pelo histórico de undo/redo do Flow (mesmo
+// DTO de criação a partir do registro salvo - usado pelo histórico de undo/redo do Flow (mesmo
 // padrão de toRequestTemplateCreationDto, ver flow-canvas.tsx)
 export function toIxcNodeCreationDto(ixcNode: IxcNode): IxcNodeUpdateForm {
     return {

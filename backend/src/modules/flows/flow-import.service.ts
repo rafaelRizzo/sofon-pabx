@@ -39,7 +39,7 @@ function assertBundle(bundle: Raw): Raw {
     return bundle.flow as Raw
 }
 
-// ─── Preview — não persiste nada, só lista o que precisa de resolução manual antes do import ────
+// ─── Preview - não persiste nada, só lista o que precisa de resolução manual antes do import ────
 
 type PendingExtension = { nodeId: string; label: string | null; hint: string | null; flowName: string }
 type PendingCredential = { nodeId: string; label: string | null; provider: string; nameHint: string; flowName: string }
@@ -80,11 +80,11 @@ export async function previewFlowImport(bundle: Raw, companyId: string) {
 
 // ─── Import ───────────────────────────────────────────────────────────────────────────────────
 // Sem transaction de banco (cada módulo tem seu próprio create/delete, não um client tx
-// compartilhado — mesmo motivo do backup/restore.ts). Em caso de erro no meio do caminho, desfaz
+// compartilhado - mesmo motivo do backup/restore.ts). Em caso de erro no meio do caminho, desfaz
 // em ordem reversa tudo que já foi criado nesta chamada (best effort) e propaga o erro original.
 
 // Reimportar o mesmo export (ou importar um flow que colide com recurso já existente na empresa
-// destino, inclusive de outra empresa) não pode falhar com 409 cru — soma "(cópia)"/"(cópia N)" até
+// destino, inclusive de outra empresa) não pode falhar com 409 cru - soma "(cópia)"/"(cópia N)" até
 // achar um nome livre. Usado por todo recurso do flow com constraint @@unique([name, companyId])
 async function resolveUniqueName(
     model: { findMany: (args: { where: { companyId: string }; select: { name: true } }) => Promise<{ name: string }[]> },
@@ -101,7 +101,7 @@ async function resolveUniqueName(
     return candidate
 }
 
-// Queue.number só aceita dígitos (regex do schema) — não dá pra sufixar "(cópia)"; incrementa até
+// Queue.number só aceita dígitos (regex do schema) - não dá pra sufixar "(cópia)"; incrementa até
 // achar um número livre na empresa destino
 async function resolveUniqueQueueNumber(number: string, companyId: string): Promise<string> {
     const existing = await prisma.queue.findMany({ where: { companyId }, select: { number: true } })

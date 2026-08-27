@@ -1,14 +1,14 @@
 import { validateEnv } from '../../config/env'
 import { logger } from '../../utils/logger'
 
-// Cliente AMI mínimo (Asterisk Manager Interface, texto puro sobre TCP) — usado no lugar de
+// Cliente AMI mínimo (Asterisk Manager Interface, texto puro sobre TCP) - usado no lugar de
 // `Bun.spawn(['asterisk', '-rx', ...])` pra não depender do binário CLI do Asterisk estar instalado
 // no mesmo host/container. Login -> Command -> Logoff, best-effort (nunca lança, só loga).
 const CRLF = '\r\n'
 const AMI_TIMEOUT_MS = 5000
 
 // Serializa execuções: cada regenerate() dispara seu próprio reloadDialplan() (fire-and-forget,
-// debounced) e o resync explícito (reloadDialplanNow) soma mais uma chamada em cima — sem fila,
+// debounced) e o resync explícito (reloadDialplanNow) soma mais uma chamada em cima - sem fila,
 // isso abre várias conexões/logins concorrentes na mesma sessão do Manager, e uma delas pode ser
 // fechada/rejeitada pelo Asterisk enquanto a outra ainda está processando (falso negativo: reload
 // funciona mas a chamada que a API estava esperando volta false). Rodando uma de cada vez, a
@@ -16,7 +16,7 @@ const AMI_TIMEOUT_MS = 5000
 let queue: Promise<unknown> = Promise.resolve()
 
 // Retorna se o comando de fato foi enviado e confirmado (data handler chegou ao fim do fluxo
-// feliz) — chamadores fire-and-forget (reloadDialplan) seguem ignorando o retorno; chamadores que
+// feliz) - chamadores fire-and-forget (reloadDialplan) seguem ignorando o retorno; chamadores que
 // precisam saber se o reload realmente aconteceu (reloadDialplanNow) usam esse boolean.
 export function runAmiCommand(command: string): Promise<boolean> {
     const run = queue.then(() => runAmiCommandNow(command))
@@ -71,7 +71,7 @@ function runAmiCommandNow(command: string): Promise<boolean> {
                     }
                     // Command + Logoff na mesma escrita: o Asterisk processa os dois e fecha a
                     // conexão sozinho (às vezes antes de terminar de streamar a resposta do
-                    // Command) — isso é o fluxo normal do Logoff que a gente pediu, não uma falha.
+                    // Command) - isso é o fluxo normal do Logoff que a gente pediu, não uma falha.
                     // `commandSent` marca esse ponto pra o close() saber diferenciar "fechou porque
                     // completou o que pedimos" de "fechou/caiu antes de sequer receber o comando".
                     commandSent = true

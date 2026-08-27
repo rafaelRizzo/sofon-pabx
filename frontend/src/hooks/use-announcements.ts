@@ -15,7 +15,7 @@ export type Announcement = {
     companyId: string
     audioId: string | null
     hasAudio: boolean
-    // destino não é mais editável por aqui — só via arrastar uma conexão no canvas do Flow
+    // destino não é mais editável por aqui - só via arrastar uma conexão no canvas do Flow
     // (ver flow-canvas.tsx), que grava direto no FlowEdge por PUT separado. Mantido no tipo só
     // porque a API ainda devolve o campo (label resolvido, usado em telas de leitura)
     destination: RouteDestination
@@ -25,7 +25,7 @@ export type Announcement = {
 }
 
 // Espelha create/updateAnnouncementSchema de backend/src/modules/announcements/schemas/announcement.schema.ts
-// (sem "destination" — ver comentário no tipo Announcement acima)
+// (sem "destination" - ver comentário no tipo Announcement acima)
 export const createAnnouncementFormSchema = z.object({
     name: z.string().min(1, "Informe o nome").max(80, "Máximo 80 caracteres"),
     audioId: z.string().nullable(),
@@ -35,7 +35,7 @@ export const updateAnnouncementFormSchema = createAnnouncementFormSchema
 
 export type AnnouncementForm = z.infer<typeof createAnnouncementFormSchema>
 
-// DTO de criação a partir do registro salvo — usado pelo histórico de undo/redo do Flow pra
+// DTO de criação a partir do registro salvo - usado pelo histórico de undo/redo do Flow pra
 // recriar o recurso quando o usuário desfaz uma exclusão (ver flow-canvas.tsx)
 export function toAnnouncementCreationDto(
     announcement: Announcement
@@ -43,7 +43,7 @@ export function toAnnouncementCreationDto(
     return { name: announcement.name, audioId: announcement.audioId }
 }
 
-// companyId opcional — enquanto não informado, a lista não é buscada (filtro de empresa
+// companyId opcional - enquanto não informado, a lista não é buscada (filtro de empresa
 // da página exige seleção antes de consultar o backend). Diferente da empresa do formulário
 // de criação (que é passada explicitamente para createAnnouncement, pois pode divergir deste
 // filtro ao editar um anúncio específico)
