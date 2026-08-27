@@ -1,17 +1,21 @@
 name: Release
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       bump:
-        description: 'Tipo de bump de versão'
-        required: true
+        description: 'Tipo de bump de versão (força, ignora análise dos commits)'
+        required: false
         type: choice
         options:
+          - auto
           - patch
           - minor
           - major
-        default: patch
+        default: auto
 
 permissions:
   contents: write
@@ -32,7 +36,48 @@ jobs:
             exit 1
           fi
 
+      - name: Determinar bump
+        id: bump
+        run: |
+          MANUAL_BUMP="${{ inputs.bump }}"
+
+          if [ -n "$MANUAL_BUMP" ] && [ "$MANUAL_BUMP" != "auto" ]; then
+            echo "Bump forçado manualmente: ${MANUAL_BUMP}"
+            echo "type=${MANUAL_BUMP}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          LAST_TAG=$(git tag -l 'v*.*.*' --sort=-v:refname | head -n1)
+          if [ -z "$LAST_TAG" ]; then
+            RANGE="HEAD"
+          else
+            RANGE="${LAST_TAG}..HEAD"
+          fi
+
+          BUMP="none"
+          while IFS= read -r SUBJECT && IFS= read -r BODY; do
+            [ -z "$SUBJECT" ] && continue
+
+            # BREAKING CHANGE: no footer, ou "!" logo antes dos ":" do header (ex: feat(front)!:)
+            if echo "$BODY" | grep -q "BREAKING CHANGE:" || echo "$SUBJECT" | grep -qE '^[a-z]+(\([a-z]+\))?!:'; then
+              BUMP="major"
+              continue
+            fi
+
+            if [ "$BUMP" = "major" ]; then continue; fi
+
+            if echo "$SUBJECT" | grep -qE '^feat(\([a-z]+\))?:'; then
+              [ "$BUMP" != "minor" ] && BUMP="minor"
+            elif echo "$SUBJECT" | grep -qE '^(fix|perf|ui)(\([a-z]+\))?:'; then
+              [ "$BUMP" = "none" ] && BUMP="patch"
+            fi
+          done < <(git log "$RANGE" --pretty=format:'%s%x00%b%x00' | tr '\0' '\n')
+
+          echo "Bump calculado a partir de ${RANGE}: ${BUMP}"
+          echo "type=${BUMP}" >> "$GITHUB_OUTPUT"
+
       - name: Calcular próxima versão
+        if: steps.bump.outputs.type != 'none'
         id: version
         run: |
           LAST_TAG=$(git tag -l 'v*.*.*' --sort=-v:refname | head -n1)
@@ -43,7 +88,7 @@ jobs:
           VERSION="${LAST_TAG#v}"
           IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
 
-          case "${{ inputs.bump }}" in
+          case "${{ steps.bump.outputs.type }}" in
             major)
               MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0
               ;;
@@ -60,6 +105,7 @@ jobs:
           echo "tag=${NEW_TAG}" >> "$GITHUB_OUTPUT"
 
       - name: Criar tag
+        if: steps.bump.outputs.type != 'none'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -67,9 +113,14 @@ jobs:
           git push origin "${{ steps.version.outputs.tag }}"
 
       - name: Criar release no GitHub
+        if: steps.bump.outputs.type != 'none'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "${{ steps.version.outputs.tag }}" \
             --title "${{ steps.version.outputs.tag }}" \
             --generate-notes
+
+      - name: Nenhum commit relevante pra release
+        if: steps.bump.outputs.type == 'none'
+        run: echo "Nenhum commit feat/fix/perf/ui/BREAKING CHANGE desde a última tag - release pulada."
