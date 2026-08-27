@@ -316,7 +316,16 @@ export function AudioFormDialog({
                   }
                 : null
         const ok = await onSave(form, upload, tts)
-        if (ok) onOpenChange(false)
+        if (!ok) return
+
+        // TTS: mantém voz/idioma selecionados e só limpa nome/texto, pra gerar vários áudios
+        // seguidos com a mesma voz sem reabrir o dialog e reselecionar tudo de novo
+        if (tts) {
+            setValue("name", "")
+            setValue("text", "")
+            return
+        }
+        onOpenChange(false)
     })
 
     const hasChanges = isDirty || !!file
