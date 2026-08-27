@@ -3,7 +3,7 @@ import { stat } from 'fs/promises'
 import { extname } from 'path'
 import type { FastifyRequest, FastifyReply } from 'fastify'
 import * as AudiosService from './audios.service'
-import { createAudioFieldsSchema, createAudioTtsSchema, updateAudioSchema, idParamSchema, companyQuerySchema, voicePreviewQuerySchema } from './schemas/audio.schema'
+import { createAudioFieldsSchema, createAudioTtsSchema, updateAudioSchema, idParamSchema, companyQuerySchema, voicePreviewQuerySchema, listVoicesQuerySchema } from './schemas/audio.schema'
 import { handleError } from '../../utils/errors/handler.error'
 import { AppError } from '../../utils/errors/app.error'
 import { prisma } from '../../lib/prisma'
@@ -129,9 +129,9 @@ export const createAudioTts = async (req: FastifyRequest, reply: FastifyReply) =
 
 export const getVoices = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
-        const { companyId } = companyQuerySchema.parse(req.query)
+        const { companyId, refresh } = listVoicesQuerySchema.parse(req.query)
         req.scope.assertAccess(companyId)
-        const voices = await AudiosService.listVoices(companyId)
+        const voices = await AudiosService.listVoices(companyId, refresh)
         return reply.send({ success: true, message: 'Voices fetched successfully', voices })
     } catch (error) {
         return handleError(reply, error, req)

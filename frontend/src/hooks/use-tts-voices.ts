@@ -1,8 +1,10 @@
 "use client"
 
-import { useQuery } from "@tanstack/react-query"
+import { useState } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { toast } from "sonner"
 
-import { api } from "@/lib/api"
+import { api, apiError } from "@/lib/api"
 
 export type Voice = {
     voiceId: string
@@ -11,9 +13,12 @@ export type Voice = {
     languages: string[]
 }
 
-async function fetchVoicesRequest(companyId: string): Promise<Voice[]> {
+async function fetchVoicesRequest(
+    companyId: string,
+    refresh = false
+): Promise<Voice[]> {
     const { data } = await api.get("/audios/tts/voices", {
-        params: { companyId },
+        params: { companyId, refresh: refresh || undefined },
     })
     return data.voices ?? []
 }
@@ -25,6 +30,9 @@ export function useTtsVoices(
     companyId?: string,
     options?: { enabled?: boolean }
 ) {
+    const queryClient = useQueryClient()
+    const [refreshing, setRefreshing] = useState(false)
+
     const { data: voices = [], isLoading: loading } = useQuery({
         queryKey: ["tts-voices", companyId],
         queryFn: () => fetchVoicesRequest(companyId as string),
@@ -32,5 +40,20 @@ export function useTtsVoices(
         staleTime: 5 * 60 * 1000,
     })
 
-    return { voices, loading }
+    // Ignora o cache de 1h do backend — pra quando a voz foi adicionada/removida agora mesmo
+    // na conta ElevenLabs e ainda não bateu o TTL
+    const refreshVoices = async () => {
+        if (!companyId) return
+        setRefreshing(true)
+        try {
+            const fresh = await fetchVoicesRequest(companyId, true)
+            queryClient.setQueryData(["tts-voices", companyId], fresh)
+        } catch (err) {
+            toast.error(apiError(err, "Erro ao atualizar vozes"))
+        } finally {
+            setRefreshing(false)
+        }
+    }
+
+    return { voices, loading, refreshing, refreshVoices }
 }

@@ -131,12 +131,14 @@ export const previewVoiceAudio = async (companyId: string, voiceId: string, lang
     return buffer
 }
 
-export const listVoices = async (companyId: string) => {
+export const listVoices = async (companyId: string, forceRefresh = false) => {
     const company = await getCompanyById(companyId)
     if (!company.elevenLabsApiKey) throw new AppError('ElevenLabs is not configured for this company', 400)
 
-    const cached = await AudiosCache.getVoices(companyId)
-    if (cached) return cached
+    if (!forceRefresh) {
+        const cached = await AudiosCache.getVoices(companyId)
+        if (cached) return cached
+    }
 
     const voices = await ElevenLabsProvider.listVoices(company.elevenLabsApiKey.trim())
     await AudiosCache.setVoices(companyId, voices)

@@ -3,6 +3,9 @@ import { timestamp, cuidParam, ok } from '../../../schemas/responses'
 
 export const idParamSchema = z.object({ id: cuidParam })
 export const companyQuerySchema = z.object({ companyId: z.cuid2() })
+export const listVoicesQuerySchema = companyQuerySchema.extend({
+    refresh: z.coerce.boolean().optional(),
+})
 
 export const updateAudioSchema = z.object({
     name: z.string().min(1).max(80),

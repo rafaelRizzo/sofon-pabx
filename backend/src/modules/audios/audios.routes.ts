@@ -4,7 +4,7 @@ import * as AudiosController from './audios.controller'
 import { protectedRoute } from '../../middleware/scope.middleware'
 import { requirePermission } from '../../middleware/permission.middleware'
 import {
-    updateAudioSchema, createAudioTtsSchema, idParamSchema, companyQuerySchema, voicePreviewQuerySchema,
+    updateAudioSchema, createAudioTtsSchema, idParamSchema, companyQuerySchema, voicePreviewQuerySchema, listVoicesQuerySchema,
     ListAudiosResponse, GetAudioResponse, CreateAudioResponse, UpdateAudioResponse,
     CreateAudioTtsResponse, ListVoicesResponse,
 } from './schemas/audio.schema'
@@ -102,8 +102,9 @@ export const audiosRoutes = async (app: FastifyInstance) => {
         schema: {
             tags: ['Audios'],
             summary: 'Listar vozes disponíveis na ElevenLabs (da conta configurada na empresa)',
+            description: 'Cacheado por 1h (Redis). Passe `refresh=true` pra ignorar o cache e buscar direto da ElevenLabs — útil logo após adicionar/remover voz na conta.',
             security: [{ bearerAuth: [] }],
-            querystring: companyQuerySchema,
+            querystring: listVoicesQuerySchema,
             response: {
                 200: ListVoicesResponse,
                 400: errors[400],

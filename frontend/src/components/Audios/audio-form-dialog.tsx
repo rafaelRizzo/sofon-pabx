@@ -8,6 +8,7 @@ import {
     FileAudioIcon,
     Loader2Icon,
     PlayIcon,
+    RefreshCwIcon,
     UploadIcon,
     XIcon,
 } from "lucide-react"
@@ -171,9 +172,12 @@ export function AudioFormDialog({
     const text = watch("text")
     const voiceId = watch("voiceId")
 
-    const { voices, loading: loadingVoices } = useTtsVoices(companyId, {
-        enabled: mode === "tts",
-    })
+    const {
+        voices,
+        loading: loadingVoices,
+        refreshing: refreshingVoices,
+        refreshVoices,
+    } = useTtsVoices(companyId, { enabled: mode === "tts" })
 
     const [languageFilter, setLanguageFilter] = useState(ALL_LANGUAGES)
     const filteredVoices = useMemo(
@@ -558,9 +562,30 @@ export function AudioFormDialog({
                                                 </Field>
 
                                                 <Field>
-                                                    <FieldLabel>
-                                                        Voz
-                                                    </FieldLabel>
+                                                    <div className="flex items-center justify-between">
+                                                        <FieldLabel>
+                                                            Voz
+                                                        </FieldLabel>
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="xs"
+                                                            disabled={
+                                                                refreshingVoices
+                                                            }
+                                                            onClick={
+                                                                refreshVoices
+                                                            }
+                                                        >
+                                                            <RefreshCwIcon
+                                                                className={cn(
+                                                                    refreshingVoices &&
+                                                                        "animate-spin"
+                                                                )}
+                                                            />
+                                                            Atualizar
+                                                        </Button>
+                                                    </div>
                                                     <Combobox<Voice>
                                                         items={filteredVoices}
                                                         value={selectedVoice}
