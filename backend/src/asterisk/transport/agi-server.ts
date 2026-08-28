@@ -92,6 +92,14 @@ async function agiSetVariable(conn: AgiConn, name: string, value: string) {
     await sendAgiCommand(conn, `SET VARIABLE ${name} ${agiQuote(value)}`)
 }
 
+// VERBOSE escreve direto no console do Asterisk, na mesma timeline das linhas "AGI Tx/Rx" -
+// visão em tempo real do que o handler está fazendo (qual processo, o que foi lido, o resultado)
+// sem precisar cruzar com o log da aplicação (pino) numa aba separada. Level 1 = sempre visível
+// em qualquer verbosidade de console ligada.
+async function agiVerbose(conn: AgiConn, message: string, level = 1) {
+    await sendAgiCommand(conn, `VERBOSE ${agiQuote(message)} ${level}`)
+}
+
 // SET CONTEXT/EXTENSION/PRIORITY são os comandos nativos do protocolo AGI pra redirecionar o
 // dialplan pra onde o script quer continuar QUANDO ele terminar - diferente de "EXEC Goto ctx,ext,pri"
 // (rodar a aplicação Goto por dentro do próprio AGI), que tem histórico de comportamento
@@ -160,6 +168,8 @@ async function handleRequestTemplate(conn: AgiConn, templateId: string) {
     const bodyRaw = template.body as Record<string, unknown> | null
     const body = bodyRaw ? await resolvePlaceholdersDeep(conn, bodyRaw) : undefined
 
+    await agiVerbose(conn, `Request Template "${template.name}": ${template.method} ${url}`)
+
     let success = false
     let status: number | undefined
     let rawBody = ''
@@ -219,6 +229,7 @@ async function handleRequestTemplate(conn: AgiConn, templateId: string) {
     }
 
     logger.info({ event: 'agi.request_template.done', templateId, success, mappings: mappings.length })
+    await agiVerbose(conn, `Request Template "${template.name}": ${success ? 'sucesso' : 'falhou'} (status=${status ?? 'erro de rede'}, ${mappings.length - unresolved.length}/${mappings.length} variáveis mapeadas)`)
     const nodeId = await agiGetVariable(conn, FLOW_NODE_ID_VAR)
     if (nodeId) {
         await agiExecGoto(conn, { context: FLOW_NODE_CONTEXT, exten: flowNodeExitExten(nodeId, success ? 'success' : 'error'), priority: 1 })
@@ -247,6 +258,8 @@ async function handleIxcNode(conn: AgiConn, nodeId: string) {
     const paramsRaw = (node.params as Record<string, string> | null) ?? {}
     const params: Record<string, string> = {}
     for (const [k, v] of Object.entries(paramsRaw)) params[k] = await resolvePlaceholders(conn, v)
+
+    await agiVerbose(conn, `IXC Node "${node.name}": ação=${node.action} params=${JSON.stringify(params)}`)
 
     let success = false
     let parsed: unknown = null
@@ -289,6 +302,7 @@ async function handleIxcNode(conn: AgiConn, nodeId: string) {
     }
 
     logger.info({ event: 'agi.ixc_node.done', nodeId, action: node.action, success, mappings: mappings.length })
+    await agiVerbose(conn, `IXC Node "${node.name}": ${success ? 'sucesso' : 'falhou'} (${mappings.length - unresolved.length}/${mappings.length} variáveis mapeadas)`)
     const flowNodeId = await agiGetVariable(conn, FLOW_NODE_ID_VAR)
     if (flowNodeId) {
         await agiExecGoto(conn, { context: FLOW_NODE_CONTEXT, exten: flowNodeExitExten(flowNodeId, success ? 'success' : 'error'), priority: 1 })
@@ -312,6 +326,8 @@ async function handleVariableCondition(conn: AgiConn, conditionId: string) {
     }
 
     const rules = condition.rules as VariableRule[]
+    await agiVerbose(conn, `Variable Condition "${condition.name}": avaliando ${rules.length} regra(s), combinator=${condition.combinator}`)
+
     const results: boolean[] = []
     for (const rule of rules) {
         const value = (await agiGetVariable(conn, rule.variable)) ?? ''
@@ -329,6 +345,7 @@ async function handleVariableCondition(conn: AgiConn, conditionId: string) {
             ruleValue: rule.value ?? null,
             result,
         })
+        await agiVerbose(conn, `  regra: ${rule.variable}="${value}" ${rule.operator}${rule.value !== undefined ? ` "${rule.value}"` : ''} => ${result ? 'true' : 'false'}`)
     }
     const matched = evaluateRules(condition.combinator as Combinator, results)
     logger.info({
@@ -339,11 +356,13 @@ async function handleVariableCondition(conn: AgiConn, conditionId: string) {
         results,
         matched,
     })
+    await agiVerbose(conn, `Variable Condition "${condition.name}": resultado final => ${matched ? 'TRUE' : 'FALSE'}`)
 
     const nodeId = await agiGetVariable(conn, FLOW_NODE_ID_VAR)
     if (nodeId) {
         const exten = flowNodeExitExten(nodeId, matched ? 'true' : 'false')
         logger.info({ event: 'agi.variable_condition.goto', conditionId, via: 'flow_node', nodeId, exten })
+        await agiVerbose(conn, `Variable Condition "${condition.name}": indo para porta "${matched ? 'true' : 'false'}" do flow node`)
         await agiExecGoto(conn, { context: FLOW_NODE_CONTEXT, exten, priority: 1 })
         return
     }
@@ -354,6 +373,7 @@ async function handleVariableCondition(conn: AgiConn, conditionId: string) {
         // sem esse log, isso parece exatamente um "AGI não fez nada" visto de fora (mesmo formato do
         // bug de deploy que a gente acabou de caçar sem log nenhum pra guiar)
         logger.warn({ event: 'agi.variable_condition.no_route', conditionId, dest, matched })
+        await agiVerbose(conn, `Variable Condition "${condition.name}": porta "${matched ? 'true' : 'false'}" sem destino configurado`, 2)
         return
     }
     logger.info({ event: 'agi.variable_condition.goto', conditionId, via: 'route_destination', target })
@@ -372,7 +392,12 @@ async function handleQueueRoute(conn: AgiConn, queueId: string) {
     const callerId = (await agiGetVariable(conn, 'CALLERID(num)')) ?? ''
     const trunkId = await agiGetVariable(conn, ROUTING_TRUNK_VAR)
     const rule = await resolveActiveRule(queue.companyId, { callerId, at: new Date(), timezone: queue.company.timezone, trunkId })
-    if (rule) await agiSetVariable(conn, 'QUEUE_PRIO', String(rule.priority))
+    if (rule) {
+        await agiSetVariable(conn, 'QUEUE_PRIO', String(rule.priority))
+        await agiVerbose(conn, `Queue Route: regra "${rule.name}" bateu (callerId=${callerId}, trunkId=${trunkId ?? '-'}) => QUEUE_PRIO=${rule.priority}`)
+    } else {
+        await agiVerbose(conn, `Queue Route: nenhuma RoutingRule ativa bateu (callerId=${callerId}, trunkId=${trunkId ?? '-'})`)
+    }
 }
 
 // Roda logo após o Queue() retornar (antes da pesquisa) - QUEUESTATUS só vem preenchido quando
@@ -382,6 +407,7 @@ async function handleQueueRoute(conn: AgiConn, queueId: string) {
 async function handleQueueOutcome(conn: AgiConn, queueId: string) {
     const queueStatus = (await agiGetVariable(conn, 'QUEUESTATUS')) ?? ''
     const callerUniqueid = await agiGetVariable(conn, 'UNIQUEID')
+    await agiVerbose(conn, `Queue Outcome: QUEUESTATUS=${queueStatus || '(vazio, atendida por AMI)'}`)
     if (!callerUniqueid) return
     await finalizeByQueueStatus({ queueId, callerUniqueid, queueStatus })
 }
@@ -392,19 +418,29 @@ async function handleQueueOutcome(conn: AgiConn, queueId: string) {
 // se houve bridge real com um agente (vazio em timeout/sem agente) - nesse caso segue sem fazer nada.
 async function handleQueueSurvey(conn: AgiConn, queueId: string) {
     const memberInterface = await agiGetVariable(conn, 'MEMBERINTERFACE')
-    if (!memberInterface) return
+    if (!memberInterface) {
+        await agiVerbose(conn, 'Queue Survey: MEMBERINTERFACE vazio (sem bridge com agente), sem pesquisa')
+        return
+    }
 
     const parsed = parseMemberInterface(memberInterface)
-    if (!parsed) return
+    if (!parsed) {
+        await agiVerbose(conn, `Queue Survey: MEMBERINTERFACE "${memberInterface}" não reconhecido, sem pesquisa`, 2)
+        return
+    }
 
     const [extension, queue] = await Promise.all([
         prisma.extension.findUnique({ where: { number: parsed.number }, select: { id: true } }),
         prisma.queue.findUnique({ where: { id: queueId }, select: { companyId: true, surveyAudioId: true } }),
     ])
-    if (!extension || !queue?.surveyAudioId) return
+    if (!extension || !queue?.surveyAudioId) {
+        await agiVerbose(conn, `Queue Survey: fila sem surveyAudioId configurado (ramal ${parsed.number}), sem pesquisa`)
+        return
+    }
 
     await agiSetVariable(conn, 'CC_EXTENSION_ID', extension.id)
     await agiSetVariable(conn, 'CC_COMPANY_ID', queue.companyId)
+    await agiVerbose(conn, `Queue Survey: agente ramal ${parsed.number} atendeu, iniciando pesquisa de satisfação`)
     await agiExecGoto(conn, { context: SURVEY_CONTEXT, exten: surveyExten(queueId), priority: 1 })
 }
 
@@ -423,17 +459,20 @@ async function handleSurveyResult(conn: AgiConn, queueId: string, scoreRaw: stri
     ])
     if (!extensionId || !companyId || !number) {
         logger.warn({ event: 'agi.callcenter.survey_result.missing_context', queueId })
+        await agiVerbose(conn, 'Survey Result: contexto da pesquisa perdido (canal sem CC_EXTENSION_ID/CC_COMPANY_ID)', 2)
         return
     }
 
     try {
         await createRating({ companyId, extensionId, number, score })
+        await agiVerbose(conn, `Survey Result: nota ${score} registrada (ramal ${extensionId}, número ${number})`)
     } catch (error) {
         logger.warn({
             event: 'agi.callcenter.survey_result.failed',
             queueId,
             message: error instanceof Error ? error.message : String(error),
         })
+        await agiVerbose(conn, `Survey Result: falha ao salvar nota - ${error instanceof Error ? error.message : String(error)}`, 2)
     }
 }
 
@@ -469,6 +508,7 @@ async function handleTransferRoute(conn: AgiConn) {
     const company = await prisma.company.findUnique({ where: { asteriskId: accountcode }, select: { id: true } })
     if (!company) {
         logger.warn({ event: 'agi.transfer_route.unknown_accountcode', accountcode })
+        await agiVerbose(conn, `Transfer Route: accountcode "${accountcode}" não corresponde a nenhuma empresa`, 2)
         return
     }
 
@@ -480,8 +520,10 @@ async function handleTransferRoute(conn: AgiConn) {
         const presence = await getExtensionPresence(extension.number)
         if (presence === 'offline') {
             logger.info({ event: 'agi.transfer_route.target_offline', exten, companyId: company.id })
+            await agiVerbose(conn, `Transfer Route: ramal ${extension.alias} está offline, abortando transferência`)
             return
         }
+        await agiVerbose(conn, `Transfer Route: encaminhando para ramal ${extension.alias}`)
         await agiExecGoto(conn, { context: extension.context, exten: extension.alias, priority: 1 })
         return
     }
@@ -491,11 +533,13 @@ async function handleTransferRoute(conn: AgiConn) {
         select: { number: true },
     })
     if (queue) {
+        await agiVerbose(conn, `Transfer Route: encaminhando para fila ${queue.number}`)
         await agiExecGoto(conn, { context: QUEUE_APP_CONTEXT, exten: queueAppExten(accountcode, queue.number), priority: 1 })
         return
     }
 
     logger.info({ event: 'agi.transfer_route.not_found', exten, companyId: company.id })
+    await agiVerbose(conn, `Transfer Route: "${exten}" não é ramal nem fila da empresa`, 2)
 }
 
 export function startAgiServer(host: string, port: number) {
@@ -530,6 +574,7 @@ async function handleConnection(conn: AgiConn) {
     const script = env['agi_network_script']
     const arg1 = env['agi_arg_1']
     logger.info({ event: 'agi.session.start', script, arg1, channel: env['agi_channel'] })
+    await agiVerbose(conn, `AGI iniciado: script=${script ?? '(desconhecido)'} arg=${arg1 ?? '-'}`)
 
     try {
         // Único script sem argumento - resolve tudo via variáveis do canal (EXTEN/accountcode)
@@ -547,12 +592,16 @@ async function handleConnection(conn: AgiConn) {
         // sem isso, uma exceção em qualquer handler vira um "AGI não fez nada" indistinguível de
         // script não reconhecido/registro não encontrado - só dava pra saber qual script/arg caiu
         // olhando o dialplan gerado e cruzando na mão (foi assim que achamos o bug de deploy antigo)
+        const message = error instanceof Error ? error.message : String(error)
         logger.error({
             event: 'agi.session.error',
             script,
             arg1,
-            message: error instanceof Error ? error.message : String(error),
+            message,
             stack: error instanceof Error ? error.stack : undefined,
         })
+        // socket pode já estar comprometido (foi a exceção que caiu aqui) - nunca deixar essa
+        // tentativa de aviso derrubar o handler de erro em si
+        await agiVerbose(conn, `AGI ERRO: script=${script ?? '(desconhecido)'} arg=${arg1 ?? '-'} - ${message}`, 3).catch(() => {})
     }
 }
