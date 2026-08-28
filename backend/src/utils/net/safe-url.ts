@@ -113,7 +113,16 @@ export async function safeFetch(rawUrl: string, init: SafeRequestInit = {}): Pro
             headers: init.headers,
             signal: init.signal,
             servername: url.protocol === 'https:' ? url.hostname : undefined,
-            lookup: (_hostname, _options, callback) => callback(null, address, family),
+            // Node chama lookup com options.all=true (Happy Eyeballs/autoSelectFamily, sempre ligado
+            // no cliente http/https do Bun) e nesse modo espera callback(err, addresses[]), não
+            // callback(err, address, family) - passar só a tripla faz o socket receber address
+            // undefined e falhar com "Invalid IP address: undefined" antes mesmo da requisição sair
+            // (silencioso: nenhuma tentativa de rede chega a acontecer, então nem timeout aparece).
+            lookup: (_hostname, options, callback) => {
+                const opts = options as { all?: boolean } | undefined
+                if (opts?.all) callback(null, [{ address, family }])
+                else callback(null, address, family)
+            },
         }, (response) => {
             const chunks: Buffer[] = []
             let size = 0
