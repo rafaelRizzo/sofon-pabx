@@ -23,6 +23,8 @@ import { z } from 'zod'
  * |                 |                | continua por onSuccess/onError do template                     | mesma empresa                                   |
  * | ixc             | ✔              | AGI síncrono → executa ação pré-configurada do IXCsoft;        |                                                 |
  * |                 |                | roteamento continua por onSuccess/onError do nó                | mesma empresa                                   |
+ * | formatter       | ✔              | AGI síncrono → aplica máscara numa variável de canal;          |                                                 |
+ * |                 |                | roteamento continua por onSuccess/onError do nó                | mesma empresa                                   |
  * | variable-set    | ✔              | Goto(variables,var-<id>,1) → Set() de 1+ variáveis, depois     | mesma empresa                                   |
  * |                 |                | segue pro destination configurado no VariableSet                |                                                  |
  * | variable-condition | ✔           | Goto(variable-conditions,varcond-<id>,1) → valida variável(is) | mesma empresa                                   |
@@ -37,7 +39,7 @@ import { z } from 'zod'
  * (src/schemas/route-destination.validate.ts) - não duplicar o switch-case.
  */
 export const ROUTE_DEST_TYPES = [
-    'extension', 'queue', 'voicemail', 'timecondition', 'holiday', 'announcement', 'ivr', 'request', 'ixc',
+    'extension', 'queue', 'voicemail', 'timecondition', 'holiday', 'announcement', 'ivr', 'request', 'ixc', 'formatter',
     'variable-set', 'variable-condition', 'flow', 'hangup',
 ] as const
 
@@ -92,6 +94,14 @@ const variants = <T extends z.ZodTypeAny>(idSchema: T, extraShape: z.ZodRawShape
         type: z.literal('ixc').describe(
             'Executa um nó IXCsoft via AGI (síncrono, trava a chamada até a resposta) - ' +
             'variáveis extraídas do response ficam disponíveis no canal; roteamento continua por onSuccess/onError do nó',
+        ),
+        id: idSchema,
+        ...extraShape,
+    }),
+    z.object({
+        type: z.literal('formatter').describe(
+            'Aplica uma máscara numa variável de canal via AGI (síncrono) - ' +
+            'testa cada máscara configurada em ordem e grava o resultado formatado; roteamento continua por onSuccess/onError do nó',
         ),
         id: idSchema,
         ...extraShape,

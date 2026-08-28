@@ -21,6 +21,8 @@ import { createHolidayGroup, deleteHolidayGroup } from '../holiday-groups/holida
 import { createHolidayGroupSchema } from '../holiday-groups/schemas/holiday-group.schema'
 import { createIxcNode, deleteIxcNode } from '../ixc-nodes/ixc-nodes.service'
 import { createIxcNodeSchema } from '../ixc-nodes/schemas/ixc-node.schema'
+import { createFormatterNode, deleteFormatterNode } from '../formatter-nodes/formatter-nodes.service'
+import { createFormatterNodeSchema } from '../formatter-nodes/schemas/formatter-node.schema'
 import { createFlow, deleteFlow } from './flows.service'
 import { createFlowNode, batchFlowNodeEdges, updateFlowNode, type FlowNodeType } from './flow-nodes.service'
 import { FLOW_EXPORT_KIND, FLOW_EXPORT_VERSION } from './schemas/flow-export.schema'
@@ -349,6 +351,23 @@ async function importFlowRecursive(
                     })
                 )
                 undo.push(() => deleteIxcNode(created.id))
+                resourceIdByNode.set(n.id, created.id)
+                break
+            }
+
+            case 'formatter': {
+                const r = n.resource
+                if (!r) throw new AppError(`Nó "${label}" (formatter) está sem configuração no arquivo de export`, 400)
+                const created = await createFormatterNode(
+                    createFormatterNodeSchema.parse({
+                        name: await resolveUniqueName(prisma.formatterNode, r.name, companyId),
+                        companyId,
+                        inputVariable: r.inputVariable,
+                        outputVariable: r.outputVariable,
+                        masks: arr(r.masks)
+                    })
+                )
+                undo.push(() => deleteFormatterNode(created.id))
                 resourceIdByNode.set(n.id, created.id)
                 break
             }

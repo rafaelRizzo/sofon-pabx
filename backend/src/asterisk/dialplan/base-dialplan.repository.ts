@@ -79,8 +79,8 @@ switch => Realtime/from-trunk-routed@extensions
 exten => i,1,Noop(DID sem rota: \${EXTEN})
  same => n,Hangup(1)
 
-; queues-app, timeconditions, announcements, ivrs, holidays, request-templates, ixc-nodes, variables,
-; variable-conditions, callcenter-surveys e flows/flow-nodes são contextos compartilhados de BAIXA
+; queues-app, timeconditions, announcements, ivrs, holidays, request-templates, ixc-nodes, formatters,
+; variables, variable-conditions, callcenter-surveys e flows/flow-nodes são contextos compartilhados de BAIXA
 ; escrita (só mudam por CRUD via API, nunca por ligação) - materializados em arquivo estático por
 ; empresa em /etc/asterisk/dialplan-extra/<contexto>/<asteriskId>.conf (ver dialplan-file.repository.ts).
 ; #tryinclude (não #include) - não erra quando a empresa ainda não gerou nenhum .conf pra esse
@@ -105,6 +105,9 @@ exten => i,1,Noop(DID sem rota: \${EXTEN})
 
 [ixc-nodes]
 #tryinclude "dialplan-extra/ixc-nodes/*.conf"
+
+[formatters]
+#tryinclude "dialplan-extra/formatters/*.conf"
 
 [variables]
 #tryinclude "dialplan-extra/variables/*.conf"

@@ -27,7 +27,8 @@ import { DialplanRepository } from '../../asterisk/dialplan.repository'
 import { ensureStaticAsteriskConfig } from '../../asterisk/ensure-static-config'
 import { removeBlindTransferFeature } from '../../asterisk/features.repository'
 import { runAmiCommand } from '../../asterisk/ami-client'
-import { TC_CONTEXT, HOL_CONTEXT, ANNOUNCEMENT_CONTEXT, IVR_CONTEXT, REQUEST_TEMPLATE_CONTEXT, VAR_CONTEXT, VARCOND_CONTEXT, SURVEY_CONTEXT, FLOW_CONTEXT, FLOW_NODE_CONTEXT } from '../../asterisk/dialplan-names'
+import { TC_CONTEXT, HOL_CONTEXT, ANNOUNCEMENT_CONTEXT, IVR_CONTEXT, REQUEST_TEMPLATE_CONTEXT, VAR_CONTEXT, VARCOND_CONTEXT, SURVEY_CONTEXT, FLOW_CONTEXT, FLOW_NODE_CONTEXT, FORMATTER_CONTEXT } from '../../asterisk/dialplan-names'
+import { FormatterNodeRepository } from '../../asterisk/destinations/formatter-node.repository'
 import { RequestTemplatesCache } from '../request-templates/cache/request-templates.cache'
 import { HolidayGroupsCache } from '../holiday-groups/cache/holiday-groups.cache'
 import { VariablesCache } from '../variables/cache/variables.cache'
@@ -37,7 +38,7 @@ import { invalidateUserCompanyIds } from '../../utils/auth/access'
 
 const DIALPLAN_FILE_CONTEXTS = [
     TC_CONTEXT, HOL_CONTEXT, ANNOUNCEMENT_CONTEXT, IVR_CONTEXT, REQUEST_TEMPLATE_CONTEXT, QUEUE_APP_CONTEXT,
-    VAR_CONTEXT, VARCOND_CONTEXT, SURVEY_CONTEXT, FLOW_CONTEXT, FLOW_NODE_CONTEXT,
+    VAR_CONTEXT, VARCOND_CONTEXT, SURVEY_CONTEXT, FLOW_CONTEXT, FLOW_NODE_CONTEXT, FORMATTER_CONTEXT,
 ]
 import type { CreateCompanyInput, UpdateCompanyInput } from './schemas/company.schema'
 import { AppError } from '../../utils/errors/app.error'
@@ -202,6 +203,7 @@ export const resyncDialplan = async (id: string) => {
         await IvrRepository.regenerate(company.id)
         await AsteriskQueueRepository.regenerate(company.id)
         await RequestTemplateRepository.regenerate(company.id)
+        await FormatterNodeRepository.regenerate(company.id)
         await VariableRepository.regenerate(company.id)
         await VariableConditionRepository.regenerate(company.id)
         await FlowNodeRepository.regenerate(company.id)

@@ -3,9 +3,9 @@ import { audioSoundPath } from '../destinations/audio.repository'
 import { buildDialplan as buildIvrDialplan } from '../destinations/ivr.repository'
 import {
     ANNOUNCEMENT_CONTEXT, FLOW_CONTEXT, FLOW_NODE_CONTEXT, HOL_CONTEXT,
-    REQUEST_TEMPLATE_CONTEXT, TC_CONTEXT, VARCOND_CONTEXT, VAR_CONTEXT, IXC_NODE_CONTEXT,
+    REQUEST_TEMPLATE_CONTEXT, TC_CONTEXT, VARCOND_CONTEXT, VAR_CONTEXT, IXC_NODE_CONTEXT, FORMATTER_CONTEXT,
     flowExten, flowNodeExten, flowNodeExitExten, announcementExten, holEntry, requestTemplateExten,
-    tcEntry, varCondEntry, varEntry, ixcNodeExten,
+    tcEntry, varCondEntry, varEntry, ixcNodeExten, formatterExten,
 } from '../dialplan/dialplan-names'
 import { FLOW_NODE_ID_VAR, nodeExitTarget } from './flow-node-runtime'
 import { QUEUE_APP_CONTEXT, queueAppExten } from '../destinations/queue.repository'
@@ -23,6 +23,7 @@ const staticPorts: Record<string, string[]> = {
     holiday: ['true', 'false'],
     request: ['success', 'error'],
     ixc: ['success', 'error'],
+    formatter: ['success', 'error'],
     'variable-set': ['default'],
     'variable-condition': ['true', 'false'],
 }
@@ -56,6 +57,7 @@ async function buildResourceEntry(node: NodeRow, asteriskId: string): Promise<Di
         case 'holiday': return go(HOL_CONTEXT, holEntry(node.resourceId))
         case 'request': return go(REQUEST_TEMPLATE_CONTEXT, requestTemplateExten(node.resourceId))
         case 'ixc': return go(IXC_NODE_CONTEXT, ixcNodeExten(node.resourceId))
+        case 'formatter': return go(FORMATTER_CONTEXT, formatterExten(node.resourceId))
         case 'variable-set': return go(VAR_CONTEXT, varEntry(node.resourceId))
         case 'variable-condition': return go(VARCOND_CONTEXT, varCondEntry(node.resourceId))
         case 'flow': return go(FLOW_CONTEXT, flowExten(node.resourceId))

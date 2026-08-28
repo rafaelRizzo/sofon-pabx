@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-# INSTALADOR SOFON PBX v7.10 - PJSIP + IAX2 (sem Docker, sem chan_sip)
+# INSTALADOR SOFON PBX v7.11 - PJSIP + IAX2 (sem Docker, sem chan_sip)
 # Debian 11+ | Ubuntu 24.04+ | Asterisk 22.7.0 LTS
 # ============================================================
 
@@ -469,8 +469,8 @@ switch => Realtime/from-trunk-routed@extensions
 exten => i,1,Noop(DID sem rota: ${EXTEN})
  same => n,Hangup(1)
 
-; queues-app, timeconditions, announcements, ivrs, holidays, request-templates, ixc-nodes, variables,
-; variable-conditions, callcenter-surveys e flows/flow-nodes são contextos compartilhados de BAIXA
+; queues-app, timeconditions, announcements, ivrs, holidays, request-templates, ixc-nodes, formatters,
+; variables, variable-conditions, callcenter-surveys e flows/flow-nodes são contextos compartilhados de BAIXA
 ; escrita (só mudam por CRUD via API, nunca por ligação) - em vez de Realtime (query no Postgres a
 ; cada Goto, pbx_realtime não tem cache), o dialplan é materializado em arquivo estático por empresa
 ; em /etc/asterisk/dialplan-extra/<contexto>/<asteriskId>.conf, regenerado + reload (`dialplan reload`)
@@ -500,6 +500,9 @@ exten => i,1,Noop(DID sem rota: ${EXTEN})
 
 [ixc-nodes]
 #tryinclude "dialplan-extra/ixc-nodes/*.conf"
+
+[formatters]
+#tryinclude "dialplan-extra/formatters/*.conf"
 
 [variables]
 #tryinclude "dialplan-extra/variables/*.conf"

@@ -128,6 +128,12 @@ async function exportIxcResource(resourceId: string) {
     }
 }
 
+async function exportFormatterResource(resourceId: string) {
+    const n = await prisma.formatterNode.findUnique({ where: { id: resourceId } })
+    if (!n) return null
+    return { name: n.name, inputVariable: n.inputVariable, outputVariable: n.outputVariable, masks: n.masks }
+}
+
 async function exportExtensionHint(resourceId: string) {
     const e = await prisma.extension.findUnique({ where: { id: resourceId }, select: { alias: true, name: true } })
     return e ? `${e.alias} - ${e.name}` : null
@@ -184,6 +190,9 @@ async function exportFlowBundleRecursive(flowId: string, companyId: string, aste
                 break
             case 'ixc':
                 exportedNodes.push({ ...base, resource: n.resourceId ? await exportIxcResource(n.resourceId) : null })
+                break
+            case 'formatter':
+                exportedNodes.push({ ...base, resource: n.resourceId ? await exportFormatterResource(n.resourceId) : null })
                 break
             case 'flow':
                 exportedNodes.push({

@@ -23,6 +23,7 @@ export const FLOW_NODE_TYPES = [
   "ivr",
   "request",
   "ixc",
+  "formatter",
   "variable-set",
   "variable-condition",
   "flow",
@@ -39,6 +40,7 @@ const DELETABLE_RESOURCE_TYPES = new Set<FlowNodeType>([
   "holiday",
   "request",
   "ixc",
+  "formatter",
   "variable-set",
   "variable-condition",
 ]);
@@ -55,6 +57,7 @@ const portsByType: Record<FlowNodeType, readonly string[]> = {
   ivr: ["invalid", "timeout"],
   request: ["success", "error"],
   ixc: ["success", "error"],
+  formatter: ["success", "error"],
   "variable-set": ["default"],
   "variable-condition": ["true", "false"],
   flow: [],
@@ -132,6 +135,12 @@ async function assertResource(
       break;
     case "ixc":
       found = await prisma.ixcNode.findUnique({
+        where: { id: resourceId },
+        select: companySelect,
+      });
+      break;
+    case "formatter":
+      found = await prisma.formatterNode.findUnique({
         where: { id: resourceId },
         select: companySelect,
       });

@@ -16,6 +16,7 @@ const SOURCE_LABELS: Record<string, string> = {
     ivroption: 'IVR option',
     requesttemplate: 'Request template',
     ixcnode: 'IXC node',
+    formatternode: 'Formatter',
     variableset: 'Variable set',
     variablecondition: 'Variable condition',
     queue: 'Queue',
@@ -142,6 +143,19 @@ export async function validateRouteDestination(
             if (node.companyId !== companyId)
                 throw new AppError(
                     `${prefix}IXC node belongs to different company`,
+                    403
+                )
+            break
+        }
+        case 'formatter': {
+            const node = await prisma.formatterNode.findUnique({
+                where: { id: dest.id },
+                select: { companyId: true }
+            })
+            if (!node) throw new AppError(`${prefix}Formatter node not found`, 404)
+            if (node.companyId !== companyId)
+                throw new AppError(
+                    `${prefix}Formatter node belongs to different company`,
                     403
                 )
             break

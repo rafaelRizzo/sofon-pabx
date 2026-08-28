@@ -15,12 +15,15 @@ import type { VariableMapping } from '../../modules/request-templates/schemas/re
 import { decryptForCompany } from '../../lib/crypto'
 import { runIxcAction, type IxcAction } from '../../integrations/ixc/client'
 import { evaluateRule, evaluateRules, type VariableRule, type Combinator } from '../destinations/variablecondition.repository'
+import { applyMask } from '../../utils/format-mask'
 
 // Servidor FastAGI - Asterisk conecta via AGI(agi://AGI_HOST:AGI_PORT/<script>,<args>) em 5 pontos:
 // - /run,<requestTemplateId> - RouteDestination type: "request"
 // - /ixc,<ixcNodeId>         - RouteDestination type: "ixc"
 // - /varcond,<variableConditionId> - RouteDestination type: "variable-condition" (regras avaliadas
 //   em JS puro, ver evaluateRule - motivo em variablecondition.repository.ts)
+// - /format,<formatterNodeId> - RouteDestination type: "formatter" (aplica máscara via
+//   applyMask, ver src/utils/format-mask.ts)
 // - /queue-route,<queueId>   - antes do Queue() nativo, seta QUEUE_PRIO a partir de RoutingRule
 // - /queue-outcome,<queueId> - depois do Queue(), lê QUEUESTATUS pra finalizar queue_calls
 //   (timeout/sem agente/fila cheia - únicos casos sem evento AMI terminal, ver ami-events.ts)
@@ -396,6 +399,42 @@ async function handleVariableCondition(conn: AgiConn, conditionId: string) {
     await agiExecGoto(conn, target)
 }
 
+// Lê inputVariable via AGI GET VARIABLE, tenta cada máscara de `masks` em ordem (applyMask,
+// src/utils/format-mask.ts) e grava o resultado em outputVariable - onSuccess/onError seguem o
+// mesmo mecanismo de FlowEdge do IxcNode (FLOW_NODE_ID quando dentro de um Flow, senão
+// FlowEdgeRepository direto quando usado como RouteDestination solto).
+async function handleFormatterNode(conn: AgiConn, formatterNodeId: string) {
+    const node = await prisma.formatterNode.findUnique({ where: { id: formatterNodeId } })
+    if (!node) {
+        logger.warn({ event: 'agi.formatter_node.not_found', formatterNodeId })
+        return
+    }
+
+    const rawValue = (await agiGetVariable(conn, node.inputVariable)) ?? ''
+    const masks = node.masks as string[]
+    const result = applyMask(rawValue, masks)
+
+    let matched = false
+    if (result) {
+        matched = true
+        await agiSetVariable(conn, node.outputVariable, result.output)
+        await agiVerbose(conn, `Formatter "${node.name}": ${node.inputVariable}="${rawValue}" => máscara "${result.matched}" => ${node.outputVariable}="${result.output}"`)
+    } else {
+        await agiVerbose(conn, `Formatter "${node.name}": ${node.inputVariable}="${rawValue}" não bateu com nenhuma das ${masks.length} máscara(s) configurada(s)`, 2)
+    }
+
+    logger.info({ event: 'agi.formatter_node.done', formatterNodeId, matched, inputVariable: node.inputVariable, outputVariable: node.outputVariable })
+
+    const flowNodeId = await agiGetVariable(conn, FLOW_NODE_ID_VAR)
+    if (flowNodeId) {
+        await agiExecGoto(conn, { context: FLOW_NODE_CONTEXT, exten: flowNodeExitExten(flowNodeId, matched ? 'success' : 'error'), priority: 1 })
+        return
+    }
+    const dest = await FlowEdgeRepository.getOne('formatternode', formatterNodeId, matched ? 'success' : 'error')
+    const target = await resolveRouteDestinationToDialplan(dest)
+    if (target) await agiExecGoto(conn, target)
+}
+
 // Seta QUEUE_PRIO (lido nativamente pelo Queue() nativo pra furar a fila) a partir da RoutingRule
 // ativa de maior priority cujas conditions batem (trunk/callerId/weekday/horário) - ver
 // RoutingRulesService.resolveActiveRule. Sem regra ativa/nenhuma bate, não seta nada (comportamento
@@ -603,6 +642,7 @@ async function handleConnection(conn: AgiConn) {
         else if (script === 'survey-result') await handleSurveyResult(conn, arg1, env['agi_arg_2'] ?? '')
         else if (script === 'ixc') await handleIxcNode(conn, arg1)
         else if (script === 'varcond') await handleVariableCondition(conn, arg1)
+        else if (script === 'format') await handleFormatterNode(conn, arg1)
         else await handleRequestTemplate(conn, arg1)
     } catch (error) {
         // sem isso, uma exceção em qualquer handler vira um "AGI não fez nada" indistinguível de

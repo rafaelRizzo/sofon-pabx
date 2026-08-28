@@ -19,6 +19,9 @@ export const requestTemplateExten = (id: string) => `req-${id}`
 export const IXC_NODE_CONTEXT = 'ixc-nodes'
 export const ixcNodeExten = (id: string) => `ixc-${id}`
 
+export const FORMATTER_CONTEXT = 'formatters'
+export const formatterExten = (id: string) => `fmt-${id}`
+
 export const SURVEY_CONTEXT = 'callcenter-surveys'
 export const surveyExten = (queueId: string) => `survey-${queueId}`
 

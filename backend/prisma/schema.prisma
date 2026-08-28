@@ -49,6 +49,7 @@ model Company {
   queueCalls             QueueCall[]
   integrationCredentials IntegrationCredential[]
   ixcNodes               IxcNode[]
+  formatterNodes         FormatterNode[]
 
   @@unique([name, doc])
   @@map("companies")
@@ -635,6 +636,28 @@ model IxcNode {
   @@index([companyId])
   @@index([credentialId])
   @@map("ixc_nodes")
+}
+
+// Nó de formatação de variável de canal via máscara (ver src/utils/format-mask.ts). Lê
+// inputVariable (identificador simples ou função Asterisk tipo CALLERID(num)), tenta cada máscara
+// de `masks` em ordem (primeira cujo nº de tokens 0/A/* bate com o tamanho do valor limpo) e grava
+// o resultado em outputVariable — obrigatório (nunca sobrescreve o input por default, evita o caso
+// de inputVariable ser uma função que não aceita SET VARIABLE). onSuccess/onError seguem o mesmo
+// mecanismo de FlowEdge do IxcNode/RequestTemplate.
+model FormatterNode {
+  id             String   @id @default(cuid())
+  name           String   @db.VarChar(80)
+  companyId      String
+  company        Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  inputVariable  String   @db.VarChar(120)
+  outputVariable String   @db.VarChar(80)
+  masks          Json // string[], 1-10 máscaras candidatas, tentadas em ordem
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @db.Timestamptz(3)
+
+  @@unique([name, companyId])
+  @@index([companyId])
+  @@map("formatter_nodes")
 }
 
 // Edge normalizado de RouteDestination — única fonte de roteamento pra todos os nós (InboundRoute/

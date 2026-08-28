@@ -20,6 +20,7 @@ export const PERMISSION_RESOURCES = [
     'request-templates',
     'integrations',
     'ixc',
+    'formatter',
     'variables',
     'variable-conditions',
     'variable-catalog',
