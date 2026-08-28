@@ -195,11 +195,9 @@ async function handleRequestTemplate(conn: AgiConn, templateId: string) {
             clearTimeout(timeout)
         }
     } catch (error) {
-        logger.warn({
-            event: 'agi.request_template.failed',
-            templateId,
-            message: error instanceof Error ? error.message : String(error),
-        })
+        const message = error instanceof Error ? error.message : String(error)
+        logger.warn({ event: 'agi.request_template.failed', templateId, message })
+        await agiVerbose(conn, `Request Template "${template.name}": erro na chamada - ${message}`, 2)
         success = false
     }
 
@@ -279,11 +277,9 @@ async function handleIxcNode(conn: AgiConn, nodeId: string) {
             clearTimeout(timeout)
         }
     } catch (error) {
-        logger.warn({
-            event: 'agi.ixc_node.failed',
-            nodeId,
-            message: error instanceof Error ? error.message : String(error),
-        })
+        const message = error instanceof Error ? error.message : String(error)
+        logger.warn({ event: 'agi.ixc_node.failed', nodeId, message })
+        await agiVerbose(conn, `IXC Node "${node.name}": erro na chamada - ${message}`, 2)
         success = false
     }
 
