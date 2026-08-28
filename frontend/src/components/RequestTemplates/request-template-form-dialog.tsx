@@ -348,6 +348,7 @@ export function RequestTemplateFormDialog({
                                                                 getValues={
                                                                     getValues
                                                                 }
+                                                                companyId={companyId}
                                                                 placeholder="https://api.exemplo.com/clientes/{{CALLERID(num)}}"
                                                             />
                                                             {errors.url && (
@@ -469,6 +470,7 @@ export function RequestTemplateFormDialog({
                                                                                     getValues={
                                                                                         getValues
                                                                                     }
+                                                                                    companyId={companyId}
                                                                                     placeholder="Bearer {{TOKEN}}"
                                                                                     className="min-w-0"
                                                                                 />
@@ -528,6 +530,7 @@ export function RequestTemplateFormDialog({
                                                             getValues={
                                                                 getValues
                                                             }
+                                                            companyId={companyId}
                                                             multiline
                                                             rows={5}
                                                             placeholder={

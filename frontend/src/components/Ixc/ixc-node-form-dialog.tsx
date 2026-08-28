@@ -335,6 +335,7 @@ export function IxcNodeFormDialog({
                                                                                 register={register}
                                                                                 setValue={setValue}
                                                                                 getValues={getValues}
+                                                                                companyId={companyId}
                                                                                 placeholder="{{CALLERID(num)}}"
                                                                                 className="min-w-0"
                                                                             />

@@ -18,19 +18,22 @@ type Props<T extends FieldValues> = {
     register: UseFormRegister<T>
     setValue: UseFormSetValue<T>
     getValues: UseFormGetValues<T>
+    companyId?: string
     placeholder?: string
     multiline?: boolean
     rows?: number
     className?: string
 }
 
-// Input/Textarea com um botão de inserir variável de canal Asterisk (ver variable-insert-button.tsx)
-// acoplado - usar em qualquer campo que aceite placeholder {{VAR}} (Request Templates, nó IXCsoft).
+// Input/Textarea com um botão de inserir variável de canal Asterisk ou do catálogo customizado da
+// empresa (ver variable-insert-button.tsx) acoplado - usar em qualquer campo que aceite placeholder
+// {{VAR}} (Request Templates, nó IXCsoft).
 export function VariableInsertField<T extends FieldValues>({
     name,
     register,
     setValue,
     getValues,
+    companyId,
     placeholder,
     multiline = false,
     rows,
@@ -65,6 +68,7 @@ export function VariableInsertField<T extends FieldValues>({
             )}
             <VariableInsertButton
                 onSelect={insert}
+                companyId={companyId}
                 className={multiline ? "shrink-0 self-start" : "shrink-0 self-center"}
             />
         </div>
