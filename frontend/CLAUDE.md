@@ -4,14 +4,14 @@
 - Vite + React 19 + TanStack Router (file-based, `autoCodeSplitting`) + TanStack Query
 - UI: shadcn/ui + Tailwind v4 + react-hook-form + zod (`zodResolver`)
 - HTTP: axios (`lib/api.ts`), realtime: SSE manual (`lib/sse.ts`)
-- Build/typecheck: `pnpm build` | `pnpm exec tsc --noEmit`
+- Build/typecheck: `pnpm build` | `pnpm exec tsc --noEmit -p tsconfig.app.json` (o `tsconfig.json` raiz só tem `references`/`files: []` - sem `-p` o comando não compila nada e sempre reporta sucesso falso)
 
 ## Convenções
 - Nunca fetch direto num componente/rota - sempre via hook (`hooks/use-<recurso>.ts`)
 - Zod schema do hook deve espelhar `create<Nome>Schema`/`update<Nome>Schema` do backend - **não há geração automática de tipos**, é duplicação manual disciplinada, mantida em sincronia pelo subagent `api-contract-reviewer`. Ponto de risco de drift: ao mudar um schema no backend, revisar o hook correspondente.
 - Nunca cor de paleta bruta (`text-gray-500`) nem `border` colorido + `bg/10` - usar a recipe de badge (ver seção shadcn abaixo)
 - Componente shadcn novo só via `pnpm dlx shadcn@latest add <nome>`; variante nova estende o `cva` existente, nunca cria componente irmão do zero
-- Ao criar tela/recurso novo, rodar `pnpm exec tsc --noEmit` (agent `build-checker`) pra validar
+- Ao criar tela/recurso novo, rodar `pnpm exec tsc --noEmit -p tsconfig.app.json` (agent `build-checker`) pra validar
 
 ---
 
@@ -107,4 +107,4 @@ Não é WebSocket nem polling do cliente - é Server-Sent Events, e o push só a
 Ao terminar uma tela/recurso novo (skill `new-resource`), passar por:
 1. `component-reviewer` - estrutura de pasta, `Props` como `type`, hook retornando objeto plano, `queryKey` com escopo completo, form sempre com `zodResolver`
 2. `api-contract-reviewer` - compara `hooks/use-<recurso>.ts` com `backend/src/modules/<recurso>/schemas/<recurso>.schema.ts` (campos, enums, rota/verbo, `RouteDestination` compartilhado)
-3. `build-checker` - `pnpm exec tsc --noEmit`
+3. `build-checker` - `pnpm exec tsc --noEmit -p tsconfig.app.json`

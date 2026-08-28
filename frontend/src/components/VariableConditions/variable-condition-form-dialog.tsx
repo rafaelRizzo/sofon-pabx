@@ -52,7 +52,6 @@ import { EntityFormDialogSkeletonContent } from "@/components/entity-form-dialog
 import { VariableRefPickerButton } from "@/components/VariableConditions/variable-ref-picker-button"
 import { type Company } from "@/hooks/use-companies"
 import { useVariableCatalog } from "@/hooks/use-variable-catalog"
-import { cn } from "@/lib/utils"
 import {
     createVariableConditionFormSchema,
     ruleNeedsValue,
@@ -373,12 +372,7 @@ export function VariableConditionFormDialog({
                                                                     key={
                                                                         field.id
                                                                     }
-                                                                    className={cn(
-                                                                        "grid items-start gap-2",
-                                                                        needsValue
-                                                                            ? "grid-cols-[1fr_9rem_1fr_1.75rem]"
-                                                                            : "grid-cols-[1fr_1fr_1.75rem]"
-                                                                    )}
+                                                                    className="grid grid-cols-[1fr_9rem_1fr_1.75rem] items-start gap-2"
                                                                 >
                                                                     <div>
                                                                         <div className="flex gap-1">
@@ -443,7 +437,13 @@ export function VariableConditionFormDialog({
                                                                             })()
                                                                         )}
                                                                     </div>
-                                                                    <div>
+                                                                    <div
+                                                                        className={
+                                                                            needsValue
+                                                                                ? undefined
+                                                                                : "col-span-2"
+                                                                        }
+                                                                    >
                                                                         <Select
                                                                             items={
                                                                                 OPERATOR_ITEMS
