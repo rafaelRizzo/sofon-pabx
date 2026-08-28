@@ -100,6 +100,12 @@ async function agiVerbose(conn: AgiConn, message: string, level = 1) {
     await sendAgiCommand(conn, `VERBOSE ${agiQuote(message)} ${level}`)
 }
 
+// VERBOSE tem limite prático de linha no console do Asterisk - corta payload/resposta grandes
+// (o app log via logger continua com o body inteiro, ver responseSample truncado em 1000 já usado ali)
+function truncateForVerbose(value: string, max = 300): string {
+    return value.length > max ? `${value.slice(0, max)}…(truncado)` : value
+}
+
 // SET CONTEXT/EXTENSION/PRIORITY são os comandos nativos do protocolo AGI pra redirecionar o
 // dialplan pra onde o script quer continuar QUANDO ele terminar - diferente de "EXEC Goto ctx,ext,pri"
 // (rodar a aplicação Goto por dentro do próprio AGI), que tem histórico de comportamento
@@ -271,8 +277,21 @@ async function handleIxcNode(conn: AgiConn, nodeId: string) {
         const controller = new AbortController()
         const timeout = setTimeout(() => controller.abort(), node.timeoutMs)
         try {
-            parsed = await runIxcAction({ baseUrl: credential.baseUrl, token }, node.action as IxcAction, params)
-            success = true
+            const result = await runIxcAction({ baseUrl: credential.baseUrl, token }, node.action as IxcAction, params)
+            parsed = result.data
+            success = result.ok
+            await agiVerbose(conn, `IXC Node "${node.name}": POST ${result.url} payload=${truncateForVerbose(JSON.stringify(result.payload))}`)
+            await agiVerbose(conn, `IXC Node "${node.name}": status=${result.status} resposta=${truncateForVerbose(result.rawBody)}`, success ? 1 : 2)
+            if (!success) {
+                logger.warn({
+                    event: 'agi.ixc_node.http_error',
+                    nodeId,
+                    action: node.action,
+                    url: result.url,
+                    status: result.status,
+                    responseSample: result.rawBody.slice(0, 1000),
+                })
+            }
         } finally {
             clearTimeout(timeout)
         }
@@ -295,6 +314,7 @@ async function handleIxcNode(conn: AgiConn, nodeId: string) {
     }
     if (unresolved.length > 0) {
         logger.warn({ event: 'agi.ixc_node.unresolved_mapping', nodeId, action: node.action, unresolved })
+        await agiVerbose(conn, `IXC Node "${node.name}": mapping não resolvido: ${unresolved.map((u) => `${u.variable}<=${u.path}`).join(', ')}`, 2)
     }
 
     logger.info({ event: 'agi.ixc_node.done', nodeId, action: node.action, success, mappings: mappings.length })
