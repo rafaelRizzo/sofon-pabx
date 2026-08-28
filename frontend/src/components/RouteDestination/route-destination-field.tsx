@@ -14,6 +14,7 @@ import {
     UsersIcon,
     WorkflowIcon,
     NetworkIcon,
+    WandSparklesIcon,
     type LucideIcon,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -49,6 +50,7 @@ export const ROUTE_DEST_TYPES = [
     "ivr",
     "request",
     "ixc",
+    "formatter",
     "variable-set",
     "variable-condition",
     "flow",
@@ -66,6 +68,7 @@ export const ROUTE_DEST_LABELS: Record<RouteDestinationType, string> = {
     ivr: "URA",
     request: "Request Template",
     ixc: "IXCsoft",
+    formatter: "Formatter",
     "variable-set": "Setar variável",
     "variable-condition": "Validar variável",
     flow: "Flow",
@@ -88,6 +91,7 @@ export const ROUTE_DEST_ICONS: Record<RouteDestinationType, LucideIcon> = {
     ivr: ListTreeIcon,
     request: GlobeIcon,
     ixc: NetworkIcon,
+    formatter: WandSparklesIcon,
     "variable-set": BracesIcon,
     "variable-condition": FilterIcon,
     flow: WorkflowIcon,
@@ -138,6 +142,11 @@ export const routeDestinationSchema = z
             label: labelSchema,
         }),
         z.object({
+            type: z.literal("formatter"),
+            id: idSchema,
+            label: labelSchema,
+        }),
+        z.object({
             type: z.literal("variable-set"),
             id: idSchema,
             label: labelSchema,
@@ -177,6 +186,7 @@ export const ROUTE_DEST_EMPTY_MESSAGES: Record<
     ivr: "Nenhuma URA cadastrada ainda",
     request: "Nenhum request template cadastrado ainda",
     ixc: "Nenhum nó IXCsoft cadastrado ainda",
+    formatter: "Nenhum formatter cadastrado ainda",
     "variable-set": "Nenhuma variável cadastrada ainda",
     "variable-condition": "Nenhuma condição de variável cadastrada ainda",
     flow: "Nenhum flow cadastrado ainda",
@@ -288,6 +298,16 @@ export async function fetchDestinationOptions(
                 name: string
             }[]
             return ixcNodes.map((n) => ({ id: n.id, label: n.name }))
+        }
+        case "formatter": {
+            const { data } = await api.get("/formatter-nodes", {
+                params: { companyId },
+            })
+            const formatterNodes = (data.formatterNodes ?? []) as {
+                id: string
+                name: string
+            }[]
+            return formatterNodes.map((n) => ({ id: n.id, label: n.name }))
         }
         case "variable-set": {
             const { data } = await api.get("/variables", {

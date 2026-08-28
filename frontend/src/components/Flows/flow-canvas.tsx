@@ -114,6 +114,11 @@ import {
     type IxcNodeUpdateForm,
 } from "@/hooks/use-ixc-nodes"
 import {
+    useFormatterNodes,
+    type FormatterNodeForm,
+    type FormatterNodeUpdateForm,
+} from "@/hooks/use-formatter-nodes"
+import {
     useTimeConditions,
     type TimeConditionForm,
     type TimeConditionCreationDto,
@@ -357,6 +362,7 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
     const { createQueue } = useQueues()
     const { createRequestTemplate } = useRequestTemplates()
     const { createIxcNode } = useIxcNodes()
+    const { createFormatterNode } = useFormatterNodes()
     const { createTimeCondition } = useTimeConditions()
     const { createHolidayGroup } = useHolidayGroups()
     const { createVariableSet } = useVariables()
@@ -910,6 +916,15 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
                         companyId,
                         true
                     )
+                case "formatter":
+                    return createFormatterNode(
+                        {
+                            ...(creationDto as FormatterNodeUpdateForm),
+                            companyId,
+                        } as FormatterNodeForm,
+                        companyId,
+                        true
+                    )
                 case "timecondition":
                     return createTimeCondition(
                         {
@@ -962,6 +977,7 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
             createQueue,
             createRequestTemplate,
             createIxcNode,
+            createFormatterNode,
             createTimeCondition,
             createHolidayGroup,
             createVariableSet,

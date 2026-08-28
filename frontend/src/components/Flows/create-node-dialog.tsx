@@ -8,6 +8,8 @@ import { RequestTemplateFormDialog } from "@/components/RequestTemplates/request
 import { useRequestTemplates } from "@/hooks/use-request-templates"
 import { IxcNodeFormDialog } from "@/components/Ixc/ixc-node-form-dialog"
 import { useIxcNodes } from "@/hooks/use-ixc-nodes"
+import { FormatterNodeFormDialog } from "@/components/FormatterNodes/formatter-node-form-dialog"
+import { useFormatterNodes } from "@/hooks/use-formatter-nodes"
 import { TimeConditionFormDialog } from "@/components/TimeConditions/time-condition-form-dialog"
 import { useTimeConditions } from "@/hooks/use-time-conditions"
 import { HolidayGroupFormDialog } from "@/components/HolidayGroups/holiday-group-form-dialog"
@@ -161,6 +163,31 @@ export function CreateNodeDialog({
                     companies={companies}
                     onSave={async (form) => {
                         const resourceId = await createIxcNode(
+                            form,
+                            companyId,
+                            true
+                        )
+                        if (!resourceId) return false
+                        const { companyId: _companyId, ...creationDto } = form
+                        await onCreated(
+                            { id: resourceId, label: form.name },
+                            creationDto
+                        )
+                        return true
+                    }}
+                />
+            )
+        }
+        case "formatter": {
+            const { createFormatterNode } = useFormatterNodes()
+            return (
+                <FormatterNodeFormDialog
+                    open={open}
+                    onOpenChange={onOpenChange}
+                    formatterNode={null}
+                    companies={companies}
+                    onSave={async (form) => {
+                        const resourceId = await createFormatterNode(
                             form,
                             companyId,
                             true

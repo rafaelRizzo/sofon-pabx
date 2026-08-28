@@ -21,6 +21,7 @@ export const CANVAS_NODE_TYPES: CanvasNodeType[] = [
     "extension",
     "request",
     "ixc",
+    "formatter",
     "timecondition",
     "holiday",
     "variable-set",
@@ -38,6 +39,7 @@ export type CanvasNodeAction =
     | "holiday"
     | "request"
     | "ixc"
+    | "formatter"
     | "variable-set"
     | "variable-condition"
     | "flow"
@@ -93,6 +95,12 @@ export const NODE_ACTIONS: NodeActionDefinition[] = [
         resourceTypes: ["ixc"],
     },
     {
+        id: "formatter",
+        label: "Formatar variável",
+        description: "Aplica uma máscara numa variável de canal.",
+        resourceTypes: ["formatter"],
+    },
+    {
         id: "variable-set",
         label: "Definir variável",
         description: "Executa um conjunto de variáveis.",
@@ -119,6 +127,7 @@ export const NODE_ACTION_LABELS: Record<CanvasNodeType, string> = {
     extension: "Transferir para ramal",
     request: "Executar requisição",
     ixc: "IXCsoft",
+    formatter: "Formatar variável",
     timecondition: "Verificar horário",
     holiday: "Verificar feriado",
     "variable-set": "Definir variável",
@@ -175,6 +184,12 @@ export const NODE_TYPE_CONFIG: Record<CanvasNodeType, NodeTypeConfig> = {
     },
     ixc: {
         apiPath: "ixc-nodes",
+        staticSlots: ["success", "error"],
+        slotField: { success: "onSuccess", error: "onError" },
+        creatable: true,
+    },
+    formatter: {
+        apiPath: "formatter-nodes",
         staticSlots: ["success", "error"],
         slotField: { success: "onSuccess", error: "onError" },
         creatable: true,

@@ -35,6 +35,7 @@ export const PERMISSION_RESOURCES = [
   { key: "variable-catalog", label: "Catálogo de Variáveis", category: "Automação" },
   { key: "integrations", label: "Credenciais de integração", category: "Automação" },
   { key: "ixc", label: "Nós IXCsoft", category: "Automação" },
+  { key: "formatter", label: "Nós Formatter", category: "Automação" },
 ] as const
 
 export type PermissionResourceKey = (typeof PERMISSION_RESOURCES)[number]["key"]

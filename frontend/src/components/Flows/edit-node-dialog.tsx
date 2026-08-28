@@ -26,6 +26,12 @@ import {
     toIxcNodeCreationDto,
     type IxcNode,
 } from "@/hooks/use-ixc-nodes"
+import { FormatterNodeFormDialog } from "@/components/FormatterNodes/formatter-node-form-dialog"
+import {
+    useFormatterNodes,
+    toFormatterNodeCreationDto,
+    type FormatterNode,
+} from "@/hooks/use-formatter-nodes"
 import { TimeConditionFormDialog } from "@/components/TimeConditions/time-condition-form-dialog"
 import {
     useTimeConditions,
@@ -256,6 +262,30 @@ export function EditNodeDialog({
                     }
                     onSave={async (form) => {
                         const ok = await updateIxcNode(id, form)
+                        if (ok) onSaved()
+                        return ok
+                    }}
+                />
+            )
+        }
+        case "formatter": {
+            const { entity, loading } = useEntityById<FormatterNode>(
+                NODE_TYPE_CONFIG.formatter.apiPath,
+                id
+            )
+            const { updateFormatterNode } = useFormatterNodes()
+            return (
+                <FormatterNodeFormDialog
+                    open={open}
+                    onOpenChange={onOpenChange}
+                    formatterNode={entity}
+                    loading={loading}
+                    companies={companies}
+                    onDelete={() =>
+                        entity && onDeleteResource?.(toFormatterNodeCreationDto(entity))
+                    }
+                    onSave={async (form) => {
+                        const ok = await updateFormatterNode(id, form)
                         if (ok) onSaved()
                         return ok
                     }}
