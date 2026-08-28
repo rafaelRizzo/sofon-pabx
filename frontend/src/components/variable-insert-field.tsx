@@ -1,5 +1,6 @@
 "use client"
 
+import { useCallback } from "react"
 import type {
     FieldValues,
     Path,
@@ -41,6 +42,16 @@ export function VariableInsertField<T extends FieldValues>({
 }: Props<T>) {
     const { elementRef, insert } = useVariableInsert<T>(name, setValue, getValues)
     const { ref, ...rest } = register(name)
+    // Ref merge memoizado - inline arrow function recriada a cada render forçava o RHF a
+    // desmontar/remontar o registro do campo a cada tecla digitada, travando a revalidação
+    // incremental (reValidateMode: "onChange") e deixando o erro do Zod preso na tela.
+    const mergedRef = useCallback(
+        (el: HTMLInputElement | HTMLTextAreaElement | null) => {
+            ref(el)
+            elementRef.current = el
+        },
+        [ref, elementRef]
+    )
 
     return (
         <div className="flex gap-1.5">
@@ -49,20 +60,14 @@ export function VariableInsertField<T extends FieldValues>({
                     placeholder={placeholder}
                     rows={rows}
                     className={className}
-                    ref={(el) => {
-                        ref(el)
-                        elementRef.current = el
-                    }}
+                    ref={mergedRef}
                     {...rest}
                 />
             ) : (
                 <Input
                     placeholder={placeholder}
                     className={className}
-                    ref={(el) => {
-                        ref(el)
-                        elementRef.current = el
-                    }}
+                    ref={mergedRef}
                     {...rest}
                 />
             )}

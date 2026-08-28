@@ -102,6 +102,7 @@ export function RequestTemplateFormDialog({
         formState: { errors, isSubmitting, isDirty },
     } = useForm<RequestTemplateForm>({
         resolver: zodResolver(createRequestTemplateFormSchema) as any,
+        mode: "onChange",
         defaultValues: {
             name: "",
             companyId: defaultCompanyId,
@@ -541,11 +542,18 @@ export function RequestTemplateFormDialog({
                                                         <FieldDescription>
                                                             Opcional. Precisa
                                                             ser um JSON válido;
-                                                            suporta{" "}
+                                                            use{" "}
                                                             <code>
                                                                 {"{{VAR}}"}
                                                             </code>{" "}
-                                                            nos valores.
+                                                            sempre entre aspas
+                                                            nos valores, ex:{" "}
+                                                            <code>
+                                                                {
+                                                                    '"campo": "{{VAR}}"'
+                                                                }
+                                                            </code>
+                                                            .
                                                         </FieldDescription>
                                                         {errors.body && (
                                                             <FieldError>

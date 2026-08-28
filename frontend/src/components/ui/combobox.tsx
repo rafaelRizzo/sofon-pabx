@@ -13,7 +13,14 @@ import {
 } from "@/components/ui/input-group"
 import { ChevronDownIcon, XIcon, CheckIcon } from "lucide-react"
 
-const Combobox = ComboboxPrimitive.Root
+function Combobox<Value, Multiple extends boolean | undefined = false>({
+    autoHighlight = true,
+    ...props
+}: ComboboxPrimitive.Root.Props<Value, Multiple>) {
+    return (
+        <ComboboxPrimitive.Root autoHighlight={autoHighlight} {...props} />
+    )
+}
 
 function ComboboxValue({ ...props }: ComboboxPrimitive.Value.Props) {
     return <ComboboxPrimitive.Value data-slot="combobox-value" {...props} />
