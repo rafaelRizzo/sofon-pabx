@@ -36,5 +36,8 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 /generated/prisma
 
-.claude
+.claude/*.json
+.claude/**/*.json
+.claude/*.lock
+.claude/**/*.lock
 .pnpm-store

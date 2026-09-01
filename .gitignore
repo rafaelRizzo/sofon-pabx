@@ -1,3 +1,6 @@
 .DS_Store
 rsync.sh
-.claude/
+.claude/*.json
+.claude/**/*.json
+.claude/*.lock
+.claude/**/*.lock

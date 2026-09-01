@@ -37,19 +37,41 @@ export function setAccessTokenCookie(token: string) {
   })
 }
 
-// refresh compartilhado: várias requests 401 simultâneas disparam um único /auth/refresh
+async function requestNewToken(): Promise<string> {
+  const { data } = await api.post("/auth/refresh")
+  setAccessTokenCookie(data.token)
+  return data.token as string
+}
+
+// refresh compartilhado: várias requests 401 simultâneas na MESMA aba disparam um único
+// /auth/refresh (dedupe local via essa promise em voo)
 let refreshing: Promise<string> | null = null
 
+// O refreshToken (cookie httpOnly) é de uso único - backend consome o JTI atomicamente e rejeita
+// reuso (ver auth.service.ts). Sem coordenação ENTRE abas, duas abas com o access token expirando
+// junto (comum: abas abertas na mesma sessão) mandam /auth/refresh quase ao mesmo tempo com o
+// mesmo cookie; uma ganha a rotação, a outra recebe 401 "Token revoked" e é deslogada à força -
+// mesmo a sessão continuando 100% válida na aba que ganhou. Web Locks API (suportada nos
+// browsers evergreen atuais) serializa isso entre abas do mesmo navegador: só uma aba por vez
+// entra no bloco abaixo; as que esperavam o lock reaproveitam o token que a vencedora já deixou
+// no cookie em vez de tentar rodar o refresh de novo com o refresh token já consumido.
+async function refreshTokenAcrossTabs(): Promise<string> {
+  if (typeof navigator === "undefined" || !("locks" in navigator)) {
+    return requestNewToken()
+  }
+
+  const tokenBeforeWait = cookies.get("token")
+  return navigator.locks.request("sofon-auth-refresh", async () => {
+    const current = cookies.get("token")
+    if (current && current !== tokenBeforeWait) return current as string
+    return requestNewToken()
+  })
+}
+
 export async function refreshToken(): Promise<string> {
-  refreshing ??= api
-    .post("/auth/refresh")
-    .then(({ data }) => {
-      setAccessTokenCookie(data.token)
-      return data.token as string
-    })
-    .finally(() => {
-      refreshing = null
-    })
+  refreshing ??= refreshTokenAcrossTabs().finally(() => {
+    refreshing = null
+  })
 
   try {
     return await refreshing
