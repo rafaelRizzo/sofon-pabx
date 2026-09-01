@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { timestamp, cuidParam, ok } from '../../../schemas/responses'
 import { variableNameSchema } from '../../../schemas/variable-name.schema'
+import { usedBySchema } from '../../../schemas/flow-reference-label'
 
 export const idParamSchema = z.object({ id: cuidParam })
 export const companyQuerySchema = z.object({ companyId: z.cuid2() })
@@ -24,6 +25,7 @@ export const VariableSchema = z.object({
     name: z.string(),
     companyId: z.string(),
     description: z.string().nullable(),
+    usedBy: usedBySchema,
     createdAt: timestamp,
     updatedAt: timestamp,
 })

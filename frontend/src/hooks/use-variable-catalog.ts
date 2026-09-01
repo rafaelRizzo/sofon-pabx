@@ -6,12 +6,14 @@ import { toast } from "sonner"
 import { z } from "zod"
 
 import { api, apiError } from "@/lib/api"
+import type { UsedByRef } from "@/components/RouteDestination/used-by-badge"
 
 export type Variable = {
     id: string
     name: string
     companyId: string
     description: string | null
+    usedBy: UsedByRef[]
     createdAt: string
     updatedAt: string
 }

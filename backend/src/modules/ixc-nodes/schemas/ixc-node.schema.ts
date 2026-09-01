@@ -7,7 +7,7 @@ export const idParamSchema = z.object({ id: cuidParam })
 export const companyQuerySchema = z.object({ companyId: z.cuid2() })
 export const optionalCompanyQuery = z.object({ companyId: z.cuid2().optional() })
 
-export const IXC_NODE_ACTIONS = ['listar_cliente', 'listar_boleto'] as const
+export const IXC_NODE_ACTIONS = ['listar_cliente', 'listar_boleto', 'listar_contrato'] as const
 
 // path avaliado sobre o JSON de resposta (ex: "cliente[0].id") - mesmo mecanismo de RequestTemplate
 const variableMappingSchema = z.object({

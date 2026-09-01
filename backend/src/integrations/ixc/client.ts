@@ -53,6 +53,11 @@ export const IXC_ACTIONS = {
         table: 'fn_areceber',
         defaultQtype: 'fn_areceber.id_cliente',
     },
+    listar_contrato: {
+        label: 'Listar contrato',
+        table: 'contrato',
+        defaultQtype: 'contrato.id_cliente',
+    },
 } as const
 
 export type IxcAction = keyof typeof IXC_ACTIONS

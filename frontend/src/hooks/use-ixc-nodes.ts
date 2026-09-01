@@ -9,12 +9,13 @@ import { api, apiError } from "@/lib/api"
 import { type RouteDestination } from "@/components/RouteDestination/route-destination-field"
 import type { UsedByRef } from "@/components/RouteDestination/used-by-badge"
 
-export const IXC_NODE_ACTIONS = ["listar_cliente", "listar_boleto"] as const
+export const IXC_NODE_ACTIONS = ["listar_cliente", "listar_boleto", "listar_contrato"] as const
 export type IxcNodeAction = (typeof IXC_NODE_ACTIONS)[number]
 
 export const IXC_NODE_ACTION_LABELS: Record<IxcNodeAction, string> = {
     listar_cliente: "Listar cliente",
     listar_boleto: "Listar boleto",
+    listar_contrato: "Listar contrato",
 }
 
 export type IxcVariableMapping = { path: string; variable: string }

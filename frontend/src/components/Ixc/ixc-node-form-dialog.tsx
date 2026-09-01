@@ -133,7 +133,7 @@ export function IxcNodeFormDialog({
     const { integrationCredentials } = useIntegrationCredentials(companyId, "ixc")
     const credentialItems = integrationCredentials.map((c) => ({ value: c.id, label: c.name }))
     const paramsWatch = watch("params")
-    const { variables: catalogVariables, createVariable } = useVariableCatalog(companyId)
+    const { variables: catalogVariables, createVariable, deleteVariable } = useVariableCatalog(companyId)
 
     const { testIxcNode, testing } = useIxcNodes()
     const [testResult, setTestResult] = useState<IxcTestResult | null>(null)
@@ -163,9 +163,12 @@ export function IxcNodeFormDialog({
         }
     }
 
+    // Prefixo IXC_ diferencia no catálogo (compartilhado entre todos os módulos) que a variável
+    // veio da resposta desse nó, não de um Formatter/IVR/Definir Variável
     function toVariableName(key: string) {
         const cleaned = key.replace(/[^A-Za-z0-9_]/g, "_").toUpperCase()
-        return (/^[A-Za-z_]/.test(cleaned) ? cleaned : `_${cleaned}`) || "VAR"
+        const base = (/^[A-Za-z_]/.test(cleaned) ? cleaned : `_${cleaned}`) || "VAR"
+        return `IXC_${base}`
     }
 
     // Caminho alternativo ao VariableCombobox (que só cria via digitação/Enter/+): aqui o nome vem
@@ -181,11 +184,34 @@ export function IxcNodeFormDialog({
         variableMappingFields.append({ path, variable: name }, { shouldFocus: false })
     }
 
+    const [mappingToRemove, setMappingToRemove] = useState<{
+        index: number
+        variableId: string
+        variableName: string
+    } | null>(null)
+
+    function requestRemoveMapping(index: number) {
+        const mapping = getValues(`variableMappings.${index}`)
+        const variable = catalogVariables.find((v) => v.name === mapping.variable)
+        if (!variable) {
+            variableMappingFields.remove(index)
+            return
+        }
+        setMappingToRemove({ index, variableId: variable.id, variableName: variable.name })
+    }
+
+    // Referência deste próprio nó a essa variável não conta como "em uso em outro lugar" - é
+    // justamente o mapeamento que o usuário está removendo agora
+    const mappingOtherUsages = (
+        catalogVariables.find((v) => v.id === mappingToRemove?.variableId)?.usedBy ?? []
+    ).filter((ref) => !(ref.sourceType === "ixcnode" && ref.sourceId === ixcNode?.id))
+
     useEffect(() => {
         if (!open) return
         setTestResult(null)
         setTestElapsedMs(null)
         setTestParamValues({})
+        setMappingToRemove(null)
         reset({
             name: ixcNode?.name ?? "",
             companyId: ixcNode?.companyId ?? defaultCompanyId,
@@ -201,6 +227,19 @@ export function IxcNodeFormDialog({
         const ok = await onSave(form)
         if (ok) onOpenChange(false)
     })
+
+    // Remove o mapeamento e já salva o nó agora (não espera o Salvar geral) - só assim a variável
+    // deixa de estar "em uso" por este nó no banco e o DELETE no catálogo não esbarra no próprio
+    // mapeamento que está sendo removido
+    async function removeMappingAndDeleteVariable(mapping: { index: number; variableId: string }) {
+        variableMappingFields.remove(mapping.index)
+        setMappingToRemove(null)
+        await handleSubmit(async (form) => {
+            const ok = await onSave(form)
+            if (!ok) return
+            await deleteVariable(mapping.variableId)
+        })()
+    }
 
     const hasIxcErrors = !!(errors.credentialId || errors.action || errors.timeoutMs || errors.params)
     const hasVariableErrors = !!errors.variableMappings
@@ -554,7 +593,7 @@ export function IxcNodeFormDialog({
                                                                             type="button"
                                                                             variant="outline"
                                                                             size="icon"
-                                                                            onClick={() => variableMappingFields.remove(index)}
+                                                                            onClick={() => requestRemoveMapping(index)}
                                                                         >
                                                                             <XIcon />
                                                                             <span className="sr-only">Remover mapeamento</span>
@@ -608,6 +647,66 @@ export function IxcNodeFormDialog({
                             }}
                         >
                             Descartar
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog
+                open={!!mappingToRemove}
+                onOpenChange={(o) => {
+                    if (!o) setMappingToRemove(null)
+                }}
+            >
+                <AlertDialogContent className="sm:max-w-md">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Remover mapeamento?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            A variável <code>{mappingToRemove?.variableName}</code> também existe no catálogo da
+                            empresa.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    {mappingOtherUsages.length > 0 ? (
+                        <div className="space-y-2 text-xs text-muted-foreground">
+                            <p>Ela ainda é usada em:</p>
+                            <ul className="list-disc space-y-0.5 pl-5">
+                                {mappingOtherUsages.map((ref) => (
+                                    <li key={`${ref.sourceType}:${ref.sourceId}:${ref.slot}`}>{ref.label}</li>
+                                ))}
+                            </ul>
+                            <p>Não é possível excluí-la enquanto isso - remova essas referências antes.</p>
+                        </div>
+                    ) : (
+                        <p className="text-xs text-muted-foreground">
+                            Nenhum outro nó ou módulo a utiliza hoje. Confirmar abaixo salva este nó agora e exclui a
+                            variável do catálogo.
+                        </p>
+                    )}
+                    <AlertDialogFooter className="flex-wrap">
+                        <AlertDialogCancel className="w-full sm:w-auto" disabled={isSubmitting}>
+                            Cancelar
+                        </AlertDialogCancel>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            className="w-full sm:w-auto"
+                            disabled={isSubmitting}
+                            onClick={() => {
+                                if (mappingToRemove) variableMappingFields.remove(mappingToRemove.index)
+                                setMappingToRemove(null)
+                            }}
+                        >
+                            Só o mapeamento
+                        </Button>
+                        <AlertDialogAction
+                            variant="destructive"
+                            className="w-full sm:w-auto"
+                            disabled={mappingOtherUsages.length > 0 || isSubmitting}
+                            onClick={() => {
+                                if (mappingToRemove) removeMappingAndDeleteVariable(mappingToRemove)
+                            }}
+                        >
+                            {isSubmitting ? "Excluindo..." : "Mapeamento e variável"}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

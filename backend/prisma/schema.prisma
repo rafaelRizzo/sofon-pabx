@@ -623,7 +623,7 @@ model IxcNode {
   company          Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
   credentialId     String
   credential       IntegrationCredential @relation(fields: [credentialId], references: [id], onDelete: Restrict)
-  action           String                @db.VarChar(40) // "listar_cliente" | "listar_boleto"
+  action           String                @db.VarChar(40) // "listar_cliente" | "listar_boleto" | "listar_contrato"
   // chave/valor com placeholders {{VAR}} resolvidos via AGI GET VARIABLE — mesmo padrão de
   // RequestTemplate.body, mas os campos aceitos variam por action (ver IXC_ACTIONS)
   params           Json                  @default("{}")

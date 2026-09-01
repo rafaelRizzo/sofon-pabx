@@ -1,13 +1,14 @@
 "use client"
 
 import { useState } from "react"
-import { ChevronRightIcon, ChevronDownIcon, PlusIcon } from "lucide-react"
+import { ChevronRightIcon, ChevronDownIcon, Loader2Icon, PlusIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 
 type Props = {
     data: unknown
-    onPick: (path: string, key: string) => void
+    onPick: (path: string, key: string) => void | Promise<void>
 }
 
 function buildPath(parentPath: string, key: string | number): string {
@@ -31,10 +32,11 @@ function JsonNode({
     label: string
     value: unknown
     path: string
-    onPick: (path: string, key: string) => void
+    onPick: (path: string, key: string) => void | Promise<void>
     depth: number
 }) {
     const [open, setOpen] = useState(depth < 1)
+    const [picking, setPicking] = useState(false)
     const isArray = Array.isArray(value)
     const isObject = !isArray && value !== null && typeof value === "object"
 
@@ -88,10 +90,21 @@ function JsonNode({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="ml-auto size-5 shrink-0 opacity-0 group-hover:opacity-100"
-                onClick={() => onPick(path, label)}
+                className={cn(
+                    "ml-auto size-5 shrink-0",
+                    picking ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+                )}
+                disabled={picking}
+                onClick={async () => {
+                    setPicking(true)
+                    try {
+                        await onPick(path, label)
+                    } finally {
+                        setPicking(false)
+                    }
+                }}
             >
-                <PlusIcon className="size-3" />
+                {picking ? <Loader2Icon className="size-3 animate-spin" /> : <PlusIcon className="size-3" />}
                 <span className="sr-only">Usar como variável</span>
             </Button>
         </div>

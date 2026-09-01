@@ -4,6 +4,7 @@ import { AppError } from '../../utils/errors/app.error'
 import type { CreateVariableInput, UpdateVariableInput } from './schemas/variable-catalog.schema'
 import type { Assignment } from '../variables/schemas/variable.schema'
 import type { IxcNodeVariableMapping } from '../ixc-nodes/schemas/ixc-node.schema'
+import { type UsedByRef } from '../../schemas/flow-reference-label'
 
 const select = {
     id: true,
@@ -14,13 +15,56 @@ const select = {
     updatedAt: true,
 } as const
 
-export const getVariablesByCompany = async (companyId: string) =>
-    prisma.variable.findMany({ where: { companyId }, select, orderBy: { name: 'asc' } })
+const USAGE_TYPE_LABELS = {
+    ivrmenu: 'Menu IVR',
+    variableset: 'Variáveis',
+    ixcnode: 'IXCsoft',
+} as const
+
+// Quem referencia esse nome de variável hoje - IvrMenu.variableName é coluna própria, já filtra no
+// banco; VariableSet.assignments e IxcNode.variableMappings são Json, então o filtro é em memória
+// (poucas dezenas de linhas por empresa, não justifica índice/jsonb query). Sem FK entre Variable e
+// essas tabelas (ver comentário do model no schema.prisma) - diferente do usedBy de destino de rota
+// (flow-reference-label.ts), que é resolvido via FlowEdgeRepository; aqui não há tabela de índice
+// reverso, então batcheamos manualmente por tipo de origem (1 query por tabela, não por variável).
+async function resolveVariablesUsedBy(names: string[], companyId: string): Promise<Map<string, UsedByRef[]>> {
+    const result = new Map<string, UsedByRef[]>(names.map((name) => [name, []]))
+    if (names.length === 0) return result
+
+    const [ivrMenus, variableSets, ixcNodes] = await Promise.all([
+        prisma.ivrMenu.findMany({ where: { companyId, variableName: { in: names } }, select: { id: true, name: true, variableName: true } }),
+        prisma.variableSet.findMany({ where: { companyId }, select: { id: true, name: true, assignments: true } }),
+        prisma.ixcNode.findMany({ where: { companyId }, select: { id: true, name: true, variableMappings: true } }),
+    ])
+
+    const push = (name: string, ref: UsedByRef) => result.get(name)?.push(ref)
+
+    for (const menu of ivrMenus) {
+        if (menu.variableName) push(menu.variableName, { sourceType: 'ivrmenu', sourceId: menu.id, slot: 'default', label: `${USAGE_TYPE_LABELS.ivrmenu}: ${menu.name}` })
+    }
+    for (const vs of variableSets) {
+        const assignedNames = new Set((vs.assignments as Assignment[]).map((a) => a.variable))
+        for (const name of assignedNames) push(name, { sourceType: 'variableset', sourceId: vs.id, slot: 'default', label: `${USAGE_TYPE_LABELS.variableset}: ${vs.name}` })
+    }
+    for (const node of ixcNodes) {
+        const mappedNames = new Set((node.variableMappings as IxcNodeVariableMapping[]).map((m) => m.variable))
+        for (const name of mappedNames) push(name, { sourceType: 'ixcnode', sourceId: node.id, slot: 'default', label: `${USAGE_TYPE_LABELS.ixcnode}: ${node.name}` })
+    }
+
+    return result
+}
+
+export const getVariablesByCompany = async (companyId: string) => {
+    const variables = await prisma.variable.findMany({ where: { companyId }, select, orderBy: { name: 'asc' } })
+    const usedByMap = await resolveVariablesUsedBy(variables.map((v) => v.name), companyId)
+    return variables.map((v) => ({ ...v, usedBy: usedByMap.get(v.name) ?? [] }))
+}
 
 export const getVariableById = async (id: string) => {
     const variable = await prisma.variable.findUnique({ where: { id }, select })
     if (!variable) throw new AppError('Variable not found', 404)
-    return variable
+    const usedByMap = await resolveVariablesUsedBy([variable.name], variable.companyId)
+    return { ...variable, usedBy: usedByMap.get(variable.name) ?? [] }
 }
 
 export const createVariable = async (data: CreateVariableInput) => {
@@ -55,30 +99,14 @@ export const updateVariable = async (id: string, data: UpdateVariableInput) => {
     })
 }
 
-// Quem referencia esse nome de variável hoje - IvrMenu.variableName é coluna própria, já filtra no
-// banco; VariableSet.assignments e IxcNode.variableMappings são Json, então o filtro é em memória
-// (poucas dezenas de linhas por empresa, não justifica índice/jsonb query). Sem FK entre Variable e
-// essas tabelas (ver comentário do model no schema.prisma), então a proteção de delete é manual, não
-// cascade/restrict do Prisma.
-const findUsage = async (name: string, companyId: string) => {
-    const [ivrMenus, variableSets, ixcNodes] = await Promise.all([
-        prisma.ivrMenu.findMany({ where: { companyId, variableName: name }, select: { name: true } }),
-        prisma.variableSet.findMany({ where: { companyId }, select: { name: true, assignments: true } }),
-        prisma.ixcNode.findMany({ where: { companyId }, select: { name: true, variableMappings: true } }),
-    ])
-    const usedBySets = variableSets.filter((vs) => (vs.assignments as Assignment[]).some((a) => a.variable === name))
-    const usedByIxcNodes = ixcNodes.filter((n) => (n.variableMappings as IxcNodeVariableMapping[]).some((m) => m.variable === name))
-    return { ivrMenus, variableSets: usedBySets, ixcNodes: usedByIxcNodes }
-}
-
 export const deleteVariable = async (id: string) => {
     const existing = await prisma.variable.findUnique({ where: { id } })
     if (!existing) throw new AppError('Variable not found', 404)
 
-    const usage = await findUsage(existing.name, existing.companyId)
-    const usedBy = [...usage.ivrMenus.map((m) => m.name), ...usage.variableSets.map((v) => v.name), ...usage.ixcNodes.map((n) => n.name)]
+    const usedByMap = await resolveVariablesUsedBy([existing.name], existing.companyId)
+    const usedBy = usedByMap.get(existing.name) ?? []
     if (usedBy.length > 0)
-        throw new AppError(`Variable is in use by: ${usedBy.join(', ')}`, 409)
+        throw new AppError(`Variable is in use by: ${usedBy.map((ref) => ref.label).join(', ')}`, 409)
 
     await prisma.variable.delete({ where: { id } })
 }

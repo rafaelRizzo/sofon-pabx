@@ -52,7 +52,7 @@ export const ixcNodesRoutes = async (app: FastifyInstance) => {
                 'Nó pré-configurado de integração com o IXCsoft, executado em tempo de chamada via AGI ' +
                 'quando referenciado como destino de rota (type: "ixc"). Aponta pra uma IxcCredential ' +
                 '(base URL + token, cadastrada uma vez em /ixc-credentials) e uma action fixa do catálogo ' +
-                '(listar_cliente/listar_boleto). params aceita placeholders {{VAR}} resolvidos via AGI GET ' +
+                '(listar_cliente/listar_boleto/listar_contrato). params aceita placeholders {{VAR}} resolvidos via AGI GET ' +
                 'VARIABLE. variableMappings extrai campos do JSON de resposta pra variáveis de canal.',
             security: [{ bearerAuth: [] }],
             body: createIxcNodeSchema,

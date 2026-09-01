@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/tooltip"
 import { type Company } from "@/hooks/use-companies"
 import { type Variable } from "@/hooks/use-variable-catalog"
+import { UsedByBadge } from "@/components/RouteDestination/used-by-badge"
 
 type Props = {
     variables: Variable[]
@@ -50,6 +51,7 @@ export function VariableCatalogTable({
                         <TableHead>Nome</TableHead>
                         <TableHead>Empresa</TableHead>
                         <TableHead>Descrição</TableHead>
+                        <TableHead>Usado em</TableHead>
                         <TableHead className="w-30 text-right">Ações</TableHead>
                     </TableRow>
                 </TableHeader>
@@ -57,7 +59,7 @@ export function VariableCatalogTable({
                     {loading ? (
                         Array.from({ length: 3 }).map((_, i) => (
                             <TableRow key={i}>
-                                {Array.from({ length: 4 }).map((_, j) => (
+                                {Array.from({ length: 5 }).map((_, j) => (
                                     <TableCell key={j}>
                                         <Skeleton className="h-4 w-full" />
                                     </TableCell>
@@ -67,7 +69,7 @@ export function VariableCatalogTable({
                     ) : variables.length === 0 ? (
                         <TableRow>
                             <TableCell
-                                colSpan={4}
+                                colSpan={5}
                                 className="h-24 text-center text-muted-foreground"
                             >
                                 {companySelected
@@ -88,6 +90,9 @@ export function VariableCatalogTable({
                                 </TableCell>
                                 <TableCell className="text-muted-foreground">
                                     {variable.description ?? "-"}
+                                </TableCell>
+                                <TableCell>
+                                    <UsedByBadge usedBy={variable.usedBy} />
                                 </TableCell>
                                 <TableCell>
                                     <TooltipProvider delay={100}>
