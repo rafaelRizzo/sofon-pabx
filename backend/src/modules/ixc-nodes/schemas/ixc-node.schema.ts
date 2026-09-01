@@ -39,8 +39,17 @@ export const updateIxcNodeSchema = z.object({
     onError: routeDestinationSchema.optional(),
 }).refine((d) => Object.keys(d).length > 0, { message: 'At least one field is required' })
 
+export const testIxcNodeSchema = z.object({
+    companyId: z.cuid2(),
+    credentialId: z.cuid2(),
+    action: z.enum(IXC_NODE_ACTIONS),
+    params: z.record(z.string(), z.string()).optional(),
+    timeoutMs: z.number().int().min(500).max(30000).default(5000),
+})
+
 export type CreateIxcNodeInput = z.infer<typeof createIxcNodeSchema>
 export type UpdateIxcNodeInput = z.infer<typeof updateIxcNodeSchema>
+export type TestIxcNodeInput = z.infer<typeof testIxcNodeSchema>
 export type IxcNodeVariableMapping = z.infer<typeof variableMappingSchema>
 
 export const IxcNodeSchema = z.object({
@@ -63,3 +72,13 @@ export const ListIxcNodesResponse = ok({ message: z.string(), ixcNodes: z.array(
 export const GetIxcNodeResponse = ok({ message: z.string(), ixcNode: IxcNodeSchema })
 export const CreateIxcNodeResponse = ok({ message: z.string(), ixcNodeId: z.string() })
 export const UpdateIxcNodeResponse = ok({ message: z.string() })
+
+const testIxcNodeResultSchema = z.object({
+    url: z.string(),
+    payload: z.record(z.string(), z.string()),
+    status: z.number(),
+    ok: z.boolean(),
+    data: z.unknown(),
+    rawBody: z.string(),
+})
+export const TestIxcNodeResponse = ok({ message: z.string(), result: testIxcNodeResultSchema })

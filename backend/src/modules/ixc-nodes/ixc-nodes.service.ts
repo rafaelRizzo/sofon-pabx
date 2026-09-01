@@ -1,5 +1,6 @@
 import { Prisma } from '../../../generated/prisma/client'
 import { prisma } from '../../lib/prisma'
+import { decryptForCompany } from '../../lib/crypto'
 import { getCompanyById } from '../companies/companies.service'
 import { IxcNodesCache } from './cache/ixc-nodes.cache'
 import { IxcNodeRepository } from '../../asterisk/destinations/ixc-node.repository'
@@ -9,7 +10,8 @@ import { validateRouteDestination, assertNotReferenced } from '../../schemas/rou
 import { resolveDestinationLabels, withDestinationLabel } from '../../schemas/route-destination-label'
 import { resolveUsedByLabels, type UsedByRef } from '../../schemas/flow-reference-label'
 import type { RouteDestination } from '../../schemas/route-destination.schema'
-import type { CreateIxcNodeInput, UpdateIxcNodeInput } from './schemas/ixc-node.schema'
+import type { CreateIxcNodeInput, UpdateIxcNodeInput, TestIxcNodeInput } from './schemas/ixc-node.schema'
+import { runIxcAction, type IxcAction } from '../../integrations/ixc/client'
 import { AppError } from '../../utils/errors/app.error'
 
 const select = {
@@ -220,6 +222,44 @@ export const updateIxcNode = async (id: string, data: UpdateIxcNodeInput) => {
         resolveUsedByLabels('ixc', [id], existing.companyId),
     ])
     return { ...node, onSuccess, onError, usedBy: usedByMap.get(id) ?? [] }
+}
+
+export const testIxcNode = async (data: TestIxcNodeInput) => {
+    await getCompanyById(data.companyId)
+    await assertCredentialBelongsToCompany(data.credentialId, data.companyId)
+
+    const credential = await prisma.integrationCredential.findUnique({ where: { id: data.credentialId } })
+    if (!credential) throw new AppError('Integration credential not found', 404)
+
+    const token = decryptForCompany(data.companyId, {
+        ciphertext: credential.tokenCiphertext,
+        iv: credential.tokenIv,
+        tag: credential.tokenTag,
+    })
+
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), data.timeoutMs)
+    try {
+        const result = await runIxcAction(
+            { baseUrl: credential.baseUrl, token },
+            data.action as IxcAction,
+            data.params ?? {},
+            controller.signal,
+        )
+        return {
+            url: result.url,
+            payload: result.payload,
+            status: result.status,
+            ok: result.ok,
+            data: result.data,
+            rawBody: result.rawBody.slice(0, 5000),
+        }
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        throw new AppError(`Falha ao conectar ao IXCsoft: ${message}`, 502)
+    } finally {
+        clearTimeout(timeout)
+    }
 }
 
 export const deleteIxcNode = async (id: string) => {

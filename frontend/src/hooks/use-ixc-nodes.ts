@@ -19,6 +19,22 @@ export const IXC_NODE_ACTION_LABELS: Record<IxcNodeAction, string> = {
 
 export type IxcVariableMapping = { path: string; variable: string }
 
+export type IxcTestResult = {
+    url: string
+    payload: Record<string, string>
+    status: number
+    ok: boolean
+    data: unknown
+    rawBody: string
+}
+
+export type IxcTestPayload = {
+    companyId: string
+    credentialId: string
+    action: IxcNodeAction
+    params: Record<string, string>
+}
+
 export type IxcNode = {
     id: string
     name: string
@@ -153,6 +169,20 @@ export function useIxcNodes(companyId?: string) {
         }
     }
 
+    const testMutation = useMutation({
+        mutationFn: (payload: IxcTestPayload) => api.post("/ixc-nodes/test", payload),
+    })
+
+    const testIxcNode = async (payload: IxcTestPayload): Promise<IxcTestResult | null> => {
+        try {
+            const { data } = await testMutation.mutateAsync(payload)
+            return data.result as IxcTestResult
+        } catch (err) {
+            toast.error(apiError(err, "Erro ao testar requisição IXCsoft"))
+            return null
+        }
+    }
+
     const deleteMutation = useMutation({
         mutationFn: (ixcNodeId: string) => api.delete(`/ixc-nodes/${ixcNodeId}`),
     })
@@ -184,5 +214,7 @@ export function useIxcNodes(companyId?: string) {
         createIxcNode,
         updateIxcNode,
         deleteIxcNode,
+        testIxcNode,
+        testing: testMutation.isPending,
     }
 }

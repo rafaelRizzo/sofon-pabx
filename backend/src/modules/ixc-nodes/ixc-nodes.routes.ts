@@ -4,8 +4,8 @@ import * as IxcNodesController from './ixc-nodes.controller'
 import { protectedRoute } from '../../middleware/scope.middleware'
 import { requirePermission } from '../../middleware/permission.middleware'
 import {
-    createIxcNodeSchema, updateIxcNodeSchema, idParamSchema, optionalCompanyQuery,
-    ListIxcNodesResponse, GetIxcNodeResponse, CreateIxcNodeResponse, UpdateIxcNodeResponse,
+    createIxcNodeSchema, updateIxcNodeSchema, testIxcNodeSchema, idParamSchema, optionalCompanyQuery,
+    ListIxcNodesResponse, GetIxcNodeResponse, CreateIxcNodeResponse, UpdateIxcNodeResponse, TestIxcNodeResponse,
 } from './schemas/ixc-node.schema'
 import { errors, deleted } from '../../schemas/responses'
 
@@ -65,6 +65,27 @@ export const ixcNodesRoutes = async (app: FastifyInstance) => {
             },
         },
     }, IxcNodesController.createIxcNode as any)
+
+    router.post('/ixc-nodes/test', {
+        onRequest: [...protectedRoute, requirePermission('ixc', 'manage')],
+        schema: {
+            tags: ['IXC'],
+            summary: 'Testar requisição IXCsoft (sem salvar)',
+            description:
+                'Executa credentialId+action+params direto contra o IXCsoft e devolve a resposta crua, ' +
+                'sem persistir nada. Usado pelo editor do nó pra o usuário ver o shape da resposta antes ' +
+                'de configurar variableMappings. Placeholders {{VAR}} em params não são resolvidos aqui ' +
+                '(sem canal/AGI) - devem ser enviados como valor literal de teste.',
+            security: [{ bearerAuth: [] }],
+            body: testIxcNodeSchema,
+            response: {
+                200: TestIxcNodeResponse,
+                401: errors[401],
+                403: errors[403],
+                404: errors[404],
+            },
+        },
+    }, IxcNodesController.testIxcNode as any)
 
     router.put('/ixc-nodes/:id', {
         onRequest: [...protectedRoute, requirePermission('ixc', 'manage')],

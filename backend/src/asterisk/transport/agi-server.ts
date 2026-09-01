@@ -280,7 +280,7 @@ async function handleIxcNode(conn: AgiConn, nodeId: string) {
         const controller = new AbortController()
         const timeout = setTimeout(() => controller.abort(), node.timeoutMs)
         try {
-            const result = await runIxcAction({ baseUrl: credential.baseUrl, token }, node.action as IxcAction, params)
+            const result = await runIxcAction({ baseUrl: credential.baseUrl, token }, node.action as IxcAction, params, controller.signal)
             parsed = result.data
             success = result.ok
             await agiVerbose(conn, `IXC Node "${node.name}": POST ${result.url} payload=${truncateForVerbose(JSON.stringify(result.payload))}`)

@@ -1,6 +1,6 @@
 import type { FastifyRequest, FastifyReply } from 'fastify'
 import * as IxcNodesService from './ixc-nodes.service'
-import { createIxcNodeSchema, updateIxcNodeSchema, idParamSchema, companyQuerySchema } from './schemas/ixc-node.schema'
+import { createIxcNodeSchema, updateIxcNodeSchema, testIxcNodeSchema, idParamSchema, companyQuerySchema } from './schemas/ixc-node.schema'
 import { handleError } from '../../utils/errors/handler.error'
 import { AppError } from '../../utils/errors/app.error'
 import { prisma } from '../../lib/prisma'
@@ -47,6 +47,17 @@ export const createIxcNode = async (req: FastifyRequest, reply: FastifyReply) =>
         req.scope.assertAccess(data.companyId)
         const ixcNode = await IxcNodesService.createIxcNode(data)
         return reply.status(201).send({ success: true, message: 'IXC node created successfully', ixcNodeId: ixcNode.id })
+    } catch (error) {
+        return handleError(reply, error, req)
+    }
+}
+
+export const testIxcNode = async (req: FastifyRequest, reply: FastifyReply) => {
+    try {
+        const data = testIxcNodeSchema.parse(req.body)
+        req.scope.assertAccess(data.companyId)
+        const result = await IxcNodesService.testIxcNode(data)
+        return reply.send({ success: true, message: 'IXC test executed', result })
     } catch (error) {
         return handleError(reply, error, req)
     }

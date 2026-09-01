@@ -20,7 +20,7 @@ export type IxcRequestResult = {
     data: unknown
 }
 
-async function ixcRequest(credential: IxcCredentialInput, table: string, filters: Record<string, string>): Promise<IxcRequestResult> {
+async function ixcRequest(credential: IxcCredentialInput, table: string, filters: Record<string, string>, signal?: AbortSignal): Promise<IxcRequestResult> {
     const url = `${credential.baseUrl.replace(/\/+$/, '')}/webservice/v1/${table}`
     const payload = { qtype: filters.qtype ?? '', query: filters.query ?? '', oper: filters.oper ?? '=', page: '1', rp: '20' }
     const res = await safeFetch(url, {
@@ -31,6 +31,7 @@ async function ixcRequest(credential: IxcCredentialInput, table: string, filters
             'Content-Type': 'application/json',
         },
         body: JSON.stringify(payload),
+        signal,
     })
     const rawBody = await res.text()
     let data: unknown = null
@@ -56,11 +57,11 @@ export const IXC_ACTIONS = {
 
 export type IxcAction = keyof typeof IXC_ACTIONS
 
-export async function runIxcAction(credential: IxcCredentialInput, action: IxcAction, params: Record<string, string>): Promise<IxcRequestResult> {
+export async function runIxcAction(credential: IxcCredentialInput, action: IxcAction, params: Record<string, string>, signal?: AbortSignal): Promise<IxcRequestResult> {
     const config = IXC_ACTIONS[action]
     return ixcRequest(credential, config.table, {
         qtype: params.qtype || config.defaultQtype,
         query: params.query ?? '',
         oper: params.oper ?? '=',
-    })
+    }, signal)
 }
