@@ -33,6 +33,20 @@ export const getIntegrationCredentialById = async (id: string) => {
     return credential
 }
 
+// Linha completa (com token cifrado) usada em tempo de chamada/teste - ver ixc-nodes.service.ts
+// (testIxcNode) e agi-server.ts (handleIxcNode). Cacheada por id: descriptografia acontece depois,
+// em cima do ciphertext já cacheado, então nunca guarda o token em texto puro.
+export const getIntegrationCredentialForCall = async (id: string) => {
+    const cached = await IntegrationCredentialsCache.getById(id)
+    if (cached) return cached as Awaited<ReturnType<typeof fetchForCall>>
+
+    const credential = await fetchForCall(id)
+    if (credential) await IntegrationCredentialsCache.setById(id, credential)
+    return credential
+}
+
+const fetchForCall = (id: string) => prisma.integrationCredential.findUnique({ where: { id } })
+
 export const createIntegrationCredential = async (data: CreateIntegrationCredentialInput) => {
     await getCompanyById(data.companyId)
 

@@ -2,6 +2,7 @@ import { Prisma } from '../../../generated/prisma/client'
 import { prisma } from '../../lib/prisma'
 import { decryptForCompany } from '../../lib/crypto'
 import { getCompanyById } from '../companies/companies.service'
+import { getIntegrationCredentialForCall } from '../integration-credentials/integration-credentials.service'
 import { IxcNodesCache } from './cache/ixc-nodes.cache'
 import { IxcNodeRepository } from '../../asterisk/destinations/ixc-node.repository'
 import { FlowEdgeRepository } from '../../asterisk/flows/flow-edge.repository'
@@ -228,7 +229,7 @@ export const testIxcNode = async (data: TestIxcNodeInput) => {
     await getCompanyById(data.companyId)
     await assertCredentialBelongsToCompany(data.credentialId, data.companyId)
 
-    const credential = await prisma.integrationCredential.findUnique({ where: { id: data.credentialId } })
+    const credential = await getIntegrationCredentialForCall(data.credentialId)
     if (!credential) throw new AppError('Integration credential not found', 404)
 
     const token = decryptForCompany(data.companyId, {

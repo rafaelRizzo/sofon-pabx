@@ -4,7 +4,6 @@ import { useState } from "react"
 import { ChevronRightIcon, ChevronDownIcon, PlusIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
 
 type Props = {
     data: unknown
@@ -113,7 +112,7 @@ export function IxcResponseTree({ data, onPick }: Props) {
     }
 
     return (
-        <div className={cn("max-h-64 space-y-0.5 overflow-auto rounded-md border p-2")}>
+        <div className="max-h-64 space-y-0.5 overflow-auto rounded-md border p-2">
             {entries.map(([key, v]) => (
                 <JsonNode
                     key={key}

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { PlusIcon, XIcon } from "lucide-react"
+import { Loader2Icon, PlusIcon, XIcon } from "lucide-react"
 import { useFieldArray, useForm } from "react-hook-form"
 
 import {
@@ -53,6 +53,7 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { type Company } from "@/hooks/use-companies"
 import { useIntegrationCredentials } from "@/hooks/use-integration-credentials"
@@ -72,7 +73,6 @@ const IXC_NODE_ACTION_ITEMS = IXC_NODE_ACTIONS.map((a) => ({
     label: IXC_NODE_ACTION_LABELS[a],
 }))
 
-const emptyParam = { key: "", value: "" }
 const emptyVariableMapping = { path: "", variable: "" }
 
 type Props = {
@@ -116,12 +116,11 @@ export function IxcNodeFormDialog({
             credentialId: "",
             action: "listar_cliente",
             timeoutMs: 5000,
-            params: [],
+            params: [{ key: "query", value: "" }],
             variableMappings: [],
         },
     })
 
-    const paramFields = useFieldArray({ control, name: "params" })
     const variableMappingFields = useFieldArray({ control, name: "variableMappings" })
 
     const companyId = watch("companyId")
@@ -135,11 +134,16 @@ export function IxcNodeFormDialog({
 
     const { testIxcNode, testing } = useIxcNodes()
     const [testResult, setTestResult] = useState<IxcTestResult | null>(null)
+    const [testElapsedMs, setTestElapsedMs] = useState<number | null>(null)
     const [testParamValues, setTestParamValues] = useState<Record<string, string>>({})
 
     function getTestValue(key: string, configuredValue: string) {
         if (testParamValues[key] !== undefined) return testParamValues[key]
         return configuredValue.includes("{{") ? "" : configuredValue
+    }
+
+    function updateTestValue(key: string, value: string) {
+        setTestParamValues((prev) => ({ ...prev, [key]: value }))
     }
 
     async function handleTestRequest() {
@@ -148,8 +152,12 @@ export function IxcNodeFormDialog({
             if (!row.key) continue
             resolvedParams[row.key] = getTestValue(row.key, row.value ?? "")
         }
+        const startedAt = performance.now()
         const result = await testIxcNode({ companyId, credentialId, action, params: resolvedParams })
-        if (result) setTestResult(result)
+        if (result) {
+            setTestResult(result)
+            setTestElapsedMs(Math.round(performance.now() - startedAt))
+        }
     }
 
     function toVariableName(key: string) {
@@ -166,6 +174,7 @@ export function IxcNodeFormDialog({
     useEffect(() => {
         if (!open) return
         setTestResult(null)
+        setTestElapsedMs(null)
         setTestParamValues({})
         reset({
             name: ixcNode?.name ?? "",
@@ -173,9 +182,7 @@ export function IxcNodeFormDialog({
             credentialId: ixcNode?.credentialId ?? "",
             action: ixcNode?.action ?? "listar_cliente",
             timeoutMs: ixcNode?.timeoutMs ?? 5000,
-            params: ixcNode?.params
-                ? Object.entries(ixcNode.params).map(([key, value]) => ({ key, value }))
-                : [],
+            params: [{ key: "query", value: ixcNode?.params?.query ?? "" }],
             variableMappings: ixcNode?.variableMappings ?? [],
         })
     }, [open, ixcNode, reset, defaultCompanyId])
@@ -201,7 +208,7 @@ export function IxcNodeFormDialog({
     return (
         <>
             <Dialog open={open} onOpenChange={requestClose}>
-                <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-2xl">
+                <DialogContent className="flex max-h-[90vh] flex-col overflow-hidden! sm:max-w-2xl">
                     {loading ? (
                         <EntityFormDialogSkeletonContent fieldCount={4} />
                     ) : (
@@ -332,67 +339,29 @@ export function IxcNodeFormDialog({
                                                     </Field>
 
                                                     <Field>
-                                                        <div className="flex items-center justify-between">
-                                                            <FieldLabel>Parâmetros</FieldLabel>
-                                                            <Button
-                                                                type="button"
-                                                                variant="outline"
-                                                                size="sm"
-                                                                onClick={() => paramFields.append(emptyParam, { shouldFocus: false })}
-                                                            >
-                                                                <PlusIcon />
-                                                                Adicionar
-                                                            </Button>
-                                                        </div>
+                                                        <FieldLabel>Parâmetros</FieldLabel>
                                                         <FieldDescription>
-                                                            Suporta placeholders <code>{"{{VAR}}"}</code> resolvidos via variável de canal
-                                                            no momento da chamada (ex: <code>query</code>: <code>{"{{CALLERID(num)}}"}</code>).
+                                                            Toda ação busca pela chave fixa <code>query</code> - só o valor é configurável.
+                                                            Suporta placeholders <code>{"{{VAR}}"}</code> resolvidos via variável de canal no
+                                                            momento da chamada (ex: <code>{"{{CALLERID(num)}}"}</code>).
                                                         </FieldDescription>
-                                                        {paramFields.fields.length === 0 ? (
-                                                            <FieldDescription>Nenhum parâmetro configurado.</FieldDescription>
-                                                        ) : (
-                                                            <div className="space-y-2 rounded-md border p-2">
-                                                                {paramFields.fields.map((field, index) => (
-                                                                    <div
-                                                                        key={field.id}
-                                                                        className="grid grid-cols-[1fr_1fr_1.75rem] items-start gap-2"
-                                                                    >
-                                                                        <div>
-                                                                            <Input
-                                                                                placeholder="query"
-                                                                                {...register(`params.${index}.key`)}
-                                                                            />
-                                                                            {errors.params?.[index]?.key && (
-                                                                                <FieldError>{errors.params[index]?.key?.message}</FieldError>
-                                                                            )}
-                                                                        </div>
-                                                                        <div>
-                                                                            <VariableInsertField
-                                                                                name={`params.${index}.value`}
-                                                                                register={register}
-                                                                                setValue={setValue}
-                                                                                getValues={getValues}
-                                                                                companyId={companyId}
-                                                                                placeholder="{{CALLERID(num)}}"
-                                                                                className="min-w-0"
-                                                                            />
-                                                                            {errors.params?.[index]?.value && (
-                                                                                <FieldError>{errors.params[index]?.value?.message}</FieldError>
-                                                                            )}
-                                                                        </div>
-                                                                        <Button
-                                                                            type="button"
-                                                                            variant="outline"
-                                                                            size="icon"
-                                                                            onClick={() => paramFields.remove(index)}
-                                                                        >
-                                                                            <XIcon />
-                                                                            <span className="sr-only">Remover parâmetro</span>
-                                                                        </Button>
-                                                                    </div>
-                                                                ))}
+                                                        <div className="grid grid-cols-[1fr_1fr] items-start gap-2 rounded-md border p-2">
+                                                            <Input value="query" disabled readOnly />
+                                                            <div>
+                                                                <VariableInsertField
+                                                                    name="params.0.value"
+                                                                    register={register}
+                                                                    setValue={setValue}
+                                                                    getValues={getValues}
+                                                                    companyId={companyId}
+                                                                    placeholder="{{CALLERID(num)}}"
+                                                                    className="min-w-0"
+                                                                />
+                                                                {errors.params?.[0]?.value && (
+                                                                    <FieldError>{errors.params[0]?.value?.message}</FieldError>
+                                                                )}
                                                             </div>
-                                                        )}
+                                                        </div>
                                                     </Field>
                                                 </FieldGroup>
                                             </TabsContent>
@@ -423,12 +392,7 @@ export function IxcNodeFormDialog({
                                                                                     <Input
                                                                                         placeholder="Valor de teste"
                                                                                         value={getTestValue(row.key, row.value ?? "")}
-                                                                                        onChange={(e) =>
-                                                                                            setTestParamValues((prev) => ({
-                                                                                                ...prev,
-                                                                                                [row.key]: e.target.value,
-                                                                                            }))
-                                                                                        }
+                                                                                        onChange={(e) => updateTestValue(row.key, e.target.value)}
                                                                                     />
                                                                                 </div>
                                                                             ) : null,
@@ -442,43 +406,67 @@ export function IxcNodeFormDialog({
                                                                     disabled={testing}
                                                                     onClick={handleTestRequest}
                                                                 >
+                                                                    {testing && <Loader2Icon className="animate-spin" />}
                                                                     {testing ? "Executando..." : "Executar teste"}
                                                                 </Button>
 
-                                                                {testResult && (
+                                                                {testing ? (
                                                                     <div className="space-y-2">
                                                                         <div className="flex items-center gap-2">
-                                                                            <Badge
-                                                                                variant="outline"
-                                                                                className={
-                                                                                    testResult.ok
-                                                                                        ? "border-transparent bg-emerald-500/15 text-emerald-600 dark:bg-emerald-400/20 dark:text-emerald-300"
-                                                                                        : "border-transparent bg-red-500/15 text-red-600 dark:bg-red-400/20 dark:text-red-300"
-                                                                                }
-                                                                            >
-                                                                                {testResult.status || "erro de rede"}
-                                                                            </Badge>
-                                                                            <span className="truncate text-xs text-muted-foreground">
-                                                                                {testResult.url}
-                                                                            </span>
+                                                                            <Skeleton className="h-5 w-14" />
+                                                                            <Skeleton className="h-4 w-48" />
                                                                         </div>
-                                                                        {testResult.data !== null && typeof testResult.data === "object" ? (
-                                                                            <>
-                                                                                <FieldDescription>
-                                                                                    Clique em <PlusIcon className="inline size-3" /> pra
-                                                                                    adicionar um campo ao mapeamento abaixo.
-                                                                                </FieldDescription>
-                                                                                <IxcResponseTree
-                                                                                    data={testResult.data}
-                                                                                    onPick={appendMappingFromPath}
+                                                                        <div className="max-h-64 space-y-1.5 overflow-hidden rounded-md border p-2">
+                                                                            {[...Array(6)].map((_, i) => (
+                                                                                <Skeleton
+                                                                                    key={i}
+                                                                                    className="h-3.5"
+                                                                                    style={{ width: `${70 - i * 6}%` }}
                                                                                 />
-                                                                            </>
-                                                                        ) : (
-                                                                            <pre className="max-h-64 overflow-auto rounded-md border p-2 font-mono text-xs whitespace-pre-wrap">
-                                                                                {testResult.rawBody || "(resposta vazia)"}
-                                                                            </pre>
-                                                                        )}
+                                                                            ))}
+                                                                        </div>
                                                                     </div>
+                                                                ) : (
+                                                                    testResult && (
+                                                                        <div className="space-y-2">
+                                                                            <div className="flex items-center gap-2">
+                                                                                <Badge
+                                                                                    variant="outline"
+                                                                                    className={
+                                                                                        testResult.ok
+                                                                                            ? "border-transparent bg-emerald-500/15 text-emerald-600 dark:bg-emerald-400/20 dark:text-emerald-300"
+                                                                                            : "border-transparent bg-red-500/15 text-red-600 dark:bg-red-400/20 dark:text-red-300"
+                                                                                    }
+                                                                                >
+                                                                                    {testResult.status || "erro de rede"}
+                                                                                </Badge>
+                                                                                <span className="truncate text-xs text-muted-foreground">
+                                                                                    {testResult.url}
+                                                                                </span>
+                                                                                {testElapsedMs !== null && (
+                                                                                    <span className="ml-auto shrink-0 text-xs text-muted-foreground">
+                                                                                        {testElapsedMs}ms
+                                                                                    </span>
+                                                                                )}
+                                                                            </div>
+                                                                            {testResult.data !== null && typeof testResult.data === "object" ? (
+                                                                                <>
+                                                                                    <FieldDescription>
+                                                                                        Clique em <PlusIcon className="inline size-3" /> pra
+                                                                                        adicionar um campo ao mapeamento abaixo.
+                                                                                    </FieldDescription>
+                                                                                    <IxcResponseTree
+                                                                                        data={testResult.data}
+                                                                                        onPick={appendMappingFromPath}
+                                                                                    />
+                                                                                </>
+                                                                            ) : (
+                                                                                <pre className="max-h-64 overflow-auto rounded-md border p-2 font-mono text-xs whitespace-pre-wrap">
+                                                                                    {testResult.rawBody || "(resposta vazia)"}
+                                                                                </pre>
+                                                                            )}
+                                                                        </div>
+                                                                    )
                                                                 )}
                                                             </div>
                                                         )}

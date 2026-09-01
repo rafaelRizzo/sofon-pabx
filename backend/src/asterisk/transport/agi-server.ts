@@ -14,6 +14,7 @@ import { finalizeByQueueStatus } from '../../modules/queue-calls/queue-calls.ser
 import type { VariableMapping } from '../../modules/request-templates/schemas/request-template.schema'
 import { decryptForCompany } from '../../lib/crypto'
 import { runIxcAction, type IxcAction } from '../../integrations/ixc/client'
+import { getIntegrationCredentialForCall } from '../../modules/integration-credentials/integration-credentials.service'
 import { evaluateRule, evaluateRules, type VariableRule, type Combinator } from '../destinations/variablecondition.repository'
 import { applyMask } from '../../utils/format-mask'
 
@@ -256,7 +257,7 @@ async function handleIxcNode(conn: AgiConn, nodeId: string) {
         logger.warn({ event: 'agi.ixc_node.not_found', nodeId })
         return
     }
-    const credential = await prisma.integrationCredential.findUnique({ where: { id: node.credentialId } })
+    const credential = await getIntegrationCredentialForCall(node.credentialId)
     if (!credential) {
         logger.warn({ event: 'agi.ixc_node.credential_not_found', nodeId, credentialId: node.credentialId })
         return
