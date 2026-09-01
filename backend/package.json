@@ -40,7 +40,7 @@
     "private": true,
     "scripts": {
         "dev": "bun run --watch src/server.ts",
-        "build": "bun build --target=bun src/server.ts --outdir=dist --minify --sourcemap=external",
+        "build": "bun build --target=bun src/server.ts src/scripts/backfill-dialplan-files.ts --outdir=dist --minify --sourcemap=external",
         "start": "bun dist/server.js",
         "migrate": "bun run prisma migrate dev",
         "deploy": "bun run prisma deploy",

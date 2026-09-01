@@ -34,15 +34,15 @@ describe('buildDialplan (IVR)', () => {
         expect(byPriority.get(6)).toMatchObject({ app: 'GotoIf', appdata: '$[${LEN(${IVR_DIGITS})} > 1]?13' })
         expect(byPriority.get(7)).toMatchObject({ app: 'GotoIf', appdata: '$["${IVR_DIGITS}"="1"]?ramais,1001,1' })
         expect(byPriority.get(8)).toMatchObject({ app: 'GotoIf', appdata: '$["${IVR_DIGITS}"="2"]?queues-app,q-1,1' })
-        expect(byPriority.get(9)).toMatchObject({ app: 'Set', appdata: '__IVR_INV=$[${__IVR_INV}+1]' })
-        expect(byPriority.get(10)).toMatchObject({ app: 'GotoIf', appdata: '$[${__IVR_INV} > 3]?12' })
+        expect(byPriority.get(9)).toMatchObject({ app: 'Set', appdata: '__IVR_INV=$[${IVR_INV}+1]' })
+        expect(byPriority.get(10)).toMatchObject({ app: 'GotoIf', appdata: '$[${IVR_INV} > 3]?12' })
         expect(byPriority.get(11)).toMatchObject({ app: 'Goto', appdata: '4' })
         expect(byPriority.get(12)).toMatchObject({ app: 'Goto', appdata: 'ramais,1002,1' })
         // MULTI_SET: sem variableName, vira NoOp, mantém a numeração fixa independente do type
         expect(byPriority.get(13)).toMatchObject({ app: 'NoOp', appdata: null })
         expect(byPriority.get(14)).toMatchObject({ app: 'Goto', appdata: '9' }) // sem longTarget, cai no invalid loop
-        expect(byPriority.get(15)).toMatchObject({ app: 'Set', appdata: '__IVR_TMO=$[${__IVR_TMO}+1]' })
-        expect(byPriority.get(16)).toMatchObject({ app: 'GotoIf', appdata: '$[${__IVR_TMO} > 3]?18' })
+        expect(byPriority.get(15)).toMatchObject({ app: 'Set', appdata: '__IVR_TMO=$[${IVR_TMO}+1]' })
+        expect(byPriority.get(16)).toMatchObject({ app: 'GotoIf', appdata: '$[${IVR_TMO} > 3]?18' })
         expect(byPriority.get(17)).toMatchObject({ app: 'Goto', appdata: '4' })
         expect(byPriority.get(18)).toMatchObject({ app: 'Hangup', appdata: null }) // sem timeoutTarget
         expect(byPriority.get(19)).toMatchObject({ app: 'Hangup', appdata: null })

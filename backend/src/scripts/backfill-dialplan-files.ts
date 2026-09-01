@@ -1,20 +1,26 @@
-// One-off: gera os arquivos estáticos de dialplan (/etc/asterisk/dialplan-extra/**) pra todas as
-// empresas já existentes no banco - necessário depois do deploy que trocou holidays/timeconditions/
-// announcements/ivrs/queues-app/request-templates/variables/variable-conditions/callcenter-surveys
-// de Realtime pra arquivo, já que `regenerate()` só roda automaticamente em create/update/delete
-// daqui pra frente (também útil depois de reinstalação do Asterisk que apagou dialplan-extra/
-// mas manteve o banco intacto). Rodar uma vez no VPS:
+// Gera os arquivos estáticos de dialplan (/etc/asterisk/dialplan-extra/**) pra todas as empresas
+// já existentes no banco. Roda sozinho em todo restart do container (entrypoint.sh, junto com
+// `prisma migrate deploy`, só em PROCESS_ROLE != web) - é a "migration" genérica pra qualquer
+// bug/ajuste no *gerador* de dialplan (buildDialplan/regenerate de qualquer repository) que não
+// mexe em schema: o fix só se reflete nas chamadas novas até esse script rodar e reescrever os
+// .conf já materializados com o template antigo. Autocura também depois de reinstalação do
+// Asterisk que apagou dialplan-extra/ mas manteve o banco intacto.
+// Rodar manualmente (ex: local contra .env apontando pro banco certo, sem esperar o próximo restart):
 //   bun run src/scripts/backfill-dialplan-files.ts
 import { prisma } from '../lib/prisma'
-import { HolidayGroupRepository } from '../asterisk/holidaygroup.repository'
-import { TimeConditionRepository } from '../asterisk/timecondition.repository'
-import { AnnouncementRepository } from '../asterisk/announcement.repository'
-import { IvrRepository } from '../asterisk/ivr.repository'
-import { AsteriskQueueRepository } from '../asterisk/queue.repository'
-import { RequestTemplateRepository } from '../asterisk/request-template.repository'
-import { VariableRepository } from '../asterisk/variable.repository'
-import { VariableConditionRepository } from '../asterisk/variablecondition.repository'
-import { CallcenterSurveyRepository } from '../asterisk/callcenter-survey.repository'
+import { HolidayGroupRepository } from '../asterisk/destinations/holidaygroup.repository'
+import { TimeConditionRepository } from '../asterisk/destinations/timecondition.repository'
+import { AnnouncementRepository } from '../asterisk/destinations/announcement.repository'
+import { IvrRepository } from '../asterisk/destinations/ivr.repository'
+import { AsteriskQueueRepository } from '../asterisk/destinations/queue.repository'
+import { RequestTemplateRepository } from '../asterisk/destinations/request-template.repository'
+import { VariableRepository } from '../asterisk/destinations/variable.repository'
+import { VariableConditionRepository } from '../asterisk/destinations/variablecondition.repository'
+import { CallcenterSurveyRepository } from '../asterisk/destinations/callcenter-survey.repository'
+import { FormatterNodeRepository } from '../asterisk/destinations/formatter-node.repository'
+import { IxcNodeRepository } from '../asterisk/destinations/ixc-node.repository'
+import { FlowRepository } from '../asterisk/flows/flow.repository'
+import { FlowNodeRepository } from '../asterisk/flows/flow-node.repository'
 
 async function main() {
     const companies = await prisma.company.findMany({ select: { id: true, name: true } })
@@ -25,12 +31,16 @@ async function main() {
         await HolidayGroupRepository.regenerate(company.id)
         await TimeConditionRepository.regenerate(company.id)
         await AnnouncementRepository.regenerate(company.id)
-        await IvrRepository.regenerate(company.id)
-        await AsteriskQueueRepository.regenerate(company.id)
+        await IvrRepository.regenerate(company.id) // já regenera flow-nodes internamente (IVRs por instância)
+        await AsteriskQueueRepository.regenerate(company.id) // já regenera flow-nodes internamente
         await RequestTemplateRepository.regenerate(company.id)
         await VariableRepository.regenerate(company.id)
         await VariableConditionRepository.regenerate(company.id)
         await CallcenterSurveyRepository.regenerate(company.id)
+        await FormatterNodeRepository.regenerate(company.id)
+        await IxcNodeRepository.regenerate(company.id)
+        await FlowRepository.regenerate(company.id)
+        await FlowNodeRepository.regenerate(company.id) // idempotente mesmo já rodado via Ivr/Queue acima
     }
 
     console.log('Backfill concluído.')

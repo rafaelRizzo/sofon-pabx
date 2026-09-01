@@ -86,16 +86,16 @@ export function buildDialplan(
         push(DIGITS_START + i, 'GotoIf', `$["\${IVR_DIGITS}"="${opt.digit}"]?${opt.target ?? HANGUP}`)
     })
 
-    push(INVALID_INCR, 'Set', '__IVR_INV=$[${__IVR_INV}+1]')
-    push(INVALID_CHECK, 'GotoIf', `$[\${__IVR_INV} > ${cfg.invalidRetries}]?${INVALID_DEST}`)
+    push(INVALID_INCR, 'Set', '__IVR_INV=$[${IVR_INV}+1]')
+    push(INVALID_CHECK, 'GotoIf', `$[\${IVR_INV} > ${cfg.invalidRetries}]?${INVALID_DEST}`)
     push(INVALID_RETRY, 'Goto', `${READ}`)
     push(INVALID_DEST, invalidTarget ? 'Goto' : 'Hangup', invalidTarget)
 
     push(MULTI_SET, cfg.variableName ? 'Set' : 'NoOp', cfg.variableName ? `${cfg.variableName}=\${IVR_DIGITS}` : null)
     push(MULTI_GOTO, 'Goto', longTarget ?? `${INVALID_INCR}`)
 
-    push(TIMEOUT_INCR, 'Set', '__IVR_TMO=$[${__IVR_TMO}+1]')
-    push(TIMEOUT_CHECK2, 'GotoIf', `$[\${__IVR_TMO} > ${cfg.timeoutRetries}]?${TIMEOUT_DEST}`)
+    push(TIMEOUT_INCR, 'Set', '__IVR_TMO=$[${IVR_TMO}+1]')
+    push(TIMEOUT_CHECK2, 'GotoIf', `$[\${IVR_TMO} > ${cfg.timeoutRetries}]?${TIMEOUT_DEST}`)
     push(TIMEOUT_RETRY, 'Goto', `${READ}`)
     push(TIMEOUT_DEST, timeoutTarget ? 'Goto' : 'Hangup', timeoutTarget)
 
