@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { timestamp, cuidParam, ok } from "../../../schemas/responses";
 import {
+  ROUTE_DEST_TYPES,
   routeDestinationSchema,
   routeDestinationResponseSchema,
 } from "../../../schemas/route-destination.schema";
@@ -17,21 +18,7 @@ export const flowNodeEdgeParamSchema = z.object({
 });
 export const companyQuerySchema = z.object({ companyId: z.cuid2() });
 
-export const flowNodeTypeSchema = z.enum([
-  "extension",
-  "queue",
-  "voicemail",
-  "timecondition",
-  "holiday",
-  "announcement",
-  "ivr",
-  "request",
-  "ixc",
-  "variable-set",
-  "variable-condition",
-  "flow",
-  "hangup",
-]);
+export const flowNodeTypeSchema = z.enum(ROUTE_DEST_TYPES);
 
 const positionSchema = z.object({ x: z.number(), y: z.number() });
 
