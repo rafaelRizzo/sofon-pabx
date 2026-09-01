@@ -55,8 +55,8 @@ export const IXC_ACTIONS = {
     },
     listar_contrato: {
         label: 'Listar contrato',
-        table: 'contrato',
-        defaultQtype: 'contrato.id_cliente',
+        table: 'cliente_contrato',
+        defaultQtype: 'cliente_contrato.id',
     },
 } as const
 
