@@ -88,3 +88,30 @@ describe('IxcNodesService.testIxcNode', () => {
         ).rejects.toMatchObject({ statusCode: 502, message: expect.stringContaining('fetch failed') })
     })
 })
+
+describe('IxcNodesService.createIxcNode', () => {
+    it('throws 404 when a variableMappings entry is not registered in the company catalog', async () => {
+        db.company.findUnique.mockResolvedValue(COMPANY)
+        db.integrationCredential.findUnique.mockResolvedValue(CREDENTIAL)
+        db.ixcNode.findUnique.mockResolvedValue(null) // no duplicate name
+        db.variable.findUnique.mockResolvedValue(null) // TOTAL not in catalog
+
+        await expect(
+            IxcNodesService.createIxcNode({
+                name: 'consulta-cliente', companyId: 'c1', credentialId: 'cred1', action: 'listar_cliente',
+                timeoutMs: 5000, variableMappings: [{ path: 'total', variable: 'TOTAL' }],
+            }),
+        ).rejects.toMatchObject({ statusCode: 404 })
+    })
+})
+
+describe('IxcNodesService.updateIxcNode', () => {
+    it('throws 404 when a variableMappings entry is not registered in the company catalog', async () => {
+        db.ixcNode.findUnique.mockResolvedValue({ id: 'node1', name: 'consulta-cliente', companyId: 'c1' })
+        db.variable.findUnique.mockResolvedValue(null) // TOTAL not in catalog
+
+        await expect(
+            IxcNodesService.updateIxcNode('node1', { variableMappings: [{ path: 'total', variable: 'TOTAL' }] }),
+        ).rejects.toMatchObject({ statusCode: 404 })
+    })
+})

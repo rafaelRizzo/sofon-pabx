@@ -10,11 +10,26 @@ export const optionalCompanyQuery = z.object({ companyId: z.cuid2().optional() }
 export const INTEGRATION_PROVIDERS = ['ixc'] as const
 export const providerQuerySchema = z.object({ provider: z.enum(INTEGRATION_PROVIDERS).optional() })
 
+// só protocolo + domínio - o client de cada provedor monta o path da API (ex: /webservice/v1/cliente)
+// a partir do baseUrl puro, então um path aqui duplicaria/quebraria a URL final da requisição
+const baseUrlSchema = z
+    .string()
+    .url()
+    .max(255)
+    .refine((v) => {
+        try {
+            const u = new URL(v)
+            return (u.pathname === '' || u.pathname === '/') && !u.search && !u.hash
+        } catch {
+            return false
+        }
+    }, 'Informe só protocolo e domínio, sem caminho (ex: https://seudominio.com.br)')
+
 export const createIntegrationCredentialSchema = z.object({
     provider: z.enum(INTEGRATION_PROVIDERS),
     name: z.string().min(1).max(80),
     companyId: z.cuid2(),
-    baseUrl: z.string().url().max(255),
+    baseUrl: baseUrlSchema,
     // token da API do provedor - nunca armazenado em texto puro (ver src/lib/crypto.ts) e nunca
     // retornado em GET; pra trocar, reenviar o campo inteiro
     token: z.string().min(1).max(500),
@@ -22,7 +37,7 @@ export const createIntegrationCredentialSchema = z.object({
 
 export const updateIntegrationCredentialSchema = z.object({
     name: z.string().min(1).max(80).optional(),
-    baseUrl: z.string().url().max(255).optional(),
+    baseUrl: baseUrlSchema.optional(),
     token: z.string().min(1).max(500).optional(),
 }).refine((d) => Object.keys(d).length > 0, { message: 'At least one field is required' })
 

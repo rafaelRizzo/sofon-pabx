@@ -184,6 +184,17 @@ export function IntegrationCredentialFormDialog({ open, onOpenChange, integratio
                                 <FieldLabel>Base URL</FieldLabel>
                                 <Input placeholder="https://seudominio.ixcsoft.com.br" {...register("baseUrl")} />
                                 {errors.baseUrl && <FieldError>{errors.baseUrl.message}</FieldError>}
+                                <FieldDescription>
+                                    Só protocolo e domínio, sem caminho - ex:{" "}
+                                    <code className="break-all rounded bg-muted px-1 py-0.5 font-mono text-foreground">
+                                        https://seudominio.ixcsoft.com.br
+                                    </code>
+                                    , nunca{" "}
+                                    <code className="break-all rounded bg-muted px-1 py-0.5 font-mono text-foreground">
+                                        .../webservice/v1/...
+                                    </code>
+                                    .
+                                </FieldDescription>
                             </Field>
 
                             <Field>

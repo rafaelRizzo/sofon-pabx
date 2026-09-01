@@ -3,6 +3,7 @@ import { getCompanyById } from '../companies/companies.service'
 import { AppError } from '../../utils/errors/app.error'
 import type { CreateVariableInput, UpdateVariableInput } from './schemas/variable-catalog.schema'
 import type { Assignment } from '../variables/schemas/variable.schema'
+import type { IxcNodeVariableMapping } from '../ixc-nodes/schemas/ixc-node.schema'
 
 const select = {
     id: true,
@@ -55,16 +56,19 @@ export const updateVariable = async (id: string, data: UpdateVariableInput) => {
 }
 
 // Quem referencia esse nome de variável hoje - IvrMenu.variableName é coluna própria, já filtra no
-// banco; VariableSet.assignments é Json, então o filtro é em memória (poucas dezenas de linhas por
-// empresa, não justifica índice/jsonb query). Sem FK entre Variable e essas tabelas (ver comentário
-// do model no schema.prisma), então a proteção de delete é manual, não cascade/restrict do Prisma.
+// banco; VariableSet.assignments e IxcNode.variableMappings são Json, então o filtro é em memória
+// (poucas dezenas de linhas por empresa, não justifica índice/jsonb query). Sem FK entre Variable e
+// essas tabelas (ver comentário do model no schema.prisma), então a proteção de delete é manual, não
+// cascade/restrict do Prisma.
 const findUsage = async (name: string, companyId: string) => {
-    const [ivrMenus, variableSets] = await Promise.all([
+    const [ivrMenus, variableSets, ixcNodes] = await Promise.all([
         prisma.ivrMenu.findMany({ where: { companyId, variableName: name }, select: { name: true } }),
         prisma.variableSet.findMany({ where: { companyId }, select: { name: true, assignments: true } }),
+        prisma.ixcNode.findMany({ where: { companyId }, select: { name: true, variableMappings: true } }),
     ])
     const usedBySets = variableSets.filter((vs) => (vs.assignments as Assignment[]).some((a) => a.variable === name))
-    return { ivrMenus, variableSets: usedBySets }
+    const usedByIxcNodes = ixcNodes.filter((n) => (n.variableMappings as IxcNodeVariableMapping[]).some((m) => m.variable === name))
+    return { ivrMenus, variableSets: usedBySets, ixcNodes: usedByIxcNodes }
 }
 
 export const deleteVariable = async (id: string) => {
@@ -72,7 +76,7 @@ export const deleteVariable = async (id: string) => {
     if (!existing) throw new AppError('Variable not found', 404)
 
     const usage = await findUsage(existing.name, existing.companyId)
-    const usedBy = [...usage.ivrMenus.map((m) => m.name), ...usage.variableSets.map((v) => v.name)]
+    const usedBy = [...usage.ivrMenus.map((m) => m.name), ...usage.variableSets.map((v) => v.name), ...usage.ixcNodes.map((n) => n.name)]
     if (usedBy.length > 0)
         throw new AppError(`Variable is in use by: ${usedBy.join(', ')}`, 409)
 

@@ -70,6 +70,7 @@ describe('VariableCatalogService.deleteVariable', () => {
         db.variable.findUnique.mockResolvedValue(VARIABLE)
         db.ivrMenu.findMany.mockResolvedValue([])
         db.variableSet.findMany.mockResolvedValue([])
+        db.ixcNode.findMany.mockResolvedValue([])
         await VariableCatalogService.deleteVariable('var1')
         expect(db.variable.delete).toHaveBeenCalledWith({ where: { id: 'var1' } })
     })
@@ -84,6 +85,7 @@ describe('VariableCatalogService.deleteVariable', () => {
         db.variable.findUnique.mockResolvedValue(VARIABLE)
         db.ivrMenu.findMany.mockResolvedValue([{ name: 'coleta-cpf' }])
         db.variableSet.findMany.mockResolvedValue([])
+        db.ixcNode.findMany.mockResolvedValue([])
         await expect(VariableCatalogService.deleteVariable('var1')).rejects.toMatchObject({ statusCode: 409 })
         expect(db.variable.delete).not.toHaveBeenCalled()
     })
@@ -93,6 +95,18 @@ describe('VariableCatalogService.deleteVariable', () => {
         db.ivrMenu.findMany.mockResolvedValue([])
         db.variableSet.findMany.mockResolvedValue([
             { name: 'Seta CRM', assignments: [{ variable: 'CPF_CLIENTE', value: '1' }] },
+        ])
+        db.ixcNode.findMany.mockResolvedValue([])
+        await expect(VariableCatalogService.deleteVariable('var1')).rejects.toMatchObject({ statusCode: 409 })
+        expect(db.variable.delete).not.toHaveBeenCalled()
+    })
+
+    it('throws 409 when in use by an IxcNode variable mapping', async () => {
+        db.variable.findUnique.mockResolvedValue(VARIABLE)
+        db.ivrMenu.findMany.mockResolvedValue([])
+        db.variableSet.findMany.mockResolvedValue([])
+        db.ixcNode.findMany.mockResolvedValue([
+            { name: 'consulta-cliente', variableMappings: [{ path: 'cliente[0].id', variable: 'CPF_CLIENTE' }] },
         ])
         await expect(VariableCatalogService.deleteVariable('var1')).rejects.toMatchObject({ statusCode: 409 })
         expect(db.variable.delete).not.toHaveBeenCalled()

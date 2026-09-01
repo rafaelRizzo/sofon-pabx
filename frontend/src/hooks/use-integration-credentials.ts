@@ -27,12 +27,27 @@ export type IntegrationCredential = {
     updatedAt: string
 }
 
+// só protocolo + domínio - o path da API (ex: /webservice/v1/cliente) é montado pelo client de
+// cada provedor a partir do baseUrl puro, então um path aqui duplicaria/quebraria a URL final
+const baseUrlSchema = z
+    .string()
+    .url("Informe uma URL válida")
+    .max(255, "Máximo 255 caracteres")
+    .refine((v) => {
+        try {
+            const u = new URL(v)
+            return (u.pathname === "" || u.pathname === "/") && !u.search && !u.hash
+        } catch {
+            return false
+        }
+    }, "Informe só protocolo e domínio, sem caminho (ex: https://seudominio.com.br)")
+
 // token nunca volta em GET (write-only); em edição, campo vazio = mantém o token atual
 export const createIntegrationCredentialFormSchema = z.object({
     provider: z.enum(INTEGRATION_PROVIDERS),
     name: z.string().min(1, "Informe o nome").max(80, "Máximo 80 caracteres"),
     companyId: z.string().min(1, "Selecione uma empresa"),
-    baseUrl: z.string().url("Informe uma URL válida").max(255, "Máximo 255 caracteres"),
+    baseUrl: baseUrlSchema,
     token: z.string().min(1, "Informe o token").max(500, "Máximo 500 caracteres"),
 })
 

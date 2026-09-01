@@ -3,6 +3,7 @@ import { prisma } from '../../lib/prisma'
 import { decryptForCompany } from '../../lib/crypto'
 import { getCompanyById } from '../companies/companies.service'
 import { getIntegrationCredentialForCall } from '../integration-credentials/integration-credentials.service'
+import { assertVariableExistsForCompany } from '../variable-catalog/variable-catalog.service'
 import { IxcNodesCache } from './cache/ixc-nodes.cache'
 import { IxcNodeRepository } from '../../asterisk/destinations/ixc-node.repository'
 import { FlowEdgeRepository } from '../../asterisk/flows/flow-edge.repository'
@@ -34,6 +35,12 @@ type IxcNodeRow = NonNullable<Awaited<ReturnType<typeof _byId>>> & { onSuccess: 
 
 const validateDest = (dest: RouteDestination | undefined | null, companyId: string, label: string) =>
     validateRouteDestination(dest ?? null, companyId, label)
+
+// mesma garantia contra typo/drift que IvrMenu (modo coleta) e VariableSet.assignments já têm -
+// a variável gravada via AGI só é útil no dialplan se estiver declarada no catálogo da empresa
+async function assertVariableMappingsExistForCompany(mappings: { variable: string }[], companyId: string) {
+    for (const m of mappings) await assertVariableExistsForCompany(m.variable, companyId)
+}
 
 async function assertCredentialBelongsToCompany(credentialId: string, companyId: string) {
     const credential = await prisma.integrationCredential.findUnique({ where: { id: credentialId }, select: { companyId: true, provider: true } })
@@ -142,6 +149,7 @@ export const createIxcNode = async (data: CreateIxcNodeInput) => {
 
     await validateDest(data.onSuccess, data.companyId, 'onSuccess')
     await validateDest(data.onError, data.companyId, 'onError')
+    await assertVariableMappingsExistForCompany(data.variableMappings, data.companyId)
 
     const node = await prisma.$transaction(async (tx) => {
         const created = await tx.ixcNode.create({
@@ -186,6 +194,7 @@ export const updateIxcNode = async (id: string, data: UpdateIxcNodeInput) => {
     if (data.credentialId) await assertCredentialBelongsToCompany(data.credentialId, existing.companyId)
     if (data.onSuccess !== undefined) await validateDest(data.onSuccess, existing.companyId, 'onSuccess')
     if (data.onError !== undefined) await validateDest(data.onError, existing.companyId, 'onError')
+    if (data.variableMappings !== undefined) await assertVariableMappingsExistForCompany(data.variableMappings, existing.companyId)
 
     const node = await prisma.$transaction(async (tx) => {
         const updated = await tx.ixcNode.update({

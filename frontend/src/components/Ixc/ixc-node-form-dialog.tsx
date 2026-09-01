@@ -44,6 +44,7 @@ import { EntityFormDialogSkeletonContent } from "@/components/entity-form-dialog
 import { Input } from "@/components/ui/input"
 import { IxcResponseTree } from "@/components/Ixc/ixc-response-tree"
 import { NumberInput } from "@/components/ui/number-input"
+import { VariableCombobox } from "@/components/variable-combobox"
 import { VariableInsertField } from "@/components/variable-insert-field"
 import {
     Select,
@@ -57,6 +58,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { type Company } from "@/hooks/use-companies"
 import { useIntegrationCredentials } from "@/hooks/use-integration-credentials"
+import { useVariableCatalog } from "@/hooks/use-variable-catalog"
 import {
     createIxcNodeFormSchema,
     IXC_NODE_ACTIONS,
@@ -131,6 +133,7 @@ export function IxcNodeFormDialog({
     const { integrationCredentials } = useIntegrationCredentials(companyId, "ixc")
     const credentialItems = integrationCredentials.map((c) => ({ value: c.id, label: c.name }))
     const paramsWatch = watch("params")
+    const { variables: catalogVariables, createVariable } = useVariableCatalog(companyId)
 
     const { testIxcNode, testing } = useIxcNodes()
     const [testResult, setTestResult] = useState<IxcTestResult | null>(null)
@@ -165,10 +168,17 @@ export function IxcNodeFormDialog({
         return (/^[A-Za-z_]/.test(cleaned) ? cleaned : `_${cleaned}`) || "VAR"
     }
 
-    function appendMappingFromPath(path: string, key: string) {
+    // Caminho alternativo ao VariableCombobox (que só cria via digitação/Enter/+): aqui o nome vem
+    // computado do campo JSON clicado, então já cria de cara no catálogo se ainda não existir - é
+    // uma ação explícita (o usuário escolheu esse campo específico), não sobra espaço pra "criar ou
+    // não" perguntar.
+    async function appendMappingFromPath(path: string, key: string) {
         const alreadyMapped = getValues("variableMappings").some((m) => m.path === path)
         if (alreadyMapped) return
-        variableMappingFields.append({ path, variable: toVariableName(key) }, { shouldFocus: false })
+        const name = toVariableName(key)
+        const exists = catalogVariables.some((v) => v.name === name)
+        if (!exists) await createVariable({ name, companyId })
+        variableMappingFields.append({ path, variable: name }, { shouldFocus: false })
     }
 
     useEffect(() => {
@@ -385,7 +395,7 @@ export function IxcNodeFormDialog({
                                                                     <div className="grid grid-cols-2 gap-2">
                                                                         {paramsWatch.map((row, i) =>
                                                                             row.key ? (
-                                                                                <div key={`${row.key}-${i}`}>
+                                                                                <div key={`${row.key}-${i}`} className="space-y-1">
                                                                                     <FieldLabel className="text-xs font-normal text-muted-foreground">
                                                                                         {row.key}
                                                                                     </FieldLabel>
@@ -499,10 +509,10 @@ export function IxcNodeFormDialog({
                                                         ) : (
                                                             <div className="space-y-2 rounded-md border p-2">
                                                                 <div className="grid grid-cols-[1fr_1fr_1.75rem] gap-2">
-                                                                    <span className="px-3 text-xs font-medium text-muted-foreground">
+                                                                    <span className="px-2 text-xs font-medium text-muted-foreground">
                                                                         Caminho JSON
                                                                     </span>
-                                                                    <span className="px-3 text-xs font-medium text-muted-foreground">
+                                                                    <span className="px-2 text-xs font-medium text-muted-foreground">
                                                                         Variável
                                                                     </span>
                                                                     <span />
@@ -524,9 +534,15 @@ export function IxcNodeFormDialog({
                                                                             )}
                                                                         </div>
                                                                         <div>
-                                                                            <Input
-                                                                                placeholder="CLIENT_ID"
-                                                                                {...register(`variableMappings.${index}.variable`)}
+                                                                            <VariableCombobox
+                                                                                companyId={companyId}
+                                                                                value={watch(`variableMappings.${index}.variable`) ?? null}
+                                                                                onChange={(name) =>
+                                                                                    setValue(`variableMappings.${index}.variable`, name ?? "", {
+                                                                                        shouldValidate: true,
+                                                                                        shouldDirty: true,
+                                                                                    })
+                                                                                }
                                                                             />
                                                                             {errors.variableMappings?.[index]?.variable && (
                                                                                 <FieldError>
