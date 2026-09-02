@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-# INSTALADOR SOFON PBX v7.11 - PJSIP + IAX2 (sem Docker, sem chan_sip)
+# INSTALADOR SOFON PBX v7.12 - PJSIP + IAX2 (sem Docker, sem chan_sip)
 # Debian 11+ | Ubuntu 24.04+ | Asterisk 22.7.0 LTS
 # ============================================================
 
@@ -41,7 +41,7 @@ show_header() {
     clear
     echo ""
     echo -e "${CYAN}════════════════════════════════════════════════════════${NC}"
-    echo -e "  ${BOLD}INSTALADOR SOFON PBX v7.8 - PJSIP + IAX2${NC}"
+    echo -e "  ${BOLD}INSTALADOR SOFON PBX v7.12 - PJSIP + IAX2${NC}"
     echo -e "${CYAN}════════════════════════════════════════════════════════${NC}"
     echo ""
 }
@@ -168,7 +168,7 @@ read -r REPLY
 # STEP 1 - ATUALIZAR SISTEMA
 # ============================================================
 show_header
-show_progress 1 13 "Atualizando sistema"
+show_progress 1 14 "Atualizando sistema"
 run apt-get update
 DEBIAN_FRONTEND=noninteractive run apt-get upgrade -y
 log "Sistema atualizado"
@@ -178,7 +178,7 @@ sleep 1
 # STEP 2 - DEPENDÊNCIAS
 # ============================================================
 show_header
-show_progress 2 13 "Instalando dependências"
+show_progress 2 14 "Instalando dependências"
 DEPS=(
     build-essential git wget curl autoconf automake libtool
     libxml2-dev libncurses5-dev uuid-dev libjansson-dev
@@ -197,7 +197,7 @@ sleep 1
 # STEP 3 - DOWNLOAD
 # ============================================================
 show_header
-show_progress 3 13 "Baixando Asterisk ${ASTERISK_VERSION}"
+show_progress 3 14 "Baixando Asterisk ${ASTERISK_VERSION}"
 cd /usr/src
 [[ -d "asterisk-${ASTERISK_VERSION}" ]] && rm -rf "asterisk-${ASTERISK_VERSION}"
 [[ -f "asterisk-${ASTERISK_VERSION}.tar.gz" ]] && rm -f "asterisk-${ASTERISK_VERSION}.tar.gz"
@@ -215,7 +215,7 @@ sleep 1
 # STEP 4 - PRÉ-REQUISITOS
 # ============================================================
 show_header
-show_progress 4 13 "Instalando pré-requisitos do Asterisk"
+show_progress 4 14 "Instalando pré-requisitos do Asterisk"
 contrib/scripts/install_prereq install >> "$LOG_FILE" 2>&1 || warn "Alguns pré-requisitos falharam (pode ser normal)"
 log "Pré-requisitos concluídos"
 sleep 1
@@ -226,7 +226,7 @@ sleep 1
 # (res_pjsip já vem embutido no core do Asterisk 22)
 # ============================================================
 show_header
-show_progress 5 13 "Configurando compilação"
+show_progress 5 14 "Configurando compilação"
 
 ./configure --with-jansson-bundled >> "$LOG_FILE" 2>&1 || err "Falha no ./configure"
 
@@ -234,7 +234,6 @@ make menuselect.makeopts >> "$LOG_FILE" 2>&1
 
 menuselect/menuselect \
     --enable format_mp3 \
-    --enable codec_opus \
     --enable codec_speex \
     --enable codec_gsm \
     --enable codec_g722 \
@@ -246,8 +245,11 @@ menuselect/menuselect \
     --enable chan_iax2 \
     --disable chan_sip \
     menuselect.makeopts >> "$LOG_FILE" 2>&1 || true
-# G.729 NÃO entra aqui: codec proprietário (Digium), sem build open-source.
-# Precisa comprar o módulo binário e instalar manualmente em /usr/lib/asterisk/modules.
+# codec_opus NÃO entra no menuselect: é um módulo binário externo (Digium) que só é
+# baixado pela UI ncurses interativa do menuselect - o --enable via CLI não dispara o
+# fetch e fica sempre desabilitado silenciosamente. Baixado manualmente no STEP 9 abaixo.
+# G.729 (codec_g729a) da Digium é pago - substituído por codec_g72x/Bcg729 (livre,
+# patente do G.729 expirou em 2017), compilado no STEP 9 abaixo também.
 
 log "Configuração concluída"
 sleep 1
@@ -256,7 +258,7 @@ sleep 1
 # STEP 6 - COMPILAR
 # ============================================================
 show_header
-show_progress 6 13 "Compilando Asterisk (5-15 min)..."
+show_progress 6 14 "Compilando Asterisk (5-15 min)..."
 make -j"$(nproc)" >> "$LOG_FILE" 2>&1 || err "Falha na compilação - verifique $LOG_FILE"
 log "Compilação concluída"
 sleep 1
@@ -266,7 +268,7 @@ sleep 1
 # FIX: backup ANTES do make install; samples apenas em fresh install
 # ============================================================
 show_header
-show_progress 7 13 "Instalando binários"
+show_progress 7 14 "Instalando binários"
 
 # Backup com timestamp completo para proteger re-execuções
 for f in pjsip.conf iax.conf extensions.conf rtp.conf modules.conf manager.conf http.conf; do
@@ -300,7 +302,7 @@ sleep 1
 # STEP 8 - USUÁRIO E PERMISSÕES
 # ============================================================
 show_header
-show_progress 8 13 "Configurando usuário asterisk"
+show_progress 8 14 "Configurando usuário asterisk"
 
 # Timezone do sistema - sem isso o CDR e os logs gravam em UTC, difícil de ler no dia a dia
 timedatectl set-timezone America/Sao_Paulo >> "$LOG_FILE" 2>&1 || warn "Falha ao ajustar timezone"
@@ -332,11 +334,77 @@ log "Usuário configurado"
 sleep 1
 
 # ============================================================
-# STEP 9 - CONFIGS DO ASTERISK
+# STEP 9 - CODECS EXTERNOS (Opus + G.729/Bcg729)
+# Roda ANTES do primeiro start do Asterisk (STEP 11) - carregar um módulo de
+# codec novo a quente num Asterisk já rodando pode falhar com "Cannot update
+# type 'opus' in module... because it has already been registered" (sorcery),
+# só resolvido com restart completo do processo. Em start limpo isso não ocorre.
+# ============================================================
+show_header
+show_progress 9 14 "Instalando codecs externos (Opus + G.729)"
+
+(cd "/usr/src/asterisk-${ASTERISK_VERSION}" && make install-headers) >> "$LOG_FILE" 2>&1 \
+    || warn "make install-headers falhou - G.729 (Bcg729) não será compilado"
+
+ARCH_RAW="$(uname -m)"
+DIGIUM_ARCH=""
+[[ "$ARCH_RAW" == "x86_64" ]] && DIGIUM_ARCH="x86-64"
+AST_MAJOR="${ASTERISK_VERSION%%.*}.0"
+
+if [[ -n "$DIGIUM_ARCH" ]]; then
+    OPUS_TARBALL="codec_opus-${AST_MAJOR}-current-${DIGIUM_ARCH}.tar.gz"
+    OPUS_URL="https://downloads.digium.com/pub/telephony/codec_opus/asterisk-${AST_MAJOR}/${DIGIUM_ARCH}/${OPUS_TARBALL}"
+    OPUS_TMPDIR="$(mktemp -d)"
+    if curl -fsSL --max-time 30 "$OPUS_URL" -o "$OPUS_TMPDIR/$OPUS_TARBALL" 2>>"$LOG_FILE"; then
+        tar -xzf "$OPUS_TMPDIR/$OPUS_TARBALL" -C "$OPUS_TMPDIR"
+        OPUS_PKGDIR="$(find "$OPUS_TMPDIR" -mindepth 1 -maxdepth 1 -type d)"
+        cp "$OPUS_PKGDIR"/*.so /usr/lib/asterisk/modules/ 2>>"$LOG_FILE" || true
+        mkdir -p /var/lib/asterisk/documentation/thirdparty
+        cp "$OPUS_PKGDIR"/*config*.xml /var/lib/asterisk/documentation/thirdparty/ 2>>"$LOG_FILE" || true
+        chown root:root /usr/lib/asterisk/modules/codec_opus.so /usr/lib/asterisk/modules/format_ogg_opus.so 2>/dev/null || true
+        chmod 755 /usr/lib/asterisk/modules/codec_opus.so /usr/lib/asterisk/modules/format_ogg_opus.so 2>/dev/null || true
+        log "codec_opus instalado (download Digium)"
+    else
+        warn "Download do codec_opus falhou (${OPUS_URL}) - seguindo sem ele"
+    fi
+    rm -rf "$OPUS_TMPDIR"
+else
+    warn "Arquitetura ${ARCH_RAW} sem binário Opus disponível na Digium - pulando"
+fi
+
+apt-get install -y libbcg729-dev >> "$LOG_FILE" 2>&1 || warn "libbcg729-dev indisponível nos repositórios - seguindo sem G.729"
+
+if ldconfig -p | grep -q libbcg729; then
+    cd /usr/src
+    rm -rf asterisk-g72x
+    if git clone --depth 1 https://github.com/arkadijs/asterisk-g72x.git >> "$LOG_FILE" 2>&1; then
+        (
+            cd asterisk-g72x
+            ./autogen.sh
+            ./configure --with-bcg729
+            make
+            make install
+        ) >> "$LOG_FILE" 2>&1 \
+            && chown root:root /usr/lib/asterisk/modules/codec_g729.so 2>/dev/null \
+            && log "codec_g729 instalado (Bcg729, livre - patente expirada em 2017)" \
+            || warn "Falha ao compilar codec_g729 (Bcg729) - seguindo sem G.729"
+    else
+        warn "Clone de asterisk-g72x falhou - seguindo sem G.729"
+    fi
+else
+    warn "libbcg729 não instalada - seguindo sem G.729"
+fi
+
+ldconfig
+log "Codecs externos processados"
+sleep 1
+
+# ============================================================
+# STEP 10 - CONFIGS DO ASTERISK
 # FIX: dialplan usa switch => Realtime/ para ramais com nomes arbitrários
 # ============================================================
 show_header
-show_progress 9 13 "Criando configurações"
+show_progress 10 14 "Criando configurações"
 
 # rtp.conf
 cat > /etc/asterisk/rtp.conf << 'EOF'
@@ -588,10 +656,10 @@ log "Configurações criadas"
 sleep 1
 
 # ============================================================
-# STEP 10 - INICIAR SERVIÇO
+# STEP 11 - INICIAR SERVIÇO
 # ============================================================
 show_header
-show_progress 10 13 "Iniciando Asterisk"
+show_progress 11 14 "Iniciando Asterisk"
 systemctl daemon-reload
 systemctl enable asterisk >> "$LOG_FILE" 2>&1 || true
 systemctl restart asterisk >> "$LOG_FILE" 2>&1 || err "Falha ao iniciar Asterisk"
@@ -606,7 +674,7 @@ log "Asterisk iniciado"
 sleep 1
 
 # ============================================================
-# STEP 11 - FIREWALL (nftables + Fail2Ban + manage-fw)
+# STEP 12 - FIREWALL (nftables + Fail2Ban + manage-fw)
 # Clona o manage-fw (https://github.com/rafaelRizzo/manage-fw) e delega pro
 # firewall.sh dele - em vez de duplicar aqui a lógica de nftables/Fail2Ban/
 # manage-fw, reusa o script genérico (backup+diff automático do nftables.conf,
@@ -616,7 +684,7 @@ sleep 1
 # anterior, senão o próprio firewall.sh recusa --update (sem baseline salva).
 # ============================================================
 show_header
-show_progress 11 13 "Configurando firewall"
+show_progress 12 14 "Configurando firewall"
 
 MANAGE_FW_DIR="/opt/manage-fw"
 if [[ -d "$MANAGE_FW_DIR/.git" ]]; then
@@ -658,10 +726,10 @@ bash "$MANAGE_FW_DIR/firewall.sh" \
 log "Firewall configurado (SSH 22+21122, PJSIP/IAX2/RTP whitelist-only, WS $WS_PORT público p/ WebRTC, AMI localhost + rede privada (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16), Fail2Ban ativo, manage-fw instalado)"
 
 # ============================================================
-# STEP 12 - SEGURANÇA
+# STEP 13 - SEGURANÇA
 # ============================================================
 show_header
-show_progress 12 13 "Aplicando hardening de segurança"
+show_progress 13 14 "Aplicando hardening de segurança"
 
 # --- Monitor: diretório de gravações de chamadas ---
 mkdir -p /var/spool/asterisk/monitor
@@ -705,7 +773,7 @@ asterisk -rx "logger reload" >> "$LOG_FILE" 2>&1 || true
 sleep 2
 log "Logger configurado → /var/log/asterisk/messages"
 
-# Fail2Ban, filtro, jail e manage-fw já configurados pelo firewall.sh no STEP 11.
+# Fail2Ban, filtro, jail e manage-fw já configurados pelo firewall.sh no STEP 12.
 
 AMI_SECRET="$(openssl rand -base64 24)"
 cat > /etc/asterisk/manager.conf << EOF
@@ -737,16 +805,16 @@ chown -R asterisk:asterisk /etc/asterisk
 asterisk -rx "manager reload" >> "$LOG_FILE" 2>&1 || true
 log "Hardening aplicado"
 
-# manage-fw já instalado em /usr/local/sbin/manage-fw pelo firewall.sh no STEP 11.
+# manage-fw já instalado em /usr/local/sbin/manage-fw pelo firewall.sh no STEP 12.
 
 # ============================================================
-# STEP 13 - SINCRONIZAR .ENV DO BACKEND
+# STEP 14 - SINCRONIZAR .ENV DO BACKEND
 # Sem chan_sip: SIP_LEGACY_ENABLED sempre false, sem SIP_PORT
 # (ver ASTERISK_VERSION/PJSIP_PORT em src/config/env.ts) - o backend
 # expõe isso pro frontend via GET /system/sip-config.
 # ============================================================
 show_header
-show_progress 13 13 "Sincronizando configuração com o backend"
+show_progress 14 14 "Sincronizando configuração com o backend"
 
 set_env_var() {
     local file=$1 key=$2 value=$3
