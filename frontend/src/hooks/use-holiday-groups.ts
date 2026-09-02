@@ -14,6 +14,8 @@ export type HolidayDate = {
     name: string
     month: number
     day: number
+    // null = recorrente todo ano; preenchido = válido só nesse ano (feriado móvel, ex: Carnaval)
+    year: number | null
 }
 
 export type HolidayGroup = {
@@ -40,6 +42,11 @@ const holidayDateFormSchema = z.object({
         .min(1, "Mês inválido")
         .max(12, "Mês inválido"),
     day: z.coerce.number().int().min(1, "Dia inválido").max(31, "Dia inválido"),
+    // vazio = recorrente todo ano; preenchido = só nesse ano (feriado móvel, ex: Carnaval)
+    year: z.preprocess(
+        (v) => (v === "" || v === undefined || v === null ? undefined : Number(v)),
+        z.number().int().min(1900, "Ano inválido").max(2100, "Ano inválido").optional()
+    ),
 })
 
 // "mode" é só de UI (decide se manda url ou dates pro backend) - não existe no schema do backend,
@@ -77,10 +84,11 @@ export function toHolidayGroupCreationDto(
         name: holidayGroup.name,
         mode: holidayGroup.url ? "url" : "manual",
         url: holidayGroup.url ?? undefined,
-        dates: holidayGroup.dates.map(({ name, month, day }) => ({
+        dates: holidayGroup.dates.map(({ name, month, day, year }) => ({
             name,
             month,
             day,
+            year: year ?? undefined,
         })),
     }
 }

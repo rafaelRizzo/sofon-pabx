@@ -42,6 +42,7 @@ import {
     FieldLabel,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import { NumberInput } from "@/components/ui/number-input"
 import {
     Select,
     SelectContent,
@@ -127,6 +128,7 @@ export function HolidayGroupFormDialog({
                           name: d.name,
                           month: d.month,
                           day: d.day,
+                          year: d.year ?? undefined,
                       }))
                     : [{ ...EMPTY_DATE }],
         })
@@ -295,6 +297,35 @@ export function HolidayGroupFormDialog({
                                                         {errors.url.message}
                                                     </FieldError>
                                                 )}
+                                                <FieldDescription>
+                                                    Chamada como{" "}
+                                                    <code>
+                                                        GET {"{url}"}/{"{ano}"}
+                                                    </code>{" "}
+                                                    (ex: .../2026). Resposta
+                                                    esperada, um item por
+                                                    feriado:
+                                                </FieldDescription>
+                                                <pre className="overflow-auto rounded-md border bg-muted/40 p-2 font-mono text-xs whitespace-pre">
+                                                    {
+                                                        '[\n  { "date": "2026-01-01", "name": "Confraternização Universal" }\n]'
+                                                    }
+                                                </pre>
+                                                <FieldDescription>
+                                                    Mesmo contrato da{" "}
+                                                    <a
+                                                        href="https://brasilapi.com.br/docs#tag/Feriados-Nacionais"
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="underline"
+                                                    >
+                                                        BrasilAPI
+                                                    </a>
+                                                    , ex:{" "}
+                                                    <code>
+                                                        https://brasilapi.com.br/api/feriados/v1
+                                                    </code>
+                                                </FieldDescription>
                                                 {isEdit &&
                                                     holidayGroup.dates.length >
                                                         0 && (
@@ -364,7 +395,7 @@ export function HolidayGroupFormDialog({
                                                     </FieldError>
                                                 )}
 
-                                                <div className="flex flex-col gap-3">
+                                                <div className="flex flex-col gap-3 p-0.5">
                                                     {fields.map(
                                                         (field, index) => (
                                                             <Card
@@ -427,13 +458,12 @@ export function HolidayGroupFormDialog({
                                                                         )}
                                                                     </Field>
 
-                                                                    <div className="grid grid-cols-2 gap-3">
+                                                                    <div className="grid grid-cols-3 gap-3">
                                                                         <Field>
                                                                             <FieldLabel>
                                                                                 Mês
                                                                             </FieldLabel>
-                                                                            <Input
-                                                                                type="number"
+                                                                            <NumberInput
                                                                                 min={
                                                                                     1
                                                                                 }
@@ -465,8 +495,7 @@ export function HolidayGroupFormDialog({
                                                                             <FieldLabel>
                                                                                 Dia
                                                                             </FieldLabel>
-                                                                            <Input
-                                                                                type="number"
+                                                                            <NumberInput
                                                                                 min={
                                                                                     1
                                                                                 }
@@ -494,7 +523,63 @@ export function HolidayGroupFormDialog({
                                                                                 </FieldError>
                                                                             )}
                                                                         </Field>
+                                                                        <Field>
+                                                                            <FieldLabel>
+                                                                                Ano
+                                                                            </FieldLabel>
+                                                                            <NumberInput
+                                                                                placeholder="Todo ano"
+                                                                                min={
+                                                                                    1900
+                                                                                }
+                                                                                max={
+                                                                                    2100
+                                                                                }
+                                                                                {...register(
+                                                                                    `dates.${index}.year`
+                                                                                )}
+                                                                            />
+                                                                            {errors
+                                                                                .dates?.[
+                                                                                index
+                                                                            ]
+                                                                                ?.year && (
+                                                                                <FieldError>
+                                                                                    {
+                                                                                        errors
+                                                                                            .dates[
+                                                                                            index
+                                                                                        ]
+                                                                                            ?.year
+                                                                                            ?.message
+                                                                                    }
+                                                                                </FieldError>
+                                                                            )}
+                                                                        </Field>
                                                                     </div>
+                                                                    <FieldDescription>
+                                                                        Deixe
+                                                                        "Ano"
+                                                                        em
+                                                                        branco
+                                                                        pra
+                                                                        feriado
+                                                                        recorrente
+                                                                        todo
+                                                                        ano.
+                                                                        Preencha
+                                                                        só se
+                                                                        for um
+                                                                        feriado
+                                                                        móvel
+                                                                        (ex:
+                                                                        Carnaval),
+                                                                        que
+                                                                        muda de
+                                                                        data a
+                                                                        cada
+                                                                        ano.
+                                                                    </FieldDescription>
                                                                 </CardContent>
                                                             </Card>
                                                         )
