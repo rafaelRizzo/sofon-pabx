@@ -7,7 +7,7 @@ const TIMEOUT_MS = 3000
 // (https://brasilapi.com.br/api/feriados/v1/{ano}): [{ date: "YYYY-MM-DD", name, type? }]
 type ApiHoliday = { date: string; name: string; type?: string }
 
-export type RemoteHoliday = { name: string; month: number; day: number }
+export type RemoteHoliday = { name: string; month: number; day: number; year: number }
 
 // Busca os feriados do ano numa URL externa (BrasilAPI, custom, o que o usuário configurar em
 // HolidayGroup.url) - usado só pelo job de resync (src/jobs/holiday-resync.job.ts). Retorna null em
@@ -28,8 +28,11 @@ export async function fetchHolidaysFromUrl(baseUrl: string, year: number): Promi
         if (!Array.isArray(data) || data.length === 0) return null
 
         return data.map((h) => {
-            const [, month, day] = h.date.split('-').map(Number)
-            return { name: h.name, month: month!, day: day! }
+            // captura o ano do próprio dígito da data (não o `year` pedido na URL) - feriado móvel
+            // (Carnaval, Sexta-feira Santa) precisa desse ano pra bater certo na checagem via AGI
+            // (ver matchesHolidayDate em holidaygroup.repository.ts), GotoIfTime nunca teve esse campo
+            const [year, month, day] = h.date.split('-').map(Number)
+            return { name: h.name, month: month!, day: day!, year: year! }
         })
     } catch (error) {
         logger.warn({ event: 'holidays.provider.error', url: baseUrl, error: error instanceof Error ? error.message : String(error) })

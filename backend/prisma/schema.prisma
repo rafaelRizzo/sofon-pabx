@@ -396,6 +396,9 @@ model HolidayDate {
   name           String       @db.VarChar(80)
   month          Int
   day            Int
+  // null = recorrente todo ano (mesmo month/day); preenchido = válido só nesse ano - feriado móvel
+  // (Carnaval, Sexta-feira Santa) vindo da API, que muda de data ano a ano
+  year           Int?
   createdAt      DateTime     @default(now()) @db.Timestamptz(3)
 
   @@index([holidayGroupId])

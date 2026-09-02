@@ -147,11 +147,11 @@ export const updateCompany = async (id: string, data: UpdateCompanyInput) => {
         select: companySelect,
     })
 
+    // HolidayGroup não precisa regenerar aqui: desde a migração pra AGI (ver holidaygroup.repository.ts),
+    // o timezone é lido ao vivo de Company a cada chamada, não fica mais baked no .conf estático como
+    // TimeCondition (GotoIfTime nativo, sem esse luxo)
     if (data.timezone !== undefined && data.timezone !== existing.timezone) {
-        await Promise.all([
-            TimeConditionRepository.regenerate(id),
-            HolidayGroupRepository.regenerate(id),
-        ])
+        await TimeConditionRepository.regenerate(id)
     }
 
     await CompaniesCache.invalidateCompany(id)

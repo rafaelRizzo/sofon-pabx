@@ -14,6 +14,9 @@ const holidayDateSchema = z.object({
     name:  z.string().min(1).max(80),
     month: z.number().int().min(1).max(12),
     day:   z.number().int().min(1).max(31),
+    // null/omitido = recorrente todo ano (feriado fixo); preenchido = válido só nesse ano (feriado
+    // móvel vindo da API, ex: Carnaval, que muda de data ano a ano)
+    year:  z.number().int().min(1900).max(2100).nullish(),
 })
 
 export const createHolidayGroupSchema = z.object({
@@ -48,6 +51,7 @@ const HolidayDateResponseSchema = z.object({
     name:  z.string(),
     month: z.number(),
     day:   z.number(),
+    year:  z.number().nullable(),
 })
 
 export const HolidayGroupSchema = z.object({

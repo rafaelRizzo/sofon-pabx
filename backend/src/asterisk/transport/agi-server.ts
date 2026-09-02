@@ -16,13 +16,17 @@ import { decryptForCompany } from '../../lib/crypto'
 import { runIxcAction, type IxcAction } from '../../integrations/ixc/client'
 import { getIntegrationCredentialForCall } from '../../modules/integration-credentials/integration-credentials.service'
 import { evaluateRule, evaluateRules, type VariableRule, type Combinator } from '../destinations/variablecondition.repository'
+import { matchesHolidayDate } from '../destinations/holidaygroup.repository'
 import { applyMask } from '../../utils/format-mask'
+import { dateInTimeZone } from '../../utils/timezone'
 
 // Servidor FastAGI - Asterisk conecta via AGI(agi://AGI_HOST:AGI_PORT/<script>,<args>) em 5 pontos:
 // - /run,<requestTemplateId> - RouteDestination type: "request"
 // - /ixc,<ixcNodeId>         - RouteDestination type: "ixc"
 // - /varcond,<variableConditionId> - RouteDestination type: "variable-condition" (regras avaliadas
 //   em JS puro, ver evaluateRule - motivo em variablecondition.repository.ts)
+// - /holiday,<holidayGroupId> - RouteDestination type: "holiday" (month/day/year avaliados em JS,
+//   ver matchesHolidayDate - GotoIfTime nativo não tem campo de ano, não dá conta de feriado móvel)
 // - /format,<formatterNodeId> - RouteDestination type: "formatter" (aplica máscara via
 //   applyMask, ver src/utils/format-mask.ts)
 // - /queue-route,<queueId>   - antes do Queue() nativo, seta QUEUE_PRIO a partir de RoutingRule
@@ -400,6 +404,59 @@ async function handleVariableCondition(conn: AgiConn, conditionId: string) {
     await agiExecGoto(conn, target)
 }
 
+// Compara a data de hoje (no timezone da EMPRESA, não do processo/servidor Asterisk - mesmo padrão
+// de resolveActiveRule/RoutingRules) contra as datas do grupo via matchesHolidayDate. Roda em JS
+// porque GotoIfTime nativo do Asterisk nunca teve campo de ano (é tipo cron: times/weekdays/mdays/
+// months) - sem isso não dá pra expressar feriado móvel vindo da API (Carnaval, Sexta-feira Santa),
+// que muda de data ano a ano; ver year em HolidayDate/matchesHolidayDate.
+async function handleHolidayCheck(conn: AgiConn, groupId: string) {
+    const group = await prisma.holidayGroup.findUnique({
+        where: { id: groupId },
+        select: {
+            name: true,
+            dates: { select: { month: true, day: true, year: true } },
+            company: { select: { timezone: true } },
+        },
+    })
+    if (!group) {
+        logger.warn({ event: 'agi.holiday_group.not_found', groupId })
+        return
+    }
+
+    const today = dateInTimeZone(new Date(), group.company.timezone)
+    const matched = matchesHolidayDate(group.dates, today)
+
+    logger.info({
+        event: 'agi.holiday_group.done',
+        groupId,
+        name: group.name,
+        timezone: group.company.timezone,
+        today,
+        dates: group.dates.length,
+        matched,
+    })
+    await agiVerbose(conn, `Holiday Group "${group.name}": hoje=${today.year}-${today.month}-${today.day} (${group.company.timezone}) => ${matched ? 'TRUE (feriado)' : 'FALSE'}`)
+
+    const nodeId = await agiGetVariable(conn, FLOW_NODE_ID_VAR)
+    if (nodeId) {
+        const exten = flowNodeExitExten(nodeId, matched ? 'true' : 'false')
+        logger.info({ event: 'agi.holiday_group.goto', groupId, via: 'flow_node', nodeId, exten })
+        await agiExecGoto(conn, { context: FLOW_NODE_CONTEXT, exten, priority: 1 })
+        return
+    }
+    const dest = await FlowEdgeRepository.getOne('holidaygroup', groupId, matched ? 'true' : 'false')
+    const target = await resolveRouteDestinationToDialplan(dest)
+    if (!target) {
+        // configurado (ou o create/update esqueceu de ligar essa porta) mas sem rota resolvível - mesmo
+        // log de handleVariableCondition, pra não parecer "AGI não fez nada" visto de fora
+        logger.warn({ event: 'agi.holiday_group.no_route', groupId, dest, matched })
+        await agiVerbose(conn, `Holiday Group "${group.name}": porta "${matched ? 'true' : 'false'}" sem destino configurado`, 2)
+        return
+    }
+    logger.info({ event: 'agi.holiday_group.goto', groupId, via: 'route_destination', target })
+    await agiExecGoto(conn, target)
+}
+
 // Lê inputVariable via AGI GET VARIABLE, tenta cada máscara de `masks` em ordem (applyMask,
 // src/utils/format-mask.ts) e grava o resultado em outputVariable - onSuccess/onError seguem o
 // mesmo mecanismo de FlowEdge do IxcNode (FLOW_NODE_ID quando dentro de um Flow, senão
@@ -643,6 +700,7 @@ async function handleConnection(conn: AgiConn) {
         else if (script === 'survey-result') await handleSurveyResult(conn, arg1, env['agi_arg_2'] ?? '')
         else if (script === 'ixc') await handleIxcNode(conn, arg1)
         else if (script === 'varcond') await handleVariableCondition(conn, arg1)
+        else if (script === 'holiday') await handleHolidayCheck(conn, arg1)
         else if (script === 'format') await handleFormatterNode(conn, arg1)
         else await handleRequestTemplate(conn, arg1)
     } catch (error) {

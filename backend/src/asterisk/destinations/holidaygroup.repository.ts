@@ -1,95 +1,39 @@
 import { prisma } from '../../lib/prisma'
-import type { RouteDest } from '../../modules/holiday-groups/schemas/holiday-group.schema'
+import { validateEnv } from '../../config/env'
 import { HOL_CONTEXT, holEntry } from '../dialplan/dialplan-names'
 import { resolveAsteriskId, withDialplanLock, writeContextFile, reloadDialplan, type DialplanRow } from '../dialplan/dialplan-file.repository'
-import { resolveRouteDestinationToDialplan } from '../dialplan/route-destination-resolver'
-import { FlowEdgeRepository } from '../flows/flow-edge.repository'
-import { nodeExitCheck } from '../flows/flow-node-runtime'
 
 export { HOL_CONTEXT, holEntry }
 
-const holMatched = (id: string) => `hol-${id}-matched`
+const env = validateEnv()
+const buildAgiUrl = (id: string) => `agi://${env.AGI_HOST}:${env.AGI_PORT}/holiday,${id}`
 
-const MONTH_CODES = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
+export type HolidayDate = { month: number; day: number; year: number | null }
 
-export type HolidayDate = { month: number; day: number }
-
-async function resolveRoute(route: RouteDest): Promise<string | null> {
-    const target = await resolveRouteDestinationToDialplan(route)
-    return target ? `${target.context},${target.exten},${target.priority}` : null
+// Compara a data de hoje (já resolvida no timezone da empresa, ver dateInTimeZone) contra as datas
+// do grupo - função pura, testável isoladamente. year null = recorrente todo ano (feriado fixo,
+// ex: Natal); year preenchido = válido só naquele ano (feriado móvel vindo da API, ex: Carnaval,
+// que muda de data ano a ano - GotoIfTime nativo nunca teve campo de ano pra expressar isso).
+export function matchesHolidayDate(dates: HolidayDate[], today: { year: number; month: number; day: number }): boolean {
+    return dates.some((d) => d.month === today.month && d.day === today.day && (d.year === null || d.year === today.year))
 }
 
-function buildDialplan(
-    id: string,
-    name: string,
-    dates: HolidayDate[],
-    trueAsterisk: string | null,
-    falseAsterisk: string | null,
-    timezone: string,
-): DialplanRow[] {
-    const context = HOL_CONTEXT
-    const entry = holEntry(id)
-    const matched = holMatched(id)
-    const entries: DialplanRow[] = []
-
-    entries.push({ context, exten: entry, priority: 1, app: 'NoOp', appdata: `HolidayGroup: ${name}` })
-
-    let priority = 2
-    for (const date of dates) {
-        entries.push({
-            context, exten: entry, priority,
-            app: 'GotoIfTime',
-            appdata: `00:00-23:59,*,${date.day},${MONTH_CODES[date.month - 1]},${timezone}?${matched},1`,
-        })
-        priority++
-    }
-
-    entries.push({
-        context, exten: entry, priority,
-        app: 'GotoIf',
-        appdata: nodeExitCheck(context, entry, priority, 'false').appdata,
-    })
-    entries.push({
-        context, exten: entry, priority: priority + 1,
-        app: falseAsterisk ? 'Goto' : 'Hangup',
-        appdata: falseAsterisk,
-    })
-
-    entries.push({
-        context, exten: matched, priority: 1,
-        app: 'GotoIf',
-        appdata: nodeExitCheck(context, matched, 1, 'true').appdata,
-    })
-    entries.push({
-        context, exten: matched, priority: 2,
-        app: trueAsterisk ? 'Goto' : 'Hangup',
-        appdata: trueAsterisk,
-    })
-
-    return entries
-}
-
+// Dialplan de um HolidayGroup é sempre o mesmo par fixo (AGI + Hangup), mesmo padrão de
+// VariableConditionRepository - GotoIfTime nativo do Asterisk não dá conta de feriado móvel (sem
+// campo de ano), então a checagem roda em JS no AGI server com o ano em mãos (ver handleHolidayCheck
+// em agi-server.ts). Quem varia (datas/timezone/rotas) é lido pelo AGI a partir do id no agiUrl.
 export const HolidayGroupRepository = {
-    // Reconstrói o arquivo de dialplan da empresa inteira pra esse contexto, a partir do estado
-    // atual em banco - chamado depois de qualquer create/update/delete de HolidayGroup (fora da tx,
-    // já que é I/O de arquivo + spawn de subprocesso). Sempre consistente com o banco, mesmo se uma
-    // regeneração concorrente for perdida (a próxima chamada corrige).
     async regenerate(companyId: string) {
         const asteriskId = await resolveAsteriskId(companyId)
         return withDialplanLock(`${HOL_CONTEXT}:${asteriskId}`, async () => {
-            const [groups, edges, company] = await Promise.all([
-                prisma.holidayGroup.findMany({ where: { companyId }, include: { dates: true } }),
-                FlowEdgeRepository.getBySource(companyId, 'holidaygroup'),
-                prisma.company.findUniqueOrThrow({ where: { id: companyId }, select: { timezone: true } }),
-            ])
-            const entries: DialplanRow[] = []
-            for (const g of groups) {
-                const [trueAsterisk, falseAsterisk] = await Promise.all([
-                    resolveRoute(edges.get(g.id)?.true ?? null),
-                    resolveRoute(edges.get(g.id)?.false ?? null),
-                ])
-                entries.push(...buildDialplan(g.id, g.name, g.dates, trueAsterisk, falseAsterisk, company.timezone))
-            }
+            const groups = await prisma.holidayGroup.findMany({ where: { companyId }, select: { id: true } })
+            const entries: DialplanRow[] = groups.flatMap(({ id }) => {
+                const exten = holEntry(id)
+                return [
+                    { context: HOL_CONTEXT, exten, priority: 1, app: 'AGI', appdata: buildAgiUrl(id) },
+                    { context: HOL_CONTEXT, exten, priority: 2, app: 'Hangup', appdata: null },
+                ]
+            })
             await writeContextFile(HOL_CONTEXT, asteriskId, entries)
             reloadDialplan()
         })

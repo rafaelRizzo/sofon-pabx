@@ -21,6 +21,14 @@ const offsetSuffix = (date: Date, timeZone: string): string => {
     return `${sign}${String(Math.floor(abs / 60)).padStart(2, '0')}:${String(abs % 60).padStart(2, '0')}`
 }
 
+// Ano/mês/dia numéricos no timezone informado, sem depender do TZ do processo Node/Bun - usado pela
+// checagem de HolidayGroup via AGI (ver handleHolidayCheck em agi-server.ts) pra comparar a data de
+// hoje contra HolidayDate.month/day/year
+export function dateInTimeZone(date: Date, timeZone: string): { year: number; month: number; day: number } {
+    const map = dateTimeParts(date, timeZone)
+    return { year: Number(map.year), month: Number(map.month), day: Number(map.day) }
+}
+
 // Formata um Date como ISO 8601 com offset fixo do timezone informado (ex: -03:00),
 // em vez do "Z" (UTC) padrão do toISOString - evita reparse de encode no zod (ver src/schemas/responses.ts)
 export function toTzISOString(date: Date, timeZone: string): string {

@@ -17,7 +17,7 @@ const holidayGroupSelect = {
     name: true,
     companyId: true,
     url: true,
-    dates: { select: { id: true, name: true, month: true, day: true } },
+    dates: { select: { id: true, name: true, month: true, day: true, year: true } },
     createdAt: true,
     updatedAt: true,
 } as const
@@ -26,7 +26,7 @@ const _byId = () => prisma.holidayGroup.findUnique({ where: { id: '' }, select: 
 export type HolidayGroupDto = NonNullable<Awaited<ReturnType<typeof _byId>>> & { trueRoute: RouteDest; falseRoute: RouteDest; usedBy: UsedByRef[] }
 type HolidayGroupRow = NonNullable<Awaited<ReturnType<typeof _byId>>> & { trueRoute: RouteDest; falseRoute: RouteDest }
 
-type DateInput = { name: string; month: number; day: number }
+type DateInput = { name: string; month: number; day: number; year?: number | null }
 
 const validateRoute = (route: RouteDest | undefined | null, companyId: string, label: string) =>
     validateRouteDestination(route ?? null, companyId, label)
@@ -196,7 +196,7 @@ export const updateHolidayGroup = async (id: string, data: UpdateHolidayGroupInp
             ? await datesFromUrl(newUrl!, new Date().getFullYear())
             : undefined
 
-    const effectiveDates: DateInput[] = newDates ?? existing.dates.map((d) => ({ name: d.name, month: d.month, day: d.day }))
+    const effectiveDates: DateInput[] = newDates ?? existing.dates.map((d) => ({ name: d.name, month: d.month, day: d.day, year: d.year }))
 
     // urlJustSet + fetch falho/vazio (fetchHolidaysFromUrl retorna null nos dois casos) não deve apagar
     // as datas manuais que já existiam - mantém o grupo como estava até um resync bem-sucedido
