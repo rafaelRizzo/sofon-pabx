@@ -25,6 +25,7 @@ function buildDialplan(
     dates: HolidayDate[],
     trueAsterisk: string | null,
     falseAsterisk: string | null,
+    timezone: string,
 ): DialplanRow[] {
     const context = HOL_CONTEXT
     const entry = holEntry(id)
@@ -38,7 +39,7 @@ function buildDialplan(
         entries.push({
             context, exten: entry, priority,
             app: 'GotoIfTime',
-            appdata: `00:00-23:59,*,${date.day},${MONTH_CODES[date.month - 1]}?${matched},1`,
+            appdata: `00:00-23:59,*,${date.day},${MONTH_CODES[date.month - 1]}@${timezone}?${matched},1`,
         })
         priority++
     }
@@ -76,9 +77,10 @@ export const HolidayGroupRepository = {
     async regenerate(companyId: string) {
         const asteriskId = await resolveAsteriskId(companyId)
         return withDialplanLock(`${HOL_CONTEXT}:${asteriskId}`, async () => {
-            const [groups, edges] = await Promise.all([
+            const [groups, edges, company] = await Promise.all([
                 prisma.holidayGroup.findMany({ where: { companyId }, include: { dates: true } }),
                 FlowEdgeRepository.getBySource(companyId, 'holidaygroup'),
+                prisma.company.findUniqueOrThrow({ where: { id: companyId }, select: { timezone: true } }),
             ])
             const entries: DialplanRow[] = []
             for (const g of groups) {
@@ -86,7 +88,7 @@ export const HolidayGroupRepository = {
                     resolveRoute(edges.get(g.id)?.true ?? null),
                     resolveRoute(edges.get(g.id)?.false ?? null),
                 ])
-                entries.push(...buildDialplan(g.id, g.name, g.dates, trueAsterisk, falseAsterisk))
+                entries.push(...buildDialplan(g.id, g.name, g.dates, trueAsterisk, falseAsterisk, company.timezone))
             }
             await writeContextFile(HOL_CONTEXT, asteriskId, entries)
             reloadDialplan()

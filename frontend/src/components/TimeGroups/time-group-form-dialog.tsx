@@ -82,6 +82,10 @@ export function TimeGroupFormDialog({
     onSave,
 }: Props) {
     const isEdit = !!timeGroup
+    // Só uma empresa disponível (ex: dialog aberto de dentro do Flow, já travado na empresa do
+    // flow) - pré-seleciona e esconde o combobox, sem exigir reescolher o que já é sabido
+    const defaultCompanyId =
+        companies.length === 1 ? (companies[0]?.id ?? "") : ""
 
     const {
         register,
@@ -95,7 +99,7 @@ export function TimeGroupFormDialog({
         resolver: zodResolver(createTimeGroupFormSchema) as any,
         defaultValues: {
             name: "",
-            companyId: "",
+            companyId: defaultCompanyId,
             ranges: [{ ...EMPTY_RANGE }],
         } as any,
     })
@@ -111,7 +115,7 @@ export function TimeGroupFormDialog({
         if (!open) return
         reset({
             name: timeGroup?.name ?? "",
-            companyId: timeGroup?.companyId ?? "",
+            companyId: timeGroup?.companyId ?? defaultCompanyId,
             ranges: timeGroup
                 ? timeGroup.ranges.map((r) => ({
                       startTime: r.startTime,
@@ -122,7 +126,7 @@ export function TimeGroupFormDialog({
                   }))
                 : [{ ...EMPTY_RANGE }],
         })
-    }, [open, timeGroup, reset])
+    }, [open, timeGroup, reset, defaultCompanyId])
 
     const onSubmit = handleSubmit(async (form) => {
         const ok = await onSave(form)
@@ -176,7 +180,7 @@ export function TimeGroupFormDialog({
                                     )}
                                 </Field>
 
-                                {!isEdit && (
+                                {!isEdit && !defaultCompanyId && (
                                     <Field>
                                         <FieldLabel>Empresa</FieldLabel>
                                         <Combobox<Company>
@@ -254,7 +258,7 @@ export function TimeGroupFormDialog({
                                         08:00–23:59 e 00:00–07:59.
                                     </FieldDescription>
 
-                                    <div className="flex flex-col gap-3">
+                                    <div className="flex flex-col gap-3 p-0.5">
                                         {fields.map((field, index) => (
                                             <Card key={field.id}>
                                                 <CardContent className="flex flex-col gap-3">

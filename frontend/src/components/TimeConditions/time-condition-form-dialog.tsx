@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
+import { PlusIcon } from "lucide-react"
 import { useForm } from "react-hook-form"
 
 import {
@@ -43,6 +44,7 @@ import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { EntityFormDialogSkeletonContent } from "@/components/entity-form-dialog-skeleton"
 import { TimeGroupsCombobox } from "@/components/TimeConditions/time-groups-combobox"
+import { TimeGroupFormDialog } from "@/components/TimeGroups/time-group-form-dialog"
 import { type Company } from "@/hooks/use-companies"
 import {
     createTimeConditionFormSchema,
@@ -98,7 +100,11 @@ export function TimeConditionFormDialog({
 
     // Grupos de horário disponíveis pra vincular - dependem da empresa escolhida no próprio form,
     // não do filtro da página (o dialog é independente da empresa que está sendo listada na tabela)
-    const { timeGroups } = useTimeGroups(companyId || undefined)
+    const { timeGroups, createTimeGroup } = useTimeGroups(companyId || undefined)
+
+    // Criação de grupo de horário sem sair do fluxo (ex: dentro do node "Verificar horário" no
+    // Flow) - grupo nasce já vinculado à mesma empresa da condição, sem exigir a página dedicada
+    const [createGroupOpen, setCreateGroupOpen] = useState(false)
 
     useEffect(() => {
         if (!open) return
@@ -224,9 +230,26 @@ export function TimeConditionFormDialog({
                                         )}
 
                                         <Field>
-                                            <FieldLabel>
-                                                Grupos de horário
-                                            </FieldLabel>
+                                            <div className="flex items-center justify-between">
+                                                <FieldLabel>
+                                                    Grupos de horário
+                                                </FieldLabel>
+                                                {!isEdit && companyId && (
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() =>
+                                                            setCreateGroupOpen(
+                                                                true
+                                                            )
+                                                        }
+                                                    >
+                                                        <PlusIcon />
+                                                        Novo grupo
+                                                    </Button>
+                                                )}
+                                            </div>
                                             {isEdit ? (
                                                 <>
                                                     <div className="flex flex-wrap gap-1.5">
@@ -358,6 +381,24 @@ export function TimeConditionFormDialog({
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            {selectedCompany && (
+                <TimeGroupFormDialog
+                    open={createGroupOpen}
+                    onOpenChange={setCreateGroupOpen}
+                    timeGroup={null}
+                    companies={[selectedCompany]}
+                    onSave={async (form) => {
+                        const groupId = await createTimeGroup(form, true)
+                        if (!groupId) return false
+                        setValue("groupIds", [...groupIds, groupId], {
+                            shouldValidate: true,
+                            shouldDirty: true,
+                        })
+                        return true
+                    }}
+                />
+            )}
         </>
     )
 }

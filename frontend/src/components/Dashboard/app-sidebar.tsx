@@ -3,6 +3,7 @@ import {
   ActivityIcon,
   BracesIcon,
   Building2Icon,
+  ClockIcon,
   DatabaseBackupIcon,
   FileAudioIcon,
   FileClockIcon,
@@ -148,6 +149,12 @@ export const NAV: NavGroup[] = [
         href: "/dashboard/audios",
         icon: FileAudioIcon,
         permission: "audios",
+      },
+      {
+        title: "Grupos de horário",
+        href: "/dashboard/time-groups",
+        icon: ClockIcon,
+        permission: "time-groups",
       },
       {
         title: "Catálogo de Variáveis",

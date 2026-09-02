@@ -147,6 +147,13 @@ export const updateCompany = async (id: string, data: UpdateCompanyInput) => {
         select: companySelect,
     })
 
+    if (data.timezone !== undefined && data.timezone !== existing.timezone) {
+        await Promise.all([
+            TimeConditionRepository.regenerate(id),
+            HolidayGroupRepository.regenerate(id),
+        ])
+    }
+
     await CompaniesCache.invalidateCompany(id)
     await CompaniesCache.invalidateAllCompanies()
     const affectedUsers = existing.users.map((u) => u.userId)

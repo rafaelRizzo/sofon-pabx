@@ -104,16 +104,24 @@ export function useTimeGroups(companyId?: string) {
     })
 
     // companyId do grupo vem do próprio form (campo "Empresa" do dialog), não do filtro da página
-    const createTimeGroup = async (form: TimeGroupForm) => {
+    async function createTimeGroup(form: TimeGroupForm): Promise<boolean>
+    async function createTimeGroup(
+        form: TimeGroupForm,
+        withResourceId: true
+    ): Promise<string | null>
+    async function createTimeGroup(
+        form: TimeGroupForm,
+        withResourceId = false
+    ) {
         const id = toast.loading("Criando grupo de horário...")
         try {
-            await createMutation.mutateAsync(form)
+            const { data } = await createMutation.mutateAsync(form)
             toast.success("Grupo de horário criado", { id })
             await invalidate()
-            return true
+            return withResourceId ? (data.timeGroupId as string) : true
         } catch (err) {
             toast.error(apiError(err, "Erro ao criar grupo de horário"), { id })
-            return false
+            return withResourceId ? null : false
         }
     }
 

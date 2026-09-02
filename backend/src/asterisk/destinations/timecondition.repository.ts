@@ -29,6 +29,7 @@ function buildDialplan(
     ranges: TimeRange[],
     trueAsterisk: string | null,
     falseAsterisk: string | null,
+    timezone: string,
 ): DialplanRow[] {
     const context = TC_CONTEXT
     const entry = tcEntry(tcId)
@@ -43,7 +44,7 @@ function buildDialplan(
         entries.push({
             context, exten: entry, priority,
             app: 'GotoIfTime',
-            appdata: `${range.startTime}-${range.endTime},${weekSpec},${range.monthdays},${range.months}?${matched},1`,
+            appdata: `${range.startTime}-${range.endTime},${weekSpec},${range.monthdays},${range.months}@${timezone}?${matched},1`,
         })
         priority++
     }
@@ -80,12 +81,13 @@ export const TimeConditionRepository = {
     async regenerate(companyId: string) {
         const asteriskId = await resolveAsteriskId(companyId)
         return withDialplanLock(`${TC_CONTEXT}:${asteriskId}`, async () => {
-            const [conditions, edges] = await Promise.all([
+            const [conditions, edges, company] = await Promise.all([
                 prisma.timeCondition.findMany({
                     where: { companyId },
                     include: { timeGroups: { include: { timeGroup: { include: { ranges: true } } } } },
                 }),
                 FlowEdgeRepository.getBySource(companyId, 'timecondition'),
+                prisma.company.findUniqueOrThrow({ where: { id: companyId }, select: { timezone: true } }),
             ])
             const entries: DialplanRow[] = []
             for (const tc of conditions) {
@@ -94,7 +96,7 @@ export const TimeConditionRepository = {
                     resolveRoute(edges.get(tc.id)?.true ?? null),
                     resolveRoute(edges.get(tc.id)?.false ?? null),
                 ])
-                entries.push(...buildDialplan(tc.id, tc.name, ranges, trueAsterisk, falseAsterisk))
+                entries.push(...buildDialplan(tc.id, tc.name, ranges, trueAsterisk, falseAsterisk, company.timezone))
             }
             await writeContextFile(TC_CONTEXT, asteriskId, entries)
             reloadDialplan()
