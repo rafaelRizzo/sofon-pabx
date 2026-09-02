@@ -4,13 +4,22 @@ import { AppError } from '../../../utils/errors/app.error'
 
 const env = validateEnv()
 
-export type ElevenLabsVoice = { voiceId: string; name: string; previewUrl: string | null; languages: string[] }
+export type ElevenLabsVoice = {
+    voiceId: string
+    name: string
+    previewUrl: string | null
+    languages: string[]
+    accent: string | null
+    gender: string | null
+    age: string | null
+    description: string | null
+}
 
 type RawVoice = {
     voice_id: string
     name: string
     preview_url?: string | null
-    labels?: { language?: string }
+    labels?: { language?: string; accent?: string; gender?: string; age?: string; description?: string }
     verified_languages?: { language: string }[]
 }
 
@@ -55,6 +64,10 @@ export async function listVoices(apiKey: string): Promise<ElevenLabsVoice[]> {
             name: v.name,
             previewUrl: v.preview_url ?? null,
             languages: extractLanguages(v),
+            accent: v.labels?.accent ?? null,
+            gender: v.labels?.gender ?? null,
+            age: v.labels?.age ?? null,
+            description: v.labels?.description ?? null,
         }))
     }, 'elevenlabs.voices.error')
 }

@@ -1,18 +1,18 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
 import {
     FileAudioIcon,
     Loader2Icon,
-    PlayIcon,
     RefreshCwIcon,
     UploadIcon,
     XIcon,
 } from "lucide-react"
 import { toast } from "sonner"
+import type { ElevenLabs } from "@elevenlabs/elevenlabs-js"
 
 import {
     AlertDialog,
@@ -25,14 +25,6 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
-import {
-    Combobox,
-    ComboboxContent,
-    ComboboxEmpty,
-    ComboboxInput,
-    ComboboxItem,
-    ComboboxList,
-} from "@/components/ui/combobox"
 import {
     Dialog,
     DialogContent,
@@ -71,8 +63,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { AudioWaveform } from "@/components/ui/audio-waveform"
 import { loadAudioFile, type Audio, type TtsVoiceSettings } from "@/hooks/use-audios"
-import { useTtsVoices, type Voice } from "@/hooks/use-tts-voices"
-import { VoicePreviewDots } from "@/components/Audios/voice-preview-dots"
+import { useTtsVoices } from "@/hooks/use-tts-voices"
+
+// Lazy: o VoicePicker (voice-picker/) carrega three.js/react-three-fiber (avatar animado),
+// ~700KB - sem isso a rota /dashboard/audios inteira pagaria esse peso mesmo pra quem só
+// faz upload de áudio, nunca abre a aba "Gerar por voz"
+const VoicePicker = lazy(() =>
+    import("@/components/voice-picker/voice-picker").then((m) => ({
+        default: m.VoicePicker,
+    }))
+)
 
 const TTS_TEXT_MAX = 2500
 const ALL_LANGUAGES = "all"
@@ -270,7 +270,23 @@ export function AudioFormDialog({
         [voices, languageFilter]
     )
 
-    const selectedVoice = voices.find((v) => v.voiceId === voiceId) ?? null
+    // VoicePicker (voice-picker/) espera o shape ElevenLabs.Voice (labels aninhado) - adapta a
+    // partir do formato flat que a API deste backend retorna (ver use-tts-voices.ts)
+    const elevenLabsVoices = useMemo<ElevenLabs.Voice[]>(
+        () =>
+            filteredVoices.map((v) => ({
+                voiceId: v.voiceId,
+                name: v.name,
+                previewUrl: v.previewUrl ?? undefined,
+                labels: {
+                    ...(v.accent && { accent: v.accent }),
+                    ...(v.gender && { gender: v.gender }),
+                    ...(v.age && { age: v.age }),
+                    ...(v.description && { description: v.description }),
+                },
+            })),
+        [filteredVoices]
+    )
 
     // Se a voz selecionada sair da lista ao trocar o filtro de idioma, limpa a seleção
     useEffect(() => {
@@ -284,20 +300,10 @@ export function AudioFormDialog({
     const [fileError, setFileError] = useState<string | null>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
 
-    const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null)
-    const [previewLoadingId, setPreviewLoadingId] = useState<string | null>(
-        null
-    )
-    const previewAudioRef = useRef<HTMLAudioElement | null>(null)
-    const previewObjectUrlRef = useRef<string | null>(null)
-
-    function stopPreview() {
-        previewAudioRef.current?.pause()
-        if (previewObjectUrlRef.current) {
-            URL.revokeObjectURL(previewObjectUrlRef.current)
-            previewObjectUrlRef.current = null
-        }
-    }
+    // Blob URLs criadas pela prévia de voz (ver getVoicePreviewUrl) - revogadas ao fechar o
+    // dialog (efeito abaixo), já que o VoicePicker (voice-picker/) toca via <audio src>, não
+    // controlamos o player diretamente daqui
+    const previewUrlsRef = useRef<string[]>([])
 
     // Player do áudio recém-gerado por TTS (o .wav final já convertido, via /audios/:id/file) -
     // diferente do togglePreview acima, que só toca a prévia curta da voz antes de gerar
@@ -328,16 +334,9 @@ export function AudioFormDialog({
     }, [generatedAudioId])
 
     // Prévia gerada sob demanda no idioma selecionado (diferente do `previewUrl` fixo, geralmente
-    // em inglês, que a ElevenLabs devolve em /audios/tts/voices)
-    async function togglePreview(voice: Voice) {
-        if (playingVoiceId === voice.voiceId) {
-            stopPreview()
-            setPlayingVoiceId(null)
-            return
-        }
-        stopPreview()
-        setPlayingVoiceId(null)
-        setPreviewLoadingId(voice.voiceId)
+    // em inglês, que a ElevenLabs devolve em /audios/tts/voices) - passado como `getPreviewUrl`
+    // pro VoicePicker, que toca o resultado via seu próprio player (voice-audio-player.tsx)
+    async function getVoicePreviewUrl(voice: ElevenLabs.Voice): Promise<string | null> {
         try {
             const language = languageFilter === ALL_LANGUAGES ? "pt" : languageFilter
             const res = await api.get("/audios/tts/preview", {
@@ -345,16 +344,11 @@ export function AudioFormDialog({
                 responseType: "blob",
             })
             const url = URL.createObjectURL(res.data as Blob)
-            previewObjectUrlRef.current = url
-            const player = new window.Audio(url)
-            player.onended = () => setPlayingVoiceId(null)
-            previewAudioRef.current = player
-            setPlayingVoiceId(voice.voiceId)
-            await player.play()
+            previewUrlsRef.current.push(url)
+            return url
         } catch (err) {
             toast.error(apiError(err, "Erro ao gerar prévia da voz"))
-        } finally {
-            setPreviewLoadingId(null)
+            return null
         }
     }
 
@@ -373,15 +367,16 @@ export function AudioFormDialog({
         setGeneratedAudioId(null)
     }, [open, audio, reset])
 
-    // Para a prévia ao fechar o dialog ou desmontar, sem depender do usuário clicar de novo
+    // Revoga as blob URLs de prévia de voz ao fechar o dialog ou desmontar
     useEffect(() => {
         if (!open) {
-            stopPreview()
-            setPlayingVoiceId(null)
+            previewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url))
+            previewUrlsRef.current = []
             setGeneratedAudioId(null)
         }
         return () => {
-            stopPreview()
+            previewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url))
+            previewUrlsRef.current = []
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open])
@@ -714,103 +709,38 @@ export function AudioFormDialog({
                                                             Atualizar
                                                         </Button>
                                                     </div>
-                                                    <Combobox<Voice>
-                                                        items={filteredVoices}
-                                                        value={selectedVoice}
-                                                        itemToStringLabel={(
-                                                            v
-                                                        ) => v.name}
-                                                        isItemEqualToValue={(
-                                                            a,
-                                                            b
-                                                        ) =>
-                                                            a.voiceId ===
-                                                            b.voiceId
-                                                        }
-                                                        onValueChange={(v) =>
-                                                            setValue(
-                                                                "voiceId",
-                                                                v?.voiceId ??
-                                                                    "",
-                                                                {
-                                                                    shouldValidate:
-                                                                        true,
-                                                                    shouldDirty:
-                                                                        true,
-                                                                }
-                                                            )
+                                                    <Suspense
+                                                        fallback={
+                                                            <div className="flex h-9 w-full items-center rounded-md border px-3 text-sm text-muted-foreground">
+                                                                Carregando...
+                                                            </div>
                                                         }
                                                     >
-                                                        <ComboboxInput
+                                                        <VoicePicker
+                                                            voices={elevenLabsVoices}
+                                                            value={voiceId}
+                                                            onValueChange={(v) =>
+                                                                setValue(
+                                                                    "voiceId",
+                                                                    v,
+                                                                    {
+                                                                        shouldValidate:
+                                                                            true,
+                                                                        shouldDirty:
+                                                                            true,
+                                                                    }
+                                                                )
+                                                            }
+                                                            getPreviewUrl={
+                                                                getVoicePreviewUrl
+                                                            }
                                                             placeholder={
                                                                 loadingVoices
                                                                     ? "Carregando vozes..."
-                                                                    : "Buscar voz..."
+                                                                    : "Selecione uma voz..."
                                                             }
                                                         />
-                                                        <ComboboxContent>
-                                                            <ComboboxEmpty>
-                                                                Nenhuma voz
-                                                                encontrada
-                                                            </ComboboxEmpty>
-                                                            <ComboboxList>
-                                                                {(
-                                                                    v: Voice
-                                                                ) => (
-                                                                    <ComboboxItem
-                                                                        key={
-                                                                            v.voiceId
-                                                                        }
-                                                                        value={
-                                                                            v
-                                                                        }
-                                                                    >
-                                                                        <span className="min-w-0 flex-1 truncate">
-                                                                            {
-                                                                                v.name
-                                                                            }
-                                                                        </span>
-                                                                        <Button
-                                                                            type="button"
-                                                                            variant="ghost"
-                                                                            size="icon-xs"
-                                                                            disabled={
-                                                                                previewLoadingId ===
-                                                                                v.voiceId
-                                                                            }
-                                                                            onClick={(
-                                                                                e
-                                                                            ) => {
-                                                                                e.stopPropagation()
-                                                                                togglePreview(
-                                                                                    v
-                                                                                )
-                                                                            }}
-                                                                            onPointerDown={(
-                                                                                e
-                                                                            ) =>
-                                                                                e.stopPropagation()
-                                                                            }
-                                                                        >
-                                                                            {previewLoadingId ===
-                                                                            v.voiceId ? (
-                                                                                <Loader2Icon className="animate-spin" />
-                                                                            ) : playingVoiceId ===
-                                                                              v.voiceId ? (
-                                                                                <VoicePreviewDots />
-                                                                            ) : (
-                                                                                <PlayIcon />
-                                                                            )}
-                                                                            <span className="sr-only">
-                                                                                Ouvir
-                                                                                prévia
-                                                                            </span>
-                                                                        </Button>
-                                                                    </ComboboxItem>
-                                                                )}
-                                                            </ComboboxList>
-                                                        </ComboboxContent>
-                                                    </Combobox>
+                                                    </Suspense>
                                                     {errors.voiceId && (
                                                         <FieldError>
                                                             {

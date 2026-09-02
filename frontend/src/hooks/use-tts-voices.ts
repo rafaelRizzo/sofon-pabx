@@ -11,6 +11,10 @@ export type Voice = {
     name: string
     previewUrl: string | null
     languages: string[]
+    accent: string | null
+    gender: string | null
+    age: string | null
+    description: string | null
 }
 
 async function fetchVoicesRequest(

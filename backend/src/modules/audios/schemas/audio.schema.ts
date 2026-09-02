@@ -64,6 +64,10 @@ export const VoiceSchema = z.object({
     name: z.string(),
     previewUrl: z.string().nullable(),
     languages: z.array(z.string()),
+    accent: z.string().nullable(),
+    gender: z.string().nullable(),
+    age: z.string().nullable(),
+    description: z.string().nullable(),
 })
 
 export const ListAudiosResponse = ok({ message: z.string(), audios: z.array(AudioSchema) })
