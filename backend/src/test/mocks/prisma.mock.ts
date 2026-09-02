@@ -1,22 +1,31 @@
 import { mock } from 'bun:test'
 
+// Métodos de leitura/agregação em lote têm um resultado "vazio" óbvio - default aqui evita que
+// todo teste precise mockar explicitamente um findMany que não é o foco do caso testado. mockReset
+// (clearPrismaMock abaixo) apaga esse default junto com o resto, então ele precisa ser reaplicado
+// a cada beforeEach - ver DEFAULT_IMPLS.
+const DEFAULT_IMPLS: Record<string, () => Promise<unknown>> = {
+    findMany: () => Promise.resolve([]),
+    createMany: () => Promise.resolve({ count: 0 }),
+    updateMany: () => Promise.resolve({ count: 0 }),
+    deleteMany: () => Promise.resolve({ count: 0 }),
+    count: () => Promise.resolve(0),
+    groupBy: () => Promise.resolve([]),
+    aggregate: () => Promise.resolve({}),
+}
+
 function model() {
-    return {
+    const m: Record<string, ReturnType<typeof mock>> = {
         findUnique: mock(),
         findUniqueOrThrow: mock(),
         findFirst: mock(),
-        findMany: mock(() => Promise.resolve([])),
         create: mock(),
-        createMany: mock(() => Promise.resolve({ count: 0 })),
         update: mock(),
-        updateMany: mock(() => Promise.resolve({ count: 0 })),
         delete: mock(),
-        deleteMany: mock(() => Promise.resolve({ count: 0 })),
         upsert: mock(),
-        count: mock(() => Promise.resolve(0)),
-        groupBy: mock(() => Promise.resolve([])),
-        aggregate: mock(() => Promise.resolve({})),
     }
+    for (const [name, impl] of Object.entries(DEFAULT_IMPLS)) m[name] = mock(impl)
+    return m
 }
 
 export function createPrismaMock() {
@@ -82,9 +91,10 @@ export function createPrismaMock() {
 export function clearPrismaMock(db: ReturnType<typeof createPrismaMock>) {
     for (const model of Object.values(db)) {
         if (model && typeof model === 'object') {
-            for (const fn of Object.values(model as object)) {
-                if (fn && typeof (fn as any).mockReset === 'function') {
-                    ;(fn as any).mockReset()
+            for (const [name, fn] of Object.entries(model as Record<string, any>)) {
+                if (fn && typeof fn.mockReset === 'function') {
+                    fn.mockReset()
+                    if (DEFAULT_IMPLS[name]) fn.mockImplementation(DEFAULT_IMPLS[name])
                 }
             }
         }
