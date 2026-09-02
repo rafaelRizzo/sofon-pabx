@@ -453,6 +453,7 @@ model Audio {
   source     AudioSource @default(UPLOAD)
   ttsText    String?     @db.Text
   ttsVoiceId String?
+  ttsSettings Json?
   createdAt  DateTime    @default(now()) @db.Timestamptz(3)
   updatedAt  DateTime    @updatedAt @db.Timestamptz(3)
 

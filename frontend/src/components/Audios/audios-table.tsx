@@ -1,6 +1,11 @@
 "use client"
 
-import { PencilIcon, PlayIcon, Trash2Icon } from "lucide-react"
+import {
+    PencilIcon,
+    PlayIcon,
+    SparklesIcon,
+    Trash2Icon,
+} from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -77,7 +82,11 @@ export function AudiosTable({
                                     <div className="flex items-center gap-2">
                                         {audio.name}
                                         {audio.source === "TTS" && (
-                                            <Badge variant="secondary">
+                                            <Badge
+                                                variant="outline"
+                                                className="border-transparent bg-violet-500/15 text-violet-600 dark:bg-violet-400/20 dark:text-violet-300"
+                                            >
+                                                <SparklesIcon />
                                                 IA
                                             </Badge>
                                         )}

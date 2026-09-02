@@ -59,10 +59,18 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Slider } from "@/components/ui/slider"
+import { Switch } from "@/components/ui/switch"
+import {
+    Accordion,
+    AccordionContent,
+    AccordionItem,
+    AccordionTrigger,
+} from "@/components/ui/accordion"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { AudioWaveform } from "@/components/ui/audio-waveform"
-import { loadAudioFile, type Audio } from "@/hooks/use-audios"
+import { loadAudioFile, type Audio, type TtsVoiceSettings } from "@/hooks/use-audios"
 import { useTtsVoices, type Voice } from "@/hooks/use-tts-voices"
 import { VoicePreviewDots } from "@/components/Audios/voice-preview-dots"
 
@@ -99,12 +107,27 @@ const LANGUAGE_SELECT_ITEMS = [
     })),
 ]
 
+// Mesmos defaults de ElevenLabsProvider.DEFAULT_VOICE_SETTINGS no backend - mantém os sliders
+// alinhados com o que a API usa quando o campo não é enviado
+const DEFAULT_VOICE_SETTINGS: Required<TtsVoiceSettings> = {
+    stability: 0.65,
+    similarityBoost: 0.85,
+    style: 0,
+    speed: 1,
+    speakerBoost: true,
+}
+
 const audioFormSchema = z
     .object({
         name: z.string().min(1, "Informe o nome").max(80, "Máximo 80 caracteres"),
         mode: z.enum(["upload", "tts"]),
         text: z.string().max(TTS_TEXT_MAX, "Máximo 2500 caracteres"),
         voiceId: z.string(),
+        stability: z.number().min(0).max(1),
+        similarityBoost: z.number().min(0).max(1),
+        style: z.number().min(0).max(1),
+        speed: z.number().min(0.7).max(1.2),
+        speakerBoost: z.boolean(),
     })
     .superRefine((data, ctx) => {
         if (data.mode !== "tts") return
@@ -118,7 +141,12 @@ const audioFormSchema = z
 
 type AudioFormValues = z.infer<typeof audioFormSchema>
 
-type TtsPayload = { text: string; voiceId: string; language: "pt" | "en" }
+type TtsPayload = {
+    text: string
+    voiceId: string
+    language: "pt" | "en"
+    voiceSettings: TtsVoiceSettings
+}
 
 type Props = {
     open: boolean
@@ -144,6 +172,50 @@ function isAudioFile(file: File) {
     return !!ext && AUDIO_EXTENSIONS.includes(ext)
 }
 
+// Mesmo layout do painel de voice_settings da ElevenLabs (label + valor + slider + legenda dos
+// extremos) - um componente só pra não repetir o mesmo bloco 4x em AudioFormDialog
+function VoiceSettingSlider({
+    label,
+    value,
+    min,
+    max,
+    minLabel,
+    maxLabel,
+    onValueChange,
+}: {
+    label: string
+    value: number
+    min: number
+    max: number
+    minLabel: string
+    maxLabel: string
+    onValueChange: (value: number) => void
+}) {
+    return (
+        <Field>
+            <div className="flex items-center justify-between">
+                <FieldLabel>{label}</FieldLabel>
+                <span className="text-xs text-muted-foreground tabular-nums">
+                    {value.toFixed(2)}
+                </span>
+            </div>
+            <Slider
+                min={min}
+                max={max}
+                step={0.01}
+                value={[value]}
+                onValueChange={(v) =>
+                    onValueChange(Array.isArray(v) ? v[0] : v)
+                }
+            />
+            <div className="flex justify-between text-xs text-muted-foreground">
+                <span>{minLabel}</span>
+                <span>{maxLabel}</span>
+            </div>
+        </Field>
+    )
+}
+
 export function AudioFormDialog({
     open,
     onOpenChange,
@@ -167,12 +239,18 @@ export function AudioFormDialog({
             mode: "upload",
             text: "",
             voiceId: "",
+            ...DEFAULT_VOICE_SETTINGS,
         },
     })
 
     const mode = watch("mode")
     const text = watch("text")
     const voiceId = watch("voiceId")
+    const stability = watch("stability")
+    const similarityBoost = watch("similarityBoost")
+    const style = watch("style")
+    const speed = watch("speed")
+    const speakerBoost = watch("speakerBoost")
 
     const {
         voices,
@@ -287,6 +365,7 @@ export function AudioFormDialog({
             mode: "upload",
             text: "",
             voiceId: "",
+            ...DEFAULT_VOICE_SETTINGS,
         })
         setFile(null)
         setFileError(null)
@@ -345,6 +424,13 @@ export function AudioFormDialog({
                       language: (languageFilter === ALL_LANGUAGES
                           ? "pt"
                           : languageFilter) as "pt" | "en",
+                      voiceSettings: {
+                          stability: form.stability,
+                          similarityBoost: form.similarityBoost,
+                          style: form.style,
+                          speed: form.speed,
+                          speakerBoost: form.speakerBoost,
+                      },
                   }
                 : null
         if (tts) setGeneratedAudioId(null)
@@ -763,6 +849,78 @@ export function AudioFormDialog({
                                                         8kHz.
                                                     </FieldDescription>
                                                 </Field>
+
+                                                <Accordion>
+                                                    <AccordionItem value="advanced">
+                                                        <AccordionTrigger>
+                                                            Configurações avançadas
+                                                        </AccordionTrigger>
+                                                        <AccordionContent>
+                                                            <div className="flex flex-col gap-4">
+                                                                <VoiceSettingSlider
+                                                                    label="Estabilidade"
+                                                                    value={stability}
+                                                                    min={0}
+                                                                    max={1}
+                                                                    minLabel="Mais variável"
+                                                                    maxLabel="Mais estável"
+                                                                    onValueChange={(v) =>
+                                                                        setValue("stability", v, { shouldDirty: true })
+                                                                    }
+                                                                />
+
+                                                                <VoiceSettingSlider
+                                                                    label="Similaridade"
+                                                                    value={similarityBoost}
+                                                                    min={0}
+                                                                    max={1}
+                                                                    minLabel="Baixa"
+                                                                    maxLabel="Alta"
+                                                                    onValueChange={(v) =>
+                                                                        setValue("similarityBoost", v, { shouldDirty: true })
+                                                                    }
+                                                                />
+
+                                                                <VoiceSettingSlider
+                                                                    label="Exagero de estilo"
+                                                                    value={style}
+                                                                    min={0}
+                                                                    max={1}
+                                                                    minLabel="Nenhum"
+                                                                    maxLabel="Exagerado"
+                                                                    onValueChange={(v) =>
+                                                                        setValue("style", v, { shouldDirty: true })
+                                                                    }
+                                                                />
+
+                                                                <VoiceSettingSlider
+                                                                    label="Velocidade"
+                                                                    value={speed}
+                                                                    min={0.7}
+                                                                    max={1.2}
+                                                                    minLabel="Mais lento"
+                                                                    maxLabel="Mais rápido"
+                                                                    onValueChange={(v) =>
+                                                                        setValue("speed", v, { shouldDirty: true })
+                                                                    }
+                                                                />
+
+                                                                <Field orientation="horizontal">
+                                                                    <FieldLabel htmlFor="speaker-boost">
+                                                                        Speaker boost
+                                                                    </FieldLabel>
+                                                                    <Switch
+                                                                        id="speaker-boost"
+                                                                        checked={speakerBoost}
+                                                                        onCheckedChange={(checked) =>
+                                                                            setValue("speakerBoost", checked, { shouldDirty: true })
+                                                                        }
+                                                                    />
+                                                                </Field>
+                                                            </div>
+                                                        </AccordionContent>
+                                                    </AccordionItem>
+                                                </Accordion>
 
                                                 {generatedAudioId && (
                                                     <Field>

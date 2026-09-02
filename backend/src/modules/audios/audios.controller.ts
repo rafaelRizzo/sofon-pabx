@@ -118,9 +118,9 @@ export const createAudio = async (req: FastifyRequest, reply: FastifyReply) => {
 
 export const createAudioTts = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
-        const { name, companyId, text, voiceId, language } = createAudioTtsSchema.parse(req.body)
+        const { name, companyId, text, voiceId, language, voiceSettings } = createAudioTtsSchema.parse(req.body)
         req.scope.assertAccess(companyId)
-        const audio = await AudiosService.createAudioFromText(companyId, name, text, voiceId, language)
+        const audio = await AudiosService.createAudioFromText(companyId, name, text, voiceId, language, voiceSettings)
         return reply.status(201).send({ success: true, message: 'Audio generated successfully', audioId: audio.id })
     } catch (error) {
         return handleError(reply, error, req)

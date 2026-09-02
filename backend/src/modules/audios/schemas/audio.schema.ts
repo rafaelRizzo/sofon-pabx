@@ -20,12 +20,25 @@ export const createAudioFieldsSchema = z.object({
     companyId: z.cuid2(),
 })
 
+// Espelha voice_settings da ElevenLabs (ver providers/elevenlabs.provider.ts) - todos opcionais,
+// campo omitido cai no default do provider. `speed` é o único fora do range 0-1 (0.7-1.2 na API).
+export const ttsVoiceSettingsSchema = z.object({
+    stability: z.number().min(0).max(1).optional(),
+    similarityBoost: z.number().min(0).max(1).optional(),
+    style: z.number().min(0).max(1).optional(),
+    speed: z.number().min(0.7).max(1.2).optional(),
+    speakerBoost: z.boolean().optional(),
+})
+
+export type TtsVoiceSettingsInput = z.infer<typeof ttsVoiceSettingsSchema>
+
 export const createAudioTtsSchema = z.object({
     name: z.string().min(1).max(80),
     companyId: z.cuid2(),
     text: z.string().min(1).max(2500),
     voiceId: z.string().min(1),
     language: z.enum(['pt', 'en']).default('pt'),
+    voiceSettings: ttsVoiceSettingsSchema.optional(),
 })
 
 export const voicePreviewQuerySchema = z.object({
@@ -41,6 +54,7 @@ export const AudioSchema = z.object({
     source: z.enum(['UPLOAD', 'TTS']),
     ttsText: z.string().nullable(),
     ttsVoiceId: z.string().nullable(),
+    ttsSettings: ttsVoiceSettingsSchema.nullable(),
     createdAt: timestamp,
     updatedAt: timestamp,
 })

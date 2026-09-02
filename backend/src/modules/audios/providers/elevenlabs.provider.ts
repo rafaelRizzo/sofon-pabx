@@ -66,15 +66,35 @@ export async function listVoices(apiKey: string): Promise<ElevenLabsVoice[]> {
 // 0.85+, é que soaria monótona ali). similarity_boost mais alto mantém o timbre fiel à voz
 // original em qualquer duração. style em 0 (exagero emocional só soma risco de distorção, sem
 // ganho pro caso de uso) e use_speaker_boost ligado (latência não importa, geração é única/
-// assíncrona, não streaming ao vivo).
-const VOICE_SETTINGS = { stability: 0.65, similarity_boost: 0.85, style: 0, use_speaker_boost: true }
+// assíncrona, não streaming ao vivo). Usado como base quando o caller (audios.service.ts) não
+// manda um voiceSettings próprio - e como fallback campo a campo pra settings parciais.
+export const DEFAULT_VOICE_SETTINGS = { stability: 0.65, similarityBoost: 0.85, style: 0, speed: 1, speakerBoost: true }
 
-export async function textToSpeech(apiKey: string, voiceId: string, text: string, language: 'pt' | 'en'): Promise<Buffer> {
+export type VoiceSettingsInput = Partial<typeof DEFAULT_VOICE_SETTINGS>
+
+export async function textToSpeech(
+    apiKey: string,
+    voiceId: string,
+    text: string,
+    language: 'pt' | 'en',
+    voiceSettings?: VoiceSettingsInput
+): Promise<Buffer> {
     return withTimeout(async (signal) => {
+        const settings = { ...DEFAULT_VOICE_SETTINGS, ...voiceSettings }
         // language_code (ISO 639-1) força o idioma em vez de depender de auto-detecção - evita
         // ambiguidade em textos curtos, mas não distingue variante (pt-BR vs pt-PT, sem suporte
         // na API). Não suportado em multilingual_v2, só nos modelos mais novos (v3, turbo/flash).
-        const requestBody: Record<string, unknown> = { text, model_id: env.ELEVENLABS_MODEL_ID, voice_settings: VOICE_SETTINGS }
+        const requestBody: Record<string, unknown> = {
+            text,
+            model_id: env.ELEVENLABS_MODEL_ID,
+            voice_settings: {
+                stability: settings.stability,
+                similarity_boost: settings.similarityBoost,
+                style: settings.style,
+                speed: settings.speed,
+                use_speaker_boost: settings.speakerBoost,
+            },
+        }
         if (env.ELEVENLABS_MODEL_ID !== 'eleven_multilingual_v2') requestBody.language_code = language
 
         const res = await fetch(`${env.ELEVENLABS_API_URL}/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`, {

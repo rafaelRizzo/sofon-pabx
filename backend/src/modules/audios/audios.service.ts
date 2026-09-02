@@ -14,7 +14,7 @@ import { IvrCache } from '../ivr/cache/ivr.cache'
 import { QueuesCache } from '../queues/cache/queues.cache'
 import { convertToAsteriskWav } from '../../utils/audio-convert'
 import * as ElevenLabsProvider from './providers/elevenlabs.provider'
-import type { UpdateAudioInput } from './schemas/audio.schema'
+import type { UpdateAudioInput, TtsVoiceSettingsInput } from './schemas/audio.schema'
 import { AppError } from '../../utils/errors/app.error'
 
 const select = {
@@ -24,6 +24,7 @@ const select = {
     source: true,
     ttsText: true,
     ttsVoiceId: true,
+    ttsSettings: true,
     createdAt: true,
     updatedAt: true,
 } as const
@@ -90,17 +91,27 @@ export const createAudio = async (companyId: string, name: string, audio: Buffer
     return created
 }
 
-export const createAudioFromText = async (companyId: string, name: string, text: string, voiceId: string, language: 'pt' | 'en') => {
+export const createAudioFromText = async (
+    companyId: string,
+    name: string,
+    text: string,
+    voiceId: string,
+    language: 'pt' | 'en',
+    voiceSettings?: TtsVoiceSettingsInput
+) => {
     const company = await getCompanyById(companyId)
     if (!company.elevenLabsApiKey) throw new AppError('ElevenLabs is not configured for this company', 400)
 
     const existing = await prisma.audio.findUnique({ where: { name_companyId: { name, companyId } } })
     if (existing) throw new AppError('Audio already exists for this company', 409)
 
-    const buffer = await ElevenLabsProvider.textToSpeech(company.elevenLabsApiKey.trim(), voiceId, text, language)
+    const buffer = await ElevenLabsProvider.textToSpeech(company.elevenLabsApiKey.trim(), voiceId, text, language, voiceSettings)
 
+    // Grava o merge efetivo (default + overrides), não só o que veio no body - assim reabrir o
+    // áudio pra regenerar mostra os valores reais usados, mesmo os que caíram no default
+    const effectiveSettings = { ...ElevenLabsProvider.DEFAULT_VOICE_SETTINGS, ...voiceSettings }
     const created = await prisma.audio.create({
-        data: { name, companyId, source: 'TTS', ttsText: text, ttsVoiceId: voiceId },
+        data: { name, companyId, source: 'TTS', ttsText: text, ttsVoiceId: voiceId, ttsSettings: effectiveSettings },
         select,
     })
     await persistAudioFile(company, created.id, buffer, '.mp3')

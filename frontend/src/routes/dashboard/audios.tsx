@@ -111,7 +111,8 @@ function AudiosPage() {
                                   formCompanyId!,
                                   tts.text,
                                   tts.voiceId,
-                                  tts.language
+                                  tts.language,
+                                  tts.voiceSettings
                               )
                             : createAudio(file!, form.name, formCompanyId!)
                     }

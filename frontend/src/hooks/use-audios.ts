@@ -6,6 +6,14 @@ import { toast } from "sonner"
 
 import { api, apiError } from "@/lib/api"
 
+export type TtsVoiceSettings = {
+    stability?: number
+    similarityBoost?: number
+    style?: number
+    speed?: number
+    speakerBoost?: boolean
+}
+
 export type Audio = {
     id: string
     name: string
@@ -13,6 +21,7 @@ export type Audio = {
     source: "UPLOAD" | "TTS"
     ttsText: string | null
     ttsVoiceId: string | null
+    ttsSettings: TtsVoiceSettings | null
     createdAt: string
     updatedAt: string
 }
@@ -110,7 +119,8 @@ export function useAudios(companyId?: string) {
         targetCompanyId: string,
         text: string,
         voiceId: string,
-        language: "pt" | "en"
+        language: "pt" | "en",
+        voiceSettings?: TtsVoiceSettings
     ) => {
         const id = toast.loading("Gerando áudio...")
         try {
@@ -120,6 +130,7 @@ export function useAudios(companyId?: string) {
                 text,
                 voiceId,
                 language,
+                voiceSettings,
             })
             toast.success("Áudio gerado", { id })
             await invalidate()
