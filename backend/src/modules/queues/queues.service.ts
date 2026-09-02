@@ -66,6 +66,7 @@ const queueSelect = {
     weight: true,
     metadata: true,
     surveyAudioId: true,
+    surveyServiceAudioId: true,
     callcenterEnabled: true,
     createdAt: true,
     updatedAt: true,
@@ -73,9 +74,18 @@ const queueSelect = {
     _count: { select: { members: true } }
 } as const
 
-const toDto = <T extends { surveyAudioId: string | null; usedBy: UsedByRef[] }>(
+const toDto = <
+    T extends {
+        surveyAudioId: string | null
+        surveyServiceAudioId: string | null
+        usedBy: UsedByRef[]
+    }
+>(
     q: T
-) => ({ ...q, hasSurveyAudio: q.surveyAudioId !== null })
+) => ({
+    ...q,
+    hasSurveyAudio: q.surveyAudioId !== null && q.surveyServiceAudioId !== null
+})
 
 const _byId = () => prisma.queue.findUnique({ where: { id: '' }, select: queueSelect })
 type QueueRow = NonNullable<Awaited<ReturnType<typeof _byId>>> & { postQueueDestination: RouteDestination }
@@ -237,7 +247,12 @@ export const createQueue = async (data: CreateQueueInput) => {
         data.companyId,
         'postQueueDestination'
     )
+    const hasSurveyAudio = (data.surveyAudioId ?? null) !== null
+    const hasSurveyServiceAudio = (data.surveyServiceAudioId ?? null) !== null
+    if (hasSurveyAudio !== hasSurveyServiceAudio)
+        throw new AppError('Both survey audios (surveyAudioId and surveyServiceAudioId) are required together', 400)
     await assertAudioBelongsToCompany(data.surveyAudioId, data.companyId)
+    await assertAudioBelongsToCompany(data.surveyServiceAudioId, data.companyId)
     await assertAudioBelongsToCompany(data.announce, data.companyId)
     await assertAudioBelongsToCompany(data.periodicAnnounce, data.companyId)
     await assertAudioBelongsToCompany(data.agentAnnounce, data.companyId)
@@ -286,7 +301,7 @@ export const createQueue = async (data: CreateQueueInput) => {
         () => AsteriskQueueRepository.regenerate(data.companyId),
         data.companyId
     )
-    if (data.surveyAudioId)
+    if (data.surveyAudioId && data.surveyServiceAudioId)
         await regenerateSafely(
             () => CallcenterSurveyRepository.regenerate(data.companyId),
             data.companyId
@@ -360,6 +375,19 @@ export const updateQueue = async (id: string, data: UpdateQueueInput) => {
             data.surveyAudioId,
             existing.companyId
         )
+    if (data.surveyServiceAudioId !== undefined)
+        await assertAudioBelongsToCompany(
+            data.surveyServiceAudioId,
+            existing.companyId
+        )
+    const finalSurveyAudioId =
+        data.surveyAudioId !== undefined ? data.surveyAudioId : existing.surveyAudioId
+    const finalSurveyServiceAudioId =
+        data.surveyServiceAudioId !== undefined
+            ? data.surveyServiceAudioId
+            : existing.surveyServiceAudioId
+    if ((finalSurveyAudioId !== null) !== (finalSurveyServiceAudioId !== null))
+        throw new AppError('Both survey audios (surveyAudioId and surveyServiceAudioId) are required together', 400)
     if (data.announce !== undefined)
         await assertAudioBelongsToCompany(data.announce, existing.companyId)
     if (data.periodicAnnounce !== undefined)
@@ -421,8 +449,10 @@ export const updateQueue = async (id: string, data: UpdateQueueInput) => {
     const needsResync =
         numberChanged || destChanged || callcenterToggled || announceChanged
     const surveyChanged =
-        data.surveyAudioId !== undefined &&
-        data.surveyAudioId !== existing.surveyAudioId
+        (data.surveyAudioId !== undefined &&
+            data.surveyAudioId !== existing.surveyAudioId) ||
+        (data.surveyServiceAudioId !== undefined &&
+            data.surveyServiceAudioId !== existing.surveyServiceAudioId)
 
     const queue = await prisma.$transaction(async (tx) => {
         await AsteriskQueueRepository.updateQueue(
@@ -501,7 +531,7 @@ export const deleteQueue = async (id: string) => {
         () => AsteriskQueueRepository.regenerate(existing.companyId),
         existing.companyId
     )
-    if (existing.surveyAudioId)
+    if (existing.surveyAudioId || existing.surveyServiceAudioId)
         await regenerateSafely(
             () => CallcenterSurveyRepository.regenerate(existing.companyId),
             existing.companyId

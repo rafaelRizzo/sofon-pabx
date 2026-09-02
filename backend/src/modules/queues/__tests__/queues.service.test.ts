@@ -49,8 +49,14 @@ mock.module('../../../asterisk/queue.repository', () => ({
     toAsteriskQueueName: (asteriskId: string, queueName: string) =>
         `${asteriskId}-${queueName}`
 }))
+mock.module('../../../asterisk/callcenter-survey.repository', () => ({
+    CallcenterSurveyRepository: {
+        regenerate: mock(() => Promise.resolve())
+    }
+}))
 
 import * as QueuesService from '../queues.service'
+import { CallcenterSurveyRepository } from '../../../asterisk/callcenter-survey.repository'
 
 const COMPANY = { id: 'c1', asteriskId: 'ast1' }
 const QUEUE = {
@@ -70,13 +76,18 @@ const QUEUE = {
     leaveWhenEmpty: false,
     weight: 0,
     metadata: {},
+    surveyAudioId: null,
+    surveyServiceAudioId: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     company: { asteriskId: 'ast1' },
     _count: { members: 0 }
 }
 
-beforeEach(() => clearPrismaMock(db))
+beforeEach(() => {
+    clearPrismaMock(db)
+    ;(CallcenterSurveyRepository.regenerate as any).mockClear()
+})
 
 // ─── createQueue ──────────────────────────────────────────────────────────────
 describe('QueuesService.createQueue', () => {
@@ -175,6 +186,79 @@ describe('QueuesService.createQueue', () => {
         } as any)
         expect(AsteriskQueueRepository.regenerate).toHaveBeenCalledWith('c1')
     })
+
+    it('throws 400 when only surveyAudioId is provided', async () => {
+        db.company.findUnique.mockResolvedValue(COMPANY)
+        db.queue.findUnique
+            .mockResolvedValueOnce(null)
+            .mockResolvedValueOnce(null)
+        await expect(
+            QueuesService.createQueue({
+                name: 'suporte',
+                companyId: 'c1',
+                number: '8001',
+                surveyAudioId: 'aud1'
+            } as any)
+        ).rejects.toMatchObject({ statusCode: 400 })
+    })
+
+    it('throws 400 when only surveyServiceAudioId is provided', async () => {
+        db.company.findUnique.mockResolvedValue(COMPANY)
+        db.queue.findUnique
+            .mockResolvedValueOnce(null)
+            .mockResolvedValueOnce(null)
+        await expect(
+            QueuesService.createQueue({
+                name: 'suporte',
+                companyId: 'c1',
+                number: '8001',
+                surveyServiceAudioId: 'aud2'
+            } as any)
+        ).rejects.toMatchObject({ statusCode: 400 })
+    })
+
+    it('creates queue and regenerates survey dialplan when both survey audios are provided', async () => {
+        const { CallcenterSurveyRepository } =
+            await import('../../../asterisk/callcenter-survey.repository')
+        db.company.findUnique.mockResolvedValue(COMPANY)
+        db.queue.findUnique
+            .mockResolvedValueOnce(null)
+            .mockResolvedValueOnce(null)
+        db.audio.findUnique.mockResolvedValue({ companyId: 'c1' })
+        db.queue.create.mockResolvedValue({
+            ...QUEUE,
+            surveyAudioId: 'aud1',
+            surveyServiceAudioId: 'aud2'
+        })
+
+        await QueuesService.createQueue({
+            name: 'suporte',
+            companyId: 'c1',
+            number: '8001',
+            surveyAudioId: 'aud1',
+            surveyServiceAudioId: 'aud2'
+        } as any)
+
+        expect(CallcenterSurveyRepository.regenerate).toHaveBeenCalledWith('c1')
+    })
+
+    it('does not regenerate survey dialplan when neither survey audio is provided', async () => {
+        const { CallcenterSurveyRepository } =
+            await import('../../../asterisk/callcenter-survey.repository')
+        db.company.findUnique.mockResolvedValue(COMPANY)
+        db.queue.findUnique
+            .mockResolvedValueOnce(null)
+            .mockResolvedValueOnce(null)
+        db.queue.create.mockResolvedValue(QUEUE)
+
+        await QueuesService.createQueue({
+            name: 'suporte',
+            companyId: 'c1',
+            number: '8001'
+        } as any)
+
+        expect(CallcenterSurveyRepository.regenerate).not.toHaveBeenCalled()
+    })
 })
 
 // ─── getQueuesByCompany ───────────────────────────────────────────────────────
@@ -251,6 +335,43 @@ describe('QueuesService.updateQueue', () => {
         })
         expect(AsteriskQueueRepository.regenerate).toHaveBeenCalledWith('c1')
     })
+
+    it('allows setting the missing survey audio when the other already exists', async () => {
+        const existing = { ...QUEUE, surveyAudioId: 'aud1', surveyServiceAudioId: null }
+        db.queue.findUnique.mockResolvedValueOnce(existing)
+        db.audio.findUnique.mockResolvedValue({ companyId: 'c1' })
+        db.queue.update.mockResolvedValue({
+            ...existing,
+            surveyServiceAudioId: 'aud2'
+        })
+        db.flowEdge.findMany.mockResolvedValue([])
+
+        await QueuesService.updateQueue('q1', {
+            surveyServiceAudioId: 'aud2'
+        } as any)
+
+        expect(CallcenterSurveyRepository.regenerate).toHaveBeenCalledWith('c1')
+    })
+
+    it('throws 400 when unsetting one survey audio leaves the other alone', async () => {
+        const existing = { ...QUEUE, surveyAudioId: 'aud1', surveyServiceAudioId: 'aud2' }
+        db.queue.findUnique.mockResolvedValueOnce(existing)
+
+        await expect(
+            QueuesService.updateQueue('q1', { surveyAudioId: null } as any)
+        ).rejects.toMatchObject({ statusCode: 400 })
+        expect(db.queue.update).not.toHaveBeenCalled()
+    })
+
+    it('throws 400 when setting only one survey audio on a queue that has none', async () => {
+        db.queue.findUnique.mockResolvedValueOnce(QUEUE)
+        db.audio.findUnique.mockResolvedValue({ companyId: 'c1' })
+
+        await expect(
+            QueuesService.updateQueue('q1', { surveyAudioId: 'aud1' } as any)
+        ).rejects.toMatchObject({ statusCode: 400 })
+        expect(db.queue.update).not.toHaveBeenCalled()
+    })
 })
 
 // ─── deleteQueue ──────────────────────────────────────────────────────────────
@@ -278,5 +399,34 @@ describe('QueuesService.deleteQueue', () => {
             statusCode: 409
         })
         expect(db.queue.delete).not.toHaveBeenCalled()
+    })
+
+    it('regenerates survey dialplan when only surveyAudioId was set', async () => {
+        db.queue.findUnique.mockResolvedValue({
+            ...QUEUE,
+            surveyAudioId: 'aud1',
+            surveyServiceAudioId: null
+        })
+        db.flowEdge.findMany.mockResolvedValue([])
+        await QueuesService.deleteQueue('q1')
+        expect(CallcenterSurveyRepository.regenerate).toHaveBeenCalledWith('c1')
+    })
+
+    it('regenerates survey dialplan when only surveyServiceAudioId was set', async () => {
+        db.queue.findUnique.mockResolvedValue({
+            ...QUEUE,
+            surveyAudioId: null,
+            surveyServiceAudioId: 'aud2'
+        })
+        db.flowEdge.findMany.mockResolvedValue([])
+        await QueuesService.deleteQueue('q1')
+        expect(CallcenterSurveyRepository.regenerate).toHaveBeenCalledWith('c1')
+    })
+
+    it('does not regenerate survey dialplan when neither survey audio was set', async () => {
+        db.queue.findUnique.mockResolvedValue(QUEUE)
+        db.flowEdge.findMany.mockResolvedValue([])
+        await QueuesService.deleteQueue('q1')
+        expect(CallcenterSurveyRepository.regenerate).not.toHaveBeenCalled()
     })
 })

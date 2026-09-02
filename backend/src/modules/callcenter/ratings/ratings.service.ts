@@ -11,6 +11,7 @@ export const getRatingsByCompany = async (query: RatingQueryInput) => {
         ...(query.extensionId && { extensionId: query.extensionId }),
         ...(query.number && { number: { contains: query.number } }),
         ...(query.score && { score: query.score }),
+        ...(query.category && { category: query.category }),
         ...((query.startDate || query.endDate) && {
             createdAt: {
                 ...(query.startDate && { gte: new Date(`${query.startDate}T00:00:00.000Z`) }),

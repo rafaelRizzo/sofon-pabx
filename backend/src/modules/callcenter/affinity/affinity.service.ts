@@ -6,8 +6,11 @@ import { toAsteriskInterface } from '../../../asterisk/queue.repository'
 // strategy configurada, então melhor afinidade = penalty mais baixo = tentado primeiro. Chamado
 // periodicamente por src/jobs/agent-affinity-recalc.job.ts (mesmo padrão de holiday-resync.job.ts).
 export const recalculateAffinity = async () => {
+    // Só a nota de atendimento (o agente) entra na afinidade/penalty - a nota de serviço
+    // contratado (CallRating.category="servico") é só informativa, não mede desempenho do agente
     const stats = await prisma.callRating.groupBy({
         by: ['extensionId', 'companyId'],
+        where: { category: 'atendimento' },
         _avg: { score: true },
         _count: { score: true },
     })

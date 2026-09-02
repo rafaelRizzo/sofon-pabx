@@ -77,13 +77,25 @@ describe('RatingsService.getRatingsByCompany', () => {
             where: expect.objectContaining({ companyId: 'c1', score: 5 }),
         }))
     })
+
+    it('applies category filter', async () => {
+        db.company.findUnique.mockResolvedValue(COMPANY)
+        db.callRating.findMany.mockResolvedValue([])
+        db.callRating.count.mockResolvedValue(0)
+
+        await RatingsService.getRatingsByCompany({ ...BASE_QUERY, category: 'servico' })
+
+        expect(db.callRating.findMany).toHaveBeenCalledWith(expect.objectContaining({
+            where: expect.objectContaining({ companyId: 'c1', category: 'servico' }),
+        }))
+    })
 })
 
 describe('RatingsService.createRating', () => {
     it('throws 404 when company not found', async () => {
         db.company.findUnique.mockResolvedValue(null)
         await expect(RatingsService.createRating({
-            companyId: 'clxxxxxxxxxxxxxxxxxxxxxxxxx', extensionId: 'e1', number: '11999998888', score: 5,
+            companyId: 'clxxxxxxxxxxxxxxxxxxxxxxxxx', extensionId: 'e1', number: '11999998888', score: 5, category: 'atendimento',
         }))
             .rejects.toMatchObject({ statusCode: 404 })
     })
@@ -92,7 +104,7 @@ describe('RatingsService.createRating', () => {
         db.company.findUnique.mockResolvedValue(COMPANY)
         db.extension.findUnique.mockResolvedValue(null)
         await expect(RatingsService.createRating({
-            companyId: 'c1', extensionId: 'clxxxxxxxxxxxxxxxxxxxxxxxxx', number: '11999998888', score: 5,
+            companyId: 'c1', extensionId: 'clxxxxxxxxxxxxxxxxxxxxxxxxx', number: '11999998888', score: 5, category: 'atendimento',
         }))
             .rejects.toMatchObject({ statusCode: 404 })
     })
@@ -102,7 +114,7 @@ describe('RatingsService.createRating', () => {
         db.extension.findUnique.mockResolvedValue(EXT)
         db.callRating.create.mockResolvedValue(RATING)
         const rating = await RatingsService.createRating({
-            companyId: 'c1', extensionId: 'e1', number: '11999998888', score: 5,
+            companyId: 'c1', extensionId: 'e1', number: '11999998888', score: 5, category: 'atendimento',
         }) as any
         expect(rating.id).toBe('rt1')
     })

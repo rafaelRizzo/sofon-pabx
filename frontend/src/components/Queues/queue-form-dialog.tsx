@@ -127,6 +127,7 @@ export function QueueFormDialog({
             leaveWhenEmpty: false,
             weight: 0,
             surveyAudioId: null,
+            surveyServiceAudioId: null,
             callcenterEnabled: false,
         },
     })
@@ -137,6 +138,7 @@ export function QueueFormDialog({
     const periodicAnnounce = watch("periodicAnnounce")
     const agentAnnounce = watch("agentAnnounce")
     const surveyAudioId = watch("surveyAudioId")
+    const surveyServiceAudioId = watch("surveyServiceAudioId")
     const selectedCompany = companies.find((c) => c.id === companyId) ?? null
 
     // Anúncios referenciam um Audio já cadastrado pra essa empresa - depende do companyId do
@@ -149,6 +151,8 @@ export function QueueFormDialog({
         audios.find((a) => a.id === agentAnnounce) ?? null
     const selectedSurveyAudio =
         audios.find((a) => a.id === surveyAudioId) ?? null
+    const selectedSurveyServiceAudio =
+        audios.find((a) => a.id === surveyServiceAudioId) ?? null
 
     useEffect(() => {
         if (!open) return
@@ -172,6 +176,7 @@ export function QueueFormDialog({
             leaveWhenEmpty: queue?.leaveWhenEmpty ?? false,
             weight: queue?.weight ?? 0,
             surveyAudioId: queue?.surveyAudioId ?? null,
+            surveyServiceAudioId: queue?.surveyServiceAudioId ?? null,
             callcenterEnabled: queue?.callcenterEnabled ?? false,
         })
     }, [open, queue, reset, defaultCompanyId])
@@ -187,6 +192,7 @@ export function QueueFormDialog({
         setValue("periodicAnnounce", null, { shouldDirty: true })
         setValue("agentAnnounce", null, { shouldDirty: true })
         setValue("surveyAudioId", null, { shouldDirty: true })
+        setValue("surveyServiceAudioId", null, { shouldDirty: true })
     }
 
     const onSubmit = handleSubmit(async (form) => {
@@ -788,6 +794,7 @@ export function QueueFormDialog({
                                             )}
                                         </Field>
 
+                                        {/* Módulo Callcenter temporariamente removido da UI
                                         <Field orientation="horizontal">
                                             <div className="flex items-center gap-2 text-xs/relaxed leading-snug font-medium">
                                                 <FieldLabel htmlFor="callcenterEnabled">
@@ -835,10 +842,12 @@ export function QueueFormDialog({
                                                 )}
                                             />
                                         </Field>
+                                        */}
 
                                         <Field>
                                             <FieldLabel>
-                                                Pesquisa de satisfação
+                                                Pesquisa de satisfação -
+                                                Pergunta 1: Atendimento
                                             </FieldLabel>
                                             {!companyId ? (
                                                 <FieldDescription>
@@ -888,14 +897,86 @@ export function QueueFormDialog({
                                             )}
                                             <FieldDescription>
                                                 Áudio que pede uma nota de 1 a 5
-                                                ao cliente após o atendimento.
-                                                Deixe vazio para não fazer
+                                                sobre o atendimento do agente.
+                                                Deixe vazio (junto com a
+                                                pergunta 2) para não fazer
                                                 pesquisa nessa fila.
                                             </FieldDescription>
                                             {errors.surveyAudioId && (
                                                 <FieldError>
                                                     {
                                                         errors.surveyAudioId
+                                                            .message
+                                                    }
+                                                </FieldError>
+                                            )}
+                                        </Field>
+
+                                        <Field>
+                                            <FieldLabel>
+                                                Pesquisa de satisfação -
+                                                Pergunta 2: Serviço contratado
+                                            </FieldLabel>
+                                            {!companyId ? (
+                                                <FieldDescription>
+                                                    Selecione uma empresa
+                                                    primeiro.
+                                                </FieldDescription>
+                                            ) : (
+                                                <Combobox<Audio>
+                                                    items={audios}
+                                                    value={
+                                                        selectedSurveyServiceAudio
+                                                    }
+                                                    itemToStringLabel={(a) =>
+                                                        a.name
+                                                    }
+                                                    isItemEqualToValue={(
+                                                        a,
+                                                        b
+                                                    ) => a.id === b.id}
+                                                    onValueChange={(a) =>
+                                                        setValue(
+                                                            "surveyServiceAudioId",
+                                                            a?.id ?? null,
+                                                            {
+                                                                shouldDirty: true,
+                                                            }
+                                                        )
+                                                    }
+                                                >
+                                                    <ComboboxInput placeholder="Nenhuma (desligada)" />
+                                                    <ComboboxContent>
+                                                        <ComboboxEmpty>
+                                                            {audios.length === 0
+                                                                ? "Nenhum áudio cadastrado para essa empresa"
+                                                                : "Nenhum resultado para essa busca"}
+                                                        </ComboboxEmpty>
+                                                        <ComboboxList>
+                                                            {(a: Audio) => (
+                                                                <ComboboxItem
+                                                                    key={a.id}
+                                                                    value={a}
+                                                                >
+                                                                    {a.name}
+                                                                </ComboboxItem>
+                                                            )}
+                                                        </ComboboxList>
+                                                    </ComboboxContent>
+                                                </Combobox>
+                                            )}
+                                            <FieldDescription>
+                                                Áudio que pede uma nota de 1 a 5
+                                                sobre o serviço/plano
+                                                contratado. Deixe vazio (junto
+                                                com a pergunta 1) para não
+                                                fazer pesquisa nessa fila.
+                                            </FieldDescription>
+                                            {errors.surveyServiceAudioId && (
+                                                <FieldError>
+                                                    {
+                                                        errors
+                                                            .surveyServiceAudioId
                                                             .message
                                                     }
                                                 </FieldError>

@@ -72,9 +72,11 @@ export type Queue = {
     // API ainda devolve o campo (label resolvido, usado em telas de leitura)
     postQueueDestination: RouteDestination
     usedBy: UsedByRef[]
-    // Pesquisa de satisfação pós-atendimento (módulo callcenter) - surveyAudioId é o áudio
-    // vinculado (null = desligada), hasSurveyAudio é derivado (surveyAudioId !== null)
+    // Pesquisa de satisfação pós-atendimento (módulo callcenter), 2 perguntas: surveyAudioId
+    // (atendimento) e surveyServiceAudioId (serviço contratado) - hasSurveyAudio é derivado (true
+    // só quando os dois estão setados, ver backend/queues.service.ts)
     surveyAudioId: string | null
+    surveyServiceAudioId: string | null
     hasSurveyAudio: boolean
     // Liga, só nessa fila, prioridade dinâmica (RoutingRule) e roteamento por afinidade (penalty) -
     // motor opcional do módulo Callcenter (regras/notas configuradas por empresa em /dashboard/callcenter)
@@ -125,18 +127,35 @@ const baseQueueFields = {
     joinEmpty: z.boolean().default(true),
     leaveWhenEmpty: z.boolean().default(false),
     weight: intWithDefault(0, Number.MAX_SAFE_INTEGER, 0),
-    // Áudio da pesquisa de satisfação pós-atendimento (null = pesquisa desligada)
+    // Pesquisa de satisfação pós-atendimento, 2 perguntas (null nos dois = pesquisa desligada) -
+    // backend valida all-or-nothing (os 2 juntos ou nenhum)
     surveyAudioId: z.string().nullable(),
+    surveyServiceAudioId: z.string().nullable(),
     // Liga o motor Callcenter (prioridade dinâmica + afinidade) só nessa fila
     callcenterEnabled: z.boolean().default(false),
 }
 
-export const createQueueFormSchema = z.object({
-    companyId: z.string().min(1, "Selecione uma empresa"),
-    ...baseQueueFields,
-})
+// Pesquisa de satisfação é all-or-nothing: os 2 áudios juntos ou nenhum (mesma regra validada no
+// backend, ver QueuesService) - reforçado aqui só pra evitar o round-trip de erro 400
+const surveyAudiosRefinement = (data: {
+    surveyAudioId: string | null
+    surveyServiceAudioId: string | null
+}) => (data.surveyAudioId !== null) === (data.surveyServiceAudioId !== null)
+const surveyAudiosRefinementOptions = {
+    message: "Preencha as 2 perguntas da pesquisa ou deixe as 2 vazias",
+    path: ["surveyServiceAudioId"],
+}
 
-export const updateQueueFormSchema = z.object(baseQueueFields)
+export const createQueueFormSchema = z
+    .object({
+        companyId: z.string().min(1, "Selecione uma empresa"),
+        ...baseQueueFields,
+    })
+    .refine(surveyAudiosRefinement, surveyAudiosRefinementOptions)
+
+export const updateQueueFormSchema = z
+    .object(baseQueueFields)
+    .refine(surveyAudiosRefinement, surveyAudiosRefinementOptions)
 
 export type QueueForm = z.infer<typeof createQueueFormSchema>
 export type QueueUpdateForm = z.infer<typeof updateQueueFormSchema>
@@ -164,6 +183,7 @@ export function toQueueCreationDto(queue: Queue): QueueUpdateForm {
         leaveWhenEmpty: queue.leaveWhenEmpty,
         weight: queue.weight,
         surveyAudioId: queue.surveyAudioId,
+        surveyServiceAudioId: queue.surveyServiceAudioId,
         callcenterEnabled: queue.callcenterEnabled,
     }
 }

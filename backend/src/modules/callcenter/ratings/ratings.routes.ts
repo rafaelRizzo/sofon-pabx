@@ -14,7 +14,7 @@ export const callcenterRatingsRoutes = async (app: FastifyInstance) => {
         schema: {
             tags: ['Callcenter Ratings'],
             summary: 'Listar notas de atendimento',
-            description: 'Query obrigatória: ?companyId. Filtros opcionais: extensionId, number, startDate, endDate (YYYY-MM-DD, cobrem o dia inteiro), limit (max 200), order (asc|desc, default desc).',
+            description: 'Query obrigatória: ?companyId. Filtros opcionais: extensionId, number, score, category (atendimento|servico), startDate, endDate (YYYY-MM-DD, cobrem o dia inteiro), limit (max 200), order (asc|desc, default desc).',
             security: [{ bearerAuth: [] }],
             querystring: ratingQuerySchema,
             response: {

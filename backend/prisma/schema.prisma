@@ -167,10 +167,15 @@ model Queue {
   leaveWhenEmpty            Boolean       @default(false)
   weight                    Int           @default(0)
   metadata                  Json          @default("{}")
-  // Áudio da pesquisa de satisfação pós-atendimento ("digite uma nota de 1 a 5") — mesmo padrão
-  // audioId nullable de Announcement/IvrMenu: null = pesquisa desligada pra essa fila (hasAudio: false)
+  // Pesquisa de satisfação pós-atendimento: 2 perguntas sequenciais, cada uma com seu próprio
+  // áudio ("digite uma nota de 1 a 5") — pergunta 1 é sobre o ATENDIMENTO (o agente), pergunta 2
+  // é sobre o SERVIÇO CONTRATADO (o plano/produto da empresa). Pesquisa só fica ativa quando os
+  // dois áudios estão setados (all-or-nothing, validado em QueuesService) — mesmo padrão audioId
+  // nullable de Announcement/IvrMenu: null = pesquisa desligada pra essa fila (hasSurveyAudio: false)
   surveyAudioId             String?
   surveyAudio               Audio?        @relation("QueueSurveyAudio", fields: [surveyAudioId], references: [id], onDelete: SetNull)
+  surveyServiceAudioId      String?
+  surveyServiceAudio        Audio?        @relation("QueueSurveyServiceAudio", fields: [surveyServiceAudioId], references: [id], onDelete: SetNull)
   // Liga prioridade dinâmica (RoutingRule via QUEUE_PRIO) e roteamento por afinidade (penalty
   // recalculado por agent-affinity-recalc.job.ts) pra essa fila. false = comportamento nativo
   // puro, sem AGI de pré-roteamento e sem o job mexendo no penalty dos membros. Pesquisa de
@@ -186,6 +191,7 @@ model Queue {
   @@unique([number, companyId])
   @@index([companyId])
   @@index([surveyAudioId])
+  @@index([surveyServiceAudioId])
   @@index([announce])
   @@index([periodicAnnounce])
   @@index([agentAnnounce])
@@ -453,6 +459,7 @@ model Audio {
   announcements          Announcement[]
   ivrMenus               IvrMenu[]
   surveyQueues           Queue[]        @relation("QueueSurveyAudio")
+  surveyServiceQueues    Queue[]        @relation("QueueSurveyServiceAudio")
   announceQueues         Queue[]        @relation("QueueAnnounceAudio")
   periodicAnnounceQueues Queue[]        @relation("QueuePeriodicAnnounceAudio")
   agentAnnounceQueues    Queue[]        @relation("QueueAgentAnnounceAudio")
@@ -806,6 +813,9 @@ model CallRating {
   number      String    @db.VarChar(80) // número do cliente (CALLERID)
   uniqueid    String?   @db.VarChar(150) // referência solta ao CDR, sem FK (cdr é fonte nativa do Asterisk)
   score       Int
+  // "atendimento" (nota do agente, entra no cálculo de AgentAffinity/penalty) ou "servico" (nota
+  // do serviço contratado, só informativo — não influencia roteamento/afinidade)
+  category    String    @default("atendimento") @db.VarChar(20)
   createdAt   DateTime  @default(now()) @db.Timestamptz(3)
 
   @@index([companyId, createdAt])

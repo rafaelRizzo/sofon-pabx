@@ -1,7 +1,7 @@
 "use client"
 
 import {
-    HeadsetIcon,
+    // HeadsetIcon, // Callcenter temporariamente removido da UI
     PencilIcon,
     StarIcon,
     Trash2Icon,
@@ -64,7 +64,7 @@ export function QueuesTable({
                         <TableHead>Destino pós-fila</TableHead>
                         <TableHead>Usado por</TableHead>
                         <TableHead>Pesquisa</TableHead>
-                        <TableHead>Callcenter</TableHead>
+                        {/* Callcenter temporariamente removido da UI - ver células comentadas abaixo */}
                         <TableHead className="w-38 text-right">Ações</TableHead>
                     </TableRow>
                 </TableHeader>
@@ -72,7 +72,7 @@ export function QueuesTable({
                     {loading ? (
                         Array.from({ length: 3 }).map((_, i) => (
                             <TableRow key={i}>
-                                {Array.from({ length: 9 }).map((_, j) => (
+                                {Array.from({ length: 8 }).map((_, j) => (
                                     <TableCell key={j}>
                                         <Skeleton className="h-4 w-full" />
                                     </TableCell>
@@ -82,7 +82,7 @@ export function QueuesTable({
                     ) : queues.length === 0 ? (
                         <TableRow>
                             <TableCell
-                                colSpan={9}
+                                colSpan={8}
                                 className="h-24 text-center text-muted-foreground"
                             >
                                 {companySelected
@@ -117,7 +117,7 @@ export function QueuesTable({
                                     {queue.hasSurveyAudio ? (
                                         <Badge
                                             variant="outline"
-                                            className="gap-1.5"
+                                            className="gap-1.5 border-transparent bg-amber-500/15 text-amber-600 dark:bg-amber-400/20 dark:text-amber-300"
                                         >
                                             <StarIcon className="size-3" />
                                             Ativa
@@ -128,6 +128,7 @@ export function QueuesTable({
                                         </span>
                                     )}
                                 </TableCell>
+                                {/* Callcenter temporariamente removido da UI
                                 <TableCell>
                                     {queue.callcenterEnabled ? (
                                         <Badge
@@ -143,6 +144,7 @@ export function QueuesTable({
                                         </span>
                                     )}
                                 </TableCell>
+                                */}
                                 <TableCell>
                                     <TooltipProvider delay={100}>
                                         <div className="flex justify-end gap-1">

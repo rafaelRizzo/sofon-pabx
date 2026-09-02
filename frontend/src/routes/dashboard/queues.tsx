@@ -128,6 +128,7 @@ function QueuesPage() {
                             leaveWhenEmpty: form.leaveWhenEmpty,
                             weight: form.weight,
                             surveyAudioId: form.surveyAudioId,
+                            surveyServiceAudioId: form.surveyServiceAudioId,
                             callcenterEnabled: form.callcenterEnabled,
                         })
                     }

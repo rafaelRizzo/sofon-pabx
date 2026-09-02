@@ -33,7 +33,8 @@ import { dateInTimeZone } from '../../utils/timezone'
 // - /queue-outcome,<queueId> - depois do Queue(), lê QUEUESTATUS pra finalizar queue_calls
 //   (timeout/sem agente/fila cheia - únicos casos sem evento AMI terminal, ver ami-events.ts)
 // - /queue-survey,<queueId> - depois do Queue(), captura MEMBERINTERFACE pra pesquisa de satisfação
-// - /survey-result,<queueId>,<score> - fim da pesquisa (callcenter-surveys), persiste a nota
+// - /survey-result,<queueId>,<category>,<score> - fim de cada pergunta da pesquisa
+//   (callcenter-surveys), persiste a nota (category: "atendimento" ou "servico")
 // - /transfer-route (sem arg) - contexto estático [transfer], resolve EXTEN discado (ramal ou fila)
 //   pro accountcode do canal, chamado via TRANSFER_CONTEXT em toda transferência DTMF atendida (*2)
 // Protocolo AGI é estritamente request/response - nunca disparar dois comandos concorrentes no mesmo
@@ -544,10 +545,10 @@ async function handleQueueSurvey(conn: AgiConn, queueId: string) {
 
     const [extension, queue] = await Promise.all([
         prisma.extension.findUnique({ where: { number: parsed.number }, select: { id: true } }),
-        prisma.queue.findUnique({ where: { id: queueId }, select: { companyId: true, surveyAudioId: true } }),
+        prisma.queue.findUnique({ where: { id: queueId }, select: { companyId: true, surveyAudioId: true, surveyServiceAudioId: true } }),
     ])
-    if (!extension || !queue?.surveyAudioId) {
-        await agiVerbose(conn, `Queue Survey: fila sem surveyAudioId configurado (ramal ${parsed.number}), sem pesquisa`)
+    if (!extension || !queue?.surveyAudioId || !queue?.surveyServiceAudioId) {
+        await agiVerbose(conn, `Queue Survey: fila sem os 2 áudios de pesquisa configurados (ramal ${parsed.number}), sem pesquisa`)
         return
     }
 
@@ -557,13 +558,23 @@ async function handleQueueSurvey(conn: AgiConn, queueId: string) {
     await agiExecGoto(conn, { context: SURVEY_CONTEXT, exten: surveyExten(queueId), priority: 1 })
 }
 
+const SURVEY_CATEGORIES = ['atendimento', 'servico'] as const
+type SurveyCategory = (typeof SURVEY_CATEGORIES)[number]
+
 // Chamado pelo dialplan gerado em callcenter-survey.repository.ts quando o cliente digita a nota
-// (1-5) - lê de volta o contexto setado por handleQueueSurvey no mesmo canal (Set/Goto preservam
-// variáveis de canal, não precisa de variável herdada com prefixo __) e persiste via RatingsService,
-// mesma validação/persistência já testada na Fase 1 - chamado direto em processo, sem HTTP.
-async function handleSurveyResult(conn: AgiConn, queueId: string, scoreRaw: string) {
+// (1-5) de qualquer uma das 2 perguntas - lê de volta o contexto setado por handleQueueSurvey no
+// mesmo canal (Set/Goto preservam variáveis de canal, não precisa de variável herdada com prefixo
+// __) e persiste via RatingsService, chamado direto em processo, sem HTTP. `category` diferencia a
+// pergunta de atendimento (o agente, entra em AgentAffinity) da de serviço contratado (só
+// informativo - ver affinity.service.ts).
+async function handleSurveyResult(conn: AgiConn, queueId: string, categoryRaw: string, scoreRaw: string) {
     const score = Number(scoreRaw)
     if (!Number.isInteger(score) || score < 1 || score > 5) return
+    if (!SURVEY_CATEGORIES.includes(categoryRaw as SurveyCategory)) {
+        logger.warn({ event: 'agi.callcenter.survey_result.invalid_category', queueId, category: categoryRaw })
+        return
+    }
+    const category = categoryRaw as SurveyCategory
 
     const [extensionId, companyId, number] = await Promise.all([
         agiGetVariable(conn, 'CC_EXTENSION_ID'),
@@ -577,8 +588,8 @@ async function handleSurveyResult(conn: AgiConn, queueId: string, scoreRaw: stri
     }
 
     try {
-        await createRating({ companyId, extensionId, number, score })
-        await agiVerbose(conn, `Survey Result: nota ${score} registrada (ramal ${extensionId}, número ${number})`)
+        await createRating({ companyId, extensionId, number, score, category })
+        await agiVerbose(conn, `Survey Result: nota ${score} (${category}) registrada (ramal ${extensionId}, número ${number})`)
     } catch (error) {
         logger.warn({
             event: 'agi.callcenter.survey_result.failed',
@@ -697,7 +708,7 @@ async function handleConnection(conn: AgiConn) {
         if (script === 'queue-route') await handleQueueRoute(conn, arg1)
         else if (script === 'queue-outcome') await handleQueueOutcome(conn, arg1)
         else if (script === 'queue-survey') await handleQueueSurvey(conn, arg1)
-        else if (script === 'survey-result') await handleSurveyResult(conn, arg1, env['agi_arg_2'] ?? '')
+        else if (script === 'survey-result') await handleSurveyResult(conn, arg1, env['agi_arg_2'] ?? '', env['agi_arg_3'] ?? '')
         else if (script === 'ixc') await handleIxcNode(conn, arg1)
         else if (script === 'varcond') await handleVariableCondition(conn, arg1)
         else if (script === 'holiday') await handleHolidayCheck(conn, arg1)

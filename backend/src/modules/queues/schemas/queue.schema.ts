@@ -53,9 +53,11 @@ export const createQueueSchema = z.object({
     leaveWhenEmpty: z.boolean().default(false),
     weight: z.number().int().min(0).default(0),
     postQueueDestination: routeDestinationSchema.optional(),
-    // Áudio da pesquisa de satisfação pós-atendimento ("digite uma nota de 1 a 5") - null/omitido =
-    // pesquisa desligada. Mesmo padrão hasAudio de Announcement/IvrMenu.
+    // Pesquisa de satisfação pós-atendimento, 2 perguntas ("digite uma nota de 1 a 5"): atendimento
+    // (o agente) e serviço contratado (o plano/produto). Só fica ativa quando os dois estão setados
+    // (all-or-nothing, validado em QueuesService) - null/omitido = pesquisa desligada.
     surveyAudioId: z.cuid2().nullable().optional(),
+    surveyServiceAudioId: z.cuid2().nullable().optional(),
     // Liga prioridade dinâmica (RoutingRule) e roteamento por afinidade (penalty) pra essa fila -
     // ver seção "Callcenter (Queue Engine)" no CLAUDE.md
     callcenterEnabled: z.boolean().default(false),
@@ -86,6 +88,7 @@ export const updateQueueSchema = z.object({
     weight: z.number().int().min(0).optional(),
     postQueueDestination: routeDestinationSchema.optional(),
     surveyAudioId: z.cuid2().nullable().optional(),
+    surveyServiceAudioId: z.cuid2().nullable().optional(),
     callcenterEnabled: z.boolean().optional(),
 })
 
@@ -115,6 +118,7 @@ export const QueueSchema = z.object({
     postQueueDestination: routeDestinationResponseSchema,
     usedBy: usedBySchema,
     surveyAudioId: z.string().nullable(),
+    surveyServiceAudioId: z.string().nullable(),
     hasSurveyAudio: z.boolean(),
     callcenterEnabled: z.boolean(),
     createdAt: timestamp,

@@ -22,6 +22,9 @@ describe('AffinityService.recalculateAffinity', () => {
 
         const result = await AffinityService.recalculateAffinity()
 
+        expect(db.callRating.groupBy).toHaveBeenCalledWith(expect.objectContaining({
+            where: { category: 'atendimento' },
+        }))
         expect(db.agentAffinity.upsert).toHaveBeenCalledWith(expect.objectContaining({
             where: { extensionId_companyId: { extensionId: 'e1', companyId: 'c1' } },
             update: { score: 4.5, sampleSize: 2 },
