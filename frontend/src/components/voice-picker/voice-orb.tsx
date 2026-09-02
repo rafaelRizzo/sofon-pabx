@@ -175,10 +175,6 @@ function Scene({
         const u = mat.uniforms
         u.uTime.value += delta * 0.5
 
-        if (u.uOpacity.value < 1) {
-            u.uOpacity.value = Math.min(1, u.uOpacity.value + delta * 2)
-        }
-
         let targetIn = 0
         let targetOut = 0.3
         if (modeRef.current === "manual") {
@@ -233,6 +229,18 @@ function Scene({
             canvas.removeEventListener("webglcontextlost", onContextLost, false)
     }, [gl])
 
+    // WebGLRenderer.dispose() (chamado pelo R3F ao desmontar o Canvas) não libera o contexto na
+    // hora - o browser só recicla esse slot quando o GC rodar. Lista com scroll rápido monta/
+    // desmonta um Canvas por item mais rápido do que o GC libera, estourando o limite de
+    // contextos WebGL simultâneos (~16 no Chromium/Edge) - itens acabam com o canvas em branco,
+    // sem lançar erro (não cai no VoiceOrbBoundary). Forçar a perda do contexto aqui libera o
+    // slot imediatamente no desmonte.
+    useEffect(() => {
+        return () => {
+            gl.getContext().getExtension("WEBGL_lose_context")?.loseContext()
+        }
+    }, [gl])
+
     const uniforms = useMemo(() => {
         perlinNoiseTexture.wrapS = THREE.RepeatWrapping
         perlinNoiseTexture.wrapT = THREE.RepeatWrapping
@@ -249,7 +257,7 @@ function Scene({
             uInverted: new THREE.Uniform(isDark ? 1 : 0),
             uInputVolume: new THREE.Uniform(0),
             uOutputVolume: new THREE.Uniform(0),
-            uOpacity: new THREE.Uniform(0),
+            uOpacity: new THREE.Uniform(1),
         }
     }, [perlinNoiseTexture, offsets])
 

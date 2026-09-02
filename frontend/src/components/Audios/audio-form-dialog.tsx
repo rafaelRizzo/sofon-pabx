@@ -67,7 +67,7 @@ import { useTtsVoices } from "@/hooks/use-tts-voices"
 
 // Lazy: o VoicePicker (voice-picker/) carrega three.js/react-three-fiber (avatar animado),
 // ~700KB - sem isso a rota /dashboard/audios inteira pagaria esse peso mesmo pra quem só
-// faz upload de áudio, nunca abre a aba "Gerar por voz"
+// faz upload de áudio, nunca abre a aba "Gerar por texto"
 const VoicePicker = lazy(() =>
     import("@/components/voice-picker/voice-picker").then((m) => ({
         default: m.VoicePicker,
@@ -262,11 +262,12 @@ export function AudioFormDialog({
     const [languageFilter, setLanguageFilter] = useState(ALL_LANGUAGES)
     const filteredVoices = useMemo(
         () =>
-            languageFilter === ALL_LANGUAGES
+            (languageFilter === ALL_LANGUAGES
                 ? voices
                 : voices.filter((v) =>
                       (v.languages ?? []).includes(languageFilter)
-                  ),
+                  )
+            ).sort((a, b) => a.name.localeCompare(b.name, "pt-BR")),
         [voices, languageFilter]
     )
 
@@ -457,7 +458,7 @@ export function AudioFormDialog({
     const title = isEdit
         ? "Renomear áudio"
         : mode === "tts"
-          ? "Gerar áudio por voz"
+          ? "Gerar áudio por texto"
           : "Enviar áudio"
 
     return (
@@ -512,7 +513,7 @@ export function AudioFormDialog({
                                                     Upload
                                                 </TabsTrigger>
                                                 <TabsTrigger value="tts">
-                                                    Gerar por voz
+                                                    Gerar por texto
                                                 </TabsTrigger>
                                             </TabsList>
 
@@ -711,7 +712,7 @@ export function AudioFormDialog({
                                                     </div>
                                                     <Suspense
                                                         fallback={
-                                                            <div className="flex h-9 w-full items-center rounded-md border px-3 text-sm text-muted-foreground">
+                                                            <div className="flex h-7 w-full items-center rounded-md border border-input bg-input/20 px-2 text-xs/relaxed text-muted-foreground dark:bg-input/30">
                                                                 Carregando...
                                                             </div>
                                                         }
@@ -749,6 +750,13 @@ export function AudioFormDialog({
                                                             }
                                                         </FieldError>
                                                     )}
+                                                    <FieldDescription>
+                                                        Vozes adicionadas manualmente
+                                                        pelo painel da ElevenLabs também
+                                                        aparecem aqui, desde que a API
+                                                        key da empresa tenha permissão
+                                                        de leitura de vozes liberada.
+                                                    </FieldDescription>
                                                 </Field>
 
                                                 <Field>

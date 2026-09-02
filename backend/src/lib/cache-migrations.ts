@@ -17,6 +17,13 @@ const MIGRATIONS: CacheMigration[] = [
         id: 'integration-credentials-add-company-field',
         run: () => cacheManager.invalidate('integration-credentials'),
     },
+    {
+        // Adicionados `surveyServiceAudioId`/`hasSurveyAudio`/`callcenterEnabled` ao QueueSchema -
+        // cache antigo (sem TTL) não tem esses campos e falha a validação Zod de response
+        // ("Response doesn't match the schema").
+        id: 'queues-add-callcenter-survey-fields',
+        run: () => cacheManager.invalidate('queues'),
+    },
 ]
 
 // Nunca lança - uma falha aqui (ex: Redis instável no boot) não pode derrubar o worker inteiro,

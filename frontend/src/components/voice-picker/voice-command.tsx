@@ -9,6 +9,7 @@ import { Command as CommandPrimitive } from "cmdk"
 import { SearchIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { ScrollArea } from "@/components/ui/scroll-area"
 
 function VoiceCommand({
     className,
@@ -53,14 +54,13 @@ function VoiceCommandList({
     ...props
 }: React.ComponentProps<typeof CommandPrimitive.List>) {
     return (
-        <CommandPrimitive.List
-            data-slot="command-list"
-            className={cn(
-                "max-h-[300px] scroll-py-1 overflow-x-hidden overflow-y-auto",
-                className
-            )}
-            {...props}
-        />
+        <ScrollArea className="h-[300px]">
+            <CommandPrimitive.List
+                data-slot="command-list"
+                className={cn("scroll-py-1 overflow-x-hidden", className)}
+                {...props}
+            />
+        </ScrollArea>
     )
 }
 

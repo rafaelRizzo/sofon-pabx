@@ -1,6 +1,6 @@
 "use client"
 
-import { LinkIcon } from "lucide-react"
+import { LinkIcon, UnlinkIcon } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import {
@@ -22,11 +22,22 @@ interface UsedByBadgeProps {
 }
 
 // Indicador de reaproveitamento - quantos outros fluxos apontam pra este registro como destino.
-// Vazio = nada renderizado (não polui a tabela quando não há uso). Label já vem resolvido do
+// Vazio = badge neutro "Não utilizado", pra deixar claro que o registro está ocioso em vez de
+// deixar a célula em branco (ambíguo com "ainda carregando"/erro). Label já vem resolvido do
 // backend (ver flow-reference-label.ts), sem fetch client-side nem estado de loading por linha -
 // mesma filosofia do RouteDestinationBadge.
 export function UsedByBadge({ usedBy }: UsedByBadgeProps) {
-    if (usedBy.length === 0) return null
+    if (usedBy.length === 0) {
+        return (
+            <Badge
+                variant="outline"
+                className="gap-1.5 border-transparent bg-muted text-muted-foreground"
+            >
+                <UnlinkIcon className="size-3" />
+                Não é destino de nada
+            </Badge>
+        )
+    }
 
     return (
         <TooltipProvider delay={100}>
