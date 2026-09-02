@@ -195,7 +195,7 @@ export function UserFormDialog({
         <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogContent
                 className={cn(
-                    "flex max-h-[90vh] flex-col sm:max-w-md",
+                    "flex max-h-[90vh] flex-col overflow-hidden! sm:max-w-md",
                     showPermissions && "sm:max-w-2xl"
                 )}
             >

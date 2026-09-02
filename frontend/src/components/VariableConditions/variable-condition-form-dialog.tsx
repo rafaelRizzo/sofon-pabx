@@ -176,7 +176,7 @@ export function VariableConditionFormDialog({
     return (
         <>
             <Dialog open={open} onOpenChange={requestClose}>
-                <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-2xl">
+                <DialogContent className="flex max-h-[90vh] flex-col overflow-hidden! sm:max-w-2xl">
                     {loading ? (
                         <EntityFormDialogSkeletonContent fieldCount={3} />
                     ) : (

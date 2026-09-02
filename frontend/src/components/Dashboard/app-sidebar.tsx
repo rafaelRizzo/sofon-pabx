@@ -3,6 +3,7 @@ import {
   ActivityIcon,
   BracesIcon,
   Building2Icon,
+  CalendarDaysIcon,
   ClockIcon,
   DatabaseBackupIcon,
   FileAudioIcon,
@@ -155,6 +156,12 @@ export const NAV: NavGroup[] = [
         href: "/dashboard/time-groups",
         icon: ClockIcon,
         permission: "time-groups",
+      },
+      {
+        title: "Feriados",
+        href: "/dashboard/holiday-groups",
+        icon: CalendarDaysIcon,
+        permission: "holiday-groups",
       },
       {
         title: "Catálogo de Variáveis",

@@ -144,7 +144,7 @@ export function TimeConditionFormDialog({
     return (
         <>
             <Dialog open={open} onOpenChange={requestClose}>
-                <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-lg">
+                <DialogContent className="flex max-h-[90vh] flex-col overflow-hidden! sm:max-w-lg">
                     {loading ? (
                         <EntityFormDialogSkeletonContent fieldCount={2} />
                     ) : (

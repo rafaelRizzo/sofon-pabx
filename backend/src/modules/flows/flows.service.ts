@@ -17,11 +17,26 @@ const select = {
     layout: true,
     createdAt: true,
     updatedAt: true,
+    entryNodeId: true,
 } as const
 
 const toDto = <T extends { entryDestination: RouteDestination; usedBy: UsedByRef[] }>(f: T) => f
 
-type FlowRow = { id: string; name: string; companyId: string; layout: unknown; createdAt: Date; updatedAt: Date; entryDestination: RouteDestination }
+type FlowRow = { id: string; name: string; companyId: string; layout: unknown; createdAt: Date; updatedAt: Date; entryNodeId: string | null; entryDestination: RouteDestination }
+
+// O início "de verdade" de um Flow, no uso normal (conectar o nó Início a um nó no canvas), fica
+// em Flow.entryNodeId - escrito por updateFlowNode({isEntry:true}), nunca pelo slot abaixo. O
+// FlowEdgeRepository ("entry") só é escrito por um PUT /flows/:id direto com entryDestination
+// (import/restore de backup) - sem isso, entryNodeId sempre teria prioridade e o slot ficaria
+// órfão. Resolver o nó primeiro replica a mesma prioridade que o dialplan real já usa
+// (`src/asterisk/flows/flow.repository.ts`), senão a listagem mostra "Encerrar chamada" pra todo
+// flow montado do jeito normal no canvas mesmo com a chamada roteando certo.
+async function resolveEntryDestination(entryNodeId: string | null, edgeEntry: RouteDestination): Promise<RouteDestination> {
+    if (!entryNodeId) return edgeEntry
+    const node = await prisma.flowNode.findUnique({ where: { id: entryNodeId }, select: { type: true, resourceId: true } })
+    if (!node?.resourceId) return edgeEntry
+    return { type: node.type, id: node.resourceId } as RouteDestination
+}
 
 // Anexa o nome legível de entryDestination (resolvido no backend, cache-first - ver
 // route-destination-label.ts). Todas as chamadas aqui são de uma única empresa por vez.
@@ -45,7 +60,17 @@ export const getFlowsByCompany = async (companyId: string) => {
             prisma.flow.findMany({ where: { companyId }, select }),
             FlowEdgeRepository.getBySource(companyId, 'flow'),
         ])
-        rows = flowRows.map((f) => ({ ...f, entryDestination: edges.get(f.id)?.entry ?? null }))
+        const entryNodeIds = flowRows.map((f) => f.entryNodeId).filter((id): id is string => !!id)
+        const entryNodes = entryNodeIds.length > 0
+            ? await prisma.flowNode.findMany({ where: { id: { in: entryNodeIds } }, select: { id: true, type: true, resourceId: true } })
+            : []
+        const entryNodeMap = new Map(entryNodes.map((n) => [n.id, n]))
+        rows = flowRows.map((f) => {
+            const edgeEntry = edges.get(f.id)?.entry ?? null
+            const node = f.entryNodeId ? entryNodeMap.get(f.entryNodeId) : undefined
+            const entryDestination = node?.resourceId ? ({ type: node.type, id: node.resourceId } as RouteDestination) : edgeEntry
+            return { ...f, entryDestination }
+        })
         await FlowsCache.setByCompany(companyId, rows)
     }
 
@@ -62,7 +87,8 @@ export const getFlowById = async (id: string) => {
         const flow = await prisma.flow.findUnique({ where: { id }, select })
         if (!flow) throw new AppError('Flow not found', 404)
 
-        const entryDestination = await FlowEdgeRepository.getOne('flow', id, 'entry')
+        const edgeEntry = await FlowEdgeRepository.getOne('flow', id, 'entry')
+        const entryDestination = await resolveEntryDestination(flow.entryNodeId, edgeEntry)
         row = { ...flow, entryDestination }
         await FlowsCache.setFlow(id, row)
     }
@@ -137,7 +163,9 @@ export const updateFlow = async (id: string, data: UpdateFlowInput) => {
         await FlowsCache.invalidateByCompany(existing.companyId)
     }
     const [entryDestination, usedByMap] = await Promise.all([
-        data.entryDestination !== undefined ? data.entryDestination : FlowEdgeRepository.getOne('flow', id, 'entry'),
+        data.entryDestination !== undefined
+            ? data.entryDestination
+            : FlowEdgeRepository.getOne('flow', id, 'entry').then((edgeEntry) => resolveEntryDestination(existing.entryNodeId, edgeEntry)),
         resolveUsedByLabels('flow', [id], existing.companyId),
     ])
     return toDto({ ...flow, entryDestination, usedBy: usedByMap.get(id) ?? [] })

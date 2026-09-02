@@ -244,7 +244,7 @@ export function OutboundRouteFormDialog({
     return (
         <>
             <Dialog open={open} onOpenChange={requestClose}>
-                <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-xl">
+                <DialogContent className="flex max-h-[90vh] flex-col overflow-hidden! sm:max-w-xl">
                     <DialogHeader>
                         <DialogTitle>
                             {isEdit

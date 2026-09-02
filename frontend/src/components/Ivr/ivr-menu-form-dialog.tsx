@@ -266,7 +266,7 @@ export function IvrMenuFormDialog({
     return (
         <>
             <Dialog open={open} onOpenChange={requestClose}>
-                <DialogContent className="flex max-h-full flex-col sm:max-w-xl">
+                <DialogContent className="flex max-h-full flex-col overflow-hidden! sm:max-w-xl">
                     <DialogHeader className="pr-8">
                         <DialogTitle>
                             {isEdit ? "Editar menu de URA" : "Novo menu de URA"}

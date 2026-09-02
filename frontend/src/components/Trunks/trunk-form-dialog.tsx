@@ -372,7 +372,7 @@ export function TrunkFormDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="flex max-h-full flex-col sm:max-w-2xl">
+            <DialogContent className="flex max-h-full flex-col overflow-hidden! sm:max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>
                         {isEdit ? "Editar tronco" : "Novo tronco"}

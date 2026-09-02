@@ -165,6 +165,24 @@ export async function resolveUsedByLabels(
     if (targetIds.length === 0) return new Map()
 
     const refsByTarget = await FlowEdgeRepository.getReferencesToMany(targetType, targetIds)
+
+    // Um FlowNode referencia o recurso direto em `resourceId` (ex: nó "Verificar feriado" apontando
+    // pro HolidayGroup) - isso nunca passa pelo FlowEdgeRepository (só route destination de
+    // campo único, tipo trueRoute/postQueueDestination, escreve lá), então sem isso todo recurso
+    // usado só dentro do canvas de um Flow aparecia como "não referenciado" aqui, mesmo com o
+    // dialplan realmente apontando pra ele. `assertNotReferenced` já faz esse mesmo cross-check
+    // pra bloquear delete (route-destination.validate.ts) - aqui é só o espelho pra exibição.
+    const flowNodeRefs = await prisma.flowNode.findMany({
+        where: { type: targetType, resourceId: { in: targetIds }, flow: { companyId } },
+        select: { resourceId: true, flowId: true },
+    })
+    for (const { resourceId, flowId } of flowNodeRefs) {
+        if (!resourceId) continue
+        const refs = refsByTarget.get(resourceId) ?? []
+        if (refs.some((r) => r.sourceType === 'flow' && r.sourceId === flowId)) continue
+        refsByTarget.set(resourceId, [...refs, { sourceType: 'flow', sourceId: flowId, slot: 'node' }])
+    }
+
     if (refsByTarget.size === 0) return new Map()
 
     const idsBySourceType = new Map<FlowSourceType, Set<string>>()

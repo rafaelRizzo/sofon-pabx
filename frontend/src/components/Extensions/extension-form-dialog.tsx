@@ -991,7 +991,7 @@ export function ExtensionFormDialog({
     if (isEdit && loadingExtension) {
         return (
             <Dialog open={open} onOpenChange={onOpenChange}>
-                <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-2xl">
+                <DialogContent className="flex max-h-[90vh] flex-col overflow-hidden! sm:max-w-2xl">
                     <DialogHeader>
                         <DialogTitle
                             render={<Skeleton className="h-5 w-40" />}
@@ -1026,7 +1026,7 @@ export function ExtensionFormDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-2xl">
+            <DialogContent className="flex max-h-[90vh] flex-col overflow-hidden! sm:max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>
                         {isEdit ? "Editar ramal" : "Novo ramal"}

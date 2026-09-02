@@ -110,7 +110,7 @@ export function CompanyFormDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-lg">
+            <DialogContent className="flex max-h-[90vh] flex-col overflow-hidden! sm:max-w-lg">
                 <DialogHeader>
                     <DialogTitle>
                         {isEdit ? "Editar empresa" : "Nova empresa"}
