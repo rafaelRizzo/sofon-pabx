@@ -39,7 +39,7 @@ function buildDialplan(
         entries.push({
             context, exten: entry, priority,
             app: 'GotoIfTime',
-            appdata: `00:00-23:59,*,${date.day},${MONTH_CODES[date.month - 1]}@${timezone}?${matched},1`,
+            appdata: `00:00-23:59,*,${date.day},${MONTH_CODES[date.month - 1]},${timezone}?${matched},1`,
         })
         priority++
     }
