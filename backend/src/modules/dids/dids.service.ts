@@ -6,6 +6,8 @@ import { InboundRouteRepository } from '../../asterisk/inboundroute.repository'
 import { FlowEdgeRepository } from '../../asterisk/flow-edge.repository'
 import type { InboundDest } from '../inbound-routes/schemas/inbound-route.schema'
 import { InboundRoutesCache } from '../inbound-routes/cache/inbound-routes.cache'
+import { resolveDestinationLabels, withDestinationLabel } from '../../schemas/route-destination-label'
+import type { RouteDestination } from '../../schemas/route-destination.schema'
 import { AppError } from '../../utils/errors/app.error'
 
 const select = {
@@ -17,48 +19,81 @@ const select = {
     updatedAt: true,
 }
 
+type DidRow = { id: string; companyId: string; [key: string]: unknown }
+
+// "Usado por" de um DID nunca passa pelo FlowEdgeRepository (não é um tipo de route destination -
+// é o próprio ponto de entrada da chamada) - é sempre resolvido pela FK direta InboundRoute.didId.
+// Calculado fresco a cada leitura (não faz parte do que DidsCache guarda) porque depende de
+// InboundRoute, uma entidade que muda independente do DID em si - mesmo motivo de usedBy em
+// flows.service.ts/holiday-groups.service.ts não ser cacheado junto com a linha principal.
+async function withUsedBy<T extends DidRow>(dids: T[]): Promise<(T & { usedBy: unknown[] })[]> {
+    if (dids.length === 0) return []
+    const didIds = dids.map((d) => d.id)
+    const routes = await prisma.inboundRoute.findMany({
+        where: { didId: { in: didIds } },
+        select: { id: true, name: true, didId: true, companyId: true },
+    })
+    if (routes.length === 0) return dids.map((d) => ({ ...d, usedBy: [] }))
+
+    const edges = await FlowEdgeRepository.getBySourceIds('inboundroute', routes.map((r) => r.id))
+
+    const destsByCompany = new Map<string, RouteDestination[]>()
+    for (const r of routes) {
+        const arr = destsByCompany.get(r.companyId) ?? []
+        arr.push(edges.get(r.id)?.default ?? null)
+        destsByCompany.set(r.companyId, arr)
+    }
+    const labelMaps = new Map(
+        await Promise.all([...destsByCompany.entries()].map(async ([companyId, dests]) => [companyId, await resolveDestinationLabels(dests, companyId)] as const)),
+    )
+
+    const routesByDid = new Map<string, unknown[]>()
+    for (const r of routes) {
+        const destination = withDestinationLabel(edges.get(r.id)?.default ?? null, labelMaps.get(r.companyId)!)
+        const list = routesByDid.get(r.didId) ?? []
+        list.push({ inboundRouteId: r.id, name: r.name, destination })
+        routesByDid.set(r.didId, list)
+    }
+
+    return dids.map((d) => ({ ...d, usedBy: routesByDid.get(d.id) ?? [] }))
+}
+
 export const getAllDids = async (companyIds?: string[], userId?: string) => {
     if (companyIds && companyIds.length === 0) return []
 
-    if (!companyIds) {
-        const cached = await DidsCache.getAll()
-        if (cached) return cached
-    } else if (userId) {
-        const cached = await DidsCache.getForScope(userId)
-        if (cached) return cached
+    let dids: DidRow[] | null = null
+    if (!companyIds) dids = (await DidsCache.getAll()) as DidRow[] | null
+    else if (userId) dids = (await DidsCache.getForScope(userId)) as DidRow[] | null
+
+    if (!dids) {
+        dids = await prisma.did.findMany({
+            where: companyIds ? { companyId: { in: companyIds } } : undefined,
+            select,
+        })
+        if (!companyIds) await DidsCache.setAll(dids)
+        else if (userId) await DidsCache.setForScope(userId, dids)
     }
-
-    const dids = await prisma.did.findMany({
-        where: companyIds ? { companyId: { in: companyIds } } : undefined,
-        select,
-    })
-
-    if (!companyIds) await DidsCache.setAll(dids)
-    else if (userId) await DidsCache.setForScope(userId, dids)
-    return dids
+    return withUsedBy(dids)
 }
 
 export const getDidsByCompany = async (companyId: string) => {
-    const cached = await DidsCache.getDidsByCompany(companyId)
-    if (cached) return cached
-
-    await getCompanyById(companyId)
-
-    const dids = await prisma.did.findMany({ where: { companyId }, select })
-
-    await DidsCache.setDidsByCompany(companyId, dids)
-    return dids
+    let dids = (await DidsCache.getDidsByCompany(companyId)) as DidRow[] | null
+    if (!dids) {
+        await getCompanyById(companyId)
+        dids = await prisma.did.findMany({ where: { companyId }, select })
+        await DidsCache.setDidsByCompany(companyId, dids)
+    }
+    return withUsedBy(dids)
 }
 
 export const getDidById = async (id: string) => {
-    const cached = await DidsCache.getDid(id)
-    if (cached) return cached
-
-    const did = await prisma.did.findUnique({ where: { id }, select })
-    if (!did) throw new AppError('DID not found', 404)
-
-    await DidsCache.setDid(id, did)
-    return did
+    let did = (await DidsCache.getDid(id)) as DidRow | null
+    if (!did) {
+        did = await prisma.did.findUnique({ where: { id }, select })
+        if (!did) throw new AppError('DID not found', 404)
+        await DidsCache.setDid(id, did)
+    }
+    return (await withUsedBy([did]))[0]!
 }
 
 export const createDid = async (data: CreateDidInput) => {

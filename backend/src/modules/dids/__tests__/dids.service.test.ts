@@ -78,6 +78,21 @@ describe('DidsService.getDidById', () => {
         await expect(DidsService.getDidById('clxxxxxxxxxxxxxxxxxxxxxxxxx'))
             .rejects.toMatchObject({ statusCode: 404 })
     })
+
+    it('returns usedBy with the inbound route destination when the DID is routed', async () => {
+        db.did.findUnique.mockResolvedValue(DID)
+        db.inboundRoute.findMany.mockResolvedValue([{ id: 'ir1', name: 'Rota principal', didId: 'd1', companyId: 'c1' }])
+        db.flowEdge.findMany.mockResolvedValue([{ sourceType: 'inboundroute', sourceId: 'ir1', slot: 'default', targetType: 'extension', targetId: 'ext1' }])
+        const did = await DidsService.getDidById('d1') as any
+        expect(did.usedBy).toEqual([{ inboundRouteId: 'ir1', name: 'Rota principal', destination: { type: 'extension', id: 'ext1', label: null } }])
+    })
+
+    it('returns empty usedBy when no inbound route references the DID', async () => {
+        db.did.findUnique.mockResolvedValue(DID)
+        db.inboundRoute.findMany.mockResolvedValue([])
+        const did = await DidsService.getDidById('d1') as any
+        expect(did.usedBy).toEqual([])
+    })
 })
 
 // ─── updateDid ────────────────────────────────────────────────────────────────

@@ -2,6 +2,7 @@
 
 import { PencilIcon, Trash2Icon } from "lucide-react"
 
+import { DidRoutedToBadge } from "@/components/Dids/did-routed-to-badge"
 import { StatusBadge } from "@/components/status-badge"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -49,6 +50,7 @@ export function DidsTable({
                         <TableHead>Número</TableHead>
                         <TableHead>Empresa</TableHead>
                         <TableHead>Status</TableHead>
+                        <TableHead>Usado por</TableHead>
                         <TableHead className="w-30 text-right">Ações</TableHead>
                     </TableRow>
                 </TableHeader>
@@ -56,7 +58,7 @@ export function DidsTable({
                     {loading ? (
                         Array.from({ length: 3 }).map((_, i) => (
                             <TableRow key={i}>
-                                {Array.from({ length: 4 }).map((_, j) => (
+                                {Array.from({ length: 5 }).map((_, j) => (
                                     <TableCell key={j}>
                                         <Skeleton className="h-4 w-full" />
                                     </TableCell>
@@ -66,7 +68,7 @@ export function DidsTable({
                     ) : dids.length === 0 ? (
                         <TableRow>
                             <TableCell
-                                colSpan={4}
+                                colSpan={5}
                                 className="h-24 text-center text-muted-foreground"
                             >
                                 Nenhum DID encontrado
@@ -85,6 +87,9 @@ export function DidsTable({
                                 </TableCell>
                                 <TableCell>
                                     <StatusBadge status={did.status} />
+                                </TableCell>
+                                <TableCell>
+                                    <DidRoutedToBadge usedBy={did.usedBy} />
                                 </TableCell>
                                 <TableCell>
                                     <TooltipProvider delay={100}>

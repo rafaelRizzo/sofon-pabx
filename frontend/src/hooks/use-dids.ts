@@ -6,14 +6,22 @@ import { toast } from "sonner"
 import { z } from "zod"
 
 import { api, apiError } from "@/lib/api"
+import type { RouteDestination } from "@/components/RouteDestination/route-destination-field"
 
 export type DidStatus = "active" | "inactive" | "blocked"
+
+export type DidUsedByRef = {
+    inboundRouteId: string
+    name: string
+    destination: RouteDestination
+}
 
 export type Did = {
     id: string
     number: string
     companyId: string
     status: DidStatus
+    usedBy: DidUsedByRef[]
     createdAt: string
     updatedAt: string
 }

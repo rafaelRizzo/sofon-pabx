@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { timestamp, ok } from '../../../schemas/responses'
+import { routeDestinationResponseSchema } from '../../../schemas/route-destination.schema'
 
 export const idParamSchema = z.object({
     id: z.cuid2(),
@@ -31,11 +32,18 @@ export type CompanyQuery = z.infer<typeof companyQuerySchema>
 export type CreateDidInput = z.infer<typeof createDidSchema>
 export type UpdateDidInput = z.infer<typeof updateDidSchema>
 
+export const didUsedBySchema = z.array(z.object({
+    inboundRouteId: z.string(),
+    name: z.string(),
+    destination: routeDestinationResponseSchema,
+})).describe('Rotas de entrada que usam este DID e pra onde cada uma direciona a chamada - vazio quando o DID não está roteado em nenhuma rota de entrada')
+
 export const DidSchema = z.object({
     id: z.string(),
     number: z.string(),
     companyId: z.string(),
     status: didStatusSchema,
+    usedBy: didUsedBySchema,
     createdAt: timestamp,
     updatedAt: timestamp,
 })
