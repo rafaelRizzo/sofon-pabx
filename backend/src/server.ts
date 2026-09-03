@@ -3,6 +3,7 @@ import { validateEnv } from './config/env'
 import { connectRedis, disconnectRedis } from './config/redis'
 import { startAgiServer } from './asterisk/agi-server'
 import { startAmiEvents, stopAmiEvents } from './asterisk/ami-events'
+import { startRealtimeBusSubscriber, stopRealtimeBusSubscriber } from './asterisk/transport/realtime-bus'
 import { ensureStaticAsteriskConfig } from './asterisk/ensure-static-config'
 import { runCacheMigrations } from './lib/cache-migrations'
 import { startHolidayResyncJob } from './jobs/holiday-resync.job'
@@ -43,6 +44,10 @@ async function start() {
         }
 
         if (runsWeb) {
+            // Sem isso, réplicas web nunca recebem os emitRealtimeChange() disparados no processo
+            // worker (AMI events) - SSE ficava preso no snapshot inicial + heartbeat, nunca
+            // empurrando atualização de verdade (ver comentário em realtime-bus.ts)
+            await startRealtimeBusSubscriber()
             await app.listen({ port: env.PORT, host: env.HOST })
             logger.info({
                 event: 'server.started',
@@ -67,6 +72,9 @@ async function shutdown() {
     if (env.PROCESS_ROLE === 'worker' || env.PROCESS_ROLE === 'all') {
         await stopAmiEvents()
     }
+    // no-op se o publisher/subscriber nunca chegou a ser criado nesse processo (subscriber só
+    // existe em web/all; publisher é lazy, criado no primeiro emitRealtimeChange())
+    await stopRealtimeBusSubscriber()
     await disconnectRedis()
 }
 

@@ -1,5 +1,15 @@
 import { z } from 'zod'
 
+// z.coerce.boolean() faz Boolean(string) por baixo - Boolean("false") é `true` em JS (qualquer
+// string não-vazia é truthy), então setar a flag como "false" no .env nunca desligava nada, só
+// omitir a variável inteira fazia efeito. Aceita só "true"/"false" literal (case-insensitive) -
+// erra alto (ZodError) em qualquer outro valor em vez de silenciosamente virar true.
+const booleanEnv = (defaultValue: boolean) =>
+    z.preprocess(
+        (val) => (typeof val === 'string' ? val.toLowerCase() : val),
+        z.enum(['true', 'false']).optional()
+    ).transform((val) => (val === undefined ? defaultValue : val === 'true'))
+
 const envSchema = z.object({
     NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
     // Controla o que esse processo sobe: 'web' (só API HTTP, escalável em N réplicas), 'worker'
@@ -15,7 +25,7 @@ const envSchema = z.object({
     REFRESH_TOKEN_EXPIRES_IN: z.string().default('7d'),
     CORS_ORIGIN: z.string().default('http://localhost:3333'),
     LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
-    LOG_ENABLED: z.coerce.boolean().default(true),
+    LOG_ENABLED: booleanEnv(true),
     API_BASE_URL: z.string().default('http://localhost:3333'),
     API_TIMEOUT: z.coerce.number().default(10000),
     RATE_LIMIT_MAX: z.coerce.number().default(1000),
@@ -58,7 +68,7 @@ const envSchema = z.object({
     // logger.warn (visível mesmo em produção, onde o nível default é 'warn') - usado pra confirmar
     // nomes de campo reais contra a versão de Asterisk instalada quando o mapeamento não bate.
     // Fica bem verboso (DeviceStateChange dispara muito) - ligar só durante uma investigação pontual.
-    AMI_DEBUG: z.coerce.boolean().default(false),
+    AMI_DEBUG: booleanEnv(false),
     // Diretório onde dialplan-file.repository.ts materializa os contextos estáticos (timeconditions,
     // announcements, ivrs, holidays, queues-app, request-templates). Default é o caminho real do
     // Asterisk - testes de integração sobrescrevem via .env.test pra um dir gravável sem Asterisk instalado.
@@ -71,7 +81,7 @@ const envSchema = z.object({
     // SIP/PJSIP) - o instalador grava esses valores no .env do backend. Expostos via GET /system/sip-config
     // pro frontend exibir a configuração correta (ex: instruções de provisionamento de ramal).
     ASTERISK_VERSION: z.string().optional(),
-    SIP_LEGACY_ENABLED: z.coerce.boolean().default(false),
+    SIP_LEGACY_ENABLED: booleanEnv(false),
     SIP_PORT: z.coerce.number().optional(),
     PJSIP_PORT: z.coerce.number().default(5060),
     // WebRTC (softphone no browser via SIP.js) - sinalização SIP sobre WebSocket. Sem domínio/TLS
