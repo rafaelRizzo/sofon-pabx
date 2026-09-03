@@ -24,6 +24,15 @@ const MIGRATIONS: CacheMigration[] = [
         id: 'queues-add-callcenter-survey-fields',
         run: () => cacheManager.invalidate('queues'),
     },
+    {
+        // Adicionado `active` (toggle online/offline do endpoint) ao TrunkSchema - cache antigo
+        // (sem TTL) não tem esse campo e falha a validação Zod de response ("Response doesn't
+        // match the schema"). Limpa tudo (prefixo `cache:*`) em vez de só `trunks`, pra pegar
+        // qualquer outro cache já defasado - cacheManager.clear() nunca toca em `jti:*` (prefixo
+        // separado por design, ver config/cache.ts), então sessões logadas não são afetadas.
+        id: 'trunks-add-active-field-clear-all',
+        run: () => cacheManager.clear(),
+    },
 ]
 
 // Nunca lança - uma falha aqui (ex: Redis instável no boot) não pode derrubar o worker inteiro,
