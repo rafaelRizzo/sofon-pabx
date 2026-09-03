@@ -21,6 +21,7 @@ export type Trunk = {
     companyId: string
     type: TrunkType
     registrationMode: RegistrationMode
+    active: boolean
     // Derivado pelo backend a partir de username (inbound: "username" se informado, senão "ip"; outbound: sempre null)
     // - não é enviado no create/update; no PUT inbound, enviar username muda para "username", enviar username: null volta para "ip"
     identifyBy: IdentifyBy | null
@@ -327,6 +328,31 @@ export function useTrunks(companyId?: string) {
         }
     }
 
+    const toggleActiveMutation = useMutation({
+        mutationFn: ({
+            trunkId,
+            active,
+        }: {
+            trunkId: string
+            active: boolean
+        }) => api.patch(`/trunks/${trunkId}/active`, { active }),
+    })
+
+    const toggleTrunkActive = async (trunkId: string, active: boolean) => {
+        const id = toast.loading(active ? "Ativando..." : "Desativando...")
+        try {
+            await toggleActiveMutation.mutateAsync({ trunkId, active })
+            toast.success(active ? "Tronco ativado" : "Tronco desativado", {
+                id,
+            })
+            await invalidate()
+            return true
+        } catch (err) {
+            toast.error(apiError(err, "Erro ao atualizar tronco"), { id })
+            return false
+        }
+    }
+
     const deleteMutation = useMutation({
         mutationFn: (trunkId: string) => api.delete(`/trunks/${trunkId}`),
     })
@@ -362,6 +388,7 @@ export function useTrunks(companyId?: string) {
         fetchTrunks: invalidate,
         createTrunk,
         updateTrunk,
+        toggleTrunkActive,
         deleteTrunk,
     }
 }

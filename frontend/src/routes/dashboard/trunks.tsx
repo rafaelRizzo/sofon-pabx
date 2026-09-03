@@ -30,6 +30,7 @@ function TrunksPage() {
         setFilter,
         createTrunk,
         updateTrunk,
+        toggleTrunkActive,
         deleteTrunk,
     } = useTrunks(companyFilter)
 
@@ -82,6 +83,9 @@ function TrunksPage() {
                 companySelected={!!companyFilter}
                 onEdit={setEditTrunk}
                 onDelete={setDeleteTarget}
+                onToggleActive={(trunk, active) =>
+                    toggleTrunkActive(trunk.id, active)
+                }
             />
 
             <DataPagination
