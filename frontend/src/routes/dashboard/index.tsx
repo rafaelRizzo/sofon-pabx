@@ -2,6 +2,9 @@ import { createFileRoute } from "@tanstack/react-router"
 
 import { DashboardInfraCards } from "@/components/Dashboard/dashboard-infra-cards"
 import { DashboardOverviewCards } from "@/components/Dashboard/dashboard-overview-cards"
+import { DashboardRecentCalls } from "@/components/Dashboard/dashboard-recent-calls"
+import { DashboardRecentLogs } from "@/components/Dashboard/dashboard-recent-logs"
+import { DashboardTrunksStatus } from "@/components/Dashboard/dashboard-trunks-status"
 import { CompanyFilter } from "@/components/company-filter"
 import { FilterBar } from "@/components/filter-bar"
 import { PageHeader } from "@/components/page-header"
@@ -15,7 +18,7 @@ export const Route = createFileRoute("/dashboard/")({
 })
 
 function DashboardPage() {
-  const { user } = useAuth()
+  const { user, hasPermission } = useAuth()
   const isAdmin = user?.role === "admin"
 
   const { companies } = useCompanies()
@@ -49,6 +52,18 @@ function DashboardPage() {
           <DashboardInfraCards infra={infra} loading={infraLoading} />
         </div>
       )}
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        {hasPermission("cdr") && (
+          <DashboardRecentCalls companyId={companyId} />
+        )}
+        {hasPermission("trunks") && (
+          <DashboardTrunksStatus companyId={companyId} />
+        )}
+        {hasPermission("audit-logs") && (
+          <DashboardRecentLogs companyId={companyId} />
+        )}
+      </div>
     </div>
   )
 }
