@@ -1,6 +1,11 @@
 "use client"
 
-import { PencilIcon, RefreshCwIcon, Trash2Icon } from "lucide-react"
+import {
+    PencilIcon,
+    RefreshCwIcon,
+    Trash2Icon,
+    UploadCloudIcon,
+} from "lucide-react"
 
 import { StatusBadge } from "@/components/status-badge"
 import { Badge } from "@/components/ui/badge"
@@ -28,6 +33,7 @@ type CompaniesTableProps = {
     onEdit: (company: Company) => void
     onDelete: (company: Company) => void
     onResyncDialplan: (company: Company) => void
+    onImportIssabel: (company: Company) => void
 }
 
 export function CompaniesTable({
@@ -36,6 +42,7 @@ export function CompaniesTable({
     onEdit,
     onDelete,
     onResyncDialplan,
+    onImportIssabel,
 }: CompaniesTableProps) {
     return (
         <div className="rounded-md border">
@@ -92,6 +99,34 @@ export function CompaniesTable({
                                 </TableCell>
                                 <TableCell className="text-right">
                                     <div className="flex justify-end gap-2">
+                                        <TooltipProvider delay={200}>
+                                            <Tooltip>
+                                                <TooltipTrigger
+                                                    render={
+                                                        <Button
+                                                            variant="outline"
+                                                            size="icon"
+                                                            onClick={() =>
+                                                                onImportIssabel(
+                                                                    company
+                                                                )
+                                                            }
+                                                        >
+                                                            <UploadCloudIcon />
+                                                            <span className="sr-only">
+                                                                Importar do
+                                                                Issabel
+                                                            </span>
+                                                        </Button>
+                                                    }
+                                                />
+                                                <TooltipContent>
+                                                    Importar ramais, filas e
+                                                    troncos de um backup do
+                                                    IssabelPBX
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        </TooltipProvider>
                                         <TooltipProvider delay={200}>
                                             <Tooltip>
                                                 <TooltipTrigger

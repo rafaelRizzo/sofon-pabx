@@ -49,6 +49,7 @@ import { queueCallsRoutes } from './modules/queue-calls/queue-calls.routes'
 import { realtimeRoutes } from './modules/realtime/realtime.routes'
 import { auditLogsRoutes } from './modules/audit-logs/audit-logs.routes'
 import { backupRoutes } from './modules/backup/backup.routes'
+import { migrationsRoutes } from './modules/migrations/migrations.routes'
 
 const env = validateEnv()
 
@@ -280,6 +281,7 @@ app.register(queueCallsRoutes)
 app.register(realtimeRoutes)
 app.register(auditLogsRoutes)
 app.register(backupRoutes)
+app.register(migrationsRoutes)
 
 // Health check
 app.get('/health', async (req, reply) => {

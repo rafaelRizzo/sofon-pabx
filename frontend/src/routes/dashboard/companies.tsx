@@ -6,6 +6,7 @@ import { PlusIcon } from "lucide-react"
 
 import { CompanyFormDialog } from "@/components/Companies/company-form-dialog"
 import { CompaniesTable } from "@/components/Companies/companies-table"
+import { ImportIssabelDialog } from "@/components/Companies/import-issabel-dialog"
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog"
 import { DataPagination } from "@/components/data-pagination"
 import { PageHeader } from "@/components/page-header"
@@ -38,6 +39,7 @@ function CompaniesPage() {
     const [formOpen, setFormOpen] = useState(false)
     const [editing, setEditing] = useState<Company | null>(null)
     const [deleting, setDeleting] = useState<Company | null>(null)
+    const [importing, setImporting] = useState<Company | null>(null)
 
     const openCreate = () => {
         setEditing(null)
@@ -77,6 +79,7 @@ function CompaniesPage() {
                 onEdit={openEdit}
                 onDelete={setDeleting}
                 onResyncDialplan={(company) => resyncDialplan(company.id)}
+                onImportIssabel={setImporting}
             />
 
             <DataPagination
@@ -104,6 +107,15 @@ function CompaniesPage() {
                         : Promise.resolve(true)
                 }
             />
+
+            {importing && (
+                <ImportIssabelDialog
+                    open={!!importing}
+                    onOpenChange={(open) => !open && setImporting(null)}
+                    companyId={importing.id}
+                    companyName={importing.name}
+                />
+            )}
         </div>
     )
 }

@@ -25,6 +25,13 @@ const envSchema = z.object({
     AUDIO_CONVERSION_CONCURRENCY: z.coerce.number().int().min(1).max(4).default(2),
     AUDIO_CONVERSION_QUEUE_MAX: z.coerce.number().int().min(0).max(100).default(10),
     AUDIO_CONVERSION_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120000).default(30000),
+    // Import de PABX externo (Issabel etc, ver módulo migrations) - o frontend tenta extrair o
+    // dump SQL do backup completo no navegador antes de enviar (evita subir os GBs de gravação/
+    // voicemail que um backup completo pode ter), mas a API aceita os dois formatos: só o .sql
+    // extraído, ou o .tar/.tgz completo (extraído aqui no servidor via `tar`, ver archive.ts) -
+    // esse segundo caso é o que precisa de um limite folgado. Upload é sempre streamado direto
+    // pra disco, nunca bufferizado inteiro em memória.
+    MIGRATION_UPLOAD_MAX_SIZE_MB: z.coerce.number().int().min(1).max(2048).default(300),
     DATABASE_POOL_SIZE: z.coerce.number().default(10),
     REDIS_URL: z.string().default('redis://localhost:6379'),
     TZ: z.string().default('America/Sao_Paulo'),
