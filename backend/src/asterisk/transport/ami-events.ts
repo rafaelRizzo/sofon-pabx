@@ -5,6 +5,8 @@ import { parseMemberInterface } from '../destinations/queue.repository'
 import { extractAmiBlocks, type AmiBlock } from './ami-events.parser'
 import { emitRealtimeChange } from './realtime-bus'
 import { recordJoin, recordAgentConnect, recordAnswered, recordAbandoned } from '../../modules/queue-calls/queue-calls.service'
+import { recordCallQuality } from '../../modules/call-quality/call-quality.service'
+import { resolveTrunkByAstId } from '../../modules/trunks/trunks.service'
 import {
     STATUS_TTL_SECONDS, CALL_TTL_SECONDS, HOLDTIME_TTL_SECONDS,
     extKey, extCallsKey, callKey, trunkKey, trunkCallsKey, queueMembersKey, queueWaitingKey, bridgeMembersKey, queueHoldtimeKey,
@@ -180,12 +182,55 @@ async function handleDialBegin(block: AmiBlock) {
     emitRealtimeChange('extension')
 }
 
+// Só perna de tronco - é o link com a operadora que importa pro histórico (CallQuality). Lê os
+// acumuladores de handleRtcpStats ANTES do del() em handleHangup, resolve trunkId/companyId a
+// partir do astId (nome do canal - não depende de AccountCode vir ou não nesse evento) e persiste.
+// Nunca lança pro chamador: handleHangup precisa limpar o Redis independente do resultado.
+async function recordTrunkCallQuality(astId: string, block: AmiBlock): Promise<void> {
+    if (!block.Uniqueid) return
+    const call = await redisClient.hGetAll(callKey(block.Uniqueid))
+    const rxSamples = Number(call.rxSamples ?? 0)
+    const txSamples = Number(call.txSamples ?? 0)
+    if (rxSamples === 0 && txSamples === 0) return // sem RTCP - nunca teve mídia (não atendida, etc)
+
+    const trunk = await resolveTrunkByAstId(astId)
+    if (!trunk) return
+
+    const rttSamples = Number(call.rttSamples ?? 0)
+    const startAt = call.startAt ? Number(call.startAt) : Date.now()
+
+    await recordCallQuality({
+        companyId: trunk.companyId,
+        trunkId: trunk.id,
+        uniqueid: block.Uniqueid,
+        linkedid: block.Linkedid ?? null,
+        callerNum: block.CallerIDNum ?? call.callerNum ?? null,
+        channel: block.Channel ?? call.channel ?? astId,
+        startAt: new Date(startAt),
+        endAt: new Date(),
+        avgRxJitterUnits: rxSamples > 0 ? Number(call.rxJitterSum) / rxSamples : null,
+        avgRxLostPct: rxSamples > 0 ? Number(call.rxLostSum) / rxSamples : null,
+        rxSamples,
+        avgTxJitterUnits: txSamples > 0 ? Number(call.txJitterSum) / txSamples : null,
+        avgTxLostPct: txSamples > 0 ? Number(call.txLostSum) / txSamples : null,
+        txSamples,
+        avgRttSeconds: rttSamples > 0 ? Number(call.rttSum) / rttSamples : null,
+        rttSamples,
+    })
+}
+
 async function handleHangup(block: AmiBlock) {
     if (!block.Uniqueid) return
     const number = block.Channel ? extensionNumberFromChannel(block.Channel) : null
     if (number) {
-        if (isTrunkId(number)) await redisClient.sRem(trunkCallsKey(number), block.Uniqueid)
-        else await redisClient.sRem(extCallsKey(number), block.Uniqueid)
+        if (isTrunkId(number)) {
+            await redisClient.sRem(trunkCallsKey(number), block.Uniqueid)
+            await recordTrunkCallQuality(number, block).catch((error) => {
+                logger.warn({ event: 'call-quality.record.failed', message: error instanceof Error ? error.message : String(error) })
+            })
+        } else {
+            await redisClient.sRem(extCallsKey(number), block.Uniqueid)
+        }
     }
     await redisClient.del(callKey(block.Uniqueid))
     emitRealtimeChange(number && isTrunkId(number) ? 'trunk' : 'extension')
@@ -236,14 +281,30 @@ async function handleRtcpStats(block: AmiBlock, direction: 'rx' | 'tx') {
     // só com dado de rede, sem channel/callerNum, que ficaria solto até o TTL de 4h
     if (!(await redisClient.exists(key))) return
 
+    const lostPct = (fractionLost / 256) * 100
     const update: Record<string, string> = {
-        [`${direction}LostPct`]: ((fractionLost / 256) * 100).toFixed(2),
+        [`${direction}LostPct`]: lostPct.toFixed(2),
         [`${direction}JitterUnits`]: String(jitterUnits),
         netUpdatedAt: String(Date.now()),
     }
     if (direction === 'tx' && block.RTT) update.rttSeconds = block.RTT
 
     await redisClient.hSet(key, update)
+
+    // Acumuladores pra média real da chamada inteira (não só a última amostra acima) - lidos no
+    // Hangup e persistidos em CallQuality (ver call-quality.service.ts). RTT só quando > 0: o
+    // valor "0.0000" antes do primeiro round-trip completo não é uma medição real, é ausência dela.
+    await redisClient.hIncrByFloat(key, `${direction}JitterSum`, jitterUnits)
+    await redisClient.hIncrByFloat(key, `${direction}LostSum`, lostPct)
+    await redisClient.hIncrBy(key, `${direction}Samples`, 1)
+    if (direction === 'tx' && block.RTT) {
+        const rtt = Number(block.RTT)
+        if (Number.isFinite(rtt) && rtt > 0) {
+            await redisClient.hIncrByFloat(key, 'rttSum', rtt)
+            await redisClient.hIncrBy(key, 'rttSamples', 1)
+        }
+    }
+
     await redisClient.expire(key, CALL_TTL_SECONDS)
 
     const number = extensionNumberFromChannel(block.Channel)

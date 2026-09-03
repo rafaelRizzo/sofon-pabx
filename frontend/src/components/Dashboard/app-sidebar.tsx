@@ -19,6 +19,7 @@ import {
   PhoneIcon,
   PhoneIncomingIcon,
   PhoneOutgoingIcon,
+  SignalIcon,
   SunIcon,
   UsersIcon,
   WorkflowIcon,
@@ -51,7 +52,7 @@ export type NavItem = {
   icon: LucideIcon
   // omitido = sempre visível (ex: Dashboard); presente = precisa de "<permission>:view"
   // (admin/reseller sempre veem tudo, só role "user" é filtrado; ver useAuth().hasPermission)
-  permission?: PermissionResourceKey | "cdr" | "audit-logs" | "backup"
+  permission?: PermissionResourceKey | "cdr" | "call-quality" | "audit-logs" | "backup"
 }
 
 export type NavGroup = {
@@ -76,6 +77,12 @@ export const NAV: NavGroup[] = [
         href: "/dashboard/cdr",
         icon: FileClockIcon,
         permission: "cdr",
+      },
+      {
+        title: "Qualidade de rede",
+        href: "/dashboard/call-quality",
+        icon: SignalIcon,
+        permission: "call-quality",
       },
     ],
   },

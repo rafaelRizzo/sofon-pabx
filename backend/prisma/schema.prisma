@@ -50,6 +50,7 @@ model Company {
   integrationCredentials IntegrationCredential[]
   ixcNodes               IxcNode[]
   formatterNodes         FormatterNode[]
+  callQualities          CallQuality[]
 
   @@unique([name, doc])
   @@map("companies")
@@ -262,10 +263,45 @@ model Trunk {
   updatedAt         DateTime             @updatedAt @db.Timestamptz(3)
   outboundRoutes    OutboundRouteTrunk[]
   inboundRoutes     InboundRoute[]
+  callQualities     CallQuality[]
 
   @@unique([name, companyId])
   @@index([companyId])
   @@map("trunks_app")
+}
+
+// Média real por chamada (soma/contagem acumulada durante a ligação, não só a última amostra) de
+// jitter/perda/RTT via RTCP nativo do Asterisk (RTCPSent/RTCPReceived, ver handleRtcpStats em
+// ami-events.ts) - só perna de tronco (é o link com a operadora que importa aqui, não LAN interna).
+// Tabela própria, não colunas no cdr nativo: cdr_adaptive_odbc já insere a linha de CDR sozinho no
+// Hangup, e nossa gravação (via AMI, processo separado) faria um UPDATE concorrente arriscado.
+model CallQuality {
+  id               String   @id @default(cuid())
+  companyId        String
+  company          Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  trunkId          String
+  trunk            Trunk    @relation(fields: [trunkId], references: [id], onDelete: Cascade)
+  uniqueid         String   @unique
+  linkedid         String?
+  callerNum        String?
+  channel          String
+  startAt          DateTime
+  endAt            DateTime
+  // null = nenhuma amostra chegou nessa direção (chamada muito curta) - diferente de 0, que é
+  // qualidade real medida
+  avgRxJitterUnits Float?
+  avgRxLostPct     Float?
+  rxSamples        Int
+  avgTxJitterUnits Float?
+  avgTxLostPct     Float?
+  txSamples        Int
+  avgRttSeconds    Float?
+  rttSamples       Int
+  createdAt        DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([companyId, startAt])
+  @@index([trunkId, startAt])
+  @@map("call_quality")
 }
 
 model OutboundRoute {

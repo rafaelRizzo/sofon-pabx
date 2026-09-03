@@ -19,6 +19,27 @@ const generatePassword = () => {
 
 export const toAsteriskId = (asteriskId: string, name: string) => `${asteriskId}-trunk-${name}`
 
+const TRUNK_ASTID_SEPARATOR = '-trunk-'
+
+// Inverso de toAsteriskId - usado pelo handler de Hangup (ami-events.ts) pra resolver qual Trunk
+// gerou uma perna de RTCP a partir só do nome do canal (ex: "5ebc18f799-trunk-1120"). astId embute
+// o asteriskId da empresa, não o companyId (cuid) - por isso precisa de 2 queries, não FK direta.
+export async function resolveTrunkByAstId(astId: string): Promise<{ id: string; companyId: string } | null> {
+    const sepIndex = astId.indexOf(TRUNK_ASTID_SEPARATOR)
+    if (sepIndex === -1) return null
+    const companyAsteriskId = astId.slice(0, sepIndex)
+    const trunkName = astId.slice(sepIndex + TRUNK_ASTID_SEPARATOR.length)
+
+    const company = await prisma.company.findUnique({ where: { asteriskId: companyAsteriskId }, select: { id: true } })
+    if (!company) return null
+
+    const trunk = await prisma.trunk.findUnique({
+        where: { name_companyId: { name: trunkName, companyId: company.id } },
+        select: { id: true },
+    })
+    return trunk ? { id: trunk.id, companyId: company.id } : null
+}
+
 const trunkSelect = {
     id: true,
     name: true,

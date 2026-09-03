@@ -27,7 +27,7 @@ src/modules/<name>/
   schemas/<name>.schema.ts  # Zod schemas de input/output + response types
   cache/<name>.cache.ts     # wrapper de CacheManager para o módulo
 ```
-Módulos: auth, users, companies, dids, extensions, queues, queue-members, trunks, outbound-routes, inbound-routes, time-groups, time-conditions, holiday-groups, cdr, announcements, ivr, request-templates, audios, variables, variable-conditions, callcenter (agents, routing-rules, ratings, affinity - ver seção "Callcenter (Queue Engine)")
+Módulos: auth, users, companies, dids, extensions, queues, queue-members, trunks, outbound-routes, inbound-routes, time-groups, time-conditions, holiday-groups, cdr, call-quality, dashboard, announcements, ivr, request-templates, audios, variables, variable-conditions, callcenter (agents, routing-rules, ratings, affinity - ver seção "Callcenter (Queue Engine)")
 
 ## Repositórios Asterisk (`src/asterisk/`)
 Cada repositório escreve direto nas tabelas realtime do Asterisk via Prisma:
@@ -97,7 +97,7 @@ onRequest: [...protectedRoute, requirePermission('<resource>', 'view'|'manage')]
 **Roles:** `admin` | `reseller` | `user`
 
 **Permissões granulares por usuário** (`src/middleware/permission.middleware.ts` + `src/utils/auth/permissions.ts`): só se aplica a `role === "user"`; admin/reseller sempre bypassam (acesso irrestrito, sem mudança de comportamento).
-- `User.permissions: String[]`: chaves `"<recurso>:view"` / `"<recurso>:manage"`. `PERMISSION_RESOURCES` cobre `companies`, `users`, `extensions`, `queues`, `ivr`, `announcements`, `callcenter`, `dids`, `inbound-routes`, `outbound-routes`, `trunks`, `audios`, `time-groups`, `time-conditions`, `holiday-groups`, `request-templates`, `variables`, `variable-conditions`. `cdr` é caso especial: só `view` (recurso somente leitura).
+- `User.permissions: String[]`: chaves `"<recurso>:view"` / `"<recurso>:manage"`. `PERMISSION_RESOURCES` cobre `companies`, `users`, `extensions`, `queues`, `ivr`, `announcements`, `callcenter`, `dids`, `inbound-routes`, `outbound-routes`, `trunks`, `audios`, `time-groups`, `time-conditions`, `holiday-groups`, `request-templates`, `variables`, `variable-conditions`. `cdr` e `call-quality` são caso especial: só `view` (recurso somente leitura, gerado pelo sistema).
 - `requirePermission(resource, action)` checa `getUserPermissions(id)` (`src/utils/auth/access.ts`, cacheado como `getUserCompanyIds`, invalidado em `updateUser`): aplicado em toda rota GET (`:view`) e POST/PUT/PATCH/DELETE (`:manage`) de todos os módulos, exceto as já `requireAdmin`-only (gate redundante ali)
 - `GET /auth/me`: `{id, name, username, role, permissions}` do token atual; base pro frontend montar menu/checkboxes
 - Guard anti-escalação: `updateUser` só aceita alterar `permissions` se `req.scope.isAdmin`, impedindo um `role="user"` de se autoconceder permissão via self-edit
@@ -336,6 +336,18 @@ Essa VPS **não** usa `network_mode: host` - os containers do backend (worker + 
 - `callStatus` na query mapeia pra coluna `disposition` no banco; na resposta o campo também sai como `callStatus` (não `disposition`) - nome escolhido por ser mais intuitivo pro consumidor da API
 - `startTime`/`answerTime`/`endTime`: ver seção Timezone - são hora local naive do CDR nativo do Asterisk, formatados na saída via `formatNaiveLocalISOString`, nunca como UTC direto. Filtro por data não precisa de conversão de tz: os dígitos de `startDate`/`endDate` já batem 1:1 com o storage naive local
 
+**Call Quality** (`CallQuality` model) - `GET /call-quality` - `{ records[], total, limit, page }`; `GET /call-quality/summary` - `{ summary: {...} }`
+- Query obrigatória: `companyId`; opcionais: `trunkId`, `startDate`/`endDate` (`YYYY-MM-DD`, cobrem o dia inteiro em UTC - `startAt` é `DateTime` real gravado como `Date.now()` do processo, sem a pegadinha naive-local do CDR)
+- Média real por chamada (soma/contagem acumulada durante a ligação via RTCP, não só a última amostra) de jitter/perda RX (o que o Asterisk recebeu do tronco) e TX+RTT (o que o tronco reportou de volta sobre o que recebeu do Asterisk) - ver `handleRtcpStats`/`recordTrunkCallQuality` em `ami-events.ts`
+- Só perna de **tronco** (link com a operadora) - ramal-ramal não gera registro aqui. Isolamento por `companyId` (FK direta, não `accountcode` como CDR) - resolvido a partir do nome do canal via `resolveTrunkByAstId` (`trunks.service.ts`), sem depender de `AccountCode` vir no evento
+- Só se cria registro se pelo menos 1 pacote RTCP chegou (`rxSamples + txSamples > 0`) - ligação que nunca teve mídia (não atendida, etc) não gera linha
+- Tabela própria, não colunas no `cdr` nativo: `cdr_adaptive_odbc` já insere a linha de CDR sozinho no Hangup, e a gravação via AMI (processo separado) faria um `UPDATE` concorrente arriscado
+- Sem `POST`/`PUT`/`DELETE` - só `view`, gerado pelo sistema
+
+**Dashboard** - `GET /dashboard/overview` - `{ overview: { extensionsOnline, extensionsOffline, callsToday, callsThisMonth, callsThisYear } }`; `GET /dashboard/infra` - `{ infra: { cpu, memory, disk, recordings } }`
+- `overview`: `protectedRoute` só (sem permissão granular, é agregado do que o usuário já vê) - escopado por `req.scope.companyIds`. Ramais online/offline via presença ao vivo (`RealtimeService.getExtensionsStatus`); chamadas via `prisma.cdr.count` (3 ranges: hoje/mês/ano no fuso `TZ`, sem `groupBy`/`date_trunc`)
+- `infra`: `requireAdmin` - infra compartilhada entre todas as empresas (1 VPS só), não é dado de empresa. CPU/memória via `os.loadavg()`/`os.totalmem()`/`os.freemem()` (nativo, sem shell-out); disco via `df -B1` na partição de `DIALPLAN_EXTRA_DIR` (bind mount real do host); tamanho das gravações via `du -sb` em `/var/spool/asterisk/monitor`, **cacheado em memória do processo por 5min** (não Redis/`CacheManager` - métrica aproximada, sem necessidade de consistência entre réplicas `web`)
+
 **Callcenter (Queue Engine)** - motor de distribuição de chamadas de fila além do `app_queue` nativo: prioridade dinâmica por regra configurável, elegibilidade agente×empresa e roteamento por afinidade (nota de atendimento). Mantém o `app_queue` nativo fazendo o trabalho de distribuição em si (ring/MOH/timeout/estratégia) - sem AMI/ARI, tudo via 2 mecanismos nativos do Asterisk + AGI de curta duração (`src/asterisk/agi-server.ts`).
 
 **`Queue.callcenterEnabled`** (default `false`) - toggle **por fila** que liga prioridade dinâmica + afinidade (ver passos 1/2/5 abaixo). `false` = fila roda 100% nativa, mesmo que a empresa já tenha `RoutingRule`/`CallRating` configurados pra outras filas - a config (regra, nota) é por empresa, mas o efeito na distribuição só existe nas filas com o flag ligado. Pesquisa de satisfação (`surveyAudioId`) e elegibilidade agente×empresa (`AgentCompanyScope`) **não** dependem desse flag - têm toggle próprio (ver seção Queues e passo 7).
@@ -395,6 +407,8 @@ Legend: `[x]` implementado + testado (unit + integration) | `[~]` implementado, 
 | Time Conditions                                         | GET list/:id · POST · PUT · DELETE                                                         | `[x]`  | `[x]`       |
 | Holiday Groups                                          | GET list/:id · POST · PUT · DELETE                                                         | `[~]`  | `[ ]`       |
 | CDR                                                     | GET /cdr                                                                                   | `[~]`  | `[ ]`       |
+| Call Quality                                            | GET /call-quality/:summary                                                                 | `[x]`  | `[ ]`       |
+| Dashboard                                               | GET /dashboard/overview/:infra                                                             | `[~]`  | `[ ]`       |
 | Announcements                                           | GET list/:id · POST · PATCH · DELETE                                                       | `[~]`  | `[ ]`       |
 | IVR Menus                                               | GET list/:id · POST · PUT · DELETE                                                         | `[~]`  | `[ ]`       |
 | Request Templates                                       | GET list/:id · POST · PUT · DELETE                                                         | `[~]`  | `[ ]`       |

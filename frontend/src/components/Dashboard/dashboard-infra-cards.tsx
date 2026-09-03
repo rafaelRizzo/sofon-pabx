@@ -1,0 +1,140 @@
+"use client"
+
+import {
+    CpuIcon,
+    HardDriveIcon,
+    MicIcon,
+    MemoryStickIcon,
+} from "lucide-react"
+
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
+import { cn } from "@/lib/utils"
+import type { DashboardInfra } from "@/hooks/use-dashboard"
+
+function formatBytes(bytes: number): string {
+    if (bytes <= 0) return "0 B"
+    const units = ["B", "KB", "MB", "GB", "TB"]
+    const exp = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
+    return `${(bytes / 1024 ** exp).toFixed(exp === 0 ? 0 : 1)} ${units[exp]}`
+}
+
+// > 85% já é digno de nota (disco/memória apertando) - mesmo critério de destaque usado em
+// outros lugares do dashboard (jitter/perda de qualidade de rede)
+function usagePctClass(pct: number): string {
+    if (pct >= 0.85) return "text-red-600 dark:text-red-400"
+    if (pct >= 0.7) return "text-amber-600 dark:text-amber-400"
+    return ""
+}
+
+function UsageBar({ pct }: { pct: number }) {
+    const clamped = Math.max(0, Math.min(1, pct))
+    return (
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+            <div
+                className={cn(
+                    "h-full rounded-full",
+                    clamped >= 0.85
+                        ? "bg-red-500"
+                        : clamped >= 0.7
+                          ? "bg-amber-500"
+                          : "bg-emerald-500"
+                )}
+                style={{ width: `${clamped * 100}%` }}
+            />
+        </div>
+    )
+}
+
+function InfraTile({
+    label,
+    icon: Icon,
+    loading,
+    children,
+}: {
+    label: string
+    icon: typeof CpuIcon
+    loading: boolean
+    children: React.ReactNode
+}) {
+    return (
+        <Card size="sm" className="border border-input ring-0 dark:border-[#383838]">
+            <CardHeader className="gap-2">
+                <CardTitle className="flex items-center gap-2 text-sm font-medium">
+                    <Icon className="size-4 text-muted-foreground" />
+                    {label}
+                </CardTitle>
+            </CardHeader>
+            <CardContent>
+                {loading ? <Skeleton className="h-10 w-full" /> : children}
+            </CardContent>
+        </Card>
+    )
+}
+
+type Props = {
+    infra: DashboardInfra | null
+    loading: boolean
+}
+
+export function DashboardInfraCards({ infra, loading }: Props) {
+    return (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <InfraTile label="CPU" icon={CpuIcon} loading={loading}>
+                <div className="flex items-baseline justify-between">
+                    <span className="font-mono text-xl font-semibold tabular-nums">
+                        {infra?.cpu.loadAvg1.toFixed(2) ?? "-"}
+                    </span>
+                    <CardDescription>{infra?.cpu.cores ?? 0} núcleos</CardDescription>
+                </div>
+                <CardDescription className="mt-1">
+                    load avg 5m {infra?.cpu.loadAvg5.toFixed(2) ?? "-"} · 15m{" "}
+                    {infra?.cpu.loadAvg15.toFixed(2) ?? "-"}
+                </CardDescription>
+            </InfraTile>
+
+            <InfraTile label="Memória" icon={MemoryStickIcon} loading={loading}>
+                <div className="flex items-baseline justify-between">
+                    <span
+                        className={cn(
+                            "font-mono text-xl font-semibold tabular-nums",
+                            usagePctClass(infra?.memory.usedPct ?? 0)
+                        )}
+                    >
+                        {infra ? `${Math.round(infra.memory.usedPct * 100)}%` : "-"}
+                    </span>
+                    <CardDescription>
+                        {infra ? formatBytes(infra.memory.totalBytes) : "-"}
+                    </CardDescription>
+                </div>
+                <UsageBar pct={infra?.memory.usedPct ?? 0} />
+            </InfraTile>
+
+            <InfraTile label="Disco" icon={HardDriveIcon} loading={loading}>
+                <div className="flex items-baseline justify-between">
+                    <span
+                        className={cn(
+                            "font-mono text-xl font-semibold tabular-nums",
+                            usagePctClass(infra?.disk.usedPct ?? 0)
+                        )}
+                    >
+                        {infra ? `${Math.round(infra.disk.usedPct * 100)}%` : "-"}
+                    </span>
+                    <CardDescription>
+                        {infra ? formatBytes(infra.disk.totalBytes) : "-"}
+                    </CardDescription>
+                </div>
+                <UsageBar pct={infra?.disk.usedPct ?? 0} />
+            </InfraTile>
+
+            <InfraTile label="Gravações" icon={MicIcon} loading={loading}>
+                <span className="font-mono text-xl font-semibold tabular-nums">
+                    {infra ? formatBytes(infra.recordings.sizeBytes) : "-"}
+                </span>
+                <CardDescription className="mt-1">
+                    Total em /var/spool/asterisk/monitor
+                </CardDescription>
+            </InfraTile>
+        </div>
+    )
+}

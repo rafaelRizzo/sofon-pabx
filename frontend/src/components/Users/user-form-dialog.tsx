@@ -67,6 +67,7 @@ const ROLES: { value: UserRole; label: string }[] = [
 // backend/src/utils/auth/permissions.ts) - entra na mesma lista/categoria pra render unificado
 const PERMISSION_ROWS = [
     { key: "cdr", label: "CDR", category: "Relatórios", manageable: false },
+    { key: "call-quality", label: "Qualidade de rede", category: "Relatórios", manageable: false },
     ...PERMISSION_RESOURCES.map((r) => ({ ...r, manageable: true as const })),
 ]
 

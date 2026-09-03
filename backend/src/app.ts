@@ -31,6 +31,8 @@ import { timeConditionsRoutes } from './modules/time-conditions/time-conditions.
 import { holidayGroupsRoutes } from './modules/holiday-groups/holiday-groups.routes'
 import { inboundRoutesRoutes } from './modules/inbound-routes/inbound-routes.routes'
 import { cdrRoutes } from './modules/cdr/cdr.routes'
+import { callQualityRoutes } from './modules/call-quality/call-quality.routes'
+import { dashboardRoutes } from './modules/dashboard/dashboard.routes'
 import { announcementsRoutes } from './modules/announcements/announcements.routes'
 import { ivrRoutes } from './modules/ivr/ivr.routes'
 import { requestTemplatesRoutes } from './modules/request-templates/request-templates.routes'
@@ -263,6 +265,8 @@ app.register(timeConditionsRoutes)
 app.register(holidayGroupsRoutes)
 app.register(inboundRoutesRoutes)
 app.register(cdrRoutes)
+app.register(callQualityRoutes)
+app.register(dashboardRoutes)
 app.register(announcementsRoutes)
 app.register(ivrRoutes)
 app.register(requestTemplatesRoutes)

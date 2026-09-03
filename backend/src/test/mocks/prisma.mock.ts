@@ -70,6 +70,7 @@ export function createPrismaMock() {
         integrationCredential: model(),
         ixcNode: model(),
         formatterNode: model(),
+        callQuality: model(),
         // Asterisk realtime
         ps_endpoints: model(),
         ps_auths: model(),

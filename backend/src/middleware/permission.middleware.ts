@@ -5,7 +5,7 @@ import type { PermissionAction, PermissionResource } from '../utils/auth/permiss
 
 // admin/reseller bypassam (acesso irrestrito, como já é hoje); a permission list granular
 // só restringe role="user"
-export const requirePermission = (resource: PermissionResource | 'cdr' | 'queue-calls' | 'audit-logs' | 'backup', action: PermissionAction) => {
+export const requirePermission = (resource: PermissionResource | 'cdr' | 'call-quality' | 'queue-calls' | 'audit-logs' | 'backup', action: PermissionAction) => {
     return async (req: FastifyRequest, _reply: FastifyReply) => {
         const { id, role } = req.user!
         if (role !== 'user') return

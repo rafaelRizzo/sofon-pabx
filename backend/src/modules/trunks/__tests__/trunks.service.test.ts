@@ -219,3 +219,38 @@ describe('TrunksService.deleteTrunk', () => {
         expect(db.trunk.delete).toHaveBeenCalledWith({ where: { id: 't1' } })
     })
 })
+
+// ─── resolveTrunkByAstId ────────────────────────────────────────────────────────
+describe('TrunksService.resolveTrunkByAstId', () => {
+    it('returns null when astId has no "-trunk-" separator', async () => {
+        const result = await TrunksService.resolveTrunkByAstId('ast1onlynoseparator')
+        expect(result).toBeNull()
+        expect(db.company.findUnique).not.toHaveBeenCalled()
+    })
+
+    it('returns null when company asteriskId does not match any company', async () => {
+        db.company.findUnique.mockResolvedValue(null)
+        const result = await TrunksService.resolveTrunkByAstId('ast1-trunk-tst-trunk')
+        expect(result).toBeNull()
+        expect(db.trunk.findUnique).not.toHaveBeenCalled()
+    })
+
+    it('returns null when trunk name does not match any trunk of that company', async () => {
+        db.company.findUnique.mockResolvedValue({ id: 'c1' })
+        db.trunk.findUnique.mockResolvedValue(null)
+        const result = await TrunksService.resolveTrunkByAstId('ast1-trunk-tst-trunk')
+        expect(result).toBeNull()
+    })
+
+    it('resolves trunkId + companyId from a valid astId', async () => {
+        db.company.findUnique.mockResolvedValue({ id: 'c1' })
+        db.trunk.findUnique.mockResolvedValue({ id: 't1' })
+        const result = await TrunksService.resolveTrunkByAstId('ast1-trunk-tst-trunk')
+        expect(result).toEqual({ id: 't1', companyId: 'c1' })
+        expect(db.company.findUnique).toHaveBeenCalledWith({ where: { asteriskId: 'ast1' }, select: { id: true } })
+        expect(db.trunk.findUnique).toHaveBeenCalledWith({
+            where: { name_companyId: { name: 'tst-trunk', companyId: 'c1' } },
+            select: { id: true },
+        })
+    })
+})
