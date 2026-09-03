@@ -19,6 +19,7 @@ export const DashboardInfraSchema = z.object({
         loadAvg5: z.number(),
         loadAvg15: z.number(),
         cores: z.number(),
+        perCoreUsedPct: z.array(z.number()),
     }),
     memory: z.object({
         totalBytes: z.number(),

@@ -129,18 +129,45 @@ async function getLogsSize(): Promise<number> {
     return bytes
 }
 
+// os.cpus().times é cumulativo desde o boot, não dá % direto - amostra 2 leituras com um
+// intervalo curto e tira a fração de tempo ocioso do delta, por núcleo (mesma técnica do "top"/
+// "mpstat"). 200ms é imperceptível num endpoint admin-only polado a cada 30s (ver useDashboardInfra).
+function cpuTimesSnapshot() {
+    return os.cpus().map((c) => ({
+        idle: c.times.idle,
+        total: c.times.user + c.times.nice + c.times.sys + c.times.idle + c.times.irq,
+    }))
+}
+
+async function getPerCoreUsage(sampleMs = 200): Promise<number[]> {
+    const start = cpuTimesSnapshot()
+    await new Promise((resolve) => setTimeout(resolve, sampleMs))
+    const end = cpuTimesSnapshot()
+    return start.map((s, i) => {
+        const idleDelta = end[i]!.idle - s.idle
+        const totalDelta = end[i]!.total - s.total
+        if (totalDelta <= 0) return 0
+        return Math.max(0, Math.min(1, 1 - idleDelta / totalDelta))
+    })
+}
+
 export const getDashboardInfra = async () => {
-    const [disk, recordingsSizeBytes, logsSizeBytes] = await Promise.all([
+    const [disk, recordingsSizeBytes, logsSizeBytes, perCoreUsedPct] = await Promise.all([
         getDiskUsage(),
         getRecordingsSize(),
         getLogsSize(),
+        getPerCoreUsage(),
     ])
     const totalBytes = os.totalmem()
     const freeBytes = os.freemem()
     const loadAvg = os.loadavg()
 
     return {
-        cpu: { loadAvg1: loadAvg[0], loadAvg5: loadAvg[1], loadAvg15: loadAvg[2], cores: os.cpus().length },
+        cpu: {
+            loadAvg1: loadAvg[0], loadAvg5: loadAvg[1], loadAvg15: loadAvg[2],
+            cores: os.cpus().length,
+            perCoreUsedPct,
+        },
         memory: { totalBytes, freeBytes, usedPct: (totalBytes - freeBytes) / totalBytes },
         disk,
         recordings: { sizeBytes: recordingsSizeBytes },

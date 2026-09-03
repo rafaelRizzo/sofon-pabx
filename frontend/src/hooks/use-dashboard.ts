@@ -15,7 +15,13 @@ export type DashboardOverview = {
 }
 
 export type DashboardInfra = {
-    cpu: { loadAvg1: number; loadAvg5: number; loadAvg15: number; cores: number }
+    cpu: {
+        loadAvg1: number
+        loadAvg5: number
+        loadAvg15: number
+        cores: number
+        perCoreUsedPct: number[]
+    }
     memory: { totalBytes: number; freeBytes: number; usedPct: number }
     disk: { totalBytes: number; usedBytes: number; freeBytes: number; usedPct: number }
     recordings: { sizeBytes: number }

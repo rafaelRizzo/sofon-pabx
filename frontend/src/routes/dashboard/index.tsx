@@ -3,7 +3,6 @@ import { createFileRoute } from "@tanstack/react-router"
 import { DashboardInfraCards } from "@/components/Dashboard/dashboard-infra-cards"
 import { DashboardOverviewCards } from "@/components/Dashboard/dashboard-overview-cards"
 import { DashboardRecentCalls } from "@/components/Dashboard/dashboard-recent-calls"
-import { DashboardRecentLogs } from "@/components/Dashboard/dashboard-recent-logs"
 import { DashboardTrunksStatus } from "@/components/Dashboard/dashboard-trunks-status"
 import { CompanyFilter } from "@/components/company-filter"
 import { FilterBar } from "@/components/filter-bar"
@@ -59,9 +58,6 @@ function DashboardPage() {
         )}
         {hasPermission("trunks") && (
           <DashboardTrunksStatus companyId={companyId} />
-        )}
-        {hasPermission("audit-logs") && (
-          <DashboardRecentLogs companyId={companyId} />
         )}
       </div>
     </div>

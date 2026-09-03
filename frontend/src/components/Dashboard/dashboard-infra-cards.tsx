@@ -92,6 +92,29 @@ export function DashboardInfraCards({ infra, loading }: Props) {
                     load avg 5m {infra?.cpu.loadAvg5.toFixed(2) ?? "-"} · 15m{" "}
                     {infra?.cpu.loadAvg15.toFixed(2) ?? "-"}
                 </CardDescription>
+                {infra && infra.cpu.perCoreUsedPct.length > 0 && (
+                    <div className="mt-2 grid grid-cols-4 gap-1">
+                        {infra.cpu.perCoreUsedPct.map((pct, i) => (
+                            <div
+                                key={i}
+                                className="flex flex-col gap-0.5 rounded bg-muted px-1.5 py-1"
+                            >
+                                <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                                    <span>C{i}</span>
+                                    <span
+                                        className={cn(
+                                            "font-mono tabular-nums",
+                                            usagePctClass(pct)
+                                        )}
+                                    >
+                                        {Math.round(pct * 100)}%
+                                    </span>
+                                </div>
+                                <UsageBar pct={pct} />
+                            </div>
+                        ))}
+                    </div>
+                )}
             </InfraTile>
 
             <InfraTile label="Memória" icon={MemoryStickIcon} loading={loading}>
