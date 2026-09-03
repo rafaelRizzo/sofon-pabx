@@ -1,5 +1,7 @@
 import { prisma } from '../../lib/prisma'
 import { AppError } from '../../utils/errors/app.error'
+import { logger } from '../../utils/logger'
+import { runAmiCommand } from '../transport/ami-client'
 
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 
@@ -79,6 +81,35 @@ const aorExtrasOf = (opts: TrunkAdvancedOpts) => {
     if (opts.qualifyFrequency !== undefined) extras.qualify_frequency = opts.qualifyFrequency
     if (opts.qualifyTimeout !== undefined) extras.qualify_timeout = opts.qualifyTimeout
     return extras
+}
+
+// ps_registrations só é lido pelo módulo na carga/reload - diferente de ps_endpoints/ps_aors/
+// ps_identifies, que o Asterisk resolve on-demand via Realtime a cada request. Sem isso, criar/
+// ativar uma trunk outbound nunca chega a instanciar o cliente de REGISTER (fica só a linha no
+// banco, sem nenhum pacote saindo), e desativar deixa o cliente antigo rodando em memória até o
+// próximo reload/retry natural. `module reload` (não `pjsip reload` inteiro) recarrega só esse
+// módulo - não derruba ps_endpoints/ps_aors/ps_identifies de nenhuma outra trunk da mesma instância.
+const REGISTRATION_RELOAD_DEBOUNCE_MS = 500
+let pendingRegistrationReload: Promise<void> | null = null
+
+export function reloadOutboundRegistrations(): Promise<void> {
+    if (pendingRegistrationReload) return pendingRegistrationReload
+    pendingRegistrationReload = new Promise((resolve) => {
+        setTimeout(async () => {
+            try {
+                await runAmiCommand('module reload res_pjsip_outbound_registration.so')
+            } catch (error) {
+                logger.warn({
+                    event: 'pjsip.registration.reload.failed',
+                    error: error instanceof Error ? error.message : String(error),
+                })
+            } finally {
+                pendingRegistrationReload = null
+                resolve()
+            }
+        }, REGISTRATION_RELOAD_DEBOUNCE_MS)
+    })
+    return pendingRegistrationReload
 }
 
 export const PjsipRepository = {

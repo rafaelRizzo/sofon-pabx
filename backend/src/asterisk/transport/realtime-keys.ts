@@ -8,6 +8,7 @@ export const extKey = (number: string) => `rt:ext:${number}`
 export const extCallsKey = (number: string) => `rt:ext:calls:${number}`
 export const callKey = (uniqueid: string) => `rt:call:${uniqueid}`
 export const trunkKey = (astId: string) => `rt:trunk:${astId}`
+export const trunkCallsKey = (astId: string) => `rt:trunk:calls:${astId}`
 export const queueMembersKey = (queueName: string) => `rt:queue:members:${queueName}`
 export const queueWaitingKey = (queueName: string) => `rt:queue:waiting:${queueName}`
 export const bridgeMembersKey = (bridgeUniqueid: string) => `rt:bridge:${bridgeUniqueid}`

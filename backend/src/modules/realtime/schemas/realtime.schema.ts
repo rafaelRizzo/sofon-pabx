@@ -26,6 +26,28 @@ const extensionStatusSchema = z.object({
     activeCalls: z.array(activeCallSchema),
 })
 
+// Qualidade de rede por perna de canal - equivalente ao `pjsip show channelstats` do CLI, via
+// RTCPSent/RTCPReceived nativo (ver handleRtcpStats em ami-events.ts). Unidades de jitter são as
+// nativas do RTP (timestamp units, dependem do clock rate do codec - 8kHz pra ulaw/alaw/g729,
+// 48kHz fixo pro Opus por RFC 7587), não convertidas pra ms aqui por não termos o codec da
+// chamada disponível neste evento.
+const callNetworkQualitySchema = z.object({
+    rxJitterUnits: z.number().nullable(),
+    rxLostPct: z.number().nullable(),
+    txJitterUnits: z.number().nullable(),
+    txLostPct: z.number().nullable(),
+    rttSeconds: z.number().nullable(),
+    updatedAt: z.number(),
+})
+
+const trunkActiveCallSchema = z.object({
+    uniqueid: z.string(),
+    callerNum: z.string(),
+    startAt: z.number().nullable(),
+    // null enquanto o primeiro par de RTCP ainda não chegou (~5s após atender, rtcpinterval)
+    network: callNetworkQualitySchema.nullable(),
+})
+
 const trunkStatusSchema = z.object({
     id: z.string(),
     name: z.string(),
@@ -34,6 +56,7 @@ const trunkStatusSchema = z.object({
     registrationMode: z.string(),
     presence: presenceEnum,
     expirySeconds: z.number().nullable(),
+    activeCalls: z.array(trunkActiveCallSchema),
 })
 
 const queueMemberStatusSchema = z.object({

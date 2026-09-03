@@ -33,7 +33,7 @@ describe('InboundRouteRepository dialplan shape', () => {
 
         const { data } = tx.extensions.createMany.mock.calls[0][0]
         expect(data.map((d: any) => d.app)).toEqual([
-            'Set', 'Set', 'Set', 'Set', 'Set', 'Answer', 'Set', 'MixMonitor', 'Set', 'Goto',
+            'Set', 'Set', 'Set', 'Set', 'Set', 'Answer', 'Wait', 'Set', 'MixMonitor', 'Set', 'Goto',
         ])
         expect(data).toContainEqual(
             expect.objectContaining({ app: 'Set', appdata: '__TRANSFER_CONTEXT=transfer' })

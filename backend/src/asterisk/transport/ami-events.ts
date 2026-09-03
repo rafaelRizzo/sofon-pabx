@@ -7,7 +7,7 @@ import { emitRealtimeChange } from './realtime-bus'
 import { recordJoin, recordAgentConnect, recordAnswered, recordAbandoned } from '../../modules/queue-calls/queue-calls.service'
 import {
     STATUS_TTL_SECONDS, CALL_TTL_SECONDS, HOLDTIME_TTL_SECONDS,
-    extKey, extCallsKey, callKey, trunkKey, queueMembersKey, queueWaitingKey, bridgeMembersKey, queueHoldtimeKey,
+    extKey, extCallsKey, callKey, trunkKey, trunkCallsKey, queueMembersKey, queueWaitingKey, bridgeMembersKey, queueHoldtimeKey,
 } from './realtime-keys'
 
 // Conexão AMI PERSISTENTE com eventos (Events: on) - popula o cache de estado ao vivo em Redis
@@ -152,7 +152,12 @@ async function handleNewchannel(block: AmiBlock) {
     await redisClient.expire(callKey(block.Uniqueid), CALL_TTL_SECONDS)
 
     const number = extensionNumberFromChannel(block.Channel)
-    if (number && !isTrunkId(number)) {
+    if (!number) return
+    if (isTrunkId(number)) {
+        await redisClient.sAdd(trunkCallsKey(number), block.Uniqueid)
+        await redisClient.expire(trunkCallsKey(number), CALL_TTL_SECONDS)
+        emitRealtimeChange('trunk')
+    } else {
         await redisClient.sAdd(extCallsKey(number), block.Uniqueid)
         emitRealtimeChange('extension')
     }
@@ -178,9 +183,12 @@ async function handleDialBegin(block: AmiBlock) {
 async function handleHangup(block: AmiBlock) {
     if (!block.Uniqueid) return
     const number = block.Channel ? extensionNumberFromChannel(block.Channel) : null
-    if (number && !isTrunkId(number)) await redisClient.sRem(extCallsKey(number), block.Uniqueid)
+    if (number) {
+        if (isTrunkId(number)) await redisClient.sRem(trunkCallsKey(number), block.Uniqueid)
+        else await redisClient.sRem(extCallsKey(number), block.Uniqueid)
+    }
     await redisClient.del(callKey(block.Uniqueid))
-    emitRealtimeChange('extension')
+    emitRealtimeChange(number && isTrunkId(number) ? 'trunk' : 'extension')
 }
 
 // "Quem fala com quem" rastreado só par a par via bridge - sem tentar reconstruir topologia N-way
@@ -205,6 +213,41 @@ async function handleBridgeLeave(block: AmiBlock) {
     await redisClient.sRem(bridgeMembersKey(block.BridgeUniqueid), block.Uniqueid)
     await redisClient.hDel(callKey(block.Uniqueid), 'bridgedWith')
     emitRealtimeChange('extension')
+}
+
+// Qualidade de rede por perna de canal (jitter/perda/RTT) - equivalente ao `pjsip show
+// channelstats` do CLI, mas via evento nativo em vez de parsear texto do CLI por AMI Command.
+// Precisa de rtcpevents=yes em rtp.conf (default do Asterisk é 'no'), ver setups/install-asterisk.sh.
+// RTCPSent é o pacote que O PRÓPRIO Asterisk manda pro outro lado - o ReportBlock embutido nele é a
+// NOSSA leitura de qualidade do que ESTAMOS RECEBENDO (jitter/perda do áudio de entrada, calculado
+// aqui pelo receptor). RTCPReceived é o pacote que o OUTRO lado mandou - o ReportBlock dele é a
+// leitura DELES sobre o que ESTAMOS ENVIANDO (jitter/perda/RTT da nossa saída, do ponto de vista do
+// destino) - RTT só existe nesse evento (LSR/DLSR referencia nosso Sender Report anterior, só dá
+// pra calcular quando a resposta chega). Campos confirmados via AMI_DEBUG contra Asterisk 22.10.1
+// real em produção (srv1489463) - nomes variam entre versões, não assumir sem checar de novo.
+async function handleRtcpStats(block: AmiBlock, direction: 'rx' | 'tx') {
+    if (!block.Uniqueid || !block.Channel) return
+    const fractionLost = Number(block.Report0FractionLost)
+    const jitterUnits = Number(block.Report0IAJitter)
+    if (!Number.isFinite(fractionLost) || !Number.isFinite(jitterUnits)) return
+
+    const key = callKey(block.Uniqueid)
+    // canal já desligou (Hangup processado antes deste RTCP tardio) - não recriar um hash fantasma
+    // só com dado de rede, sem channel/callerNum, que ficaria solto até o TTL de 4h
+    if (!(await redisClient.exists(key))) return
+
+    const update: Record<string, string> = {
+        [`${direction}LostPct`]: ((fractionLost / 256) * 100).toFixed(2),
+        [`${direction}JitterUnits`]: String(jitterUnits),
+        netUpdatedAt: String(Date.now()),
+    }
+    if (direction === 'tx' && block.RTT) update.rttSeconds = block.RTT
+
+    await redisClient.hSet(key, update)
+    await redisClient.expire(key, CALL_TTL_SECONDS)
+
+    const number = extensionNumberFromChannel(block.Channel)
+    emitRealtimeChange(number && isTrunkId(number) ? 'trunk' : 'extension')
 }
 
 async function patchQueueMember(queueName: string, iface: string, patch: Record<string, unknown>) {
@@ -352,6 +395,8 @@ async function routeEvent(block: AmiBlock): Promise<void> {
         case 'Hangup': return handleHangup(block)
         case 'BridgeEnter': return handleBridgeEnter(block)
         case 'BridgeLeave': return handleBridgeLeave(block)
+        case 'RTCPSent': return handleRtcpStats(block, 'rx')
+        case 'RTCPReceived': return handleRtcpStats(block, 'tx')
         case 'QueueMemberStatus': return handleQueueMemberStatus(block)
         case 'QueueMemberPause': return handleQueueMemberPause(block)
         case 'QueueMemberAdded': return handleQueueMemberAdded(block)
@@ -504,16 +549,18 @@ async function hydratePjsipRegistrations(items: AmiBlock[]) {
 // este processo subiu (sem Newchannel correspondente capturado).
 async function hydrateCoreChannels(items: AmiBlock[]) {
     const liveUniqueids = new Set<string>()
-    let changed = false
+    let extChanged = false
+    let trunkChanged = false
 
     for (const item of items) {
         if (item.Event !== 'CoreShowChannel' || !item.Channel || !item.Uniqueid) continue
         liveUniqueids.add(item.Uniqueid)
 
         const number = extensionNumberFromChannel(item.Channel)
-        if (!number || isTrunkId(number)) continue
+        if (!number) continue
+        const trunk = isTrunkId(number)
 
-        await redisClient.sAdd(extCallsKey(number), item.Uniqueid)
+        await redisClient.sAdd(trunk ? trunkCallsKey(number) : extCallsKey(number), item.Uniqueid)
         const exists = await redisClient.exists(callKey(item.Uniqueid))
         if (!exists) {
             await redisClient.hSet(callKey(item.Uniqueid), {
@@ -522,7 +569,8 @@ async function hydrateCoreChannels(items: AmiBlock[]) {
                 exten: item.Exten ?? '',
                 startAt: String(Date.now()),
             })
-            changed = true
+            if (trunk) trunkChanged = true
+            else extChanged = true
         }
         await redisClient.expire(callKey(item.Uniqueid), CALL_TTL_SECONDS)
     }
@@ -534,10 +582,21 @@ async function hydrateCoreChannels(items: AmiBlock[]) {
         if (stale.length === 0) continue
         await redisClient.sRem(key, stale)
         for (const u of stale) await redisClient.del(callKey(u))
-        changed = true
+        extChanged = true
     }
 
-    if (changed) emitRealtimeChange('extension')
+    const trackedTrunkKeys = await redisClient.keys('rt:trunk:calls:*')
+    for (const key of trackedTrunkKeys) {
+        const tracked = await redisClient.sMembers(key)
+        const stale = tracked.filter((u) => !liveUniqueids.has(u))
+        if (stale.length === 0) continue
+        await redisClient.sRem(key, stale)
+        for (const u of stale) await redisClient.del(callKey(u))
+        trunkChanged = true
+    }
+
+    if (extChanged) emitRealtimeChange('extension')
+    if (trunkChanged) emitRealtimeChange('trunk')
 }
 
 async function hydrateSnapshot(kind: SnapshotKind, items: AmiBlock[]): Promise<void> {

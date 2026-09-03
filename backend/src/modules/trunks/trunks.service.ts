@@ -3,7 +3,7 @@ import { prisma } from '../../lib/prisma'
 import { getCompanyById } from '../companies/companies.service'
 import { TrunksCache } from './cache/trunks.cache'
 import type { CreateTrunkInput, UpdateTrunkInput } from './schemas/trunk.schema'
-import { PjsipRepository } from '../../asterisk/pjsip.repository'
+import { PjsipRepository, reloadOutboundRegistrations } from '../../asterisk/pjsip.repository'
 import { IaxRepository } from '../../asterisk/iax.repository'
 import { InboundRouteRepository, TRUNK_ENTRY_CONTEXT } from '../../asterisk/inboundroute.repository'
 import { FlowEdgeRepository } from '../../asterisk/flow-edge.repository'
@@ -220,6 +220,7 @@ export const createTrunk = async (data: CreateTrunkInput) => {
     })
     await TrunksCache.invalidateAllTrunks()
     await TrunksCache.setTrunk(created!.id, created!)
+    if (data.type !== 'iax' && data.registrationMode === 'outbound') void reloadOutboundRegistrations()
     return created!
 }
 
@@ -337,6 +338,7 @@ export const updateTrunk = async (id: string, data: UpdateTrunkInput) => {
     await TrunksCache.invalidateTrunk(id)
     await TrunksCache.invalidateByCompany(existing.companyId)
     await TrunksCache.invalidateAllTrunks()
+    if (existing.type !== 'iax' && existing.registrationMode === 'outbound') void reloadOutboundRegistrations()
     return getTrunkById(id)
 }
 
@@ -412,6 +414,7 @@ export const setTrunkActive = async (id: string, active: boolean) => {
     await TrunksCache.invalidateTrunk(id)
     await TrunksCache.invalidateByCompany(existing.companyId)
     await TrunksCache.invalidateAllTrunks()
+    if (existing.type !== 'iax' && existing.registrationMode === 'outbound') void reloadOutboundRegistrations()
     return getTrunkById(id)
 }
 

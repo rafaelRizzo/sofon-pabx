@@ -5,7 +5,7 @@ import { getCompanyById } from '../companies/companies.service'
 import { toAsteriskId } from '../trunks/trunks.service'
 import { toAsteriskQueueName, toAsteriskInterface } from '../../asterisk/queue.repository'
 import { isTrunkId, extensionNumberFromChannel } from '../../asterisk/ami-events'
-import { extKey, extCallsKey, callKey, trunkKey, queueMembersKey, queueWaitingKey, queueHoldtimeKey } from '../../asterisk/realtime-keys'
+import { extKey, extCallsKey, callKey, trunkKey, trunkCallsKey, queueMembersKey, queueWaitingKey, queueHoldtimeKey } from '../../asterisk/realtime-keys'
 
 const TZ = process.env.TZ || 'America/Sao_Paulo'
 
@@ -137,13 +137,43 @@ export const getTrunksStatus = async (companyIds?: string[]) => {
 
     return Promise.all(trunks.map(async (trunk) => {
         const astId = toAsteriskId(asteriskIdByCompany.get(trunk.companyId)!, trunk.name)
-        const status = await safeHGetAll(trunkKey(astId))
+        const [status, callUniqueids] = await Promise.all([
+            safeHGetAll(trunkKey(astId)),
+            safeSMembers(trunkCallsKey(astId)),
+        ])
+
+        const activeCallsRaw = await Promise.all(callUniqueids.map(async (uniqueid) => {
+            const call = await safeHGetAll(callKey(uniqueid))
+            if (Object.keys(call).length === 0) return null
+            const hasNetwork = call.netUpdatedAt !== undefined
+            return {
+                uniqueid,
+                callerNum: call.callerNum ?? '',
+                startAt: call.startAt ? Number(call.startAt) : null,
+                // rx = qualidade do que o Asterisk está RECEBENDO desse tronco (jitter/perda medidos
+                // aqui); tx = qualidade do que o Asterisk está ENVIANDO, do ponto de vista do
+                // destino (relatada por eles) + RTT - ver handleRtcpStats em ami-events.ts. null
+                // enquanto o primeiro par de RTCP ainda não chegou (~5s após atender, rtcpinterval).
+                network: hasNetwork ? {
+                    rxJitterUnits: call.rxJitterUnits ? Number(call.rxJitterUnits) : null,
+                    rxLostPct: call.rxLostPct ? Number(call.rxLostPct) : null,
+                    txJitterUnits: call.txJitterUnits ? Number(call.txJitterUnits) : null,
+                    txLostPct: call.txLostPct ? Number(call.txLostPct) : null,
+                    rttSeconds: call.rttSeconds ? Number(call.rttSeconds) : null,
+                    updatedAt: Number(call.netUpdatedAt),
+                } : null,
+            }
+        }))
+        // órfão: uniqueid ainda no set mas o hash já expirou/sumiu (Hangup perdido) - descarta na leitura
+        const activeCalls = activeCallsRaw.filter((c): c is NonNullable<typeof c> => c !== null)
+
         return {
             ...trunk,
             presence: status.presence === 'online' || status.presence === 'offline' ? status.presence : 'unknown',
             // Intervalo de registro configurado (segundos) - só existe pra troncos outbound PJSIP
             // com registro (ver hydratePjsipRegistrations em ami-events.ts); null pros demais
             expirySeconds: status.expirySeconds ? Number(status.expirySeconds) : null,
+            activeCalls,
         }
     }))
 }

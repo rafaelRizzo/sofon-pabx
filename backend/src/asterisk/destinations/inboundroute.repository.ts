@@ -71,6 +71,10 @@ function buildInboundEntries(
     }
 
     push('Answer', null)
+    // RTP ainda não estabilizou logo após o Answer - qualquer app que já toque áudio na sequência
+    // (Playback do IVR/Announcement, MOH da Queue) corta o começo do primeiro frame sem essa
+    // pausa. 3s cobre o handshake do canal de mídia com a operadora antes de qualquer coisa tocar.
+    push('Wait', '3')
     // Grava desde a entrada - mesmo padrão de dialplan.repository.ts (ramais/internal), só que
     // sem alias de ramal: usa o número do DID discado como identificador no nome do arquivo
     push('Set', `MIXMONITOR_FILENAME=${mixmonitorFilename}`)

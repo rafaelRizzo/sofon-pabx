@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-# INSTALADOR SOFON PBX v7.12 - PJSIP + IAX2 (sem Docker, sem chan_sip)
+# INSTALADOR SOFON PBX v7.13 - PJSIP + IAX2 (sem Docker, sem chan_sip)
 # Debian 11+ | Ubuntu 24.04+ | Asterisk 22.7.0 LTS
 # ============================================================
 
@@ -407,12 +407,16 @@ show_header
 show_progress 10 14 "Criando configurações"
 
 # rtp.conf
+# rtcpevents=yes: emite RTCPSent/RTCPReceived no AMI (jitter/packet loss/RTT por canal em
+# chamada) - default do Asterisk é 'no', sem isso o backend não tem como popular qualidade de
+# rede em tempo real (ver src/asterisk/transport/ami-events.ts)
 cat > /etc/asterisk/rtp.conf << 'EOF'
 [general]
 rtpstart=10000
 rtpend=20000
 strictrtp=yes
 probation=4
+rtcpevents=yes
 EOF
 
 # http.conf - servidor HTTP embutido do Asterisk, usado só pelo WebSocket do WebRTC (res_http_websocket

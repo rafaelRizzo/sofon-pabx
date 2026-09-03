@@ -38,6 +38,27 @@ export type RealtimeExtension = {
     activeCalls: RealtimeActiveCall[]
 }
 
+// Qualidade de rede por perna de canal - equivalente ao `pjsip show channelstats` do CLI, via
+// RTCPSent/RTCPReceived nativo do Asterisk (ver handleRtcpStats em ami-events.ts, backend).
+// Unidades de jitter são as nativas do RTP (timestamp units), não convertidas pra ms - o backend
+// não tem o codec da chamada disponível nesse evento pra fazer a conversão correta.
+export type RealtimeCallNetworkQuality = {
+    rxJitterUnits: number | null
+    rxLostPct: number | null
+    txJitterUnits: number | null
+    txLostPct: number | null
+    rttSeconds: number | null
+    updatedAt: number
+}
+
+export type RealtimeTrunkActiveCall = {
+    uniqueid: string
+    callerNum: string
+    startAt: number | null
+    // null enquanto o primeiro par de RTCP ainda não chegou (~5s após atender)
+    network: RealtimeCallNetworkQuality | null
+}
+
 export type RealtimeTrunk = {
     id: string
     name: string
@@ -47,6 +68,7 @@ export type RealtimeTrunk = {
     presence: Presence
     // Intervalo de registro configurado (segundos) - só existe pra troncos outbound com registro
     expirySeconds: number | null
+    activeCalls: RealtimeTrunkActiveCall[]
 }
 
 export type RealtimeQueueMember = {
