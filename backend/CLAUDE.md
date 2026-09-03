@@ -250,6 +250,7 @@ Essa VPS **não** usa `network_mode: host` - os containers do backend (worker + 
 - outbound: `{ name, companyId, type(sip|pjsip), host, username, password, context?, codecs? }`
 - inbound: todos opcionais exceto name/companyId/type
 - Update: `{ host?, username?, password?, context?, codecs? }`
+- `PATCH /:id/active`: `{ active: boolean }` - toggle que preserva `Trunk` e todas as associações (InboundRoute/OutboundRouteTrunk) no Postgres, mas mexe no Asterisk: `active:false` apaga o endpoint/friend (`ps_endpoints`/`ps_auths`/`ps_aors`/`ps_registrations`/`ps_identifies` ou `iax_friends`) - sem REGISTER, sem inbound, sem outbound (Dial() de outbound route pra um trunk inativo simplesmente falha e cai no próximo da cadeia via `GotoIf DIALSTATUS` já existente, sem precisar excluir o trunk da rota). `active:true` recria o endpoint com os mesmos dados salvos (host/username/password/codecs/etc). Trunk `registrationMode:"custom"` não tem endpoint algum, então o toggle é só a coluna no banco. Idempotente (chamar com o mesmo estado é no-op)
 
 **Outbound Routes** - `{ id, name, companyId, position, patterns[], trunks[], extensions[], createdAt, updatedAt }`
 - Create: `{ name, companyId, position?, patterns?[{pattern, prefix?, prepend?}], trunkIds?[] }`

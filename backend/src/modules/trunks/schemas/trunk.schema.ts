@@ -138,6 +138,8 @@ export const updateTrunkSchema = z.object({
     context: customTrunkContextSchema.optional(),
 })
 
+export const setTrunkActiveSchema = z.object({ active: z.boolean() })
+
 export const trunkIdParamSchema = z.object({ id: z.cuid2() })
 export const trunkQuerySchema = z.object({ companyId: z.cuid2() })
 
@@ -150,6 +152,7 @@ export const TrunkSchema = z.object({
     companyId: z.string(),
     type: z.enum(['pjsip', 'iax']),
     registrationMode: z.enum(['outbound', 'inbound', 'custom']),
+    active: z.boolean(),
     identifyBy: z.enum(['ip', 'username']).nullable(),
     host: z.string().nullable(),
     port: z.number().nullable(),
@@ -186,3 +189,4 @@ export const ListTrunksResponse = ok({ message: z.string(), trunks: z.array(Trun
 export const GetTrunkResponse = ok({ message: z.string(), trunk: TrunkSchema })
 export const CreateTrunkResponse = ok({ message: z.string(), trunk: TrunkSchema })
 export const UpdateTrunkResponse = ok({ message: z.string(), trunk: TrunkSchema })
+export const SetTrunkActiveResponse = ok({ message: z.string(), trunk: TrunkSchema })

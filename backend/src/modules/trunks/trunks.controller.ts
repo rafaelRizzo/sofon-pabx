@@ -1,6 +1,8 @@
 import type { FastifyRequest, FastifyReply } from 'fastify'
 import * as TrunksService from './trunks.service'
-import { createTrunkSchema, updateTrunkSchema, trunkIdParamSchema, trunkQuerySchema } from './schemas/trunk.schema'
+import {
+    createTrunkSchema, updateTrunkSchema, setTrunkActiveSchema, trunkIdParamSchema, trunkQuerySchema,
+} from './schemas/trunk.schema'
 import { handleError } from '../../utils/errors/handler.error'
 import { AppError } from '../../utils/errors/app.error'
 import { prisma } from '../../lib/prisma'
@@ -61,6 +63,20 @@ export const updateTrunk = async (req: FastifyRequest, reply: FastifyReply) => {
         req.scope.assertAccess(owner.companyId)
         const trunk = await TrunksService.updateTrunk(id, data)
         return reply.send({ success: true, message: 'Trunk updated successfully', trunk })
+    } catch (error) {
+        return handleError(reply, error, req)
+    }
+}
+
+export const setTrunkActive = async (req: FastifyRequest, reply: FastifyReply) => {
+    try {
+        const { id } = trunkIdParamSchema.parse(req.params)
+        const { active } = setTrunkActiveSchema.parse(req.body)
+        const owner = await prisma.trunk.findUnique({ where: { id }, select: { companyId: true } })
+        if (!owner) throw new AppError('Trunk not found', 404)
+        req.scope.assertAccess(owner.companyId)
+        const trunk = await TrunksService.setTrunkActive(id, active)
+        return reply.send({ success: true, message: `Trunk ${active ? 'ativado' : 'desativado'} com sucesso`, trunk })
     } catch (error) {
         return handleError(reply, error, req)
     }

@@ -222,6 +222,9 @@ model Trunk {
   company           Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
   type              String               @default("pjsip") @db.VarChar(10) // "pjsip" | "iax"
   registrationMode  String               @db.VarChar(10)
+  // false = credenciais/config preservadas no banco, mas sem endpoint/friend no Asterisk — sem
+  // REGISTER, sem inbound, sem outbound. true (default) recria o endpoint (ver trunks.service.ts)
+  active            Boolean              @default(true)
   identifyBy        String?              @db.VarChar(10) // "ip" | "username" — só p/ registrationMode inbound
   host              String?              @db.VarChar(255)
   port              Int?

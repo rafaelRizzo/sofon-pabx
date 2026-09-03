@@ -5,8 +5,8 @@ import * as TrunksController from './trunks.controller'
 import { protectedRoute } from '../../middleware/scope.middleware'
 import { requirePermission } from '../../middleware/permission.middleware'
 import {
-    createTrunkSchema, updateTrunkSchema, trunkIdParamSchema, trunkQuerySchema,
-    ListTrunksResponse, GetTrunkResponse, CreateTrunkResponse, UpdateTrunkResponse,
+    createTrunkSchema, updateTrunkSchema, setTrunkActiveSchema, trunkIdParamSchema, trunkQuerySchema,
+    ListTrunksResponse, GetTrunkResponse, CreateTrunkResponse, UpdateTrunkResponse, SetTrunkActiveResponse,
 } from './schemas/trunk.schema'
 import { errors, deleted } from '../../schemas/responses'
 
@@ -80,6 +80,24 @@ export const trunksRoutes = async (app: FastifyInstance) => {
             },
         },
     }, TrunksController.updateTrunk as any)
+
+    router.patch('/trunks/:id/active', {
+        onRequest: [...protectedRoute, requirePermission('trunks', 'manage')],
+        schema: {
+            tags: ['Trunks'],
+            summary: 'Ativar/desativar trunk',
+            description: 'active=false apaga o endpoint/friend no Asterisk (sem REGISTER, sem inbound, sem outbound), preservando a config. active=true recria o endpoint.',
+            security: [{ bearerAuth: [] }],
+            params: trunkIdParamSchema,
+            body: setTrunkActiveSchema,
+            response: {
+                200: SetTrunkActiveResponse,
+                401: errors[401],
+                403: errors[403],
+                404: errors[404],
+            },
+        },
+    }, TrunksController.setTrunkActive as any)
 
     router.delete('/trunks/:id', {
         onRequest: [...protectedRoute, requirePermission('trunks', 'manage')],

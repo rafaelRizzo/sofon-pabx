@@ -25,6 +25,7 @@ const trunkSelect = {
     companyId: true,
     type: true,
     registrationMode: true,
+    active: true,
     identifyBy: true,
     host: true,
     port: true,
@@ -332,6 +333,81 @@ export const updateTrunk = async (id: string, data: UpdateTrunkInput) => {
             }
         }
     })
+
+    await TrunksCache.invalidateTrunk(id)
+    await TrunksCache.invalidateByCompany(existing.companyId)
+    await TrunksCache.invalidateAllTrunks()
+    return getTrunkById(id)
+}
+
+// Desativar apaga o endpoint/friend no Asterisk (sem REGISTER, sem inbound, sem outbound) mas
+// preserva o registro Trunk e todas as associações (InboundRoute/OutboundRouteTrunk) - reativar
+// recria o endpoint com os mesmos dados salvos, sem precisar reconfigurar nada
+export const setTrunkActive = async (id: string, active: boolean) => {
+    const existing = await prisma.trunk.findUnique({
+        where: { id },
+        include: { company: { select: { asteriskId: true } } },
+    })
+    if (!existing) throw new AppError('Trunk not found', 404)
+    if (existing.active === active) return getTrunkById(id)
+
+    if (existing.registrationMode === 'custom') {
+        await prisma.trunk.update({ where: { id }, data: { active } })
+    } else {
+        const astId = toAsteriskId(existing.company.asteriskId, existing.name)
+        const endpointId = existing.identifyBy === 'username' && existing.username ? existing.username : astId
+        const identifyBy = existing.identifyBy as 'ip' | 'username' | null
+
+        await prisma.$transaction(async (tx) => {
+            if (!active) {
+                if (existing.type === 'iax') await IaxRepository.deleteTrunk(tx, endpointId)
+                else await PjsipRepository.deleteTrunk(tx, astId, existing.registrationMode, endpointId)
+            } else if (existing.type === 'iax') {
+                await IaxRepository.createTrunk(tx, astId, {
+                    username: existing.username ?? undefined,
+                    password: existing.password ?? undefined,
+                    context: existing.context,
+                    codecs: existing.codecs,
+                    registrationMode: existing.registrationMode,
+                    identifyBy,
+                    host: existing.host ?? undefined,
+                    setvar: `TRUNKID=${id}`,
+                    accountcode: existing.company.asteriskId,
+                    qualify: existing.qualify,
+                    trunkMode: existing.trunkMode,
+                    encryption: existing.encryption,
+                    transfer: existing.transfer,
+                    jitterbuffer: existing.jitterbuffer,
+                })
+            } else {
+                await PjsipRepository.createTrunk(tx, astId, {
+                    username: existing.username ?? undefined,
+                    password: existing.password ?? undefined,
+                    context: existing.context,
+                    codecs: existing.codecs,
+                    registrationMode: existing.registrationMode,
+                    identifyBy,
+                    host: existing.host ?? undefined,
+                    port: existing.port,
+                    setvar: `TRUNKID=${id}`,
+                    accountcode: existing.company.asteriskId,
+                    transport: existing.transport,
+                    dtmfMode: existing.dtmfMode,
+                    directMedia: existing.directMedia,
+                    qualifyFrequency: existing.qualifyFrequency,
+                    qualifyTimeout: existing.qualifyTimeout,
+                    outboundProxy: existing.outboundProxy,
+                    iceSupport: existing.iceSupport,
+                    rel: existing.rel,
+                    timers: existing.timers,
+                    timersMinSe: existing.timersMinSe,
+                    timersSessExpires: existing.timersSessExpires,
+                    sendDiversion: existing.sendDiversion,
+                })
+            }
+            await tx.trunk.update({ where: { id }, data: { active } })
+        })
+    }
 
     await TrunksCache.invalidateTrunk(id)
     await TrunksCache.invalidateByCompany(existing.companyId)
