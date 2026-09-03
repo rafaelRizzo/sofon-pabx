@@ -2,6 +2,7 @@
 
 import {
     CpuIcon,
+    FileTextIcon,
     HardDriveIcon,
     MicIcon,
     MemoryStickIcon,
@@ -79,7 +80,7 @@ type Props = {
 
 export function DashboardInfraCards({ infra, loading }: Props) {
     return (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
             <InfraTile label="CPU" icon={CpuIcon} loading={loading}>
                 <div className="flex items-baseline justify-between">
                     <span className="font-mono text-xl font-semibold tabular-nums">
@@ -133,6 +134,15 @@ export function DashboardInfraCards({ infra, loading }: Props) {
                 </span>
                 <CardDescription className="mt-1">
                     Total em /var/spool/asterisk/monitor
+                </CardDescription>
+            </InfraTile>
+
+            <InfraTile label="Logs" icon={FileTextIcon} loading={loading}>
+                <span className="font-mono text-xl font-semibold tabular-nums">
+                    {infra ? formatBytes(infra.logs.sizeBytes) : "-"}
+                </span>
+                <CardDescription className="mt-1">
+                    Total em /var/log/asterisk
                 </CardDescription>
             </InfraTile>
         </div>

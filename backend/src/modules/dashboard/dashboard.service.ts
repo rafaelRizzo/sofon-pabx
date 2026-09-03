@@ -55,7 +55,12 @@ export const getDashboardOverview = async (companyIds?: string[]) => {
 const RECORDINGS_DIR = '/var/spool/asterisk/monitor'
 const RECORDINGS_CACHE_MS = 5 * 60 * 1000
 
+// Mesmo path fixo usado em setups/install-asterisk.sh (logger.conf) - messages/full com logrotate
+const LOGS_DIR = '/var/log/asterisk'
+const LOGS_CACHE_MS = 5 * 60 * 1000
+
 let recordingsSizeCache: { bytes: number; at: number } | null = null
+let logsSizeCache: { bytes: number; at: number } | null = null
 
 async function runCommand(cmd: string[], timeoutMs: number): Promise<string> {
     const proc = Bun.spawn(cmd, { stdout: 'pipe', stderr: 'pipe' })
@@ -111,8 +116,25 @@ async function getRecordingsSize(): Promise<number> {
     return bytes
 }
 
+// Mesmo padrão de getRecordingsSize (du recursivo caro, cacheado em memória do processo por
+// 5min - métrica aproximada, sem necessidade de consistência entre réplicas web)
+async function getLogsSize(): Promise<number> {
+    if (logsSizeCache && Date.now() - logsSizeCache.at < LOGS_CACHE_MS) {
+        return logsSizeCache.bytes
+    }
+    const output = await runCommand(['du', '-sb', LOGS_DIR], 30_000)
+    const bytes = Number(output.split(/\s+/)[0])
+    if (!Number.isFinite(bytes)) throw new AppError('Não foi possível interpretar a saída do "du"', 502)
+    logsSizeCache = { bytes, at: Date.now() }
+    return bytes
+}
+
 export const getDashboardInfra = async () => {
-    const [disk, recordingsSizeBytes] = await Promise.all([getDiskUsage(), getRecordingsSize()])
+    const [disk, recordingsSizeBytes, logsSizeBytes] = await Promise.all([
+        getDiskUsage(),
+        getRecordingsSize(),
+        getLogsSize(),
+    ])
     const totalBytes = os.totalmem()
     const freeBytes = os.freemem()
     const loadAvg = os.loadavg()
@@ -122,5 +144,6 @@ export const getDashboardInfra = async () => {
         memory: { totalBytes, freeBytes, usedPct: (totalBytes - freeBytes) / totalBytes },
         disk,
         recordings: { sizeBytes: recordingsSizeBytes },
+        logs: { sizeBytes: logsSizeBytes },
     }
 }

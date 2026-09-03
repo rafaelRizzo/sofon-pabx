@@ -32,6 +32,7 @@ export const DashboardInfraSchema = z.object({
         usedPct: z.number(),
     }),
     recordings: z.object({ sizeBytes: z.number() }),
+    logs: z.object({ sizeBytes: z.number() }),
 })
 
 export const DashboardInfraResponse = ok({ infra: DashboardInfraSchema })

@@ -26,6 +26,8 @@ x-backend-common: &backend-common
     - /etc/asterisk:/etc/asterisk
     - /var/lib/asterisk/sounds:/var/lib/asterisk/sounds
     - /var/spool/asterisk/monitor:/var/spool/asterisk/monitor:ro
+    # Só leitura, pro dashboard medir o tamanho (GET /dashboard/infra, ver dashboard.service.ts)
+    - /var/log/asterisk:/var/log/asterisk:ro
 
 services:
   postgres:
