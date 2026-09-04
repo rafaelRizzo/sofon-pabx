@@ -45,10 +45,14 @@ function DashboardPage() {
 
       <DashboardOverviewCards overview={overview} loading={overviewLoading} />
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <DashboardCallsComparisonChart overview={overview} loading={overviewLoading} />
+      <div className="grid gap-4 lg:grid-cols-3">
+        <div className="lg:col-span-1">
+          <DashboardCallsComparisonChart overview={overview} loading={overviewLoading} />
+        </div>
         {hasPermission("cdr") && (
-          <DashboardCallsByRegionMap companyId={companyId} />
+          <div className="lg:col-span-2">
+            <DashboardCallsByRegionMap companyId={companyId} />
+          </div>
         )}
       </div>
 

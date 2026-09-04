@@ -73,12 +73,12 @@ export function DashboardCallsComparisonChart({ overview, loading }: Props) {
     }))
 
     return (
-        <Card>
+        <Card className="h-full">
             <CardHeader>
                 <CardTitle>Comparativo de chamadas</CardTitle>
                 <CardDescription>Ontem, hoje, mês e ano</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex flex-1 flex-col justify-center">
                 {loading ? (
                     <Skeleton className="h-56 w-full" />
                 ) : (

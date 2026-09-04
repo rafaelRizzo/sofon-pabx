@@ -56,11 +56,11 @@ const DIRECTION_OPTIONS: { value: CallsByRegionDirection; label: string }[] = [
 // Classes escritas por extenso (não montadas por template string) - o scanner do Tailwind lê
 // o texto-fonte literal, uma classe interpolada em runtime (`fill-[${cor}]`) nunca é gerada
 const BUCKETS = [
-    { min: 0.75, fillClass: "fill-[var(--chart-5)]", swatchClass: "bg-[var(--chart-5)]", label: "> 75% do pico" },
-    { min: 0.5, fillClass: "fill-[var(--chart-4)]", swatchClass: "bg-[var(--chart-4)]", label: "50% – 75%" },
-    { min: 0.25, fillClass: "fill-[var(--chart-3)]", swatchClass: "bg-[var(--chart-3)]", label: "25% – 50%" },
-    { min: 0.1, fillClass: "fill-[var(--chart-2)]", swatchClass: "bg-[var(--chart-2)]", label: "10% – 25%" },
-    { min: 0, fillClass: "fill-[var(--chart-1)]", swatchClass: "bg-[var(--chart-1)]", label: "1% – 10%" },
+    { min: 0.75, fillClass: "fill-[var(--chart-5)]" },
+    { min: 0.5, fillClass: "fill-[var(--chart-4)]" },
+    { min: 0.25, fillClass: "fill-[var(--chart-3)]" },
+    { min: 0.1, fillClass: "fill-[var(--chart-2)]" },
+    { min: 0, fillClass: "fill-[var(--chart-1)]" },
 ] as const
 
 // "YYYY-MM-DD" -> Date local (evita o shift de fuso de "new Date(string)", que interpreta como UTC)
@@ -143,7 +143,7 @@ export function DashboardCallsByRegionMap({ companyId }: Props) {
     )
 
     return (
-        <Card>
+        <Card className="h-full">
             <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                     <CardTitle>Chamadas por região</CardTitle>
@@ -189,33 +189,17 @@ export function DashboardCallsByRegionMap({ companyId }: Props) {
                     </Popover>
                 </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex flex-1 flex-col items-center justify-center">
                 {loading ? (
-                    <Skeleton className="h-56 w-full" />
+                    <Skeleton className="h-72 w-full max-w-md" />
                 ) : (
-                    <div className="flex flex-col items-center gap-3 sm:flex-row sm:items-center sm:justify-center">
-                        <BrazilMap
-                            regions={mapOverrides}
-                            showTooltips
-                            enableZoom
-                            aria-label="Chamadas por UF"
-                            className="max-w-52"
-                        />
-                        <div className="flex flex-row flex-wrap gap-3 sm:flex-col sm:gap-1.5">
-                            {BUCKETS.map((b) => (
-                                <div key={b.label} className="flex items-center gap-1.5 text-xs">
-                                    <span
-                                        className={`inline-block h-3 w-3 rounded-xs ${b.swatchClass}`}
-                                    />
-                                    <span className="text-muted-foreground">{b.label}</span>
-                                </div>
-                            ))}
-                            <div className="flex items-center gap-1.5 text-xs">
-                                <span className="inline-block h-3 w-3 rounded-xs bg-muted" />
-                                <span className="text-muted-foreground">Sem chamadas</span>
-                            </div>
-                        </div>
-                    </div>
+                    <BrazilMap
+                        regions={mapOverrides}
+                        showTooltips
+                        enableZoom
+                        aria-label="Chamadas por UF"
+                        className="mx-auto w-full max-w-sm lg:max-w-md"
+                    />
                 )}
             </CardContent>
         </Card>
