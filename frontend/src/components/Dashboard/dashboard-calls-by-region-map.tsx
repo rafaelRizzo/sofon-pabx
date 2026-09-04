@@ -191,14 +191,15 @@ export function DashboardCallsByRegionMap({ companyId }: Props) {
             </CardHeader>
             <CardContent>
                 {loading ? (
-                    <Skeleton className="h-96 w-full" />
+                    <Skeleton className="h-56 w-full" />
                 ) : (
-                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-[1fr_auto]">
+                    <div className="flex flex-col items-center gap-3 sm:flex-row sm:items-center sm:justify-center">
                         <BrazilMap
                             regions={mapOverrides}
                             showTooltips
                             enableZoom
                             aria-label="Chamadas por UF"
+                            className="max-w-52"
                         />
                         <div className="flex flex-row flex-wrap gap-3 sm:flex-col sm:gap-1.5">
                             {BUCKETS.map((b) => (
