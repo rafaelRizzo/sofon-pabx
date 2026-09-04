@@ -51,16 +51,21 @@ const DIRECTION_OPTIONS: { value: CallsByRegionDirection; label: string }[] = [
     { value: "outbound", label: "Só saída" },
 ]
 
-// Mesma escala sequencial das outras views do dashboard (--chart-1..5, um hue só, luminância
-// decrescente) - buckets relativos ao pico do período filtrado, não valor absoluto fixo
-// Classes escritas por extenso (não montadas por template string) - o scanner do Tailwind lê
-// o texto-fonte literal, uma classe interpolada em runtime (`fill-[${cor}]`) nunca é gerada
+// Escala sequencial própria do mapa (--map-bucket-1..5, index.css) - mesmo hue do resto do
+// dashboard, mas com curva de luminância própria por tema: no light mode espelha --chart-1..5
+// (mais chamadas = mais escuro, funciona bem em fundo claro); no dark mode é invertida (mais
+// chamadas = mais claro/vívido), senão os estados com mais chamadas ficariam os menos visíveis
+// contra o fundo quase preto do card. Buckets relativos ao pico do período filtrado, não valor
+// absoluto fixo. Classes escritas por extenso (não montadas por template string) - o scanner do
+// Tailwind lê o texto-fonte literal, uma classe interpolada em runtime (`fill-[${cor}]`) nunca é gerada
+// labelClass: no dark mode os buckets 3-5 ficam claros (mais chamadas = mais vívido), texto
+// branco fixo ficaria ilegível neles - só 1-2 continuam escuros o bastante pro branco funcionar
 const BUCKETS = [
-    { min: 0.75, fillClass: "fill-[var(--chart-5)]" },
-    { min: 0.5, fillClass: "fill-[var(--chart-4)]" },
-    { min: 0.25, fillClass: "fill-[var(--chart-3)]" },
-    { min: 0.1, fillClass: "fill-[var(--chart-2)]" },
-    { min: 0, fillClass: "fill-[var(--chart-1)]" },
+    { min: 0.75, fillClass: "fill-[var(--map-bucket-5)]", labelClass: "fill-white dark:fill-neutral-900" },
+    { min: 0.5, fillClass: "fill-[var(--map-bucket-4)]", labelClass: "fill-white dark:fill-neutral-900" },
+    { min: 0.25, fillClass: "fill-[var(--map-bucket-3)]", labelClass: "fill-white dark:fill-neutral-900" },
+    { min: 0.1, fillClass: "fill-[var(--map-bucket-2)]", labelClass: "fill-white" },
+    { min: 0, fillClass: "fill-[var(--map-bucket-1)]", labelClass: "fill-white" },
 ] as const
 
 // "YYYY-MM-DD" -> Date local (evita o shift de fuso de "new Date(string)", que interpreta como UTC)
@@ -119,6 +124,9 @@ export function DashboardCallsByRegionMap({ companyId }: Props) {
                     className: bucket
                         ? `${bucket.fillClass} hover:opacity-80`
                         : "fill-muted",
+                    // bucket colorido usa o labelClass próprio (contraste varia por tema, ver
+                    // BUCKETS); sem chamada usa --map-label (escuro no light, claro no dark)
+                    labelClassName: bucket?.labelClass,
                     tooltipContent: (
                         <div className="min-w-32">
                             <p className="font-medium">{UF_NAMES[uf]}</p>
@@ -189,17 +197,23 @@ export function DashboardCallsByRegionMap({ companyId }: Props) {
                     </Popover>
                 </div>
             </CardHeader>
-            <CardContent className="flex flex-1 flex-col items-center justify-center">
+            <CardContent className="flex flex-1 flex-col justify-center">
                 {loading ? (
-                    <Skeleton className="h-72 w-full max-w-md" />
+                    <Skeleton className="h-72 w-full sm:h-80 lg:h-96" />
                 ) : (
-                    <BrazilMap
-                        regions={mapOverrides}
-                        showTooltips
-                        enableZoom
-                        aria-label="Chamadas por UF"
-                        className="mx-auto w-full max-w-sm lg:max-w-md"
-                    />
+                    // altura fixa + w-full/h-full no SVG: viewBox quase quadrado deixaria a
+                    // altura explodir junto com a largura se h-auto (comportamento padrão).
+                    // [&>...] força a div interna do BrazilMap (sem prop de className própria)
+                    // a herdar a altura fixa, senão ela fica height:auto e quebra a cadeia de h-full
+                    <div className="h-72 w-full sm:h-80 lg:h-96 [&>[data-slot=map-container]]:h-full">
+                        <BrazilMap
+                            regions={mapOverrides}
+                            showTooltips
+                            enableZoom
+                            aria-label="Chamadas por UF"
+                            className="h-full w-full"
+                        />
+                    </div>
                 )}
             </CardContent>
         </Card>

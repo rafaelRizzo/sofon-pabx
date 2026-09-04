@@ -98,9 +98,16 @@
     --map-region-stroke: oklch(28.2% 0.091 277.023);
     --map-region-stroke-hover: oklch(28.2% 0.091 277.023);
     --map-region-focus-ring: oklch(70.7% 0.165 277.023);
-    --map-label: oklch(100% 0 0);
-    --map-label-hover: oklch(100% 0 0);
+    /* escuro no light mode: fundo claro do fill-muted (regiões sem chamada) apaga texto branco */
+    --map-label: oklch(32% 0 0);
+    --map-label-hover: oklch(32% 0 0);
     --map-label-selected: oklch(100% 0 0);
+    /* espelha --chart-1..5: no fundo claro, mais chamadas = mais escuro funciona bem */
+    --map-bucket-1: oklch(0.785 0.115 274.713);
+    --map-bucket-2: oklch(0.585 0.233 277.117);
+    --map-bucket-3: oklch(0.511 0.262 276.966);
+    --map-bucket-4: oklch(0.457 0.24 277.023);
+    --map-bucket-5: oklch(0.398 0.195 277.366);
 }
 
 .dark {
@@ -139,13 +146,22 @@
     --map-region-hover: oklch(50% 0.134 277.023);
     --map-region-selected: oklch(39.1% 0.09 277.023);
     --map-region-disabled: oklch(55.4% 0.046 277.023);
-    /* usa o hue do primary da aplicação (277), só mais claro pra contrastar com o fundo escuro do card */
-    --map-region-stroke: oklch(62% 0.19 277.023);
-    --map-region-stroke-hover: oklch(72% 0.16 277.023);
+    /* contorno neutro (Tailwind neutral-700), 2 tons mais claro que --card (neutral-900) -
+       neutral-800 sumia, sem separação visível entre estados. neutral-600 no hover */
+    --map-region-stroke: oklch(0.371 0 0);
+    --map-region-stroke-hover: oklch(0.439 0 0);
     --map-region-focus-ring: oklch(70.7% 0.165 277.023);
     --map-label: oklch(100% 0 0);
     --map-label-hover: oklch(100% 0 0);
     --map-label-selected: oklch(100% 0 0);
+    /* invertido em relação ao light mode: no fundo quase preto, o bucket com mais
+       chamadas precisa ser o mais claro/vívido pra se destacar - usando --chart-x aqui
+       (mais escuro = mais chamadas) os estados mais importantes ficavam os menos visíveis */
+    --map-bucket-1: oklch(0.34 0.14 277.023);
+    --map-bucket-2: oklch(0.46 0.17 277.023);
+    --map-bucket-3: oklch(0.58 0.19 277.023);
+    --map-bucket-4: oklch(0.68 0.18 277.023);
+    --map-bucket-5: oklch(0.8 0.16 277.023);
 }
 
 @layer base {
