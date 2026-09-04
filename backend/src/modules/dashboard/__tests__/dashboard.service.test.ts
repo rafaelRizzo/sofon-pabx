@@ -40,13 +40,14 @@ describe('DashboardService.getDashboardOverview', () => {
         expect(result).toEqual({
             extensionsOnline: 0, extensionsOffline: 0,
             callsToday: 0, callsYesterday: 0, callsThisMonth: 0, callsThisYear: 0,
+            callsOutboundToday: 0,
         })
         expect(db.company.findMany).not.toHaveBeenCalled()
     })
 
     it('counts calls per period scoped by accountcode', async () => {
         db.company.findMany.mockResolvedValue([{ asteriskId: 'ast1' }, { asteriskId: 'ast2' }])
-        db.cdr.count.mockResolvedValueOnce(5).mockResolvedValueOnce(2).mockResolvedValueOnce(40).mockResolvedValueOnce(300)
+        db.cdr.count.mockResolvedValueOnce(5).mockResolvedValueOnce(2).mockResolvedValueOnce(40).mockResolvedValueOnce(300).mockResolvedValueOnce(1)
 
         const result = await DashboardService.getDashboardOverview(['c1', 'c2'])
 
@@ -56,9 +57,69 @@ describe('DashboardService.getDashboardOverview', () => {
         expect(result.callsYesterday).toBe(2)
         expect(result.callsThisMonth).toBe(40)
         expect(result.callsThisYear).toBe(300)
-        expect(db.cdr.count).toHaveBeenCalledTimes(4)
+        expect(result.callsOutboundToday).toBe(1)
+        expect(db.cdr.count).toHaveBeenCalledTimes(5)
         for (const call of db.cdr.count.mock.calls) {
             expect(call[0].where.accountcode).toEqual({ in: ['ast1', 'ast2'] })
         }
+    })
+})
+
+describe('DashboardService.getDashboardCallsByRegion', () => {
+    it('returns no regions when companyIds is an empty array (no access)', async () => {
+        const result = await DashboardService.getDashboardCallsByRegion([], { direction: 'all' })
+        expect(result).toEqual({ regions: [] })
+        expect(db.company.findMany).not.toHaveBeenCalled()
+    })
+
+    it('aggregates calls by UF with a DDD breakdown, picking src/dst per direction', async () => {
+        db.company.findMany.mockResolvedValue([{ asteriskId: 'ast1' }])
+        db.cdr.findMany.mockResolvedValue([
+            { direction: 'inbound', src: '11987654321', dst: '2002' },
+            { direction: 'inbound', src: '11912345678', dst: '2002' },
+            { direction: 'outbound', src: '2002', dst: '21934567890' },
+            { direction: 'inbound', src: '2002', dst: '2003' }, // ramal->ramal, sem DDD válido
+        ])
+
+        const result = await DashboardService.getDashboardCallsByRegion(['c1'], { direction: 'all' })
+
+        expect(result.regions).toEqual(
+            expect.arrayContaining([
+                { uf: 'SP', calls: 2, byDdd: [{ ddd: '11', calls: 2 }] },
+                { uf: 'RJ', calls: 1, byDdd: [{ ddd: '21', calls: 1 }] },
+            ])
+        )
+        expect(result.regions).toHaveLength(2)
+        expect(db.cdr.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    accountcode: { in: ['ast1'] },
+                    direction: { in: ['inbound', 'outbound'] },
+                }),
+            })
+        )
+    })
+
+    it('filters by a single direction and date range', async () => {
+        db.company.findMany.mockResolvedValue([{ asteriskId: 'ast1' }])
+        db.cdr.findMany.mockResolvedValue([])
+
+        await DashboardService.getDashboardCallsByRegion(['c1'], {
+            direction: 'outbound',
+            startDate: '2026-01-01',
+            endDate: '2026-01-31',
+        })
+
+        expect(db.cdr.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    direction: 'outbound',
+                    startTime: {
+                        gte: new Date('2026-01-01T00:00:00.000Z'),
+                        lte: new Date('2026-01-31T23:59:59.999Z'),
+                    },
+                }),
+            })
+        )
     })
 })

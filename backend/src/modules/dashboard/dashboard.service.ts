@@ -3,6 +3,8 @@ import { prisma } from '../../lib/prisma'
 import { AppError } from '../../utils/errors/app.error'
 import { validateEnv } from '../../config/env'
 import { getExtensionsStatus } from '../realtime/realtime.service'
+import { DDD_TO_UF, extractDDD } from '../../utils/ddd.util'
+import type { DashboardCallsByRegionQueryInput } from './schemas/dashboard.schema'
 
 const TZ = process.env.TZ || 'America/Sao_Paulo'
 
@@ -32,6 +34,7 @@ export const getDashboardOverview = async (companyIds?: string[]) => {
         return {
             extensionsOnline: 0, extensionsOffline: 0,
             callsToday: 0, callsYesterday: 0, callsThisMonth: 0, callsThisYear: 0,
+            callsOutboundToday: 0,
         }
     }
 
@@ -48,7 +51,7 @@ export const getDashboardOverview = async (companyIds?: string[]) => {
     // do Prisma já retorna 0 corretamente, sem precisar de guarda extra
     const accountcode = { in: asteriskIds }
 
-    const [callsToday, callsYesterday, callsThisMonth, callsThisYear] = await Promise.all([
+    const [callsToday, callsYesterday, callsThisMonth, callsThisYear, callsOutboundToday] = await Promise.all([
         prisma.cdr.count({ where: { accountcode, startTime: { gte: new Date(`${today}T00:00:00.000Z`) } } }),
         prisma.cdr.count({
             where: {
@@ -58,9 +61,70 @@ export const getDashboardOverview = async (companyIds?: string[]) => {
         }),
         prisma.cdr.count({ where: { accountcode, startTime: { gte: new Date(`${monthStart}T00:00:00.000Z`) } } }),
         prisma.cdr.count({ where: { accountcode, startTime: { gte: new Date(`${yearStart}T00:00:00.000Z`) } } }),
+        prisma.cdr.count({
+            where: { accountcode, direction: 'outbound', startTime: { gte: new Date(`${today}T00:00:00.000Z`) } },
+        }),
     ])
 
-    return { extensionsOnline, extensionsOffline, callsToday, callsYesterday, callsThisMonth, callsThisYear }
+    return {
+        extensionsOnline, extensionsOffline,
+        callsToday, callsYesterday, callsThisMonth, callsThisYear,
+        callsOutboundToday,
+    }
+}
+
+// Extrai DDD de src (inbound)/dst (outbound) do CDR e agrega por UF (mapa não tem malha por DDD,
+// ver docs do shadcnmaps) mantendo o breakdown por DDD dentro de cada UF pro tooltip do front.
+// Projeção só de direction/src/dst (sem select completo) - agregação em JS, mesmo padrão de
+// getExtensionsStatus (sem groupBy por substring no Prisma)
+export const getDashboardCallsByRegion = async (
+    companyIds: string[] | undefined,
+    filter: Pick<DashboardCallsByRegionQueryInput, 'startDate' | 'endDate' | 'direction'>
+) => {
+    if (companyIds && companyIds.length === 0) return { regions: [] }
+
+    const asteriskIds = await resolveAsteriskIds(companyIds)
+    const direction = filter.direction
+
+    const rows = await prisma.cdr.findMany({
+        where: {
+            accountcode: { in: asteriskIds },
+            direction: direction === 'all' ? { in: ['inbound', 'outbound'] } : direction,
+            ...((filter.startDate || filter.endDate) && {
+                startTime: {
+                    ...(filter.startDate && { gte: new Date(`${filter.startDate}T00:00:00.000Z`) }),
+                    ...(filter.endDate && { lte: new Date(`${filter.endDate}T23:59:59.999Z`) }),
+                },
+            }),
+        },
+        select: { direction: true, src: true, dst: true },
+    })
+
+    const callsByDdd = new Map<string, number>()
+    for (const row of rows) {
+        const number = row.direction === 'outbound' ? row.dst : row.src
+        const ddd = extractDDD(number)
+        if (!ddd) continue
+        callsByDdd.set(ddd, (callsByDdd.get(ddd) ?? 0) + 1)
+    }
+
+    const byUf = new Map<string, Map<string, number>>()
+    for (const [ddd, calls] of callsByDdd) {
+        const uf = DDD_TO_UF[ddd]!
+        const entry = byUf.get(uf) ?? new Map<string, number>()
+        entry.set(ddd, calls)
+        byUf.set(uf, entry)
+    }
+
+    return {
+        regions: [...byUf.entries()].map(([uf, byDdd]) => ({
+            uf,
+            calls: [...byDdd.values()].reduce((sum, n) => sum + n, 0),
+            byDdd: [...byDdd.entries()]
+                .map(([ddd, calls]) => ({ ddd, calls }))
+                .sort((a, b) => b.calls - a.calls),
+        })),
+    }
 }
 
 // Mesmo path de cdr.controller.ts (MONITOR_BASE_DIR) - onde o MixMonitor sempre grava

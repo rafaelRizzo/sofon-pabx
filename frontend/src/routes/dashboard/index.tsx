@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router"
 
+import { DashboardCallsByRegionMap } from "@/components/Dashboard/dashboard-calls-by-region-map"
 import { DashboardCallsComparisonChart } from "@/components/Dashboard/dashboard-calls-comparison-chart"
 import { DashboardInfraCards } from "@/components/Dashboard/dashboard-infra-cards"
 import { DashboardOverviewCards } from "@/components/Dashboard/dashboard-overview-cards"
@@ -45,6 +46,10 @@ function DashboardPage() {
       <DashboardOverviewCards overview={overview} loading={overviewLoading} />
 
       <DashboardCallsComparisonChart overview={overview} loading={overviewLoading} />
+
+      {hasPermission("cdr") && (
+        <DashboardCallsByRegionMap companyId={companyId} />
+      )}
 
       {isAdmin && (
         <div className="flex flex-col gap-2">

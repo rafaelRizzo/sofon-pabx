@@ -2,7 +2,13 @@ import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import * as Controller from './dashboard.controller'
 import { protectedRoute, requireAdmin } from '../../middleware/scope.middleware'
-import { dashboardOverviewQuerySchema, DashboardInfraResponse, DashboardOverviewResponse } from './schemas/dashboard.schema'
+import {
+    dashboardOverviewQuerySchema,
+    dashboardCallsByRegionQuerySchema,
+    DashboardInfraResponse,
+    DashboardOverviewResponse,
+    DashboardCallsByRegionResponse,
+} from './schemas/dashboard.schema'
 import { errors } from '../../schemas/responses'
 
 export const dashboardRoutes = async (app: FastifyInstance) => {
@@ -24,6 +30,22 @@ export const dashboardRoutes = async (app: FastifyInstance) => {
             },
         },
     }, Controller.getOverview as any)
+
+    router.get('/dashboard/calls-by-region', {
+        // Mesmo padrão de scope de /dashboard/overview - agregado do que o usuário já vê via CDR
+        onRequest: protectedRoute,
+        schema: {
+            tags: ['Dashboard'],
+            summary: 'Chamadas por UF/DDD (mapa do Brasil)',
+            description: 'Agrega chamadas do CDR por UF a partir do DDD de src (inbound) ou dst (outbound), com breakdown por DDD dentro de cada UF. Best-effort: DDD extraído por heurística de tamanho do número (10/11 dígitos, com/sem +55), já que o formato de src/dst depende do tronco/operadora. Filtro opcional ?companyId estreita dentro do scope; ?startDate/?endDate (YYYY-MM-DD) e ?direction (all|inbound|outbound, default all).',
+            security: [{ bearerAuth: [] }],
+            querystring: dashboardCallsByRegionQuerySchema,
+            response: {
+                200: DashboardCallsByRegionResponse,
+                401: errors[401],
+            },
+        },
+    }, Controller.getCallsByRegion as any)
 
     router.get('/dashboard/infra', {
         // Infra compartilhada entre TODAS as empresas (uma VPS só) - não é dado de uma empresa,

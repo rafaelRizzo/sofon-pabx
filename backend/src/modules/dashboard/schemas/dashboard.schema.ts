@@ -3,6 +3,15 @@ import { ok } from '../../../schemas/responses'
 
 export const dashboardOverviewQuerySchema = z.object({ companyId: z.cuid2().optional() })
 
+export const dashboardCallsByRegionQuerySchema = z.object({
+    companyId: z.cuid2().optional(),
+    startDate: z.iso.date().optional(),
+    endDate: z.iso.date().optional(),
+    direction: z.enum(['all', 'inbound', 'outbound']).default('all'),
+})
+
+export type DashboardCallsByRegionQueryInput = z.infer<typeof dashboardCallsByRegionQuerySchema>
+
 export const DashboardOverviewSchema = z.object({
     extensionsOnline: z.number(),
     extensionsOffline: z.number(),
@@ -10,9 +19,22 @@ export const DashboardOverviewSchema = z.object({
     callsYesterday: z.number(),
     callsThisMonth: z.number(),
     callsThisYear: z.number(),
+    callsOutboundToday: z.number(),
 })
 
 export const DashboardOverviewResponse = ok({ overview: DashboardOverviewSchema })
+
+export const DashboardCallsByRegionSchema = z.object({
+    regions: z.array(
+        z.object({
+            uf: z.string(),
+            calls: z.number(),
+            byDdd: z.array(z.object({ ddd: z.string(), calls: z.number() })),
+        })
+    ),
+})
+
+export const DashboardCallsByRegionResponse = ok({ callsByRegion: DashboardCallsByRegionSchema })
 
 export const DashboardInfraSchema = z.object({
     uptimeSeconds: z.number(),

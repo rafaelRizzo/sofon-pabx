@@ -1,6 +1,6 @@
 import type { FastifyRequest, FastifyReply } from 'fastify'
 import * as Service from './dashboard.service'
-import { dashboardOverviewQuerySchema as optionalCompanyQuery } from './schemas/dashboard.schema'
+import { dashboardOverviewQuerySchema as optionalCompanyQuery, dashboardCallsByRegionQuerySchema } from './schemas/dashboard.schema'
 import { handleError } from '../../utils/errors/handler.error'
 
 // Mesmo padrão de realtime.controller.ts - ?companyId estreita dentro do scope do usuário
@@ -15,6 +15,21 @@ export const getOverview = async (req: FastifyRequest, reply: FastifyReply) => {
         }
         const overview = await Service.getDashboardOverview(req.scope.companyIds ?? undefined)
         return reply.send({ success: true, overview })
+    } catch (e) {
+        return handleError(reply, e, req)
+    }
+}
+
+export const getCallsByRegion = async (req: FastifyRequest, reply: FastifyReply) => {
+    try {
+        const query = dashboardCallsByRegionQuerySchema.parse(req.query)
+        if (query.companyId) {
+            req.scope.assertAccess(query.companyId)
+            const callsByRegion = await Service.getDashboardCallsByRegion([query.companyId], query)
+            return reply.send({ success: true, callsByRegion })
+        }
+        const callsByRegion = await Service.getDashboardCallsByRegion(req.scope.companyIds ?? undefined, query)
+        return reply.send({ success: true, callsByRegion })
     } catch (e) {
         return handleError(reply, e, req)
     }
