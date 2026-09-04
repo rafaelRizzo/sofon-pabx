@@ -309,7 +309,7 @@ export function AuditLogDetailDialog({ log, onOpenChange }: Props) {
                         </p>
                     ) : (
                         <ScrollArea className="min-w-0 flex-1 overflow-x-hidden!">
-                            <div className="pr-3">
+                            <div className="px-3">
                                 <GroupedList leaves={diff} renderLeaf={(leaf) => <DiffLeafRow leaf={leaf} />} />
                             </div>
                         </ScrollArea>
@@ -318,7 +318,7 @@ export function AuditLogDetailDialog({ log, onOpenChange }: Props) {
                     <p className="py-4 text-center text-sm text-muted-foreground">Nenhum dado registrado</p>
                 ) : (
                     <ScrollArea className="min-w-0 flex-1 overflow-x-hidden!">
-                        <div className="pr-3">
+                        <div className="px-3">
                             <GroupedList
                                 leaves={snapshot}
                                 renderLeaf={(leaf) => <SnapshotLeafRow leaf={leaf} tone={isCreate ? "after" : "before"} />}

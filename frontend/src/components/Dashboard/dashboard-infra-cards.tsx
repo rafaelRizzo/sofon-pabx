@@ -60,15 +60,69 @@ function UsageBar({ pct }: { pct: number }) {
     )
 }
 
+// Cada variante espelha o formato real do conteúdo do tile (valor + descrição, com ou sem barra/
+// grid) - skeleton genérico (1 retângulo) não passava a forma do dado que está carregando
+function StatSkeleton() {
+    return (
+        <div className="flex flex-col gap-1.5">
+            <Skeleton className="h-7 w-16" />
+            <Skeleton className="h-3 w-32" />
+        </div>
+    )
+}
+
+function BarStatSkeleton() {
+    return (
+        <div className="flex flex-col gap-2">
+            <div className="flex items-baseline justify-between">
+                <Skeleton className="h-7 w-12" />
+                <Skeleton className="h-3 w-14" />
+            </div>
+            <Skeleton className="h-1.5 w-full rounded-full" />
+        </div>
+    )
+}
+
+function CpuSkeleton() {
+    return (
+        <div className="flex flex-col gap-2">
+            <div className="flex items-baseline justify-between">
+                <Skeleton className="h-7 w-12" />
+                <Skeleton className="h-3 w-14" />
+            </div>
+            <Skeleton className="h-3 w-40" />
+            <div className="grid grid-cols-4 gap-1">
+                {Array.from({ length: 4 }).map((_, i) => (
+                    <Skeleton key={i} className="h-9 w-full rounded" />
+                ))}
+            </div>
+        </div>
+    )
+}
+
+function NetworkSkeleton() {
+    return (
+        <div className="flex flex-col gap-1.5">
+            <div className="flex items-center justify-between">
+                <Skeleton className="h-5 w-16" />
+                <Skeleton className="h-5 w-16" />
+            </div>
+            <Skeleton className="h-3 w-24" />
+        </div>
+    )
+}
+
 function InfraTile({
     label,
     icon: Icon,
     loading,
+    skeleton,
     children,
 }: {
     label: string
     icon: typeof CpuIcon
     loading: boolean
+    skeleton: React.ReactNode
     children: React.ReactNode
 }) {
     return (
@@ -79,9 +133,7 @@ function InfraTile({
                     {label}
                 </CardTitle>
             </CardHeader>
-            <CardContent>
-                {loading ? <Skeleton className="h-10 w-full" /> : children}
-            </CardContent>
+            <CardContent>{loading ? skeleton : children}</CardContent>
         </Card>
     )
 }
@@ -93,8 +145,8 @@ type Props = {
 
 export function DashboardInfraCards({ infra, loading }: Props) {
     return (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-            <InfraTile label="CPU" icon={CpuIcon} loading={loading}>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <InfraTile label="CPU" icon={CpuIcon} loading={loading} skeleton={<CpuSkeleton />}>
                 <div className="flex items-baseline justify-between">
                     <span className="font-mono text-xl font-semibold tabular-nums">
                         {infra?.cpu.loadAvg1.toFixed(2) ?? "-"}
@@ -130,7 +182,7 @@ export function DashboardInfraCards({ infra, loading }: Props) {
                 )}
             </InfraTile>
 
-            <InfraTile label="Memória" icon={MemoryStickIcon} loading={loading}>
+            <InfraTile label="Memória" icon={MemoryStickIcon} loading={loading} skeleton={<BarStatSkeleton />}>
                 <div className="flex items-baseline justify-between">
                     <span
                         className={cn(
@@ -147,7 +199,7 @@ export function DashboardInfraCards({ infra, loading }: Props) {
                 <UsageBar pct={infra?.memory.usedPct ?? 0} />
             </InfraTile>
 
-            <InfraTile label="Disco" icon={HardDriveIcon} loading={loading}>
+            <InfraTile label="Disco" icon={HardDriveIcon} loading={loading} skeleton={<BarStatSkeleton />}>
                 <div className="flex items-baseline justify-between">
                     <span
                         className={cn(
@@ -164,7 +216,7 @@ export function DashboardInfraCards({ infra, loading }: Props) {
                 <UsageBar pct={infra?.disk.usedPct ?? 0} />
             </InfraTile>
 
-            <InfraTile label="Gravações" icon={MicIcon} loading={loading}>
+            <InfraTile label="Gravações" icon={MicIcon} loading={loading} skeleton={<StatSkeleton />}>
                 <span className="font-mono text-xl font-semibold tabular-nums">
                     {infra ? formatBytes(infra.recordings.sizeBytes) : "-"}
                 </span>
@@ -173,7 +225,7 @@ export function DashboardInfraCards({ infra, loading }: Props) {
                 </CardDescription>
             </InfraTile>
 
-            <InfraTile label="Logs" icon={FileTextIcon} loading={loading}>
+            <InfraTile label="Logs" icon={FileTextIcon} loading={loading} skeleton={<StatSkeleton />}>
                 <span className="font-mono text-xl font-semibold tabular-nums">
                     {infra ? formatBytes(infra.logs.sizeBytes) : "-"}
                 </span>
@@ -182,14 +234,14 @@ export function DashboardInfraCards({ infra, loading }: Props) {
                 </CardDescription>
             </InfraTile>
 
-            <InfraTile label="Uptime" icon={ClockIcon} loading={loading}>
+            <InfraTile label="Uptime" icon={ClockIcon} loading={loading} skeleton={<StatSkeleton />}>
                 <span className="font-mono text-xl font-semibold tabular-nums">
                     {infra ? formatUptime(infra.uptimeSeconds) : "-"}
                 </span>
                 <CardDescription className="mt-1">Desde o último restart</CardDescription>
             </InfraTile>
 
-            <InfraTile label="Rede" icon={NetworkIcon} loading={loading}>
+            <InfraTile label="Rede (backend)" icon={NetworkIcon} loading={loading} skeleton={<NetworkSkeleton />}>
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1">
                         <ArrowDownIcon className="size-3.5 text-emerald-600 dark:text-emerald-400" />
