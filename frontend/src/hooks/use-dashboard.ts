@@ -10,11 +10,14 @@ export type DashboardOverview = {
     extensionsOnline: number
     extensionsOffline: number
     callsToday: number
+    callsYesterday: number
     callsThisMonth: number
     callsThisYear: number
 }
 
 export type DashboardInfra = {
+    uptimeSeconds: number
+    network: { rxBytesPerSec: number; txBytesPerSec: number }
     cpu: {
         loadAvg1: number
         loadAvg5: number

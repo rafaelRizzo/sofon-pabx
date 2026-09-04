@@ -39,23 +39,24 @@ describe('DashboardService.getDashboardOverview', () => {
         const result = await DashboardService.getDashboardOverview([])
         expect(result).toEqual({
             extensionsOnline: 0, extensionsOffline: 0,
-            callsToday: 0, callsThisMonth: 0, callsThisYear: 0,
+            callsToday: 0, callsYesterday: 0, callsThisMonth: 0, callsThisYear: 0,
         })
         expect(db.company.findMany).not.toHaveBeenCalled()
     })
 
     it('counts calls per period scoped by accountcode', async () => {
         db.company.findMany.mockResolvedValue([{ asteriskId: 'ast1' }, { asteriskId: 'ast2' }])
-        db.cdr.count.mockResolvedValueOnce(5).mockResolvedValueOnce(40).mockResolvedValueOnce(300)
+        db.cdr.count.mockResolvedValueOnce(5).mockResolvedValueOnce(2).mockResolvedValueOnce(40).mockResolvedValueOnce(300)
 
         const result = await DashboardService.getDashboardOverview(['c1', 'c2'])
 
         expect(result.extensionsOnline).toBe(0)
         expect(result.extensionsOffline).toBe(0)
         expect(result.callsToday).toBe(5)
+        expect(result.callsYesterday).toBe(2)
         expect(result.callsThisMonth).toBe(40)
         expect(result.callsThisYear).toBe(300)
-        expect(db.cdr.count).toHaveBeenCalledTimes(3)
+        expect(db.cdr.count).toHaveBeenCalledTimes(4)
         for (const call of db.cdr.count.mock.calls) {
             expect(call[0].where.accountcode).toEqual({ in: ['ast1', 'ast2'] })
         }

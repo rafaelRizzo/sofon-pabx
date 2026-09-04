@@ -1,11 +1,15 @@
 "use client"
 
 import {
+    ArrowDownIcon,
+    ArrowUpIcon,
+    ClockIcon,
     CpuIcon,
     FileTextIcon,
     HardDriveIcon,
     MicIcon,
     MemoryStickIcon,
+    NetworkIcon,
 } from "lucide-react"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -18,6 +22,15 @@ function formatBytes(bytes: number): string {
     const units = ["B", "KB", "MB", "GB", "TB"]
     const exp = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
     return `${(bytes / 1024 ** exp).toFixed(exp === 0 ? 0 : 1)} ${units[exp]}`
+}
+
+function formatUptime(seconds: number): string {
+    const days = Math.floor(seconds / 86400)
+    const hours = Math.floor((seconds % 86400) / 3600)
+    const minutes = Math.floor((seconds % 3600) / 60)
+    if (days > 0) return `${days}d ${hours}h`
+    if (hours > 0) return `${hours}h ${minutes}m`
+    return `${minutes}m`
 }
 
 // > 85% já é digno de nota (disco/memória apertando) - mesmo critério de destaque usado em
@@ -100,7 +113,7 @@ export function DashboardInfraCards({ infra, loading }: Props) {
                                 className="flex flex-col gap-0.5 rounded bg-muted px-1.5 py-1"
                             >
                                 <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-                                    <span>C{i}</span>
+                                    <span>C{i + 1}</span>
                                     <span
                                         className={cn(
                                             "font-mono tabular-nums",
@@ -167,6 +180,31 @@ export function DashboardInfraCards({ infra, loading }: Props) {
                 <CardDescription className="mt-1">
                     Total em /var/log/asterisk
                 </CardDescription>
+            </InfraTile>
+
+            <InfraTile label="Uptime" icon={ClockIcon} loading={loading}>
+                <span className="font-mono text-xl font-semibold tabular-nums">
+                    {infra ? formatUptime(infra.uptimeSeconds) : "-"}
+                </span>
+                <CardDescription className="mt-1">Desde o último restart</CardDescription>
+            </InfraTile>
+
+            <InfraTile label="Rede" icon={NetworkIcon} loading={loading}>
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1">
+                        <ArrowDownIcon className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+                        <span className="font-mono text-sm font-semibold tabular-nums">
+                            {infra ? `${formatBytes(infra.network.rxBytesPerSec)}/s` : "-"}
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                        <ArrowUpIcon className="size-3.5 text-blue-600 dark:text-blue-400" />
+                        <span className="font-mono text-sm font-semibold tabular-nums">
+                            {infra ? `${formatBytes(infra.network.txBytesPerSec)}/s` : "-"}
+                        </span>
+                    </div>
+                </div>
+                <CardDescription className="mt-1">Entrada · Saída</CardDescription>
             </InfraTile>
         </div>
     )

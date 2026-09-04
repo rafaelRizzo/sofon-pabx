@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router"
 
+import { DashboardCallsComparisonChart } from "@/components/Dashboard/dashboard-calls-comparison-chart"
 import { DashboardInfraCards } from "@/components/Dashboard/dashboard-infra-cards"
 import { DashboardOverviewCards } from "@/components/Dashboard/dashboard-overview-cards"
 import { DashboardRecentCalls } from "@/components/Dashboard/dashboard-recent-calls"
@@ -42,6 +43,8 @@ function DashboardPage() {
       </FilterBar>
 
       <DashboardOverviewCards overview={overview} loading={overviewLoading} />
+
+      <DashboardCallsComparisonChart overview={overview} loading={overviewLoading} />
 
       {isAdmin && (
         <div className="flex flex-col gap-2">

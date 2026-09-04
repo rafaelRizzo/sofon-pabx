@@ -8,12 +8,15 @@ const TZ = process.env.TZ || 'America/Sao_Paulo'
 
 // Mesmo formato usado em todo o projeto pra filtrar CDR por dia (ver cdr.service.ts) - string
 // solta YYYY-MM-DD no fuso da empresa, sem conversão: startTime é naive-local (ver schema.prisma)
-function localDateParts(): { today: string; monthStart: string; yearStart: string } {
+function localDateParts(): { today: string; yesterday: string; monthStart: string; yearStart: string } {
     const now = new Date()
     const today = new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(now) // YYYY-MM-DD
+    const yesterday = new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(
+        new Date(now.getTime() - 24 * 60 * 60 * 1000)
+    )
     const year = today.slice(0, 4)
     const month = today.slice(5, 7)
-    return { today, monthStart: `${year}-${month}-01`, yearStart: `${year}-01-01` }
+    return { today, yesterday, monthStart: `${year}-${month}-01`, yearStart: `${year}-01-01` }
 }
 
 async function resolveAsteriskIds(companyIds?: string[]): Promise<string[]> {
@@ -26,7 +29,10 @@ async function resolveAsteriskIds(companyIds?: string[]): Promise<string[]> {
 
 export const getDashboardOverview = async (companyIds?: string[]) => {
     if (companyIds && companyIds.length === 0) {
-        return { extensionsOnline: 0, extensionsOffline: 0, callsToday: 0, callsThisMonth: 0, callsThisYear: 0 }
+        return {
+            extensionsOnline: 0, extensionsOffline: 0,
+            callsToday: 0, callsYesterday: 0, callsThisMonth: 0, callsThisYear: 0,
+        }
     }
 
     const [extensions, asteriskIds] = await Promise.all([
@@ -37,18 +43,24 @@ export const getDashboardOverview = async (companyIds?: string[]) => {
     const extensionsOnline = extensions.filter((e) => e.presence === 'online').length
     const extensionsOffline = extensions.length - extensionsOnline
 
-    const { today, monthStart, yearStart } = localDateParts()
+    const { today, yesterday, monthStart, yearStart } = localDateParts()
     // asteriskIds vazio (empresas sem trunk cadastrado ainda não tem CDR) - filtro por lista vazia
     // do Prisma já retorna 0 corretamente, sem precisar de guarda extra
     const accountcode = { in: asteriskIds }
 
-    const [callsToday, callsThisMonth, callsThisYear] = await Promise.all([
+    const [callsToday, callsYesterday, callsThisMonth, callsThisYear] = await Promise.all([
         prisma.cdr.count({ where: { accountcode, startTime: { gte: new Date(`${today}T00:00:00.000Z`) } } }),
+        prisma.cdr.count({
+            where: {
+                accountcode,
+                startTime: { gte: new Date(`${yesterday}T00:00:00.000Z`), lt: new Date(`${today}T00:00:00.000Z`) },
+            },
+        }),
         prisma.cdr.count({ where: { accountcode, startTime: { gte: new Date(`${monthStart}T00:00:00.000Z`) } } }),
         prisma.cdr.count({ where: { accountcode, startTime: { gte: new Date(`${yearStart}T00:00:00.000Z`) } } }),
     ])
 
-    return { extensionsOnline, extensionsOffline, callsToday, callsThisMonth, callsThisYear }
+    return { extensionsOnline, extensionsOffline, callsToday, callsYesterday, callsThisMonth, callsThisYear }
 }
 
 // Mesmo path de cdr.controller.ts (MONITOR_BASE_DIR) - onde o MixMonitor sempre grava
@@ -131,7 +143,9 @@ async function getLogsSize(): Promise<number> {
 
 // os.cpus().times é cumulativo desde o boot, não dá % direto - amostra 2 leituras com um
 // intervalo curto e tira a fração de tempo ocioso do delta, por núcleo (mesma técnica do "top"/
-// "mpstat"). 200ms é imperceptível num endpoint admin-only polado a cada 30s (ver useDashboardInfra).
+// "mpstat"). Janela de 1s (não 200ms) - o contador do SO só incrementa em ticks de ~10ms, então
+// uma janela curta demais gera poucos ticks de resolução e o delta fica ruidoso (lia 0% mesmo com
+// carga real). 1s é imperceptível num endpoint admin-only polado a cada 30s (useDashboardInfra).
 function cpuTimesSnapshot() {
     return os.cpus().map((c) => ({
         idle: c.times.idle,
@@ -139,7 +153,7 @@ function cpuTimesSnapshot() {
     }))
 }
 
-async function getPerCoreUsage(sampleMs = 200): Promise<number[]> {
+async function getPerCoreUsage(sampleMs = 1000): Promise<number[]> {
     const start = cpuTimesSnapshot()
     await new Promise((resolve) => setTimeout(resolve, sampleMs))
     const end = cpuTimesSnapshot()
@@ -151,18 +165,54 @@ async function getPerCoreUsage(sampleMs = 200): Promise<number[]> {
     })
 }
 
+// Contadores acumulados por interface desde o boot (coluna 1 = bytes recebidos, coluna 9 = bytes
+// transmitidos - layout fixo do /proc/net/dev do kernel Linux). Soma todas as interfaces exceto
+// "lo" (loopback não é tráfego real de rede). Container em bridge (produção Dokploy, ver CLAUDE.md)
+// só enxerga o próprio veth, não a VPS inteira - mesma limitação já aceita pra CPU/memória (visão
+// do processo/cgroup, não "toda a VPS" quando não está em network_mode: host).
+async function readNetDevBytes(): Promise<{ rxBytes: number; txBytes: number }> {
+    const output = await Bun.file('/proc/net/dev').text()
+    let rxBytes = 0
+    let txBytes = 0
+    for (const line of output.trim().split('\n').slice(2)) {
+        const [ifaceRaw, rest] = line.split(':')
+        const iface = ifaceRaw?.trim()
+        if (!iface || iface === 'lo' || !rest) continue
+        const parts = rest.trim().split(/\s+/)
+        rxBytes += Number(parts[0]) || 0
+        txBytes += Number(parts[8]) || 0
+    }
+    return { rxBytes, txBytes }
+}
+
+// Mesma técnica de getPerCoreUsage (2 amostras, janela de 1s) - contador cumulativo não dá
+// bytes/s direto, precisa do delta entre 2 leituras.
+async function getNetworkThroughput(sampleMs = 1000): Promise<{ rxBytesPerSec: number; txBytesPerSec: number }> {
+    const start = await readNetDevBytes()
+    await new Promise((resolve) => setTimeout(resolve, sampleMs))
+    const end = await readNetDevBytes()
+    const seconds = sampleMs / 1000
+    return {
+        rxBytesPerSec: Math.max(0, (end.rxBytes - start.rxBytes) / seconds),
+        txBytesPerSec: Math.max(0, (end.txBytes - start.txBytes) / seconds),
+    }
+}
+
 export const getDashboardInfra = async () => {
-    const [disk, recordingsSizeBytes, logsSizeBytes, perCoreUsedPct] = await Promise.all([
+    const [disk, recordingsSizeBytes, logsSizeBytes, perCoreUsedPct, network] = await Promise.all([
         getDiskUsage(),
         getRecordingsSize(),
         getLogsSize(),
         getPerCoreUsage(),
+        getNetworkThroughput(),
     ])
     const totalBytes = os.totalmem()
     const freeBytes = os.freemem()
     const loadAvg = os.loadavg()
 
     return {
+        uptimeSeconds: os.uptime(),
+        network,
         cpu: {
             loadAvg1: loadAvg[0], loadAvg5: loadAvg[1], loadAvg15: loadAvg[2],
             cores: os.cpus().length,

@@ -7,6 +7,7 @@ export const DashboardOverviewSchema = z.object({
     extensionsOnline: z.number(),
     extensionsOffline: z.number(),
     callsToday: z.number(),
+    callsYesterday: z.number(),
     callsThisMonth: z.number(),
     callsThisYear: z.number(),
 })
@@ -14,6 +15,11 @@ export const DashboardOverviewSchema = z.object({
 export const DashboardOverviewResponse = ok({ overview: DashboardOverviewSchema })
 
 export const DashboardInfraSchema = z.object({
+    uptimeSeconds: z.number(),
+    network: z.object({
+        rxBytesPerSec: z.number(),
+        txBytesPerSec: z.number(),
+    }),
     cpu: z.object({
         loadAvg1: z.number(),
         loadAvg5: z.number(),
