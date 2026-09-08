@@ -23,6 +23,10 @@ const TONE = {
         chip: "bg-slate-500/10 dark:bg-slate-400/10",
         icon: "text-slate-600 dark:text-slate-400",
     },
+    red: {
+        chip: "bg-red-500/10 dark:bg-red-400/10",
+        icon: "text-red-600 dark:text-red-400",
+    },
     blue: {
         chip: "bg-blue-500/10 dark:bg-blue-400/10",
         icon: "text-blue-600 dark:text-blue-400",
@@ -98,7 +102,7 @@ export function DashboardOverviewCards({ overview, loading }: Props) {
                 value={String(overview?.extensionsOffline ?? 0)}
                 loading={loading}
                 icon={PhoneOffIcon}
-                tone="slate"
+                tone="red"
             />
             <StatTile
                 label="Chamadas hoje"

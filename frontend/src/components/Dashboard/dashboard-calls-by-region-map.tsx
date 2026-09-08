@@ -159,6 +159,7 @@ export function DashboardCallsByRegionMap({ companyId }: Props) {
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row">
                     <Select
+                        items={DIRECTION_OPTIONS}
                         value={direction}
                         onValueChange={(v) => setDirection(v as CallsByRegionDirection)}
                     >

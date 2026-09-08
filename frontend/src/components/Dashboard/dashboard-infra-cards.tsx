@@ -118,15 +118,20 @@ function InfraTile({
     loading,
     skeleton,
     children,
+    className,
 }: {
     label: string
     icon: typeof CpuIcon
     loading: boolean
     skeleton: React.ReactNode
     children: React.ReactNode
+    className?: string
 }) {
     return (
-        <Card size="sm" className="border border-input ring-0 dark:border-[#383838]">
+        <Card
+            size="sm"
+            className={cn("border border-input ring-0 dark:border-[#383838]", className)}
+        >
             <CardHeader className="gap-2">
                 <CardTitle className="flex items-center gap-2 text-sm font-medium">
                     <Icon className="size-4 text-muted-foreground" />
@@ -241,8 +246,14 @@ export function DashboardInfraCards({ infra, loading }: Props) {
                 <CardDescription className="mt-1">Desde o último restart</CardDescription>
             </InfraTile>
 
-            <InfraTile label="Rede (backend)" icon={NetworkIcon} loading={loading} skeleton={<NetworkSkeleton />}>
-                <div className="flex items-center justify-between">
+            <InfraTile
+                label="Rede (backend)"
+                icon={NetworkIcon}
+                loading={loading}
+                skeleton={<NetworkSkeleton />}
+                className="sm:col-span-2 lg:col-span-3"
+            >
+                <div className="flex items-center gap-8">
                     <div className="flex items-center gap-1">
                         <ArrowDownIcon className="size-3.5 text-emerald-600 dark:text-emerald-400" />
                         <span className="font-mono text-sm font-semibold tabular-nums">

@@ -239,8 +239,10 @@ export const AsteriskQueueRepository = {
                     // mudar depois (pesquisa/postQueueDestination rodam DEPOIS do Queue() retornar).
                     { context: QUEUE_APP_CONTEXT, exten, priority: priority++, app: 'Set', appdata: `CDR(queue_name)=${asteriskName}` },
                     // opção "t": só o AGENTE (member) pode iniciar transferência DTMF atendida (*2) - sem
-                    // "T", que daria esse poder pro cliente que está esperando/atendido na fila
-                    { context: QUEUE_APP_CONTEXT, exten, priority: priority++, app: 'Queue', appdata: `${asteriskName},t` },
+                    // "T", que daria esse poder pro cliente que está esperando/atendido na fila.
+                    // opção "c": sem ela, Queue() por padrão HANGUP o caller quando o agente desliga
+                    // primeiro - precisa continuar no dialplan pra chegar em queue-outcome/queue-survey
+                    { context: QUEUE_APP_CONTEXT, exten, priority: priority++, app: 'Queue', appdata: `${asteriskName},tc` },
                     { context: QUEUE_APP_CONTEXT, exten, priority: priority++, app: 'AGI', appdata: buildQueueOutcomeAgiUrl(q.id) },
                     { context: QUEUE_APP_CONTEXT, exten, priority: priority++, app: 'AGI', appdata: buildQueueSurveyAgiUrl(q.id) },
                     nodeExitCheck(QUEUE_APP_CONTEXT, exten, priority++, 'default'),

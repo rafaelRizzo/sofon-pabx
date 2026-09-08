@@ -342,7 +342,8 @@ export function useExtensions(companyId?: string) {
         const id = toast.loading("Resetando senha...")
         try {
             const { data } = await api.patch(
-                `/extensions/${extensionId}/password`
+                `/extensions/${extensionId}/password`,
+                {}
             )
             toast.success("Senha resetada", { id })
             return data.password ?? null

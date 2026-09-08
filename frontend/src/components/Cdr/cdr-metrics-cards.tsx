@@ -4,6 +4,7 @@ import {
     PercentIcon,
     PhoneCallIcon,
     PhoneIcon,
+    PhoneMissedIcon,
     TimerIcon,
     type LucideIcon,
 } from "lucide-react"
@@ -29,6 +30,10 @@ const TONE = {
     indigo: {
         chip: "bg-indigo-500/10 dark:bg-indigo-400/10",
         icon: "text-indigo-600 dark:text-indigo-400",
+    },
+    red: {
+        chip: "bg-red-500/10 dark:bg-red-400/10",
+        icon: "text-red-600 dark:text-red-400",
     },
 } as const
 
@@ -93,9 +98,10 @@ type Props = {
 
 export function CdrMetricsCards({ metrics, loading }: Props) {
     const answerRate = metrics ? Math.round(metrics.answerRate * 100) : 0
+    const missed = metrics ? Math.max(0, metrics.total - metrics.answered) : 0
 
     return (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
             <StatTile
                 label="Total de chamadas"
                 value={String(metrics?.total ?? 0)}
@@ -109,6 +115,13 @@ export function CdrMetricsCards({ metrics, loading }: Props) {
                 loading={loading}
                 icon={PhoneCallIcon}
                 tone="emerald"
+            />
+            <StatTile
+                label="Perdidas"
+                value={String(missed)}
+                loading={loading}
+                icon={PhoneMissedIcon}
+                tone="red"
             />
             <StatTile
                 label="Taxa de atendimento"
