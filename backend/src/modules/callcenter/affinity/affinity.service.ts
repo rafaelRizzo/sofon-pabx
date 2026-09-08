@@ -7,19 +7,21 @@ import { toAsteriskInterface } from '../../../asterisk/queue.repository'
 // periodicamente por src/jobs/agent-affinity-recalc.job.ts (mesmo padrão de holiday-resync.job.ts).
 export const recalculateAffinity = async () => {
     // Só a nota de atendimento (o agente) entra na afinidade/penalty - a nota de serviço
-    // contratado (CallRating.category="servico") é só informativa, não mede desempenho do agente
+    // contratado (CallRating.scoreServico) é só informativa, não mede desempenho do agente
     const stats = await prisma.callRating.groupBy({
         by: ['extensionId', 'companyId'],
-        where: { category: 'atendimento' },
-        _avg: { score: true },
-        _count: { score: true },
+        where: { scoreAtendimento: { not: null } },
+        _avg: { scoreAtendimento: true },
+        _count: { scoreAtendimento: true },
     })
 
     for (const s of stats) {
+        const score = s._avg.scoreAtendimento ?? 0
+        const sampleSize = s._count.scoreAtendimento
         await prisma.agentAffinity.upsert({
             where: { extensionId_companyId: { extensionId: s.extensionId, companyId: s.companyId } },
-            update: { score: s._avg.score ?? 0, sampleSize: s._count.score },
-            create: { extensionId: s.extensionId, companyId: s.companyId, score: s._avg.score ?? 0, sampleSize: s._count.score },
+            update: { score, sampleSize },
+            create: { extensionId: s.extensionId, companyId: s.companyId, score, sampleSize },
         })
     }
 

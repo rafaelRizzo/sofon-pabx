@@ -15,7 +15,7 @@ beforeEach(() => clearPrismaMock(db))
 describe('AffinityService.recalculateAffinity', () => {
     it('upserts AgentAffinity from CallRating averages and recalcs penalties for affected companies', async () => {
         db.callRating.groupBy.mockResolvedValue([
-            { extensionId: 'e1', companyId: 'c1', _avg: { score: 4.5 }, _count: { score: 2 } },
+            { extensionId: 'e1', companyId: 'c1', _avg: { scoreAtendimento: 4.5 }, _count: { scoreAtendimento: 2 } },
         ])
         db.agentAffinity.upsert.mockResolvedValue({})
         db.queue.findMany.mockResolvedValue([])
@@ -23,7 +23,7 @@ describe('AffinityService.recalculateAffinity', () => {
         const result = await AffinityService.recalculateAffinity()
 
         expect(db.callRating.groupBy).toHaveBeenCalledWith(expect.objectContaining({
-            where: { category: 'atendimento' },
+            where: { scoreAtendimento: { not: null } },
         }))
         expect(db.agentAffinity.upsert).toHaveBeenCalledWith(expect.objectContaining({
             where: { extensionId_companyId: { extensionId: 'e1', companyId: 'c1' } },

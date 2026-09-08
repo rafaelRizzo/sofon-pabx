@@ -12,13 +12,19 @@ export type CallRating = {
     extensionId: string
     number: string
     uniqueid: string | null
-    score: number
+    // 1 linha por chamada - cada nota fica null até a respectiva pergunta ser respondida
+    scoreAtendimento: number | null
+    scoreServico: number | null
     createdAt: string
+    // resolvido pelo backend em tempo de leitura (join solto por uniqueid com o CDR) - indica se
+    // dá pra baixar a gravação da chamada vinculada a essa nota
+    hasRecording: boolean
 }
 
 export type CallRatingFilters = {
     extensionId?: string
     number?: string
+    // bate em scoreAtendimento OU scoreServico
     score?: number
     startDate?: string // YYYY-MM-DD
     endDate?: string // YYYY-MM-DD
@@ -42,53 +48,76 @@ export type CallRatingForm = z.infer<typeof createCallRatingFormSchema>
 
 const DEFAULT_LIMIT = 50
 
+function filterParams(companyId: string, filters: CallRatingFilters, extra?: object) {
+    return {
+        companyId,
+        extensionId: filters.extensionId || undefined,
+        number: filters.number || undefined,
+        score: filters.score || undefined,
+        startDate: filters.startDate || undefined,
+        endDate: filters.endDate || undefined,
+        order: filters.order ?? "desc",
+        ...extra,
+    }
+}
+
 // companyId é obrigatório na query do backend - sem opção de "todas as empresas" aqui
 export function useCallRatings(
     companyId?: string,
-    filters: CallRatingFilters = {}
+    filters: CallRatingFilters = {},
+    limit = DEFAULT_LIMIT
 ) {
     const [ratings, setRatings] = useState<CallRating[]>([])
     const [total, setTotal] = useState(0)
+    const [page, setPage] = useState(1)
     const [loading, setLoading] = useState(true)
 
     const { extensionId, number, score, startDate, endDate, order } = filters
 
-    const fetchRatings = useCallback(async () => {
-        if (!companyId) {
-            setRatings([])
-            setTotal(0)
-            setLoading(false)
-            return
-        }
-        setLoading(true)
-        try {
-            const { data } = await api.get("/callcenter/ratings", {
-                params: {
-                    companyId,
-                    extensionId: extensionId || undefined,
-                    number: number || undefined,
-                    score: score || undefined,
-                    startDate: startDate || undefined,
-                    endDate: endDate || undefined,
-                    limit: DEFAULT_LIMIT,
-                    order: order ?? "desc",
-                },
-            })
-            setRatings(data.records ?? [])
-            setTotal(data.total ?? 0)
-        } catch (err) {
-            toast.error(apiError(err, "Erro ao buscar notas de atendimento"))
-        } finally {
-            setLoading(false)
-        }
-    }, [companyId, extensionId, number, score, startDate, endDate, order])
+    const fetchPage = useCallback(
+        async (targetPage: number) => {
+            if (!companyId) {
+                setRatings([])
+                setTotal(0)
+                setLoading(false)
+                return
+            }
+            setLoading(true)
+            try {
+                const { data } = await api.get("/callcenter/ratings", {
+                    params: filterParams(companyId, filters, { page: targetPage, limit }),
+                })
+                setRatings(data.records ?? [])
+                setTotal(data.total ?? 0)
+            } catch (err) {
+                toast.error(apiError(err, "Erro ao buscar notas de atendimento"))
+            } finally {
+                setLoading(false)
+            }
+        },
+        // filters é recriado a cada render do caller - usar os campos primitivos como deps reais
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [companyId, limit, extensionId, number, score, startDate, endDate, order]
+    )
+
+    // qualquer mudança de filtro/empresa reseta a navegação para a 1ª página
+    useEffect(() => {
+        setPage(1)
+        fetchPage(1)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [fetchPage])
+
+    const goToPage = (targetPage: number) => {
+        setPage(targetPage)
+        fetchPage(targetPage)
+    }
 
     const createRating = async (form: CallRatingForm) => {
         const id = toast.loading("Registrando nota...")
         try {
             await api.post("/callcenter/ratings", form)
             toast.success("Nota registrada", { id })
-            await fetchRatings()
+            await fetchPage(page)
             return true
         } catch (err) {
             toast.error(apiError(err, "Erro ao registrar nota"), { id })
@@ -96,15 +125,57 @@ export function useCallRatings(
         }
     }
 
-    useEffect(() => {
-        fetchRatings()
-    }, [fetchRatings])
-
     return {
         ratings,
         total,
+        limit,
         loading,
-        fetchRatings,
+        page,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+        goToPage,
         createRating,
+    }
+}
+
+// Streaming CSV do backend (/callcenter/ratings/export) - sem limite de linhas, mesmo padrão de
+// downloadCdrExport (use-cdr.ts)
+export async function downloadCallRatingsExport(companyId: string, filters: CallRatingFilters = {}) {
+    const res = await api.get("/callcenter/ratings/export", {
+        params: filterParams(companyId, filters),
+        responseType: "blob",
+    })
+    const url = URL.createObjectURL(res.data as Blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = "notas-de-atendimento.csv"
+    a.click()
+    URL.revokeObjectURL(url)
+}
+
+function extractFilename(disposition: unknown, fallback: string): string {
+    if (typeof disposition !== "string") return fallback
+    const match = disposition.match(/filename="?([^"]+)"?/)
+    return match?.[1] ?? fallback
+}
+
+// Baixa a gravação da chamada vinculada à nota (/callcenter/ratings/:id/recording) - backend
+// resolve o CDR pelo uniqueid solto (sem FK), mesmo padrão de downloadCdrRecording (use-cdr.ts)
+export async function downloadCallRatingRecording(id: string, companyId: string) {
+    const toastId = toast.loading("Baixando gravação...")
+    try {
+        const res = await api.get(`/callcenter/ratings/${id}/recording`, {
+            params: { companyId },
+            responseType: "blob",
+        })
+        const filename = extractFilename(res.headers["content-disposition"], `nota-${id}.wav`)
+        const url = URL.createObjectURL(res.data as Blob)
+        const a = document.createElement("a")
+        a.href = url
+        a.download = filename
+        a.click()
+        URL.revokeObjectURL(url)
+        toast.success("Gravação baixada", { id: toastId })
+    } catch (err) {
+        toast.error(apiError(err, "Erro ao baixar gravação"), { id: toastId })
     }
 }

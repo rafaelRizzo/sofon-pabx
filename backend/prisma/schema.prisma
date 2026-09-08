@@ -845,19 +845,22 @@ model RoutingRule {
 // Nota de atendimento (1-5) capturada via IVR de pesquisa pós-chamada — fonte de dado para
 // AgentAffinity (Fase 2 recalcula a partir daqui).
 model CallRating {
-  id          String    @id @default(cuid())
-  companyId   String
-  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  extensionId String
-  extension   Extension @relation(fields: [extensionId], references: [id], onDelete: Cascade)
-  number      String    @db.VarChar(80) // número do cliente (CALLERID)
-  uniqueid    String?   @db.VarChar(150) // referência solta ao CDR, sem FK (cdr é fonte nativa do Asterisk)
-  score       Int
-  // "atendimento" (nota do agente, entra no cálculo de AgentAffinity/penalty) ou "servico" (nota
-  // do serviço contratado, só informativo — não influencia roteamento/afinidade)
-  category    String    @default("atendimento") @db.VarChar(20)
-  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+  id               String    @id @default(cuid())
+  companyId        String
+  company          Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  extensionId      String
+  extension        Extension @relation(fields: [extensionId], references: [id], onDelete: Cascade)
+  number           String    @db.VarChar(80) // número do cliente (CALLERID)
+  uniqueid         String?   @db.VarChar(150) // referência solta ao CDR, sem FK (cdr é fonte nativa do Asterisk)
+  // nota sobre o agente - entra no cálculo de AgentAffinity/penalty (ver affinity.service.ts)
+  scoreAtendimento Int?
+  // nota sobre o serviço/plano contratado - só informativo, não influencia roteamento/afinidade
+  scoreServico     Int?
+  createdAt        DateTime  @default(now()) @db.Timestamptz(3)
 
+  // 1 linha por chamada: as 2 perguntas da pesquisa (atendimento/serviço) fazem upsert na mesma
+  // linha via (companyId, uniqueid) em vez de criar uma linha por pergunta (ver ratings.service.ts)
+  @@unique([companyId, uniqueid])
   @@index([companyId, createdAt])
   @@index([extensionId, createdAt])
   @@map("call_ratings")

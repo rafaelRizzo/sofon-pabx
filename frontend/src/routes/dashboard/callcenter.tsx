@@ -4,7 +4,6 @@ import { createFileRoute } from "@tanstack/react-router"
 import { CompanyFilter } from "@/components/company-filter"
 import { PageHeader } from "@/components/page-header"
 import { AgentScopesPanel } from "@/components/Callcenter/agent-scopes-panel"
-import { CallRatingsPanel } from "@/components/Callcenter/call-ratings-panel"
 import { RoutingRulesPanel } from "@/components/Callcenter/routing-rules-panel"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useCompanies } from "@/hooks/use-companies"
@@ -18,7 +17,7 @@ function CallcenterPage() {
         <div className="flex flex-col gap-4">
             <PageHeader
                 title="Callcenter"
-                description="Elegibilidade de agentes, regras de prioridade e notas de atendimento por empresa"
+                description="Elegibilidade de agentes e regras de prioridade por empresa"
             />
 
             <CompanyFilter
@@ -42,18 +41,12 @@ function CallcenterPage() {
                         <TabsTrigger value="routing-rules">
                             Regras de prioridade
                         </TabsTrigger>
-                        <TabsTrigger value="ratings">
-                            Notas de atendimento
-                        </TabsTrigger>
                     </TabsList>
                     <TabsContent value="agent-scopes">
                         <AgentScopesPanel companyId={companyId} />
                     </TabsContent>
                     <TabsContent value="routing-rules">
                         <RoutingRulesPanel companyId={companyId} />
-                    </TabsContent>
-                    <TabsContent value="ratings">
-                        <CallRatingsPanel companyId={companyId} />
                     </TabsContent>
                 </Tabs>
             )}

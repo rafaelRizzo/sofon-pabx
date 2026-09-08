@@ -582,6 +582,9 @@ async function handleSurveyResult(conn: AgiConn, queueId: string, categoryRaw: s
     const extensionId = await agiGetVariable(conn, 'CC_EXTENSION_ID')
     const companyId = await agiGetVariable(conn, 'CC_COMPANY_ID')
     const number = await agiGetVariable(conn, 'CALLERID(num)')
+    // liga a nota ao CDR dessa mesma chamada (cdr.uniqueid) - permite baixar a gravação vinculada
+    // na tela de notas de atendimento; sem FK de propósito, cdr.uniqueid é solto (ver schema.prisma)
+    const uniqueid = await agiGetVariable(conn, 'UNIQUEID')
     if (!extensionId || !companyId || !number) {
         logger.warn({ event: 'agi.callcenter.survey_result.missing_context', queueId })
         await agiVerbose(conn, 'Survey Result: contexto da pesquisa perdido (canal sem CC_EXTENSION_ID/CC_COMPANY_ID)', 2)
@@ -589,7 +592,7 @@ async function handleSurveyResult(conn: AgiConn, queueId: string, categoryRaw: s
     }
 
     try {
-        await createRating({ companyId, extensionId, number, score, category })
+        await createRating({ companyId, extensionId, number, score, category, uniqueid: uniqueid ?? undefined })
         await agiVerbose(conn, `Survey Result: nota ${score} (${category}) registrada (ramal ${extensionId}, número ${number})`)
     } catch (error) {
         logger.warn({

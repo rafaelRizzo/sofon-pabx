@@ -3,8 +3,9 @@
 import { useState } from "react"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
-import { CalendarIcon, StarIcon } from "lucide-react"
+import { CalendarIcon, DownloadIcon, StarIcon } from "lucide-react"
 import type { DateRange } from "react-day-picker"
+import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -17,6 +18,7 @@ import {
     ComboboxItem,
     ComboboxList,
 } from "@/components/ui/combobox"
+import { DataPagination } from "@/components/data-pagination"
 import { Input } from "@/components/ui/input"
 import {
     Popover,
@@ -39,8 +41,13 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table"
-import { useCallRatings } from "@/hooks/use-call-ratings"
+import {
+    downloadCallRatingRecording,
+    downloadCallRatingsExport,
+    useCallRatings,
+} from "@/hooks/use-call-ratings"
 import { useExtensions, type Extension } from "@/hooks/use-extensions"
+import { apiError } from "@/lib/api"
 
 // "YYYY-MM-DD" -> Date local (evita o shift de fuso de "new Date(string)", que interpreta como UTC)
 function parseDateOnly(value: string): Date | undefined {
@@ -75,15 +82,19 @@ export function CallRatingsPanel({ companyId }: Props) {
     const [startDate, setStartDate] = useState("")
     const [endDate, setEndDate] = useState("")
     const [order, setOrder] = useState<"asc" | "desc">("desc")
+    const [exporting, setExporting] = useState(false)
 
-    const { ratings, total, loading } = useCallRatings(companyId, {
+    const filters = {
         extensionId: extensionId || undefined,
         number: number || undefined,
         score: score !== "all" ? Number(score) : undefined,
         startDate: startDate || undefined,
         endDate: endDate || undefined,
         order,
-    })
+    }
+
+    const { ratings, total, loading, page, totalPages, goToPage } =
+        useCallRatings(companyId, filters, 20)
 
     const selectedExtension =
         extensions.find((e) => e.id === extensionId) ?? null
@@ -107,13 +118,32 @@ export function CallRatingsPanel({ companyId }: Props) {
         setEndDate(range?.to ? format(range.to, "yyyy-MM-dd") : "")
     }
 
+    const handleExport = async () => {
+        setExporting(true)
+        const id = toast.loading("Gerando export...")
+        try {
+            await downloadCallRatingsExport(companyId, filters)
+            toast.success("Export gerado", { id })
+        } catch (err) {
+            toast.error(apiError(err, "Erro ao exportar notas"), { id })
+        } finally {
+            setExporting(false)
+        }
+    }
+
     return (
         <div className="flex flex-col gap-4">
-            <p className="text-sm text-muted-foreground">
-                Notas de 1 a 5 dadas pelo cliente na pesquisa de satisfação
-                pós-atendimento
-                {total > 0 && ` (${total} registro(s))`}.
-            </p>
+            <div className="flex items-center justify-between gap-2">
+                <p className="text-sm text-muted-foreground">
+                    Notas de 1 a 5 dadas pelo cliente na pesquisa de
+                    satisfação pós-atendimento
+                    {total > 0 && ` (${total} registro(s))`}.
+                </p>
+                <Button variant="outline" onClick={handleExport} disabled={exporting}>
+                    <DownloadIcon />
+                    Exportar
+                </Button>
+            </div>
 
             <div className="flex flex-wrap items-end gap-2">
                 <Combobox<Extension>
@@ -206,15 +236,19 @@ export function CallRatingsPanel({ companyId }: Props) {
                         <TableRow>
                             <TableHead>Ramal</TableHead>
                             <TableHead>Número</TableHead>
-                            <TableHead>Nota</TableHead>
+                            <TableHead>Atendimento</TableHead>
+                            <TableHead>Serviço contratado</TableHead>
                             <TableHead>Data</TableHead>
+                            <TableHead className="text-center">
+                                Ações
+                            </TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {loading ? (
                             Array.from({ length: 3 }).map((_, i) => (
                                 <TableRow key={i}>
-                                    {Array.from({ length: 4 }).map((_, j) => (
+                                    {Array.from({ length: 6 }).map((_, j) => (
                                         <TableCell key={j}>
                                             <Skeleton className="h-4 w-full" />
                                         </TableCell>
@@ -224,7 +258,7 @@ export function CallRatingsPanel({ companyId }: Props) {
                         ) : ratings.length === 0 ? (
                             <TableRow>
                                 <TableCell
-                                    colSpan={4}
+                                    colSpan={6}
                                     className="h-24 text-center text-muted-foreground"
                                 >
                                     Nenhuma nota registrada
@@ -238,18 +272,56 @@ export function CallRatingsPanel({ companyId }: Props) {
                                     </TableCell>
                                     <TableCell>{rating.number}</TableCell>
                                     <TableCell>
-                                        <Badge
-                                            variant="outline"
-                                            className="gap-1.5"
-                                        >
-                                            <StarIcon className="size-3" />
-                                            {rating.score}/5
-                                        </Badge>
+                                        {rating.scoreAtendimento != null ? (
+                                            <Badge
+                                                variant="outline"
+                                                className="gap-1.5"
+                                            >
+                                                <StarIcon className="size-3" />
+                                                {rating.scoreAtendimento}/5
+                                            </Badge>
+                                        ) : (
+                                            "-"
+                                        )}
+                                    </TableCell>
+                                    <TableCell>
+                                        {rating.scoreServico != null ? (
+                                            <Badge
+                                                variant="outline"
+                                                className="gap-1.5"
+                                            >
+                                                <StarIcon className="size-3" />
+                                                {rating.scoreServico}/5
+                                            </Badge>
+                                        ) : (
+                                            "-"
+                                        )}
                                     </TableCell>
                                     <TableCell className="text-muted-foreground">
                                         {new Date(
                                             rating.createdAt
                                         ).toLocaleString("pt-BR")}
+                                    </TableCell>
+                                    <TableCell className="text-center">
+                                        {rating.hasRecording ? (
+                                            <Button
+                                                variant="ghost"
+                                                size="icon-sm"
+                                                onClick={() =>
+                                                    downloadCallRatingRecording(
+                                                        rating.id,
+                                                        companyId
+                                                    )
+                                                }
+                                            >
+                                                <DownloadIcon />
+                                                <span className="sr-only">
+                                                    Baixar gravação
+                                                </span>
+                                            </Button>
+                                        ) : (
+                                            "-"
+                                        )}
                                     </TableCell>
                                 </TableRow>
                             ))
@@ -257,6 +329,13 @@ export function CallRatingsPanel({ companyId }: Props) {
                     </TableBody>
                 </Table>
             </div>
+
+            <DataPagination
+                page={page}
+                totalPages={totalPages}
+                total={total}
+                onPageChange={goToPage}
+            />
         </div>
     )
 }

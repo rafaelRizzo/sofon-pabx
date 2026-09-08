@@ -15,7 +15,7 @@ import * as RatingsService from '../ratings.service'
 
 const COMPANY = { id: 'c1', asteriskId: 'ast1' }
 const EXT = { id: 'e1', alias: '2001', name: 'Agent', type: 'pjsip', context: 'ramais', allowOutbound: true, companyId: 'c1', createdAt: new Date(), updatedAt: new Date() }
-const RATING = { id: 'rt1', companyId: 'c1', extensionId: 'e1', number: '11999998888', uniqueid: '1234.5', score: 5, createdAt: new Date() }
+const RATING = { id: 'rt1', companyId: 'c1', extensionId: 'e1', number: '11999998888', uniqueid: '1234.5', scoreAtendimento: 5, scoreServico: null, createdAt: new Date() }
 
 const BASE_QUERY = { companyId: 'c1', limit: 50, order: 'desc' } as any
 
@@ -66,7 +66,7 @@ describe('RatingsService.getRatingsByCompany', () => {
         }))
     })
 
-    it('applies score filter', async () => {
+    it('applies score filter (bate em scoreAtendimento OU scoreServico)', async () => {
         db.company.findUnique.mockResolvedValue(COMPANY)
         db.callRating.findMany.mockResolvedValue([])
         db.callRating.count.mockResolvedValue(0)
@@ -74,19 +74,10 @@ describe('RatingsService.getRatingsByCompany', () => {
         await RatingsService.getRatingsByCompany({ ...BASE_QUERY, score: 5 })
 
         expect(db.callRating.findMany).toHaveBeenCalledWith(expect.objectContaining({
-            where: expect.objectContaining({ companyId: 'c1', score: 5 }),
-        }))
-    })
-
-    it('applies category filter', async () => {
-        db.company.findUnique.mockResolvedValue(COMPANY)
-        db.callRating.findMany.mockResolvedValue([])
-        db.callRating.count.mockResolvedValue(0)
-
-        await RatingsService.getRatingsByCompany({ ...BASE_QUERY, category: 'servico' })
-
-        expect(db.callRating.findMany).toHaveBeenCalledWith(expect.objectContaining({
-            where: expect.objectContaining({ companyId: 'c1', category: 'servico' }),
+            where: expect.objectContaining({
+                companyId: 'c1',
+                OR: [{ scoreAtendimento: 5 }, { scoreServico: 5 }],
+            }),
         }))
     })
 })
@@ -109,7 +100,7 @@ describe('RatingsService.createRating', () => {
             .rejects.toMatchObject({ statusCode: 404 })
     })
 
-    it('creates rating', async () => {
+    it('creates rating without uniqueid (no merge possible)', async () => {
         db.company.findUnique.mockResolvedValue(COMPANY)
         db.extension.findUnique.mockResolvedValue(EXT)
         db.callRating.create.mockResolvedValue(RATING)
@@ -117,5 +108,25 @@ describe('RatingsService.createRating', () => {
             companyId: 'c1', extensionId: 'e1', number: '11999998888', score: 5, category: 'atendimento',
         }) as any
         expect(rating.id).toBe('rt1')
+        expect(db.callRating.create).toHaveBeenCalledWith({
+            data: { companyId: 'c1', extensionId: 'e1', number: '11999998888', uniqueid: undefined, scoreAtendimento: 5 },
+        })
+        expect(db.callRating.upsert).not.toHaveBeenCalled()
+    })
+
+    it('upserts by companyId+uniqueid so the 2 survey questions land on the same row', async () => {
+        db.company.findUnique.mockResolvedValue(COMPANY)
+        db.extension.findUnique.mockResolvedValue(EXT)
+        db.callRating.upsert.mockResolvedValue(RATING)
+
+        await RatingsService.createRating({
+            companyId: 'c1', extensionId: 'e1', number: '11999998888', uniqueid: '1234.5', score: 4, category: 'servico',
+        })
+
+        expect(db.callRating.upsert).toHaveBeenCalledWith({
+            where: { companyId_uniqueid: { companyId: 'c1', uniqueid: '1234.5' } },
+            update: { extensionId: 'e1', number: '11999998888', scoreServico: 4 },
+            create: { companyId: 'c1', extensionId: 'e1', number: '11999998888', uniqueid: '1234.5', scoreServico: 4 },
+        })
     })
 })
