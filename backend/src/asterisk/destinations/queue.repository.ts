@@ -97,6 +97,10 @@ export const AsteriskQueueRepository = {
                 joinempty: data.joinEmpty ? 'yes' : 'no',
                 leavewhenempty: data.leaveWhenEmpty ? 'yes' : 'no',
                 weight: data.weight,
+                // sem isso, Queue() nunca seta MEMBERINTERFACE no canal do caller (default do
+                // Asterisk é "no") - AGI queue-survey depende dessa variável pra identificar o
+                // agente que atendeu, ver handleQueueSurvey em agi-server.ts
+                setinterfacevar: 'yes',
             },
         })
     },
@@ -107,6 +111,9 @@ export const AsteriskQueueRepository = {
     // busca ser um no-op silencioso e o upsert seguinte criava uma segunda linha órfã.
     // oldAsteriskName === newAsteriskName quando não há rename (só update de campos).
     async updateQueue(tx: Tx, appQueueId: string, oldAsteriskName: string, newAsteriskName: string, update: Record<string, any>) {
+        // autocura filas criadas antes dessa coluna existir - toda edição já deixa setinterfacevar
+        // correto, sem precisar de backfill (ver mesmo motivo em createQueue acima)
+        update = { ...update, setinterfacevar: 'yes' }
         const existing = await tx.queues.findUnique({ where: { appQueueId } })
         if (existing) {
             if (existing.name !== newAsteriskName)

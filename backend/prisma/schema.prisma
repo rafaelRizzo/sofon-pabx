@@ -1253,6 +1253,7 @@ model queues {
   weight               Int?    @default(0)
   reportholdtime       String? @default("no") @db.VarChar(10)
   ringinuse            String? @default("yes") @db.VarChar(10)
+  setinterfacevar      String? @default("no") @db.VarChar(10)
 }
 
 // uniqueid é o nome exato que o Asterisk Realtime espera — não renomear para id
