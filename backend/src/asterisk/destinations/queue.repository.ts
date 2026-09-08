@@ -230,6 +230,11 @@ export const AsteriskQueueRepository = {
                 const asteriskName = toAsteriskQueueName(asteriskId, q.number)
                 const { app, appdata } = await resolvePostQueueDestination(edges.get(q.id)?.default ?? null)
 
+                // autocura setinterfacevar (ver createQueue/updateQueue) pra filas que existiam
+                // antes dessa coluna - regenerate() já roda em todo restart via backfill-dialplan-
+                // files.ts, então isso se aplica sozinho sem precisar salvar cada fila manualmente
+                await prisma.queues.updateMany({ where: { name: asteriskName }, data: { setinterfacevar: 'yes' } })
+
                 // callcenterEnabled=false: fila roda 100% nativa, sem o AGI de pré-roteamento
                 // (RoutingRule/QUEUE_PRIO) - pesquisa (priority AGI queue-survey) segue independente,
                 // gated pelo próprio surveyAudioId dentro do handler

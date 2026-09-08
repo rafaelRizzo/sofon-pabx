@@ -576,11 +576,12 @@ async function handleSurveyResult(conn: AgiConn, queueId: string, categoryRaw: s
     }
     const category = categoryRaw as SurveyCategory
 
-    const [extensionId, companyId, number] = await Promise.all([
-        agiGetVariable(conn, 'CC_EXTENSION_ID'),
-        agiGetVariable(conn, 'CC_COMPANY_ID'),
-        agiGetVariable(conn, 'CALLERID(num)'),
-    ])
+    // sequencial de propósito (nunca Promise.all) - comandos AGI não podem ser concorrentes no
+    // mesmo socket (ver comentário na linha 144); Promise.all aqui travava o AGI pra sempre porque
+    // só o 1º GET VARIABLE chegava a ser enviado, o resto ficava esperando resposta que nunca vinha
+    const extensionId = await agiGetVariable(conn, 'CC_EXTENSION_ID')
+    const companyId = await agiGetVariable(conn, 'CC_COMPANY_ID')
+    const number = await agiGetVariable(conn, 'CALLERID(num)')
     if (!extensionId || !companyId || !number) {
         logger.warn({ event: 'agi.callcenter.survey_result.missing_context', queueId })
         await agiVerbose(conn, 'Survey Result: contexto da pesquisa perdido (canal sem CC_EXTENSION_ID/CC_COMPANY_ID)', 2)
