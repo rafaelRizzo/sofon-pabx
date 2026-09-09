@@ -66,6 +66,19 @@ const EMPTY_RANGE: TimeRangeForm = {
     months: "*",
 }
 
+// Pré-preenchimento padrão pra grupo novo: seg-sex 08-18h + sáb 08-12h,
+// o horário comercial mais comum entre os clientes
+const DEFAULT_RANGES: TimeRangeForm[] = [
+    { ...EMPTY_RANGE },
+    {
+        startTime: "08:00",
+        endTime: "12:00",
+        weekdays: ["sat"],
+        monthdays: "*",
+        months: "*",
+    },
+]
+
 type Props = {
     open: boolean
     onOpenChange: (open: boolean) => void
@@ -100,7 +113,7 @@ export function TimeGroupFormDialog({
         defaultValues: {
             name: "",
             companyId: defaultCompanyId,
-            ranges: [{ ...EMPTY_RANGE }],
+            ranges: DEFAULT_RANGES.map((r) => ({ ...r })),
         } as any,
     })
 
@@ -124,7 +137,7 @@ export function TimeGroupFormDialog({
                       monthdays: r.monthdays,
                       months: r.months,
                   }))
-                : [{ ...EMPTY_RANGE }],
+                : DEFAULT_RANGES.map((r) => ({ ...r })),
         })
     }, [open, timeGroup, reset, defaultCompanyId])
 
