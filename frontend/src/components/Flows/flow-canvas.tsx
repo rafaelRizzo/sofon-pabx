@@ -24,12 +24,15 @@ import {
 import "@xyflow/react/dist/style.css"
 import "@/components/Flows/flow-canvas.css"
 import {
+    CloudIcon,
+    CloudOffIcon,
     Loader2Icon,
     LockIcon,
     MinusIcon,
     PanelRightCloseIcon,
     PanelRightOpenIcon,
     PlusIcon,
+    SaveIcon,
     SearchIcon,
     UnlockIcon,
     WandSparklesIcon,
@@ -40,6 +43,8 @@ import { api, apiError, isValidationError } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog"
 import {
     ROUTE_DEST_ICONS,
@@ -89,6 +94,16 @@ import {
     clearPendingForNode,
     type EdgeOperation,
 } from "@/lib/flow-canvas-db"
+import {
+    saveFlowDraft,
+    loadFlowDraft,
+    clearFlowDraft,
+    isDraftDirty,
+    type DraftNodeCreation,
+    type DraftResourceCreation,
+    type DraftResourceUpdate,
+    type DraftResourceDeletion,
+} from "@/lib/flow-draft-db"
 import {
     useFlowHistory,
     type HistoryAction,
@@ -143,6 +158,8 @@ import {
     type IvrMenuCreationDto,
     type IvrMenuForm,
 } from "@/hooks/use-ivr"
+import { useExtensions, type ExtensionUpdateForm } from "@/hooks/use-extensions"
+import { useFlows } from "@/hooks/use-flows"
 
 const START_KEY = "start"
 const MINI_MAP_IDLE_DELAY = 1200
@@ -150,6 +167,13 @@ const EDGE_SYNC_DEBOUNCE_MS = 350
 const EDGE_SYNC_MAX_DELAY_MS = 30000
 const NODE_PANEL_STORAGE_KEY = "flow-canvas:node-panel-open"
 const NODE_ACTION_DRAG_TYPE = "application/flow-node-action"
+// Prefixos dos ids locais usados só quando auto save está desligado - nunca mandados pro backend
+// como se fossem reais (ver saveDraft: todo id com esse prefixo é resolvido pro id de verdade antes
+// de qualquer chamada de API). "pending:" (já existente) continua sendo só o id efêmero do meio
+// segundo entre o POST otimista e a resposta do backend com auto save ligado - semântica diferente.
+const DRAFT_NODE_PREFIX = "draft-node:"
+const DRAFT_RES_PREFIX = "draft-res:"
+const autoSaveStorageKey = (flowId: string) => `flow-canvas:autosave:${flowId}`
 
 // Handles dos nós são Top (target) / Bottom (source) - o flow lê de cima pra baixo, então o
 // auto-layout roda na mesma direção pra não gerar setas em ziguezague ou de baixo pra cima.
@@ -248,7 +272,9 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
         refetchNodes,
         setEdges: setFlowEdges,
     } = flowNodesState
-    const { allIvrMenus, createIvrMenu } = useIvr(flow.companyId)
+    const { allIvrMenus, createIvrMenu, updateIvrMenu } = useIvr(
+        flow.companyId
+    )
     const ivrById = useMemo(
         () => new Map(allIvrMenus.map((menu) => [menu.id, menu])),
         [allIvrMenus]
@@ -320,6 +346,91 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
     const flowInstanceRef = useRef<ReactFlowInstance | null>(null)
     const contextPositionRef = useRef<{ x: number; y: number } | null>(null)
 
+    // Auto save: ligado (padrão, preserva o comportamento de sempre) = toda edição vai pro backend
+    // na hora, como já acontecia. Desligado = nada sai daqui - fica só nestes refs + IndexedDB
+    // (flow-draft-db.ts) até o usuário clicar em "Salvar" (ver saveDraft abaixo). Por flow
+    // (localStorage), não global - flows diferentes podem ter preferências diferentes.
+    const [autoSave, setAutoSaveState] = useState<boolean>(
+        () => localStorage.getItem(autoSaveStorageKey(flow.id)) !== "off"
+    )
+    const autoSaveRef = useRef(autoSave)
+    useEffect(() => {
+        autoSaveRef.current = autoSave
+    }, [autoSave])
+    // nós/recursos criados 100% dentro do draft atual (nunca existiram no backend) - chave = localId
+    // (nó) / draftId (recurso). "Cancelar" (excluir antes de salvar) só remove daqui, sem rede.
+    const draftNodeCreations = useRef(new Map<string, DraftNodeCreation>())
+    const draftResourceCreations = useRef(
+        new Map<string, DraftResourceCreation>()
+    )
+    // edição de recurso que já existia antes deste draft - last-write-wins por resourceId
+    const draftResourceUpdates = useRef(new Map<string, DraftResourceUpdate>())
+    // exclusão de nó+recurso que já existiam antes deste draft - chave = nodeId
+    const draftResourceDeletions = useRef(
+        new Map<string, DraftResourceDeletion>()
+    )
+    // exclusão de nó (sem recurso, ex. "extension"/"flow") que já existia antes deste draft
+    const draftNodeDeletions = useRef(new Set<string>())
+    const draftEntry = useRef<{
+        dirty: boolean
+        nodeId: string | null
+        isEntry: boolean
+    }>({ dirty: false, nodeId: null, isEntry: true })
+    const draftStart = useRef<{
+        dirty: boolean
+        position: { x: number; y: number } | null
+    }>({ dirty: false, position: null })
+    const draftPersistTimer = useRef<ReturnType<typeof setTimeout> | null>(
+        null
+    )
+    const [draftVersion, setDraftVersion] = useState(0)
+    const [isSavingDraft, setIsSavingDraft] = useState(false)
+
+    // Grava o snapshot inteiro do draft (debounced) - só o suficiente pra sobreviver a reload/fechar
+    // aba enquanto auto save está desligado; posição de nó e conexão de edge continuam usando o
+    // buffer próprio já existente (flow-canvas-db.ts), reaproveitado tal como está.
+    const persistDraftSnapshot = useCallback(() => {
+        if (draftPersistTimer.current) clearTimeout(draftPersistTimer.current)
+        draftPersistTimer.current = setTimeout(() => {
+            void saveFlowDraft({
+                flowId: flow.id,
+                nodeCreations: [...draftNodeCreations.current.values()],
+                resourceCreations: [...draftResourceCreations.current.values()],
+                resourceUpdates: [...draftResourceUpdates.current.values()],
+                resourceDeletions: [
+                    ...draftResourceDeletions.current.values(),
+                ],
+                nodeDeletions: [...draftNodeDeletions.current],
+                entryDirty: draftEntry.current.dirty,
+                entryNodeId: draftEntry.current.nodeId,
+                entryIsEntry: draftEntry.current.isEntry,
+                startDirty: draftStart.current.dirty,
+                startPosition: draftStart.current.position,
+            })
+        }, 300)
+    }, [flow.id])
+
+    // Chamar depois de QUALQUER mutação nos refs de draft acima - persiste em IndexedDB e força
+    // re-render pra badge de "N alterações pendentes" (refs sozinhos não disparam re-render).
+    const markDraftDirty = useCallback(() => {
+        persistDraftSnapshot()
+        setDraftVersion((v) => v + 1)
+    }, [persistDraftSnapshot])
+
+    const draftDirtyCount = useMemo(
+        () =>
+            draftNodeCreations.current.size +
+            draftResourceUpdates.current.size +
+            draftResourceDeletions.current.size +
+            draftNodeDeletions.current.size +
+            (draftEntry.current.dirty ? 1 : 0) +
+            (draftStart.current.dirty ? 1 : 0) +
+            pendingPositions.current.size +
+            pendingEdgeOperations.current.size,
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [draftVersion]
+    )
+
     // Histórico undo/redo (ver flow-history.ts) - em memória, zerado ao desmontar (trocar de flow
     // ou recarregar a página).
     const history = useFlowHistory()
@@ -358,15 +469,19 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
     // Hooks de criação por tipo de recurso - usados só pra recriar um recurso excluído/desfeito
     // (ver recreateResource abaixo). O form de edição/criação de cada tipo já usa esses mesmos
     // hooks em edit-node-dialog.tsx/create-node-dialog.tsx.
-    const { createAnnouncement } = useAnnouncements()
-    const { createQueue } = useQueues()
-    const { createRequestTemplate } = useRequestTemplates()
-    const { createIxcNode } = useIxcNodes()
-    const { createFormatterNode } = useFormatterNodes()
-    const { createTimeCondition } = useTimeConditions()
-    const { createHolidayGroup } = useHolidayGroups()
-    const { createVariableSet } = useVariables()
-    const { createVariableCondition } = useVariableConditions()
+    const { createAnnouncement, updateAnnouncement } = useAnnouncements()
+    const { createQueue, updateQueue } = useQueues()
+    const { createRequestTemplate, updateRequestTemplate } =
+        useRequestTemplates()
+    const { createIxcNode, updateIxcNode } = useIxcNodes()
+    const { createFormatterNode, updateFormatterNode } = useFormatterNodes()
+    const { createTimeCondition, updateTimeCondition } = useTimeConditions()
+    const { createHolidayGroup, updateHolidayGroup } = useHolidayGroups()
+    const { createVariableSet, updateVariableSet } = useVariables()
+    const { createVariableCondition, updateVariableCondition } =
+        useVariableConditions()
+    const { updateExtension } = useExtensions()
+    const { updateFlow } = useFlows()
 
     const showMiniMap = useCallback(() => {
         if (miniMapTimer.current) clearTimeout(miniMapTimer.current)
@@ -433,6 +548,9 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
     }, [flowNodes])
 
     const scheduleEdgeSync = useCallback((delay = EDGE_SYNC_DEBOUNCE_MS) => {
+        // auto save desligado: a operação já foi gravada em IndexedDB por queueEdgeOperation (linha
+        // abaixo) - só não agenda o envio pro backend. saveDraft chama flushEdgeOperations() direto.
+        if (!autoSaveRef.current) return
         if (edgeSyncTimer.current) clearTimeout(edgeSyncTimer.current)
         edgeSyncTimer.current = setTimeout(
             () => flushEdgeOperationsRef.current(),
@@ -550,8 +668,9 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
             void savePendingEdgeOp(flow.id, key, operation)
             setFlowEdges((current) => applyEdgeOperations(current, [operation]))
             scheduleEdgeSync()
+            if (!autoSaveRef.current) markDraftDirty()
         },
-        [flow.id, scheduleEdgeSync, setFlowEdges]
+        [flow.id, scheduleEdgeSync, setFlowEdges, markDraftDirty]
     )
 
     const disconnectNodes = useCallback(
@@ -686,7 +805,23 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
     // fez seu próprio removeNodeFromCanvas e só precisa do resultado awaitable da chamada HTTP.
     const deleteNodeCore = useCallback(
         async (nodeId: string) => {
+            // nó criado neste mesmo draft (nunca existiu no backend) - cancela a criação, sem rede.
+            // Só remove draftNodeCreations: igual ao fluxo online, apagar o card não apaga o
+            // recurso por trás dele (isso é "excluir recurso", ver deleteResourceCore abaixo) -
+            // então o recurso do draft, se houver, continua marcado pra ser criado no "Salvar".
+            if (draftNodeCreations.current.has(nodeId)) {
+                draftNodeCreations.current.delete(nodeId)
+                pendingNodeIds.current.delete(nodeId)
+                markDraftDirty()
+                return true
+            }
             if (pendingNodeIds.current.has(nodeId)) return true
+            if (!autoSaveRef.current) {
+                // nó real (existia antes deste draft) - só enfileira, sem chamar a API agora.
+                draftNodeDeletions.current.add(nodeId)
+                markDraftDirty()
+                return true
+            }
             setDeletingNodeCount((count) => count + 1)
             try {
                 await api.delete(`/flows/${flow.id}/nodes/${nodeId}`)
@@ -703,7 +838,7 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
                 setDeletingNodeCount((count) => count - 1)
             }
         },
-        [flow.id, reconcileNodes]
+        [flow.id, reconcileNodes, markDraftDirty]
     )
 
     const deleteNode = useCallback(
@@ -739,6 +874,28 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
             type: CanvasNodeType
             resourceId: string
         }) => {
+            const isDraftNode = draftNodeCreations.current.has(target.nodeId)
+            const isDraftResource = draftResourceCreations.current.has(
+                target.resourceId
+            )
+            if (isDraftNode || isDraftResource || !autoSaveRef.current) {
+                // recurso (e/ou nó) criado neste mesmo draft - cancela, sem rede.
+                if (isDraftNode) draftNodeCreations.current.delete(target.nodeId)
+                if (isDraftResource)
+                    draftResourceCreations.current.delete(target.resourceId)
+                // recurso real (já existia antes deste draft) - enfileira a exclusão de verdade pro
+                // "Salvar" (ver saveDraft - lá resolve se o nó também precisa ser apagado ou se,
+                // como aqui, o nó nunca existiu de verdade e só o recurso precisa sair).
+                else
+                    draftResourceDeletions.current.set(target.nodeId, {
+                        nodeId: target.nodeId,
+                        type: target.type,
+                        resourceId: target.resourceId,
+                    })
+                pendingNodeIds.current.delete(target.nodeId)
+                markDraftDirty()
+                return true
+            }
             try {
                 await api.post(
                     `/flows/${flow.id}/nodes/${target.nodeId}/resource-deletion-check`
@@ -759,7 +916,7 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
                 return false
             }
         },
-        [flow.id, reconcileNodes]
+        [flow.id, reconcileNodes, markDraftDirty]
     )
 
     const deleteResource = useCallback(async () => {
@@ -826,6 +983,13 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
             const from = entryNodeIdRef.current
             setEntryNodeId(nodeId)
             history.push({ kind: "change-entry", from, to: nodeId })
+            if (!autoSaveRef.current) {
+                // nodeId pode ser um id local (nó criado neste mesmo draft) - resolveNodeId em
+                // saveDraft traduz pro id real depois que o nó for materializado no backend.
+                draftEntry.current = { dirty: true, nodeId, isEntry: true }
+                markDraftDirty()
+                return Promise.resolve(true)
+            }
             return api
                 .put(`/flows/${flow.id}/nodes/${nodeId}`, { isEntry: true })
                 .then(
@@ -843,7 +1007,7 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
                     }
                 )
         },
-        [flow.id, reconcileNodes, setEntryNodeId, history]
+        [flow.id, reconcileNodes, setEntryNodeId, history, markDraftDirty]
     )
 
     const clearEntry = useCallback(
@@ -851,6 +1015,11 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
             const from = entryNodeIdRef.current
             setEntryNodeId((current) => (current === nodeId ? null : current))
             history.push({ kind: "change-entry", from, to: null })
+            if (!autoSaveRef.current) {
+                draftEntry.current = { dirty: true, nodeId, isEntry: false }
+                markDraftDirty()
+                return Promise.resolve(true)
+            }
             return api
                 .put(`/flows/${flow.id}/nodes/${nodeId}`, { isEntry: false })
                 .then(
@@ -868,7 +1037,7 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
                     }
                 )
         },
-        [flow.id, reconcileNodes, setEntryNodeId, history]
+        [flow.id, reconcileNodes, setEntryNodeId, history, markDraftDirty]
     )
 
     // Recria um recurso a partir do DTO de criação capturado antes da exclusão (ver
@@ -985,6 +1154,66 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
         ]
     )
 
+    // Mesma fórmula de label usada em create-node-dialog.tsx ao criar cada tipo - reaproveitada
+    // aqui pra nomear um recurso de rascunho (sem back-end pra devolver o registro completo ainda).
+    const labelForDraftResource = useCallback(
+        (type: CanvasNodeType, form: Record<string, unknown>): string => {
+            if (type === "queue")
+                return `${form.name as string} (${form.number as string})`
+            return (form.name as string) ?? "Recurso"
+        },
+        []
+    )
+
+    // Registra um form de criação como rascunho local (sem nenhuma chamada de rede) e devolve um id
+    // local (draft-res:<uuid>) pra usar no lugar do resourceId real - só materializa de verdade
+    // (recreateResource) no clique de "Salvar" (ver saveDraft).
+    const createDraftResource = useCallback(
+        (
+            type: CanvasNodeType,
+            form: unknown,
+            label: string,
+            companyId: string
+        ): string => {
+            const draftId = `${DRAFT_RES_PREFIX}${crypto.randomUUID()}`
+            draftResourceCreations.current.set(draftId, {
+                draftId,
+                type,
+                companyId,
+                form,
+                label,
+            })
+            markDraftDirty()
+            return draftId
+        },
+        [markDraftDirty]
+    )
+
+    // Variante de recreateResource usada pelo histórico de undo/redo (applyHistoryAction): com auto
+    // save desligado, "recriar" um recurso excluído (ou refazer uma criação desfeita) não pode
+    // chamar a API de verdade - vira só outro registro de rascunho, exatamente como se o usuário
+    // tivesse criado o recurso agora pela primeira vez.
+    const recreateResourceDraftAware = useCallback(
+        async (
+            type: CanvasNodeType,
+            creationDto: unknown,
+            companyId: string
+        ): Promise<string | null> => {
+            if (!autoSaveRef.current)
+                return createDraftResource(
+                    type,
+                    creationDto,
+                    labelForDraftResource(
+                        type,
+                        creationDto as Record<string, unknown>
+                    ),
+                    companyId
+                )
+            return recreateResource(type, creationDto, companyId)
+        },
+        [createDraftResource, labelForDraftResource, recreateResource]
+    )
+
     // Retorna o id local otimista imediatamente (contrato síncrono já usado pelos chamadores
     // interativos, ex. conectar na sequência) e, à parte, `result` - promise que resolve o
     // sucesso/falha da criação de verdade. `applyHistoryAction` usa `result` pra saber se um
@@ -998,7 +1227,13 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
             localId: string
             result: Promise<{ ok: true; nodeId: string } | { ok: false }>
         } => {
-            const localId = `pending:${crypto.randomUUID()}`
+            // auto save desligado: nunca some prefixo pending: (que sinaliza "em voo, resolve em
+            // instantes") - draft-node: fica assim indefinidamente, só materializa de verdade no
+            // clique de "Salvar" (ver saveDraft, que realiza cada entrada de draftNodeCreations na
+            // ordem e substitui o id local pelo real em todo lugar que o referencia).
+            const localId = !autoSaveRef.current
+                ? `${DRAFT_NODE_PREFIX}${crypto.randomUUID()}`
+                : `pending:${crypto.randomUUID()}`
             const now = new Date().toISOString()
             pendingNodeIds.current.add(localId)
             setFlowNodes((current) => [
@@ -1014,6 +1249,21 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
                     updatedAt: now,
                 } satisfies FlowNodeInstance,
             ])
+
+            if (!autoSaveRef.current) {
+                draftNodeCreations.current.set(localId, {
+                    localId,
+                    type,
+                    resourceId: option.id,
+                    label: option.label ?? null,
+                    position,
+                })
+                markDraftDirty()
+                return {
+                    localId,
+                    result: Promise.resolve({ ok: true, nodeId: localId }),
+                }
+            }
 
             const result = api
                 .post(`/flows/${flow.id}/nodes`, {
@@ -1145,6 +1395,7 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
             scheduleEdgeSync,
             setFlowEdges,
             setFlowNodes,
+            markDraftDirty,
         ]
     )
 
@@ -1318,11 +1569,15 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
             )
             pendingPositions.current.set(nodeId, position)
             void savePendingPosition(flow.id, nodeId, position)
-            if (saveTimer.current) clearTimeout(saveTimer.current)
-            saveTimer.current = setTimeout(
-                () => void persistPositions(),
-                flushDelay
-            )
+            // auto save desligado: a posição já está em IndexedDB (linha acima) - não agenda o PUT.
+            // saveDraft chama persistPositions() direto pra despejar tudo de uma vez no "Salvar".
+            if (autoSaveRef.current) {
+                if (saveTimer.current) clearTimeout(saveTimer.current)
+                saveTimer.current = setTimeout(
+                    () => void persistPositions(),
+                    flushDelay
+                )
+            } else markDraftDirty()
             if (
                 recordHistory &&
                 previous &&
@@ -1335,7 +1590,7 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
                     to: position,
                 })
         },
-        [flow.id, persistPositions, setFlowNodes, history]
+        [flow.id, persistPositions, setFlowNodes, history, markDraftDirty]
     )
 
     // Idem, pro nó sintético Início (posição guardada à parte, ver comentário de startPosition
@@ -1358,6 +1613,11 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
                     })
                 return position
             })
+            if (!autoSaveRef.current) {
+                draftStart.current = { dirty: true, position }
+                markDraftDirty()
+                return
+            }
             if (startSaveTimer.current) clearTimeout(startSaveTimer.current)
             startSaveTimer.current = setTimeout(() => {
                 void api
@@ -1381,7 +1641,7 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
                     })
             }, flushDelay)
         },
-        [flow.id, history]
+        [flow.id, history, markDraftDirty]
     )
 
     // Auto-layout (ELK, algoritmo "layered"): recalcula a posição de todos os nós a partir das
@@ -1579,7 +1839,7 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
                         if (!ok)
                             throw new Error("undo create-resource-node failed")
                     } else {
-                        const resourceId = await recreateResource(
+                        const resourceId = await recreateResourceDraftAware(
                             action.resourceType,
                             action.creationDto,
                             flow.companyId
@@ -1649,7 +1909,7 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
                 }
                 case "delete-resource": {
                     if (direction === "undo") {
-                        const resourceId = await recreateResource(
+                        const resourceId = await recreateResourceDraftAware(
                             action.resourceType,
                             action.creationDto,
                             flow.companyId
@@ -1719,9 +1979,396 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
             deleteNodeCore,
             deleteResourceCore,
             createNode,
-            recreateResource,
+            recreateResourceDraftAware,
             flow.companyId,
         ]
+    )
+
+    // Aplica de verdade a edição de um recurso que já existia antes deste draft - contraparte de
+    // recreateResource, usada só por saveDraft (auto save ligado nunca passa por aqui, o form já
+    // chama updateXxx direto, ver edit-node-dialog.tsx).
+    const updateResourceGeneric = useCallback(
+        async (
+            type: CanvasNodeType,
+            resourceId: string,
+            form: unknown
+        ): Promise<boolean> => {
+            switch (type) {
+                case "announcement":
+                    return updateAnnouncement(
+                        resourceId,
+                        form as AnnouncementForm
+                    )
+                case "queue":
+                    return updateQueue(resourceId, form as QueueUpdateForm)
+                case "request":
+                    return updateRequestTemplate(
+                        resourceId,
+                        form as RequestTemplateUpdateForm
+                    )
+                case "ixc":
+                    return updateIxcNode(
+                        resourceId,
+                        form as IxcNodeUpdateForm
+                    )
+                case "formatter":
+                    return updateFormatterNode(
+                        resourceId,
+                        form as FormatterNodeUpdateForm
+                    )
+                case "timecondition":
+                    return updateTimeCondition(
+                        resourceId,
+                        form as TimeConditionForm
+                    )
+                case "holiday":
+                    return updateHolidayGroup(
+                        resourceId,
+                        form as HolidayGroupUpdateForm
+                    )
+                case "variable-set":
+                    return updateVariableSet(
+                        resourceId,
+                        form as VariableSetUpdateForm
+                    )
+                case "variable-condition":
+                    return updateVariableCondition(
+                        resourceId,
+                        form as VariableConditionUpdateForm
+                    )
+                case "ivr":
+                    return updateIvrMenu(resourceId, form as IvrMenuForm)
+                case "extension":
+                    return updateExtension(
+                        resourceId,
+                        form as ExtensionUpdateForm
+                    )
+                case "flow":
+                    return updateFlow(resourceId, form as { name: string })
+            }
+        },
+        [
+            updateAnnouncement,
+            updateQueue,
+            updateRequestTemplate,
+            updateIxcNode,
+            updateFormatterNode,
+            updateTimeCondition,
+            updateHolidayGroup,
+            updateVariableSet,
+            updateVariableCondition,
+            updateIvrMenu,
+            updateExtension,
+            updateFlow,
+        ]
+    )
+
+    // Editar um recurso no EditNodeDialog com auto save desligado (ou editar um recurso que ainda é
+    // só rascunho, com auto save em qualquer estado) nunca chama a API - só reescreve o rascunho e
+    // reflete o novo nome no card na hora, sem esperar o "Salvar".
+    const applyDraftResourceEdit = useCallback(
+        (type: CanvasNodeType, resourceId: string, form: unknown) => {
+            const label = labelForDraftResource(
+                type,
+                form as Record<string, unknown>
+            )
+            const existing = draftResourceCreations.current.get(resourceId)
+            if (existing)
+                draftResourceCreations.current.set(resourceId, {
+                    ...existing,
+                    form,
+                    label,
+                })
+            else draftResourceUpdates.current.set(resourceId, { resourceId, type, form })
+            setFlowNodes((current) =>
+                current.map((node) =>
+                    node.resourceId === resourceId ? { ...node, label } : node
+                )
+            )
+            markDraftDirty()
+        },
+        [labelForDraftResource, markDraftDirty, setFlowNodes]
+    )
+
+    // Aplica de verdade tudo que ficou pendente no draft, na ordem: recursos+nós criados, exclusões
+    // de recurso, exclusões de nó, edições de recurso, conexões, posições, entrada do flow e posição
+    // do "Início". Para no primeiro erro (toast + return), deixando o restante pendente pro próximo
+    // clique em "Salvar" - nunca limpa o draft parcialmente. Reaproveita as mesmas rotas/funções do
+    // caminho online (recreateResource, flushEdgeOperations, persistPositions).
+    const saveDraft = useCallback(async () => {
+        if (isSavingDraft) return
+        const hasPending =
+            draftNodeCreations.current.size > 0 ||
+            draftResourceDeletions.current.size > 0 ||
+            draftNodeDeletions.current.size > 0 ||
+            draftResourceUpdates.current.size > 0 ||
+            draftEntry.current.dirty ||
+            draftStart.current.dirty ||
+            pendingPositions.current.size > 0 ||
+            pendingEdgeOperations.current.size > 0
+        if (!hasPending) return
+        setIsSavingDraft(true)
+        try {
+            // 1) materializa recurso+nó de cada criação feita neste draft, na ordem em que ocorreram
+            for (const creation of [...draftNodeCreations.current.values()]) {
+                let resourceId = creation.resourceId
+                if (resourceId.startsWith(DRAFT_RES_PREFIX)) {
+                    const draftResource = draftResourceCreations.current.get(
+                        resourceId
+                    )
+                    if (!draftResource) continue
+                    const realResourceId = await recreateResource(
+                        draftResource.type,
+                        draftResource.form,
+                        draftResource.companyId
+                    )
+                    if (!realResourceId) {
+                        toast.error(
+                            `Erro ao criar "${draftResource.label}" - o restante fica pendente`
+                        )
+                        return
+                    }
+                    draftResourceCreations.current.delete(resourceId)
+                    resourceId = realResourceId
+                }
+                let nodeId: string
+                try {
+                    const { data } = await api.post(
+                        `/flows/${flow.id}/nodes`,
+                        {
+                            type: creation.type,
+                            resourceId,
+                            label: creation.label,
+                            position: creation.position,
+                        }
+                    )
+                    nodeId = data.nodeId as string
+                } catch (err) {
+                    toast.error(
+                        apiError(
+                            err,
+                            `Erro ao criar nó "${creation.label ?? creation.type}" - o restante fica pendente`
+                        )
+                    )
+                    return
+                }
+                const localId = creation.localId
+                draftNodeCreations.current.delete(localId)
+                pendingNodeIds.current.delete(localId)
+                nodeIdMapRef.current.set(localId, nodeId)
+                setFlowNodes((current) =>
+                    current.map((node) =>
+                        node.id === localId
+                            ? { ...node, id: nodeId, resourceId }
+                            : node
+                    )
+                )
+                setFlowEdges((current) =>
+                    current.map((edge) => ({
+                        ...edge,
+                        sourceNodeId:
+                            edge.sourceNodeId === localId
+                                ? nodeId
+                                : edge.sourceNodeId,
+                        targetNodeId:
+                            edge.targetNodeId === localId
+                                ? nodeId
+                                : edge.targetNodeId,
+                    }))
+                )
+                for (const [key, operation] of Array.from(
+                    pendingEdgeOperations.current
+                )) {
+                    const sourceNodeId =
+                        operation.sourceNodeId === localId
+                            ? nodeId
+                            : operation.sourceNodeId
+                    const targetNodeId =
+                        operation.type === "connect" &&
+                        operation.targetNodeId === localId
+                            ? nodeId
+                            : operation.type === "connect"
+                              ? operation.targetNodeId
+                              : null
+                    if (
+                        sourceNodeId === operation.sourceNodeId &&
+                        targetNodeId ===
+                            (operation.type === "connect"
+                                ? operation.targetNodeId
+                                : null)
+                    )
+                        continue
+                    const next: EdgeOperation =
+                        operation.type === "connect"
+                            ? { ...operation, sourceNodeId, targetNodeId: targetNodeId! }
+                            : { ...operation, sourceNodeId }
+                    const nextKey = `${next.sourceNodeId}:${next.sourcePort}`
+                    pendingEdgeOperations.current.delete(key)
+                    pendingEdgeOperations.current.set(nextKey, next)
+                    void clearPendingEdgeOp(flow.id, key)
+                    void savePendingEdgeOp(flow.id, nextKey, next)
+                }
+                if (pendingPositions.current.has(localId)) {
+                    const localPosition = pendingPositions.current.get(localId)!
+                    pendingPositions.current.delete(localId)
+                    pendingPositions.current.set(nodeId, localPosition)
+                    void clearPendingPosition(flow.id, localId)
+                    void savePendingPosition(flow.id, nodeId, localPosition)
+                }
+                if (draftEntry.current.nodeId === localId)
+                    draftEntry.current.nodeId = nodeId
+            }
+
+            // 2) exclusões de recurso (nó junto, se ele chegou a existir de verdade no backend)
+            for (const deletion of [...draftResourceDeletions.current.values()]) {
+                const nodeId = resolveNodeId(deletion.nodeId)
+                const nodeIsReal =
+                    !nodeId.startsWith(DRAFT_NODE_PREFIX) &&
+                    !nodeId.startsWith("pending:")
+                try {
+                    if (nodeIsReal) {
+                        await api.post(
+                            `/flows/${flow.id}/nodes/${nodeId}/resource-deletion-check`
+                        )
+                        await api.delete(`/flows/${flow.id}/nodes/${nodeId}`)
+                    }
+                    await api.delete(
+                        `/${NODE_TYPE_CONFIG[deletion.type].apiPath}/${deletion.resourceId}`
+                    )
+                } catch (err) {
+                    toast.error(
+                        apiError(
+                            err,
+                            "Erro ao excluir recurso - o restante fica pendente"
+                        )
+                    )
+                    return
+                }
+                draftResourceDeletions.current.delete(deletion.nodeId)
+            }
+
+            // 3) exclusões de nó "puro" (sem exclusão de recurso, ex. extension/flow desconectados)
+            for (const nodeId of [...draftNodeDeletions.current]) {
+                const realId = resolveNodeId(nodeId)
+                try {
+                    await api.delete(`/flows/${flow.id}/nodes/${realId}`)
+                } catch (err) {
+                    toast.error(
+                        apiError(
+                            err,
+                            "Erro ao excluir nó - o restante fica pendente"
+                        )
+                    )
+                    return
+                }
+                draftNodeDeletions.current.delete(nodeId)
+            }
+
+            // 4) edição de recurso que já existia antes deste draft
+            for (const update of [...draftResourceUpdates.current.values()]) {
+                const ok = await updateResourceGeneric(
+                    update.type,
+                    update.resourceId,
+                    update.form
+                )
+                if (!ok) {
+                    toast.error(
+                        "Erro ao salvar edição de recurso - o restante fica pendente"
+                    )
+                    return
+                }
+                draftResourceUpdates.current.delete(update.resourceId)
+            }
+
+            // 5) conexões pendentes (connect/disconnect) - flush direto, sem depender do agendamento
+            // normal (scheduleEdgeSync não dispara com auto save desligado, ver definição acima)
+            await flushEdgeOperations()
+
+            // 6) posições de nó pendentes
+            await persistPositions()
+
+            // 7) entrada do flow (último set/clear feito neste draft)
+            if (draftEntry.current.dirty && draftEntry.current.nodeId) {
+                const targetId = resolveNodeId(draftEntry.current.nodeId)
+                try {
+                    await api.put(`/flows/${flow.id}/nodes/${targetId}`, {
+                        isEntry: draftEntry.current.isEntry,
+                    })
+                } catch (err) {
+                    toast.error(
+                        apiError(
+                            err,
+                            "Erro ao salvar início do flow - o restante fica pendente"
+                        )
+                    )
+                    return
+                }
+                draftEntry.current = { dirty: false, nodeId: null, isEntry: true }
+            }
+
+            // 8) posição do nó sintético "Início"
+            if (draftStart.current.dirty && draftStart.current.position) {
+                try {
+                    await api.put(`/flows/${flow.id}/layout`, {
+                        layout: [
+                            {
+                                nodeType: "start",
+                                nodeId: START_KEY,
+                                x: draftStart.current.position.x,
+                                y: draftStart.current.position.y,
+                            },
+                        ],
+                    })
+                } catch (err) {
+                    toast.error(
+                        apiError(
+                            err,
+                            "Erro ao salvar posição do início do flow - o restante fica pendente"
+                        )
+                    )
+                    return
+                }
+                draftStart.current = { dirty: false, position: null }
+            }
+
+            await clearFlowDraft(flow.id)
+            markDraftDirty()
+            toast.success("Alterações salvas")
+            try {
+                await reconcileNodes()
+            } catch {
+                // O próximo carregamento busca o estado autoritativo.
+            }
+        } finally {
+            setIsSavingDraft(false)
+        }
+    }, [
+        isSavingDraft,
+        flow.id,
+        recreateResource,
+        resolveNodeId,
+        flushEdgeOperations,
+        persistPositions,
+        updateResourceGeneric,
+        reconcileNodes,
+        markDraftDirty,
+        setFlowNodes,
+        setFlowEdges,
+    ])
+
+    // Alterna auto save - ligar de novo com alterações pendentes dispara o "Salvar" automaticamente
+    // (evita ficar num estado híbrido "toggle ligado mas ainda tem coisa só local").
+    const handleToggleAutoSave = useCallback(
+        (checked: boolean) => {
+            autoSaveRef.current = checked
+            setAutoSaveState(checked)
+            localStorage.setItem(
+                autoSaveStorageKey(flow.id),
+                checked ? "on" : "off"
+            )
+            if (checked) void saveDraft()
+        },
+        [flow.id, saveDraft]
     )
 
     useEffect(() => {
@@ -1774,12 +2421,81 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
         if (hydratedFlowRef.current === flow.id) return
         hydratedFlowRef.current = flow.id
         let cancelled = false
-        const knownNodeIds = new Set([
-            START_KEY,
-            ...flowNodes.map((node) => node.id),
-        ])
-        void loadPendingForFlow(flow.id).then(({ positions, edgeOps }) => {
+        void Promise.all([
+            loadPendingForFlow(flow.id),
+            loadFlowDraft(flow.id),
+        ]).then(([{ positions, edgeOps }, draft]) => {
             if (cancelled) return
+
+            // Rehidrata o draft (auto save desligado numa sessão anterior, aba fechada/recarregada
+            // antes de clicar em "Salvar") ANTES de calcular knownNodeIds - nó criado só no draft
+            // precisa contar como "conhecido" pra posição/edge dele (abaixo) não ser descartada como
+            // órfã, e nó/recurso marcado pra exclusão precisa sumir da base antes de tudo o resto.
+            if (draft) {
+                for (const creation of draft.resourceCreations)
+                    draftResourceCreations.current.set(creation.draftId, creation)
+                for (const update of draft.resourceUpdates)
+                    draftResourceUpdates.current.set(update.resourceId, update)
+                for (const deletion of draft.resourceDeletions)
+                    draftResourceDeletions.current.set(deletion.nodeId, deletion)
+                for (const nodeId of draft.nodeDeletions)
+                    draftNodeDeletions.current.add(nodeId)
+                if (draft.entryDirty)
+                    draftEntry.current = {
+                        dirty: true,
+                        nodeId: draft.entryNodeId,
+                        isEntry: draft.entryIsEntry,
+                    }
+                if (draft.startDirty && draft.startPosition) {
+                    draftStart.current = {
+                        dirty: true,
+                        position: draft.startPosition,
+                    }
+                    setStartPosition(draft.startPosition)
+                }
+                const removedNodeIds = new Set([
+                    ...draft.resourceDeletions.map((d) => d.nodeId),
+                    ...draft.nodeDeletions,
+                ])
+                const now = new Date().toISOString()
+                setFlowNodes((current) => [
+                    ...current.filter((node) => !removedNodeIds.has(node.id)),
+                    ...draft.nodeCreations.map(
+                        (creation): FlowNodeInstance => ({
+                            id: creation.localId,
+                            flowId: flow.id,
+                            type: creation.type,
+                            resourceId: creation.resourceId,
+                            label: creation.label,
+                            position: creation.position,
+                            createdAt: now,
+                            updatedAt: now,
+                        })
+                    ),
+                ])
+                setFlowEdges((current) =>
+                    current.filter(
+                        (edge) =>
+                            !removedNodeIds.has(edge.sourceNodeId) &&
+                            !removedNodeIds.has(edge.targetNodeId)
+                    )
+                )
+                if (draft.entryDirty)
+                    setEntryNodeId(
+                        draft.entryIsEntry ? draft.entryNodeId : null
+                    )
+                for (const creation of draft.nodeCreations) {
+                    pendingNodeIds.current.add(creation.localId)
+                    draftNodeCreations.current.set(creation.localId, creation)
+                }
+                if (isDraftDirty(draft)) markDraftDirty()
+            }
+
+            const knownNodeIds = new Set([
+                START_KEY,
+                ...flowNodes.map((node) => node.id),
+                ...(draft?.nodeCreations.map((c) => c.localId) ?? []),
+            ])
             let hasPositions = false
             for (const [nodeId, position] of positions) {
                 if (!knownNodeIds.has(nodeId)) {
@@ -1840,6 +2556,8 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
         scheduleEdgeSync,
         setFlowEdges,
         setFlowNodes,
+        setEntryNodeId,
+        markDraftDirty,
     ])
 
     const onConnect = useCallback(
@@ -2065,8 +2783,51 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
                         </ContextMenuContent>
                     </ContextMenu>
                 )}
+                <div className="absolute top-3 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-md border bg-card px-2.5 py-1.5 shadow-sm">
+                    <Label
+                        htmlFor="flow-autosave-toggle"
+                        className="flex items-center gap-1.5 text-xs font-medium"
+                    >
+                        {autoSave ? (
+                            <CloudIcon className="size-3.5 text-muted-foreground" />
+                        ) : (
+                            <CloudOffIcon className="size-3.5 text-muted-foreground" />
+                        )}
+                        Salvamento automático
+                    </Label>
+                    <Switch
+                        id="flow-autosave-toggle"
+                        size="sm"
+                        checked={autoSave}
+                        onCheckedChange={handleToggleAutoSave}
+                        disabled={isSavingDraft}
+                    />
+                    {!autoSave && (
+                        <>
+                            <span className="text-xs text-muted-foreground">
+                                {draftDirtyCount > 0
+                                    ? `${draftDirtyCount} alteração${draftDirtyCount === 1 ? "" : "ões"} pendente${draftDirtyCount === 1 ? "" : "s"}`
+                                    : "Tudo salvo"}
+                            </span>
+                            <Button
+                                size="sm"
+                                variant="secondary"
+                                className="h-6 gap-1 px-2 text-xs"
+                                onClick={() => void saveDraft()}
+                                disabled={isSavingDraft || draftDirtyCount === 0}
+                            >
+                                {isSavingDraft ? (
+                                    <Loader2Icon className="size-3 animate-spin" />
+                                ) : (
+                                    <SaveIcon className="size-3" />
+                                )}
+                                Salvar
+                            </Button>
+                        </>
+                    )}
+                </div>
                 {(refreshing || isSyncingEdges || deletingNodeCount > 0) && (
-                    <div className="absolute top-3 left-1/2 z-20 flex -translate-x-1/2 items-center gap-1.5 rounded-md border bg-card px-2 py-1 text-xs text-muted-foreground shadow-sm">
+                    <div className="absolute top-14 left-1/2 z-20 flex -translate-x-1/2 items-center gap-1.5 rounded-md border bg-card px-2 py-1 text-xs text-muted-foreground shadow-sm">
                         <Loader2Icon className="size-3 animate-spin" />
                         {isSyncingEdges
                             ? "Salvando conexões..."
@@ -2195,6 +2956,8 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
                     companies={companies.filter(
                         (company) => company.id === flow.companyId
                     )}
+                    autoSave={autoSave}
+                    onCreateDraftResource={createDraftResource}
                     onCreated={async (option, creationDto) => {
                         const source = pendingCreation.source
                             ? nodeById.get(pendingCreation.source.nodeId)
@@ -2255,7 +3018,31 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
                     companies={companies.filter(
                         (company) => company.id === flow.companyId
                     )}
-                    onSaved={() => void refetchNodes()}
+                    autoSave={autoSave}
+                    draftEntity={
+                        editingNode.resourceId.startsWith(DRAFT_RES_PREFIX)
+                            ? draftResourceCreations.current.get(
+                                  editingNode.resourceId
+                              )?.form
+                            : undefined
+                    }
+                    onDraftSave={(form) =>
+                        applyDraftResourceEdit(
+                            editingNode.type,
+                            editingNode.resourceId,
+                            form
+                        )
+                    }
+                    onDraftUpdate={(form) =>
+                        applyDraftResourceEdit(
+                            editingNode.type,
+                            editingNode.resourceId,
+                            form
+                        )
+                    }
+                    onSaved={() => {
+                        if (autoSave) void refetchNodes()
+                    }}
                     onDeleteResource={(creationDto) =>
                         setResourceToDelete({
                             nodeId: editingNode.nodeId,

@@ -30,6 +30,19 @@ type Props = {
     onOpenChange: (open: boolean) => void
     companyId: string
     companies: Company[]
+    // false = auto save desligado - o form NÃO deve chamar a API de criação do recurso; em vez
+    // disso registra um recurso "de rascunho" (ver onCreateDraftResource) e segue o mesmo fluxo de
+    // onCreated com um id local, só materializado de verdade no backend quando o usuário clicar em
+    // "Salvar" no canvas (ver saveDraft em flow-canvas.tsx)
+    autoSave: boolean
+    // registra o form de criação como rascunho local (sem rede) e devolve um id local (draft-res:<uuid>)
+    // pra usar no lugar do id real - só chamado quando autoSave=false
+    onCreateDraftResource: (
+        type: CanvasNodeType,
+        form: unknown,
+        label: string,
+        companyId: string
+    ) => string
     // creationDto é o form validado (sem companyId - recriação sempre usa a empresa do flow) do
     // recurso recém-criado - o histórico de undo/redo do canvas guarda isso pra poder recriar o
     // recurso caso o usuário desfaça essa criação (ver flow-canvas.tsx)
@@ -54,6 +67,8 @@ export function CreateNodeDialog({
     onOpenChange,
     companyId,
     companies,
+    autoSave,
+    onCreateDraftResource,
     onCreated,
 }: Props) {
     switch (type) {
@@ -66,6 +81,19 @@ export function CreateNodeDialog({
                     announcement={null}
                     companyId={companyId}
                     onSave={async (form) => {
+                        if (!autoSave) {
+                            const draftId = onCreateDraftResource(
+                                type,
+                                form,
+                                form.name,
+                                companyId
+                            )
+                            await onCreated(
+                                { id: draftId, label: form.name },
+                                form
+                            )
+                            return true
+                        }
                         const resourceId = await createAnnouncement(
                             form,
                             companyId,
@@ -92,9 +120,22 @@ export function CreateNodeDialog({
                     defaultCompanyId={companyId}
                     flowNodeMode
                     onSave={async (form) => {
+                        const { companyId: _companyId, ...creationDto } = form
+                        if (!autoSave) {
+                            const draftId = onCreateDraftResource(
+                                type,
+                                form,
+                                form.name,
+                                companyId
+                            )
+                            await onCreated(
+                                { id: draftId, label: form.name },
+                                creationDto
+                            )
+                            return true
+                        }
                         const resourceId = await createIvrMenu(form, companyId)
                         if (!resourceId) return false
-                        const { companyId: _companyId, ...creationDto } = form
                         await onCreated(
                             { id: resourceId, label: form.name },
                             creationDto
@@ -113,16 +154,24 @@ export function CreateNodeDialog({
                     queue={null}
                     companies={companies}
                     onSave={async (form) => {
+                        const { companyId: _companyId, ...creationDto } = form
+                        const label = `${form.name} (${form.number})`
+                        if (!autoSave) {
+                            const draftId = onCreateDraftResource(
+                                type,
+                                form,
+                                label,
+                                companyId
+                            )
+                            await onCreated(
+                                { id: draftId, label },
+                                creationDto
+                            )
+                            return true
+                        }
                         const resourceId = await createQueue(form, true)
                         if (!resourceId) return false
-                        const { companyId: _companyId, ...creationDto } = form
-                        await onCreated(
-                            {
-                                id: resourceId,
-                                label: `${form.name} (${form.number})`,
-                            },
-                            creationDto
-                        )
+                        await onCreated({ id: resourceId, label }, creationDto)
                         return true
                     }}
                 />
@@ -137,13 +186,26 @@ export function CreateNodeDialog({
                     requestTemplate={null}
                     companies={companies}
                     onSave={async (form) => {
+                        const { companyId: _companyId, ...creationDto } = form
+                        if (!autoSave) {
+                            const draftId = onCreateDraftResource(
+                                type,
+                                form,
+                                form.name,
+                                companyId
+                            )
+                            await onCreated(
+                                { id: draftId, label: form.name },
+                                creationDto
+                            )
+                            return true
+                        }
                         const resourceId = await createRequestTemplate(
                             form,
                             companyId,
                             true
                         )
                         if (!resourceId) return false
-                        const { companyId: _companyId, ...creationDto } = form
                         await onCreated(
                             { id: resourceId, label: form.name },
                             creationDto
@@ -162,13 +224,26 @@ export function CreateNodeDialog({
                     ixcNode={null}
                     companies={companies}
                     onSave={async (form) => {
+                        const { companyId: _companyId, ...creationDto } = form
+                        if (!autoSave) {
+                            const draftId = onCreateDraftResource(
+                                type,
+                                form,
+                                form.name,
+                                companyId
+                            )
+                            await onCreated(
+                                { id: draftId, label: form.name },
+                                creationDto
+                            )
+                            return true
+                        }
                         const resourceId = await createIxcNode(
                             form,
                             companyId,
                             true
                         )
                         if (!resourceId) return false
-                        const { companyId: _companyId, ...creationDto } = form
                         await onCreated(
                             { id: resourceId, label: form.name },
                             creationDto
@@ -187,13 +262,26 @@ export function CreateNodeDialog({
                     formatterNode={null}
                     companies={companies}
                     onSave={async (form) => {
+                        const { companyId: _companyId, ...creationDto } = form
+                        if (!autoSave) {
+                            const draftId = onCreateDraftResource(
+                                type,
+                                form,
+                                form.name,
+                                companyId
+                            )
+                            await onCreated(
+                                { id: draftId, label: form.name },
+                                creationDto
+                            )
+                            return true
+                        }
                         const resourceId = await createFormatterNode(
                             form,
                             companyId,
                             true
                         )
                         if (!resourceId) return false
-                        const { companyId: _companyId, ...creationDto } = form
                         await onCreated(
                             { id: resourceId, label: form.name },
                             creationDto
@@ -212,9 +300,22 @@ export function CreateNodeDialog({
                     timeCondition={null}
                     companies={companies}
                     onSave={async (form) => {
+                        const { companyId: _companyId, ...creationDto } = form
+                        if (!autoSave) {
+                            const draftId = onCreateDraftResource(
+                                type,
+                                form,
+                                form.name,
+                                companyId
+                            )
+                            await onCreated(
+                                { id: draftId, label: form.name },
+                                creationDto
+                            )
+                            return true
+                        }
                         const resourceId = await createTimeCondition(form, true)
                         if (!resourceId) return false
-                        const { companyId: _companyId, ...creationDto } = form
                         await onCreated(
                             { id: resourceId, label: form.name },
                             creationDto
@@ -233,9 +334,22 @@ export function CreateNodeDialog({
                     holidayGroup={null}
                     companies={companies}
                     onSave={async (form) => {
+                        const { companyId: _companyId, ...creationDto } = form
+                        if (!autoSave) {
+                            const draftId = onCreateDraftResource(
+                                type,
+                                form,
+                                form.name,
+                                companyId
+                            )
+                            await onCreated(
+                                { id: draftId, label: form.name },
+                                creationDto
+                            )
+                            return true
+                        }
                         const resourceId = await createHolidayGroup(form, true)
                         if (!resourceId) return false
-                        const { companyId: _companyId, ...creationDto } = form
                         await onCreated(
                             { id: resourceId, label: form.name },
                             creationDto
@@ -254,9 +368,22 @@ export function CreateNodeDialog({
                     variableSet={null}
                     companies={companies}
                     onSave={async (form) => {
+                        const { companyId: _companyId, ...creationDto } = form
+                        if (!autoSave) {
+                            const draftId = onCreateDraftResource(
+                                type,
+                                form,
+                                form.name,
+                                companyId
+                            )
+                            await onCreated(
+                                { id: draftId, label: form.name },
+                                creationDto
+                            )
+                            return true
+                        }
                         const resourceId = await createVariableSet(form, true)
                         if (!resourceId) return false
-                        const { companyId: _companyId, ...creationDto } = form
                         await onCreated(
                             { id: resourceId, label: form.name },
                             creationDto
@@ -275,12 +402,25 @@ export function CreateNodeDialog({
                     variableCondition={null}
                     companies={companies}
                     onSave={async (form) => {
+                        const { companyId: _companyId, ...creationDto } = form
+                        if (!autoSave) {
+                            const draftId = onCreateDraftResource(
+                                type,
+                                form,
+                                form.name,
+                                companyId
+                            )
+                            await onCreated(
+                                { id: draftId, label: form.name },
+                                creationDto
+                            )
+                            return true
+                        }
                         const resourceId = await createVariableCondition(
                             form,
                             true
                         )
                         if (!resourceId) return false
-                        const { companyId: _companyId, ...creationDto } = form
                         await onCreated(
                             { id: resourceId, label: form.name },
                             creationDto

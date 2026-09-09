@@ -79,6 +79,20 @@ type Props = {
     onOpenChange: (open: boolean) => void
     companyId: string
     companies: Company[]
+    // true = comportamento de sempre (chama a API de update na hora). false = auto save desligado -
+    // editar um recurso já existente no backend não chama a API, só enfileira a mudança (ver
+    // onDraftUpdate) pra aplicar de verdade quando o usuário clicar em "Salvar" no canvas.
+    autoSave: boolean
+    // presente quando `id` é um id de rascunho local (recurso criado nesta mesma sessão sem auto
+    // save, ainda não existe no backend) - o form dialog edita esse objeto em vez de buscar por
+    // GET/:id (que daria 404, o registro não existe). onSave nesse caso vira onDraftSave.
+    draftEntity?: unknown
+    // chamado no lugar do update real quando draftEntity está presente - só reescreve o rascunho
+    // local, sem nenhuma chamada de rede
+    onDraftSave?: (form: unknown) => void
+    // chamado no lugar do update real quando autoSave=false e o recurso já é real (existia antes
+    // deste draft) - enfileira a atualização pra aplicar no clique de "Salvar"
+    onDraftUpdate?: (form: unknown) => void
     // dispara depois de salvar com sucesso - o canvas usa isso pra refazer o grafo (o nome exibido
     // no nó, ou uma conexão feita através do próprio form, pode ter mudado)
     onSaved: () => void
@@ -96,9 +110,12 @@ type Props = {
 // criação) enquanto o registro não chega (ver isEdit nesses dialogs).
 // queryKey [apiPath, id] cacheia/dedupa por cache do TanStack Query - StrictMode não dispara mais
 // o GET duas vezes (a segunda montagem do efeito só lê o resultado em voo da primeira).
-function useEntityById<T>(apiPath: string, id: string) {
+// `enabled=false` pula o fetch por completo - usado quando `id` é um id de rascunho local (ver
+// draftEntity acima), que nunca existiu no backend e daria 404.
+function useEntityById<T>(apiPath: string, id: string, enabled = true) {
     const { data: entity = null, isLoading: loading } = useQuery({
         queryKey: [apiPath, id],
+        enabled,
         queryFn: async (): Promise<T | null> => {
             try {
                 const { data } = await api.get(`/${apiPath}/${id}`)
@@ -113,7 +130,7 @@ function useEntityById<T>(apiPath: string, id: string) {
         },
     })
 
-    return { entity, loading }
+    return { entity, loading: enabled && loading }
 }
 
 // Duplo-clique num nó do canvas (ver flow-node.tsx) abre o form de edição do módulo dono do
@@ -131,28 +148,48 @@ export function EditNodeDialog({
     onOpenChange,
     companyId,
     companies,
+    autoSave,
+    draftEntity,
+    onDraftSave,
+    onDraftUpdate,
     onSaved,
     onDeleteResource,
 }: Props) {
+    const isDraft = draftEntity !== undefined
     switch (type) {
         case "announcement": {
             const { entity, loading } = useEntityById<Announcement>(
                 NODE_TYPE_CONFIG.announcement.apiPath,
-                id
+                id,
+                !isDraft
             )
             const { updateAnnouncement } = useAnnouncements()
+            const resolved = isDraft ? (draftEntity as Announcement) : entity
             return (
                 <AnnouncementFormDialog
                     open={open}
                     onOpenChange={onOpenChange}
-                    announcement={entity}
+                    announcement={resolved}
                     loading={loading}
                     companyId={companyId}
                     onDelete={() =>
-                        entity &&
-                        onDeleteResource?.(toAnnouncementCreationDto(entity))
+                        onDeleteResource?.(
+                            isDraft
+                                ? draftEntity
+                                : entity && toAnnouncementCreationDto(entity)
+                        )
                     }
                     onSave={async (form) => {
+                        if (isDraft) {
+                            onDraftSave?.(form)
+                            onSaved()
+                            return true
+                        }
+                        if (!autoSave) {
+                            onDraftUpdate?.(form)
+                            onSaved()
+                            return true
+                        }
                         const ok = await updateAnnouncement(id, form)
                         if (ok) onSaved()
                         return ok
@@ -163,21 +200,36 @@ export function EditNodeDialog({
         case "ivr": {
             const { entity } = useEntityById<IvrMenu>(
                 NODE_TYPE_CONFIG.ivr.apiPath,
-                id
+                id,
+                !isDraft
             )
             const { updateIvrMenu } = useIvr()
+            const resolved = isDraft ? (draftEntity as IvrMenu) : entity
             return (
                 <IvrMenuFormDialog
                     open={open}
                     onOpenChange={onOpenChange}
-                    ivrMenu={entity}
+                    ivrMenu={resolved}
                     companies={companies}
                     flowNodeMode
                     onDelete={() =>
-                        entity &&
-                        onDeleteResource?.(toIvrMenuCreationDto(entity))
+                        onDeleteResource?.(
+                            isDraft
+                                ? draftEntity
+                                : entity && toIvrMenuCreationDto(entity)
+                        )
                     }
                     onSave={async (form) => {
+                        if (isDraft) {
+                            onDraftSave?.(form)
+                            onSaved()
+                            return true
+                        }
+                        if (!autoSave) {
+                            onDraftUpdate?.(form)
+                            onSaved()
+                            return true
+                        }
                         const ok = await updateIvrMenu(id, form)
                         if (ok) onSaved()
                         return ok
@@ -188,55 +240,90 @@ export function EditNodeDialog({
         case "queue": {
             const { entity, loading } = useEntityById<Queue>(
                 NODE_TYPE_CONFIG.queue.apiPath,
-                id
+                id,
+                !isDraft
             )
             const { updateQueue } = useQueues()
             const [membersOpen, setMembersOpen] = useState(false)
+            const resolved = isDraft ? (draftEntity as Queue) : entity
             return (
                 <>
                     <QueueFormDialog
                         open={open}
                         onOpenChange={onOpenChange}
-                        queue={entity}
+                        queue={resolved}
                         loading={loading}
                         companies={companies}
                         onDelete={() =>
-                            entity &&
-                            onDeleteResource?.(toQueueCreationDto(entity))
+                            onDeleteResource?.(
+                                isDraft
+                                    ? draftEntity
+                                    : entity && toQueueCreationDto(entity)
+                            )
                         }
-                        onManageMembers={() => setMembersOpen(true)}
+                        onManageMembers={
+                            isDraft ? undefined : () => setMembersOpen(true)
+                        }
                         onSave={async (form) => {
+                            if (isDraft) {
+                                onDraftSave?.(form)
+                                onSaved()
+                                return true
+                            }
+                            if (!autoSave) {
+                                onDraftUpdate?.(form)
+                                onSaved()
+                                return true
+                            }
                             const ok = await updateQueue(id, form)
                             if (ok) onSaved()
                             return ok
                         }}
                     />
-                    <QueueMembersSheet
-                        open={membersOpen}
-                        onOpenChange={setMembersOpen}
-                        queue={entity}
-                    />
+                    {!isDraft && (
+                        <QueueMembersSheet
+                            open={membersOpen}
+                            onOpenChange={setMembersOpen}
+                            queue={entity}
+                        />
+                    )}
                 </>
             )
         }
         case "request": {
             const { entity, loading } = useEntityById<RequestTemplate>(
                 NODE_TYPE_CONFIG.request.apiPath,
-                id
+                id,
+                !isDraft
             )
             const { updateRequestTemplate } = useRequestTemplates()
+            const resolved = isDraft ? (draftEntity as RequestTemplate) : entity
             return (
                 <RequestTemplateFormDialog
                     open={open}
                     onOpenChange={onOpenChange}
-                    requestTemplate={entity}
+                    requestTemplate={resolved}
                     loading={loading}
                     companies={companies}
                     onDelete={() =>
-                        entity &&
-                        onDeleteResource?.(toRequestTemplateCreationDto(entity))
+                        onDeleteResource?.(
+                            isDraft
+                                ? draftEntity
+                                : entity &&
+                                  toRequestTemplateCreationDto(entity)
+                        )
                     }
                     onSave={async (form) => {
+                        if (isDraft) {
+                            onDraftSave?.(form)
+                            onSaved()
+                            return true
+                        }
+                        if (!autoSave) {
+                            onDraftUpdate?.(form)
+                            onSaved()
+                            return true
+                        }
                         const ok = await updateRequestTemplate(id, form)
                         if (ok) onSaved()
                         return ok
@@ -247,20 +334,36 @@ export function EditNodeDialog({
         case "ixc": {
             const { entity, loading } = useEntityById<IxcNode>(
                 NODE_TYPE_CONFIG.ixc.apiPath,
-                id
+                id,
+                !isDraft
             )
             const { updateIxcNode } = useIxcNodes()
+            const resolved = isDraft ? (draftEntity as IxcNode) : entity
             return (
                 <IxcNodeFormDialog
                     open={open}
                     onOpenChange={onOpenChange}
-                    ixcNode={entity}
+                    ixcNode={resolved}
                     loading={loading}
                     companies={companies}
                     onDelete={() =>
-                        entity && onDeleteResource?.(toIxcNodeCreationDto(entity))
+                        onDeleteResource?.(
+                            isDraft
+                                ? draftEntity
+                                : entity && toIxcNodeCreationDto(entity)
+                        )
                     }
                     onSave={async (form) => {
+                        if (isDraft) {
+                            onDraftSave?.(form)
+                            onSaved()
+                            return true
+                        }
+                        if (!autoSave) {
+                            onDraftUpdate?.(form)
+                            onSaved()
+                            return true
+                        }
                         const ok = await updateIxcNode(id, form)
                         if (ok) onSaved()
                         return ok
@@ -271,20 +374,36 @@ export function EditNodeDialog({
         case "formatter": {
             const { entity, loading } = useEntityById<FormatterNode>(
                 NODE_TYPE_CONFIG.formatter.apiPath,
-                id
+                id,
+                !isDraft
             )
             const { updateFormatterNode } = useFormatterNodes()
+            const resolved = isDraft ? (draftEntity as FormatterNode) : entity
             return (
                 <FormatterNodeFormDialog
                     open={open}
                     onOpenChange={onOpenChange}
-                    formatterNode={entity}
+                    formatterNode={resolved}
                     loading={loading}
                     companies={companies}
                     onDelete={() =>
-                        entity && onDeleteResource?.(toFormatterNodeCreationDto(entity))
+                        onDeleteResource?.(
+                            isDraft
+                                ? draftEntity
+                                : entity && toFormatterNodeCreationDto(entity)
+                        )
                     }
                     onSave={async (form) => {
+                        if (isDraft) {
+                            onDraftSave?.(form)
+                            onSaved()
+                            return true
+                        }
+                        if (!autoSave) {
+                            onDraftUpdate?.(form)
+                            onSaved()
+                            return true
+                        }
                         const ok = await updateFormatterNode(id, form)
                         if (ok) onSaved()
                         return ok
@@ -295,21 +414,36 @@ export function EditNodeDialog({
         case "timecondition": {
             const { entity, loading } = useEntityById<TimeCondition>(
                 NODE_TYPE_CONFIG.timecondition.apiPath,
-                id
+                id,
+                !isDraft
             )
             const { updateTimeCondition } = useTimeConditions()
+            const resolved = isDraft ? (draftEntity as TimeCondition) : entity
             return (
                 <TimeConditionFormDialog
                     open={open}
                     onOpenChange={onOpenChange}
-                    timeCondition={entity}
+                    timeCondition={resolved}
                     loading={loading}
                     companies={companies}
                     onDelete={() =>
-                        entity &&
-                        onDeleteResource?.(toTimeConditionCreationDto(entity))
+                        onDeleteResource?.(
+                            isDraft
+                                ? draftEntity
+                                : entity && toTimeConditionCreationDto(entity)
+                        )
                     }
                     onSave={async (form) => {
+                        if (isDraft) {
+                            onDraftSave?.(form)
+                            onSaved()
+                            return true
+                        }
+                        if (!autoSave) {
+                            onDraftUpdate?.(form)
+                            onSaved()
+                            return true
+                        }
                         const ok = await updateTimeCondition(id, form)
                         if (ok) onSaved()
                         return ok
@@ -320,21 +454,36 @@ export function EditNodeDialog({
         case "holiday": {
             const { entity, loading } = useEntityById<HolidayGroup>(
                 NODE_TYPE_CONFIG.holiday.apiPath,
-                id
+                id,
+                !isDraft
             )
             const { updateHolidayGroup } = useHolidayGroups()
+            const resolved = isDraft ? (draftEntity as HolidayGroup) : entity
             return (
                 <HolidayGroupFormDialog
                     open={open}
                     onOpenChange={onOpenChange}
-                    holidayGroup={entity}
+                    holidayGroup={resolved}
                     loading={loading}
                     companies={companies}
                     onDelete={() =>
-                        entity &&
-                        onDeleteResource?.(toHolidayGroupCreationDto(entity))
+                        onDeleteResource?.(
+                            isDraft
+                                ? draftEntity
+                                : entity && toHolidayGroupCreationDto(entity)
+                        )
                     }
                     onSave={async (form) => {
+                        if (isDraft) {
+                            onDraftSave?.(form)
+                            onSaved()
+                            return true
+                        }
+                        if (!autoSave) {
+                            onDraftUpdate?.(form)
+                            onSaved()
+                            return true
+                        }
                         const ok = await updateHolidayGroup(id, form)
                         if (ok) onSaved()
                         return ok
@@ -345,21 +494,36 @@ export function EditNodeDialog({
         case "variable-set": {
             const { entity, loading } = useEntityById<VariableSet>(
                 NODE_TYPE_CONFIG["variable-set"].apiPath,
-                id
+                id,
+                !isDraft
             )
             const { updateVariableSet } = useVariables()
+            const resolved = isDraft ? (draftEntity as VariableSet) : entity
             return (
                 <VariableSetFormDialog
                     open={open}
                     onOpenChange={onOpenChange}
-                    variableSet={entity}
+                    variableSet={resolved}
                     loading={loading}
                     companies={companies}
                     onDelete={() =>
-                        entity &&
-                        onDeleteResource?.(toVariableSetCreationDto(entity))
+                        onDeleteResource?.(
+                            isDraft
+                                ? draftEntity
+                                : entity && toVariableSetCreationDto(entity)
+                        )
                     }
                     onSave={async (form) => {
+                        if (isDraft) {
+                            onDraftSave?.(form)
+                            onSaved()
+                            return true
+                        }
+                        if (!autoSave) {
+                            onDraftUpdate?.(form)
+                            onSaved()
+                            return true
+                        }
                         const ok = await updateVariableSet(id, form)
                         if (ok) onSaved()
                         return ok
@@ -370,23 +534,39 @@ export function EditNodeDialog({
         case "variable-condition": {
             const { entity, loading } = useEntityById<VariableCondition>(
                 NODE_TYPE_CONFIG["variable-condition"].apiPath,
-                id
+                id,
+                !isDraft
             )
             const { updateVariableCondition } = useVariableConditions()
+            const resolved = isDraft
+                ? (draftEntity as VariableCondition)
+                : entity
             return (
                 <VariableConditionFormDialog
                     open={open}
                     onOpenChange={onOpenChange}
-                    variableCondition={entity}
+                    variableCondition={resolved}
                     loading={loading}
                     companies={companies}
                     onDelete={() =>
-                        entity &&
                         onDeleteResource?.(
-                            toVariableConditionCreationDto(entity)
+                            isDraft
+                                ? draftEntity
+                                : entity &&
+                                  toVariableConditionCreationDto(entity)
                         )
                     }
                     onSave={async (form) => {
+                        if (isDraft) {
+                            onDraftSave?.(form)
+                            onSaved()
+                            return true
+                        }
+                        if (!autoSave) {
+                            onDraftUpdate?.(form)
+                            onSaved()
+                            return true
+                        }
                         const ok = await updateVariableCondition(id, form)
                         if (ok) onSaved()
                         return ok
@@ -396,7 +576,8 @@ export function EditNodeDialog({
         }
         case "extension": {
             // ExtensionFormDialog aceita o id direto (string) e busca o registro internamente -
-            // não precisa passar por useEntityById
+            // não precisa passar por useEntityById. Nunca é um recurso de rascunho (creatable:false
+            // no canvas, ver node-types.ts), só a edição em si pode ficar pendente de auto save.
             const { updateExtension } = useExtensions()
             return (
                 <ExtensionFormDialog
@@ -405,6 +586,11 @@ export function EditNodeDialog({
                     extension={id}
                     companies={companies}
                     onUpdate={async (form) => {
+                        if (!autoSave) {
+                            onDraftUpdate?.(form)
+                            onSaved()
+                            return true
+                        }
                         const ok = await updateExtension(id, form)
                         if (ok) onSaved()
                         return ok
@@ -414,7 +600,8 @@ export function EditNodeDialog({
         }
         case "flow": {
             // nó "flow" = referência a outro Flow dentro deste - edita só nome/empresa aqui; a
-            // cadeia de nós desse flow aninhado se edita abrindo ele mesmo (ver /dashboard/flows/:id)
+            // cadeia de nós desse flow aninhado se edita abrindo ele mesmo (ver /dashboard/flows/:id).
+            // Também nunca é um recurso de rascunho (creatable:false), só a edição pode ficar pendente.
             const { flow, loading } = useFlow(id)
             const { updateFlow } = useFlows()
             return (
@@ -425,6 +612,11 @@ export function EditNodeDialog({
                     loading={loading}
                     companies={companies}
                     onSave={async (form) => {
+                        if (!autoSave) {
+                            onDraftUpdate?.({ name: form.name })
+                            onSaved()
+                            return true
+                        }
                         const ok = await updateFlow(id, { name: form.name })
                         if (ok) onSaved()
                         return ok
