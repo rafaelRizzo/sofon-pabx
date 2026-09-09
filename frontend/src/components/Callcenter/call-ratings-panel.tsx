@@ -7,8 +7,8 @@ import { CalendarIcon, DownloadIcon, StarIcon } from "lucide-react"
 import type { DateRange } from "react-day-picker"
 import { toast } from "sonner"
 
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 import { Calendar } from "@/components/ui/calendar"
 import {
     Combobox,
@@ -64,6 +64,24 @@ const ORDER_OPTIONS = [
     { value: "desc", label: "Mais recentes" },
     { value: "asc", label: "Mais antigas" },
 ] as const
+
+function StarRating({ score }: { score: number }) {
+    return (
+        <div className="flex items-center gap-0.5" aria-label={`${score}/5`}>
+            {[1, 2, 3, 4, 5].map((i) => (
+                <StarIcon
+                    key={i}
+                    className={cn(
+                        "size-3.5",
+                        i <= score
+                            ? "fill-amber-500 text-amber-500 dark:fill-amber-400 dark:text-amber-400"
+                            : "fill-none text-muted-foreground/30"
+                    )}
+                />
+            ))}
+        </div>
+    )
+}
 
 const SCORE_OPTIONS = [
     { value: "all", label: "Todas as notas" },
@@ -273,26 +291,14 @@ export function CallRatingsPanel({ companyId }: Props) {
                                     <TableCell>{rating.number}</TableCell>
                                     <TableCell>
                                         {rating.scoreAtendimento != null ? (
-                                            <Badge
-                                                variant="outline"
-                                                className="gap-1.5"
-                                            >
-                                                <StarIcon className="size-3" />
-                                                {rating.scoreAtendimento}/5
-                                            </Badge>
+                                            <StarRating score={rating.scoreAtendimento} />
                                         ) : (
                                             "-"
                                         )}
                                     </TableCell>
                                     <TableCell>
                                         {rating.scoreServico != null ? (
-                                            <Badge
-                                                variant="outline"
-                                                className="gap-1.5"
-                                            >
-                                                <StarIcon className="size-3" />
-                                                {rating.scoreServico}/5
-                                            </Badge>
+                                            <StarRating score={rating.scoreServico} />
                                         ) : (
                                             "-"
                                         )}
