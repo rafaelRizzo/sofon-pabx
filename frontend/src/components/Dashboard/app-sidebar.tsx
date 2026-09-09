@@ -74,6 +74,17 @@ export const NAV: NavGroup[] = [
         icon: LayoutDashboardIcon,
       },
       {
+        title: "Tempo real",
+        href: "/dashboard/monitoring",
+        icon: ActivityIcon,
+        permission: "extensions",
+      },
+    ],
+  },
+  {
+    label: "Registros",
+    items: [
+      {
         title: "CDR",
         href: "/dashboard/cdr",
         icon: FileClockIcon,
@@ -85,16 +96,11 @@ export const NAV: NavGroup[] = [
         icon: SignalIcon,
         permission: "call-quality",
       },
-    ],
-  },
-  {
-    label: "Monitoramento",
-    items: [
       {
-        title: "Tempo real",
-        href: "/dashboard/monitoring",
-        icon: ActivityIcon,
-        permission: "extensions",
+        title: "Notas de atendimento",
+        href: "/dashboard/call-ratings",
+        icon: StarIcon,
+        permission: "callcenter",
       },
     ],
   },
@@ -124,12 +130,6 @@ export const NAV: NavGroup[] = [
         href: "/dashboard/queues",
         icon: ListOrderedIcon,
         permission: "queues",
-      },
-      {
-        title: "Notas de atendimento",
-        href: "/dashboard/call-ratings",
-        icon: StarIcon,
-        permission: "callcenter",
       },
     ],
   },

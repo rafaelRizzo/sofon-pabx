@@ -1,4 +1,5 @@
 import { prisma } from '../../lib/prisma'
+import { validateEnv } from '../../config/env'
 import type { RouteDest } from '../../modules/time-conditions/schemas/time-condition.schema'
 import { TC_CONTEXT, tcEntry } from '../dialplan/dialplan-names'
 import { resolveAsteriskId, withDialplanLock, writeContextFile, reloadDialplan, type DialplanRow } from '../dialplan/dialplan-file.repository'
@@ -7,6 +8,11 @@ import { FlowEdgeRepository } from '../flows/flow-edge.repository'
 import { nodeExitCheck } from '../flows/flow-node-runtime'
 
 export { TC_CONTEXT, tcEntry }
+
+const env = validateEnv()
+// Só pra log/VERBOSE no console do Asterisk (ver handleTimeConditionCheck em transport/agi-server.ts)
+// - a avaliação em si continua 100% nativa via GotoIfTime na priority seguinte, esse AGI não decide nada.
+const buildAgiUrl = (tcId: string) => `agi://${env.AGI_HOST}:${env.AGI_PORT}/tc,${tcId}`
 
 const tcMatched = (tcId: string) => `tc-${tcId}-matched`
 
@@ -36,9 +42,10 @@ function buildDialplan(
     const matched = tcMatched(tcId)
     const entries: DialplanRow[] = []
 
-    entries.push({ context, exten: entry, priority: 1, app: 'NoOp', appdata: `TimeCondition: ${name}` })
+    entries.push({ context, exten: entry, priority: 1, app: 'AGI', appdata: buildAgiUrl(tcId) })
+    entries.push({ context, exten: entry, priority: 2, app: 'NoOp', appdata: `TimeCondition: ${name}` })
 
-    let priority = 2
+    let priority = 3
     for (const range of ranges) {
         const weekSpec = range.weekdays.length > 0 ? range.weekdays.join('&') : '*'
         entries.push({

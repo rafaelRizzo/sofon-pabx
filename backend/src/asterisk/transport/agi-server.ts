@@ -27,6 +27,9 @@ import { dateInTimeZone } from '../../utils/timezone'
 //   em JS puro, ver evaluateRule - motivo em variablecondition.repository.ts)
 // - /holiday,<holidayGroupId> - RouteDestination type: "holiday" (month/day/year avaliados em JS,
 //   ver matchesHolidayDate - GotoIfTime nativo não tem campo de ano, não dá conta de feriado móvel)
+// - /tc,<timeConditionId>    - só loga no console (VERBOSE) os períodos configurados antes do
+//   GotoIfTime nativo (priority seguinte, ver timecondition.repository.ts) - avaliação continua 100%
+//   nativa, esse hop não decide nada nem faz Goto
 // - /format,<formatterNodeId> - RouteDestination type: "formatter" (aplica máscara via
 //   applyMask, ver src/utils/format-mask.ts)
 // - /queue-route,<queueId>   - antes do Queue() nativo, seta QUEUE_PRIO a partir de RoutingRule
@@ -426,6 +429,11 @@ async function handleHolidayCheck(conn: AgiConn, groupId: string) {
 
     const today = dateInTimeZone(new Date(), group.company.timezone)
     const matched = matchesHolidayDate(group.dates, today)
+    // Data configurada de cada feriado, não só a contagem - é o que permite ver, olhando o console
+    // do Asterisk numa ligação real, se o grupo tem a data certa cadastrada sem precisar abrir a tela
+    const datesLabel = group.dates
+        .map((d) => `${String(d.day).padStart(2, '0')}/${String(d.month).padStart(2, '0')}${d.year ? `/${d.year}` : ''}`)
+        .join(', ')
 
     logger.info({
         event: 'agi.holiday_group.done',
@@ -433,10 +441,11 @@ async function handleHolidayCheck(conn: AgiConn, groupId: string) {
         name: group.name,
         timezone: group.company.timezone,
         today,
-        dates: group.dates.length,
+        dates: group.dates,
         matched,
     })
     await agiVerbose(conn, `Holiday Group "${group.name}": hoje=${today.year}-${today.month}-${today.day} (${group.company.timezone}) => ${matched ? 'TRUE (feriado)' : 'FALSE'}`)
+    await agiVerbose(conn, `Holiday Group "${group.name}": datas configuradas (${group.dates.length}): ${group.dates.length > 0 ? truncateForVerbose(datesLabel) : '(nenhuma)'}`)
 
     const nodeId = await agiGetVariable(conn, FLOW_NODE_ID_VAR)
     if (nodeId) {
@@ -456,6 +465,46 @@ async function handleHolidayCheck(conn: AgiConn, groupId: string) {
     }
     logger.info({ event: 'agi.holiday_group.goto', groupId, via: 'route_destination', target })
     await agiExecGoto(conn, target)
+}
+
+// Roda ANTES do GotoIfTime nativo (priority 1 de tc-<tcId>, ver timecondition.repository.ts) só
+// pra deixar visível no console do Asterisk quais períodos estão configurados numa ligação real -
+// a avaliação em si continua 100% nativa (GotoIfTime na priority seguinte), esse AGI não decide
+// nada nem faz Goto, só loga e deixa o dialplan seguir sozinho pra próxima priority.
+async function handleTimeConditionCheck(conn: AgiConn, tcId: string) {
+    const tc = await prisma.timeCondition.findUnique({
+        where: { id: tcId },
+        select: {
+            name: true,
+            timeGroups: { select: { timeGroup: { select: { name: true, ranges: true } } } },
+        },
+    })
+    if (!tc) {
+        logger.warn({ event: 'agi.time_condition.not_found', tcId })
+        return
+    }
+
+    const ranges = tc.timeGroups.flatMap((g) => g.timeGroup.ranges)
+    const rangesLabel = ranges
+        .map((r) => {
+            const weekdays = r.weekdays.length > 0 ? r.weekdays.join(',') : '*'
+            const extra = [
+                r.monthdays !== '*' ? `dia ${r.monthdays}` : null,
+                r.months !== '*' ? r.months : null,
+            ].filter(Boolean)
+            return `${r.startTime}-${r.endTime} (${weekdays}${extra.length > 0 ? `, ${extra.join(', ')}` : ''})`
+        })
+        .join(' | ')
+
+    logger.info({
+        event: 'agi.time_condition.check',
+        tcId,
+        name: tc.name,
+        groups: tc.timeGroups.map((g) => g.timeGroup.name),
+        ranges,
+    })
+    await agiVerbose(conn, `Time Condition "${tc.name}": grupo(s) ${tc.timeGroups.map((g) => g.timeGroup.name).join(', ') || '(nenhum)'}`)
+    await agiVerbose(conn, `Time Condition "${tc.name}": períodos configurados (${ranges.length}): ${ranges.length > 0 ? truncateForVerbose(rangesLabel) : '(nenhum)'}`)
 }
 
 // Lê inputVariable via AGI GET VARIABLE, tenta cada máscara de `masks` em ordem (applyMask,
@@ -716,6 +765,7 @@ async function handleConnection(conn: AgiConn) {
         else if (script === 'ixc') await handleIxcNode(conn, arg1)
         else if (script === 'varcond') await handleVariableCondition(conn, arg1)
         else if (script === 'holiday') await handleHolidayCheck(conn, arg1)
+        else if (script === 'tc') await handleTimeConditionCheck(conn, arg1)
         else if (script === 'format') await handleFormatterNode(conn, arg1)
         else await handleRequestTemplate(conn, arg1)
     } catch (error) {

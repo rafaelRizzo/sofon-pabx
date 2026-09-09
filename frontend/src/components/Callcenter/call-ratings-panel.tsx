@@ -75,7 +75,7 @@ function StarRating({ score }: { score: number }) {
                         "size-3.5",
                         i <= score
                             ? "fill-amber-500 text-amber-500 dark:fill-amber-400 dark:text-amber-400"
-                            : "fill-none text-muted-foreground/30"
+                            : "fill-current text-zinc-300 dark:text-zinc-600"
                     )}
                 />
             ))}

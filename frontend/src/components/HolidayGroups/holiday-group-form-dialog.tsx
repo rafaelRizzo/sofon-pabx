@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useFieldArray, useForm } from "react-hook-form"
-import { PlusIcon, Trash2Icon } from "lucide-react"
+import { InfoIcon, PlusIcon, Trash2Icon } from "lucide-react"
 
 import {
     AlertDialog,
@@ -15,6 +15,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -287,6 +288,44 @@ export function HolidayGroupFormDialog({
 
                                         {mode === "url" ? (
                                             <Field>
+                                                <Alert>
+                                                    <InfoIcon />
+                                                    <AlertDescription>
+                                                        <strong>
+                                                            Na prática:
+                                                        </strong>{" "}
+                                                        1x por dia o sistema
+                                                        acessa essa URL e
+                                                        atualiza sozinho a
+                                                        lista de feriados do
+                                                        ano corrente (ex: dia
+                                                        1º de janeiro ele já
+                                                        busca a lista de
+                                                        2027). Ele{" "}
+                                                        <strong>não</strong>{" "}
+                                                        fica checando "hoje é
+                                                        feriado?" - ele só
+                                                        mantém essa lista em
+                                                        dia. Quem realmente
+                                                        compara a data da
+                                                        ligação com a lista e
+                                                        decide o
+                                                        direcionamento é o
+                                                        próprio sistema
+                                                        telefônico, no
+                                                        momento em que a
+                                                        ligação chega.
+                                                        <br />
+                                                        <br />
+                                                        Útil pra feriado que
+                                                        muda de dia todo ano
+                                                        (ex: Carnaval, Sexta
+                                                        Santa) - com URL você
+                                                        não precisa lembrar
+                                                        de atualizar a data
+                                                        manualmente todo ano.
+                                                    </AlertDescription>
+                                                </Alert>
                                                 <FieldLabel>URL</FieldLabel>
                                                 <Input
                                                     placeholder="https://..."
