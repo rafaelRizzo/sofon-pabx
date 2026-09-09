@@ -11,7 +11,7 @@
         "@paralleldrive/cuid2": "^3.3.0",
         "@prisma/adapter-pg": "^7.10.0",
         "@prisma/client": "^7.10.0",
-        "@scalar/fastify-api-reference": "^1.67.0",
+        "@scalar/fastify-api-reference": "^1.68.0",
         "argon2": "^0.45.1",
         "axios": "^1.20.0",
         "dotenv": "^17.4.2",
@@ -26,9 +26,9 @@
         "zod": "^4.5.4"
     },
     "devDependencies": {
-        "@types/bun": "^1.4.1",
+        "@types/bun": "^1.4.2",
         "@types/jsonwebtoken": "^9.0.10",
-        "@types/node": "^26.4.1",
+        "@types/node": "^26.5.0",
         "@types/uuid": "^11.0.0",
         "typescript": "^7.0.2"
     },
