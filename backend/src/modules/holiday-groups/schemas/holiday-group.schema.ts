@@ -19,6 +19,16 @@ const holidayDateSchema = z.object({
     year:  z.number().int().min(1900).max(2100).nullish(),
 })
 
+// Contrato é URL BASE - o sistema já adiciona "/<ano>" na chamada (ver http.provider.ts). URL
+// terminando em 4 dígitos é o erro mais comum (usuário copia o endereço já testado com o ano, ex:
+// .../v1/2026, no navegador) e gera uma chamada errada em duplicidade (.../v1/2026/2026 => 404).
+const urlEndsWithYear = /\/\d{4}\/?$/
+const urlWithoutYear = (d: { url?: string | null }) => !d.url || !urlEndsWithYear.test(d.url)
+const urlWithoutYearMessage = {
+    message: 'URL não deve terminar com o ano - o sistema já adiciona "/<ano>" automaticamente na chamada (ex: https://brasilapi.com.br/api/feriados/v1, sem "/2026" no final)',
+    path: ['url'],
+}
+
 export const createHolidayGroupSchema = z.object({
     name:       z.string().min(1).max(80).regex(/^[^\x00-\x1f\x7f]*$/, 'Nome não pode conter caracteres de controle'),
     companyId:  z.cuid2(),
@@ -29,7 +39,7 @@ export const createHolidayGroupSchema = z.object({
 }).refine((d) => !(d.url && d.dates), {
     message: 'Cannot set dates manually when url is configured - dates are managed automatically by the resync job',
     path: ['dates'],
-})
+}).refine(urlWithoutYear, urlWithoutYearMessage)
 
 export const updateHolidayGroupSchema = z.object({
     name:       z.string().min(1).max(80).regex(/^[^\x00-\x1f\x7f]*$/, 'Nome não pode conter caracteres de controle').optional(),
@@ -42,6 +52,7 @@ export const updateHolidayGroupSchema = z.object({
       message: 'Cannot set dates manually when url is configured - dates are managed automatically by the resync job',
       path: ['dates'],
   })
+  .refine(urlWithoutYear, urlWithoutYearMessage)
 
 export type CreateHolidayGroupInput = z.infer<typeof createHolidayGroupSchema>
 export type UpdateHolidayGroupInput = z.infer<typeof updateHolidayGroupSchema>

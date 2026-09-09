@@ -138,6 +138,24 @@ describe('HolidayGroupsService.createHolidayGroup', () => {
             falseRoute: { type: 'extension', id: 'clxxxxxxxxxxxxxxxxxxxxxxxxx' },
         })).rejects.toMatchObject({ statusCode: 404 })
     })
+
+    it('throws 422 when the url fetch fails or comes back empty', async () => {
+        db.company.findUnique.mockResolvedValue(COMPANY)
+        db.holidayGroup.findUnique.mockResolvedValue(null)
+        ;(fetchHolidaysFromUrl as any).mockResolvedValue(null)
+        await expect(HolidayGroupsService.createHolidayGroup({
+            name: 'Feriados Nacionais', companyId: 'c1',
+            url: 'https://example.com/feriados',
+        })).rejects.toMatchObject({ statusCode: 422 })
+    })
+
+    it('rejects url ending with a year segment (contrato é só a URL base)', () => {
+        const result = createHolidayGroupSchema.safeParse({
+            name: 'Feriados Nacionais', companyId: 'cmrntbdpc000001qcnlvt01cb',
+            url: 'https://brasilapi.com.br/api/feriados/v1/2026',
+        })
+        expect(result.success).toBe(false)
+    })
 })
 
 // ─── updateHolidayGroup ─────────────────────────────────────────────────────────
@@ -181,6 +199,14 @@ describe('HolidayGroupsService.updateHolidayGroup', () => {
         db.holidayGroup.findUnique.mockResolvedValue(null)
         await expect(HolidayGroupsService.updateHolidayGroup('clxxxxxxxxxxxxxxxxxxxxxxxxx', { name: 'x' }))
             .rejects.toMatchObject({ statusCode: 404 })
+    })
+
+    it('throws 422 (and keeps old dates untouched) when the newly set url fails to fetch', async () => {
+        db.holidayGroup.findUnique.mockResolvedValue({ ...HG, url: null, dates: [DATE1] })
+        ;(fetchHolidaysFromUrl as any).mockResolvedValue(null)
+        await expect(HolidayGroupsService.updateHolidayGroup('hg1', { url: 'https://example.com/feriados/2026' }))
+            .rejects.toMatchObject({ statusCode: 422 })
+        expect(db.holidayDate.deleteMany).not.toHaveBeenCalled()
     })
 })
 

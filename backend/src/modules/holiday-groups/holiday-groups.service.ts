@@ -42,6 +42,20 @@ async function datesFromUrl(url: string, year: number): Promise<DateInput[]> {
     return remote
 }
 
+// Usado só na ação INTERATIVA de configurar/trocar a URL (create, ou update que muda a url) - ao
+// contrário do resync periódico (datesFromUrl acima, que não pode falhar um cron sozinho por uma
+// instabilidade transitória), aqui o usuário está esperando uma resposta imediata: se o fetch falhar
+// ou vier vazio, é melhor bloquear o save com uma mensagem clara (URL errada, endpoint fora do ar,
+// formato de resposta inesperado) do que salvar silenciosamente mantendo a configuração antiga.
+async function datesFromUrlOrThrow(url: string, year: number): Promise<DateInput[]> {
+    const remote = await fetchHolidaysFromUrl(url, year)
+    if (!remote || remote.length === 0) {
+        logger.warn({ event: 'holidays.provider.fallback', url, year })
+        throw new AppError('Não foi possível buscar as datas dessa URL - confira o endereço (não deve incluir o ano) e o formato da resposta', 422)
+    }
+    return remote
+}
+
 // Chamado só pelo job de resync (src/jobs/holiday-resync.job.ts) - busca a URL configurada e
 // SUBSTITUI as datas do grupo. Não-op se o grupo não tiver url (grupo manual, fora do escopo do job).
 export async function resyncHolidayGroupFromUrl(tx: Tx, id: string, year: number) {
@@ -144,7 +158,7 @@ export const createHolidayGroup = async (data: CreateHolidayGroupInput) => {
     await validateRoute(data.trueRoute, data.companyId, 'trueRoute')
     await validateRoute(data.falseRoute, data.companyId, 'falseRoute')
 
-    const initialDates: DateInput[] = data.url ? await datesFromUrl(data.url, new Date().getFullYear()) : (data.dates ?? [])
+    const initialDates: DateInput[] = data.url ? await datesFromUrlOrThrow(data.url, new Date().getFullYear()) : (data.dates ?? [])
 
     const hg = await prisma.$transaction(async (tx) => {
         const created = await tx.holidayGroup.create({
@@ -193,20 +207,13 @@ export const updateHolidayGroup = async (id: string, data: UpdateHolidayGroupInp
     const newDates: DateInput[] | undefined = data.dates !== undefined
         ? data.dates
         : urlJustSet
-            ? await datesFromUrl(newUrl!, new Date().getFullYear())
+            ? await datesFromUrlOrThrow(newUrl!, new Date().getFullYear())
             : undefined
 
     const effectiveDates: DateInput[] = newDates ?? existing.dates.map((d) => ({ name: d.name, month: d.month, day: d.day, year: d.year }))
 
-    // urlJustSet + fetch falho/vazio (fetchHolidaysFromUrl retorna null nos dois casos) não deve apagar
-    // as datas manuais que já existiam - mantém o grupo como estava até um resync bem-sucedido
-    const shouldReplaceDates = newDates !== undefined && !(urlJustSet && newDates.length === 0)
-    if (urlJustSet && newDates?.length === 0) {
-        logger.warn({ event: 'holidays.url_set.fetch_empty', holidayGroupId: id, url: newUrl })
-    }
-
     const hg = await prisma.$transaction(async (tx) => {
-        if (shouldReplaceDates) {
+        if (newDates !== undefined) {
             await tx.holidayDate.deleteMany({ where: { holidayGroupId: id } })
             await tx.holidayDate.createMany({ data: newDates!.map((d) => ({ ...d, holidayGroupId: id })) })
         }
