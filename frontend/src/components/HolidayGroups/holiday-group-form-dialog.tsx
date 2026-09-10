@@ -282,14 +282,17 @@ export function HolidayGroupFormDialog({
                                                         <strong>
                                                             Na prática:
                                                         </strong>{" "}
-                                                        1x por dia o sistema
-                                                        acessa essa URL e
-                                                        atualiza sozinho a
-                                                        lista de feriados do
-                                                        ano corrente (ex: dia
-                                                        1º de janeiro ele já
-                                                        busca a lista de
-                                                        2027). Ele{" "}
+                                                        ao salvar, o sistema já
+                                                        busca essa URL na hora
+                                                        e preenche a lista de
+                                                        feriados abaixo -
+                                                        depois disso, ele
+                                                        também revalida essa
+                                                        lista sozinho em
+                                                        segundo plano a cada 24
+                                                        horas (ex: dia 1º de
+                                                        janeiro ele já busca a
+                                                        lista de 2027). Ele{" "}
                                                         <strong>não</strong>{" "}
                                                         fica checando "hoje é
                                                         feriado?" - ele só
