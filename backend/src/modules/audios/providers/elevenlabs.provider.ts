@@ -31,6 +31,22 @@ function extractLanguages(v: RawVoice): string[] {
     return v.labels?.language ? [v.labels.language] : []
 }
 
+// ElevenLabs sinaliza tanto key inválida quanto quota de caracteres esgotada como HTTP 401 - só
+// distinguível pelo `detail.code` no corpo. Repassa a mensagem original da ElevenLabs sempre que
+// disponível (em vez de uma mensagem genérica nossa) pra deixar claro pro usuário que o erro é da
+// conta ElevenLabs, não do PABX.
+type ElevenLabsErrorDetail = { code?: string; message?: string }
+
+function parseElevenLabsError(rawBody: string): ElevenLabsErrorDetail | null {
+    try {
+        const parsed = JSON.parse(rawBody) as { detail?: ElevenLabsErrorDetail | string }
+        if (typeof parsed.detail === 'string') return { message: parsed.detail }
+        return parsed.detail ?? null
+    } catch {
+        return null
+    }
+}
+
 async function withTimeout<T>(fn: (signal: AbortSignal) => Promise<T>, event: string): Promise<T> {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), env.ELEVENLABS_TIMEOUT_MS)
@@ -54,8 +70,11 @@ export async function listVoices(apiKey: string): Promise<ElevenLabsVoice[]> {
             signal,
         })
         if (!res.ok) {
-            logger.warn({ event: 'elevenlabs.voices.error', status: res.status })
-            if (res.status === 401) throw new AppError('Invalid ElevenLabs API key', 400)
+            const body = await res.text().catch(() => '')
+            logger.warn({ event: 'elevenlabs.voices.error', status: res.status, body: body.slice(0, 500) })
+            const detail = parseElevenLabsError(body)
+            if (res.status === 401)
+                throw new AppError(`ElevenLabs: ${detail?.message ?? 'API key inválida'}`, 400)
             throw new AppError('Failed to fetch voices from ElevenLabs', 502)
         }
         const data = (await res.json()) as { voices: RawVoice[] }
@@ -119,9 +138,18 @@ export async function textToSpeech(
         if (!res.ok) {
             const body = await res.text().catch(() => '')
             logger.warn({ event: 'elevenlabs.tts.error', status: res.status, body: body.slice(0, 500) })
-            if (res.status === 401) throw new AppError('Invalid ElevenLabs API key', 400)
-            if (res.status === 429) throw new AppError('ElevenLabs quota exceeded', 429)
-            if (res.status >= 400 && res.status < 500) throw new AppError('ElevenLabs rejected the request', 400)
+            const detail = parseElevenLabsError(body)
+            // ElevenLabs devolve 401 tanto pra key inválida quanto pra quota de caracteres
+            // esgotada - só dá pra distinguir pelo `detail.code`, e a mensagem original explica o
+            // motivo exato (ex: "You have 0 credits remaining...") sem o usuário suspeitar do PABX
+            if (detail?.code === 'quota_exceeded')
+                throw new AppError(`ElevenLabs: ${detail.message ?? 'quota de caracteres esgotada'}`, 429)
+            if (res.status === 401)
+                throw new AppError(`ElevenLabs: ${detail?.message ?? 'API key inválida'}`, 400)
+            if (res.status === 429)
+                throw new AppError(`ElevenLabs: ${detail?.message ?? 'limite de requisições excedido'}`, 429)
+            if (res.status >= 400 && res.status < 500)
+                throw new AppError(`ElevenLabs: ${detail?.message ?? 'requisição rejeitada'}`, 400)
             throw new AppError('Failed to generate audio with ElevenLabs', 502)
         }
         return Buffer.from(await res.arrayBuffer())

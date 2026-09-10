@@ -74,9 +74,16 @@ const BLOCK_SIZE = 22
 // 2 perguntas sequenciais no mesmo exten (survey-<queueId>): pergunta 1 é sobre o ATENDIMENTO (o
 // agente), pergunta 2 sobre o SERVIÇO CONTRATADO (o plano/produto) - notas independentes
 // (CallRating.category), só a de atendimento entra em AgentAffinity (ver affinity.service.ts).
-// Regenerado sempre que Queue.surveyAudioId/surveyServiceAudioId mudam (ver QueuesService) - fila
-// sem os dois áudios setados não entra no arquivo (pesquisa desligada, all-or-nothing).
-function buildSurveyDialplan(queueId: string, atendimentoSoundPath: string, servicoSoundPath: string): DialplanRow[] {
+// Regenerado sempre que Queue.surveyAudioId/surveyServiceAudioId/surveyThanksAudioId mudam (ver
+// QueuesService) - fila sem os 2 áudios de pergunta setados não entra no arquivo (pesquisa
+// desligada, all-or-nothing). thanksSoundPath é independente e opcional: só toca um Playback extra
+// em FINAL_HANGUP antes do Hangup quando setado - não afeta se a pesquisa existe ou não.
+function buildSurveyDialplan(
+    queueId: string,
+    atendimentoSoundPath: string,
+    servicoSoundPath: string,
+    thanksSoundPath: string | null,
+): DialplanRow[] {
     const context = SURVEY_CONTEXT
     const exten = surveyExten(queueId)
 
@@ -93,7 +100,14 @@ function buildSurveyDialplan(queueId: string, atendimentoSoundPath: string, serv
         FINAL_HANGUP, FINAL_HANGUP,
     )
 
-    return [...block1, ...block2, { context, exten, priority: FINAL_HANGUP, app: 'Hangup', appdata: null }]
+    const final: DialplanRow[] = thanksSoundPath
+        ? [
+              { context, exten, priority: FINAL_HANGUP, app: 'Playback', appdata: thanksSoundPath },
+              { context, exten, priority: FINAL_HANGUP + 1, app: 'Hangup', appdata: null },
+          ]
+        : [{ context, exten, priority: FINAL_HANGUP, app: 'Hangup', appdata: null }]
+
+    return [...block1, ...block2, ...final]
 }
 
 export const CallcenterSurveyRepository = {
@@ -107,13 +121,14 @@ export const CallcenterSurveyRepository = {
         return withDialplanLock(`${SURVEY_CONTEXT}:${asteriskId}`, async () => {
             const queues = await prisma.queue.findMany({
                 where: { companyId, surveyAudioId: { not: null }, surveyServiceAudioId: { not: null } },
-                select: { id: true, surveyAudioId: true, surveyServiceAudioId: true },
+                select: { id: true, surveyAudioId: true, surveyServiceAudioId: true, surveyThanksAudioId: true },
             })
             const entries: DialplanRow[] = queues.flatMap((q) =>
                 buildSurveyDialplan(
                     q.id,
                     audioSoundPath(asteriskId, q.surveyAudioId!),
                     audioSoundPath(asteriskId, q.surveyServiceAudioId!),
+                    q.surveyThanksAudioId ? audioSoundPath(asteriskId, q.surveyThanksAudioId) : null,
                 )
             )
             await writeContextFile(SURVEY_CONTEXT, asteriskId, entries)

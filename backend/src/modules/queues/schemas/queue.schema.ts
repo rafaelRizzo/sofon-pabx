@@ -58,6 +58,9 @@ export const createQueueSchema = z.object({
     // (all-or-nothing, validado em QueuesService) - null/omitido = pesquisa desligada.
     surveyAudioId: z.cuid2().nullable().optional(),
     surveyServiceAudioId: z.cuid2().nullable().optional(),
+    // Áudio de agradecimento tocado ao final da pesquisa, depois da pergunta 2 - campo independente
+    // e opcional, não entra na regra all-or-nothing das 2 perguntas acima
+    surveyThanksAudioId: z.cuid2().nullable().optional(),
     // Liga prioridade dinâmica (RoutingRule) e roteamento por afinidade (penalty) pra essa fila -
     // ver seção "Callcenter (Queue Engine)" no CLAUDE.md
     callcenterEnabled: z.boolean().default(false),
@@ -89,6 +92,7 @@ export const updateQueueSchema = z.object({
     postQueueDestination: routeDestinationSchema.optional(),
     surveyAudioId: z.cuid2().nullable().optional(),
     surveyServiceAudioId: z.cuid2().nullable().optional(),
+    surveyThanksAudioId: z.cuid2().nullable().optional(),
     callcenterEnabled: z.boolean().optional(),
 })
 
@@ -119,6 +123,7 @@ export const QueueSchema = z.object({
     usedBy: usedBySchema,
     surveyAudioId: z.string().nullable(),
     surveyServiceAudioId: z.string().nullable(),
+    surveyThanksAudioId: z.string().nullable(),
     hasSurveyAudio: z.boolean(),
     callcenterEnabled: z.boolean(),
     createdAt: timestamp,

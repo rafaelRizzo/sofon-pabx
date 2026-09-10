@@ -77,6 +77,9 @@ export type Queue = {
     // só quando os dois estão setados, ver backend/queues.service.ts)
     surveyAudioId: string | null
     surveyServiceAudioId: string | null
+    // Áudio de agradecimento tocado ao final da pesquisa, depois da pergunta 2 - independente e
+    // opcional, não entra na regra all-or-nothing das 2 perguntas acima
+    surveyThanksAudioId: string | null
     hasSurveyAudio: boolean
     // Liga, só nessa fila, prioridade dinâmica (RoutingRule) e roteamento por afinidade (penalty) -
     // motor opcional do módulo Callcenter (regras/notas configuradas por empresa em /dashboard/callcenter)
@@ -131,6 +134,9 @@ const baseQueueFields = {
     // backend valida all-or-nothing (os 2 juntos ou nenhum)
     surveyAudioId: z.string().nullable(),
     surveyServiceAudioId: z.string().nullable(),
+    // Áudio de agradecimento tocado ao final da pesquisa - independente, não entra na regra
+    // all-or-nothing acima
+    surveyThanksAudioId: z.string().nullable(),
     // Liga o motor Callcenter (prioridade dinâmica + afinidade) só nessa fila
     callcenterEnabled: z.boolean().default(false),
 }
@@ -184,6 +190,7 @@ export function toQueueCreationDto(queue: Queue): QueueUpdateForm {
         weight: queue.weight,
         surveyAudioId: queue.surveyAudioId,
         surveyServiceAudioId: queue.surveyServiceAudioId,
+        surveyThanksAudioId: queue.surveyThanksAudioId,
         callcenterEnabled: queue.callcenterEnabled,
     }
 }

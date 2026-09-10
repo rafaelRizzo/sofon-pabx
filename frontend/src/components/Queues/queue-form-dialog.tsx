@@ -112,6 +112,7 @@ export function QueueFormDialog({
             weight: 0,
             surveyAudioId: null,
             surveyServiceAudioId: null,
+            surveyThanksAudioId: null,
             callcenterEnabled: false,
         },
     })
@@ -123,6 +124,7 @@ export function QueueFormDialog({
     const agentAnnounce = watch("agentAnnounce")
     const surveyAudioId = watch("surveyAudioId")
     const surveyServiceAudioId = watch("surveyServiceAudioId")
+    const surveyThanksAudioId = watch("surveyThanksAudioId")
     const selectedCompany = companies.find((c) => c.id === companyId) ?? null
 
     // Anúncios referenciam um Audio já cadastrado pra essa empresa - depende do companyId do
@@ -137,6 +139,8 @@ export function QueueFormDialog({
         audios.find((a) => a.id === surveyAudioId) ?? null
     const selectedSurveyServiceAudio =
         audios.find((a) => a.id === surveyServiceAudioId) ?? null
+    const selectedSurveyThanksAudio =
+        audios.find((a) => a.id === surveyThanksAudioId) ?? null
 
     useEffect(() => {
         if (!open) return
@@ -161,6 +165,7 @@ export function QueueFormDialog({
             weight: queue?.weight ?? 0,
             surveyAudioId: queue?.surveyAudioId ?? null,
             surveyServiceAudioId: queue?.surveyServiceAudioId ?? null,
+            surveyThanksAudioId: queue?.surveyThanksAudioId ?? null,
             callcenterEnabled: queue?.callcenterEnabled ?? false,
         })
     }, [open, queue, reset, defaultCompanyId])
@@ -177,6 +182,7 @@ export function QueueFormDialog({
         setValue("agentAnnounce", null, { shouldDirty: true })
         setValue("surveyAudioId", null, { shouldDirty: true })
         setValue("surveyServiceAudioId", null, { shouldDirty: true })
+        setValue("surveyThanksAudioId", null, { shouldDirty: true })
     }
 
     const onSubmit = handleSubmit(async (form) => {
@@ -961,6 +967,76 @@ export function QueueFormDialog({
                                                     {
                                                         errors
                                                             .surveyServiceAudioId
+                                                            .message
+                                                    }
+                                                </FieldError>
+                                            )}
+                                        </Field>
+
+                                        <Field>
+                                            <FieldLabel>
+                                                Pesquisa de satisfação - Áudio
+                                                de agradecimento
+                                            </FieldLabel>
+                                            {!companyId ? (
+                                                <FieldDescription>
+                                                    Selecione uma empresa
+                                                    primeiro.
+                                                </FieldDescription>
+                                            ) : (
+                                                <Combobox<Audio>
+                                                    items={audios}
+                                                    value={
+                                                        selectedSurveyThanksAudio
+                                                    }
+                                                    itemToStringLabel={(a) =>
+                                                        a.name
+                                                    }
+                                                    isItemEqualToValue={(
+                                                        a,
+                                                        b
+                                                    ) => a.id === b.id}
+                                                    onValueChange={(a) =>
+                                                        setValue(
+                                                            "surveyThanksAudioId",
+                                                            a?.id ?? null,
+                                                            {
+                                                                shouldDirty: true,
+                                                            }
+                                                        )
+                                                    }
+                                                >
+                                                    <ComboboxInput placeholder="Nenhum" />
+                                                    <ComboboxContent>
+                                                        <ComboboxEmpty>
+                                                            {audios.length === 0
+                                                                ? "Nenhum áudio cadastrado para essa empresa"
+                                                                : "Nenhum resultado para essa busca"}
+                                                        </ComboboxEmpty>
+                                                        <ComboboxList>
+                                                            {(a: Audio) => (
+                                                                <ComboboxItem
+                                                                    key={a.id}
+                                                                    value={a}
+                                                                >
+                                                                    {a.name}
+                                                                </ComboboxItem>
+                                                            )}
+                                                        </ComboboxList>
+                                                    </ComboboxContent>
+                                                </Combobox>
+                                            )}
+                                            <FieldDescription>
+                                                Áudio tocado ao final da
+                                                pesquisa, depois da pergunta 2.
+                                                Opcional e independente das
+                                                perguntas acima.
+                                            </FieldDescription>
+                                            {errors.surveyThanksAudioId && (
+                                                <FieldError>
+                                                    {
+                                                        errors
+                                                            .surveyThanksAudioId
                                                             .message
                                                     }
                                                 </FieldError>

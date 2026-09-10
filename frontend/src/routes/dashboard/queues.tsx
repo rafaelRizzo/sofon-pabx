@@ -129,6 +129,7 @@ function QueuesPage() {
                             weight: form.weight,
                             surveyAudioId: form.surveyAudioId,
                             surveyServiceAudioId: form.surveyServiceAudioId,
+                            surveyThanksAudioId: form.surveyThanksAudioId,
                             callcenterEnabled: form.callcenterEnabled,
                         })
                     }

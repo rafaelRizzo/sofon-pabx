@@ -67,6 +67,7 @@ const queueSelect = {
     metadata: true,
     surveyAudioId: true,
     surveyServiceAudioId: true,
+    surveyThanksAudioId: true,
     callcenterEnabled: true,
     createdAt: true,
     updatedAt: true,
@@ -253,6 +254,7 @@ export const createQueue = async (data: CreateQueueInput) => {
         throw new AppError('Both survey audios (surveyAudioId and surveyServiceAudioId) are required together', 400)
     await assertAudioBelongsToCompany(data.surveyAudioId, data.companyId)
     await assertAudioBelongsToCompany(data.surveyServiceAudioId, data.companyId)
+    await assertAudioBelongsToCompany(data.surveyThanksAudioId, data.companyId)
     await assertAudioBelongsToCompany(data.announce, data.companyId)
     await assertAudioBelongsToCompany(data.periodicAnnounce, data.companyId)
     await assertAudioBelongsToCompany(data.agentAnnounce, data.companyId)
@@ -388,6 +390,11 @@ export const updateQueue = async (id: string, data: UpdateQueueInput) => {
             : existing.surveyServiceAudioId
     if ((finalSurveyAudioId !== null) !== (finalSurveyServiceAudioId !== null))
         throw new AppError('Both survey audios (surveyAudioId and surveyServiceAudioId) are required together', 400)
+    if (data.surveyThanksAudioId !== undefined)
+        await assertAudioBelongsToCompany(
+            data.surveyThanksAudioId,
+            existing.companyId
+        )
     if (data.announce !== undefined)
         await assertAudioBelongsToCompany(data.announce, existing.companyId)
     if (data.periodicAnnounce !== undefined)
@@ -452,7 +459,9 @@ export const updateQueue = async (id: string, data: UpdateQueueInput) => {
         (data.surveyAudioId !== undefined &&
             data.surveyAudioId !== existing.surveyAudioId) ||
         (data.surveyServiceAudioId !== undefined &&
-            data.surveyServiceAudioId !== existing.surveyServiceAudioId)
+            data.surveyServiceAudioId !== existing.surveyServiceAudioId) ||
+        (data.surveyThanksAudioId !== undefined &&
+            data.surveyThanksAudioId !== existing.surveyThanksAudioId)
 
     const queue = await prisma.$transaction(async (tx) => {
         await AsteriskQueueRepository.updateQueue(

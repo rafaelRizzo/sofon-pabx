@@ -177,6 +177,10 @@ model Queue {
   surveyAudio               Audio?        @relation("QueueSurveyAudio", fields: [surveyAudioId], references: [id], onDelete: SetNull)
   surveyServiceAudioId      String?
   surveyServiceAudio        Audio?        @relation("QueueSurveyServiceAudio", fields: [surveyServiceAudioId], references: [id], onDelete: SetNull)
+  // Áudio de agradecimento tocado ao final da pesquisa, depois da pergunta 2 — campo independente
+  // e opcional (não entra na regra all-or-nothing das 2 perguntas acima)
+  surveyThanksAudioId       String?
+  surveyThanksAudio         Audio?        @relation("QueueSurveyThanksAudio", fields: [surveyThanksAudioId], references: [id], onDelete: SetNull)
   // Liga prioridade dinâmica (RoutingRule via QUEUE_PRIO) e roteamento por afinidade (penalty
   // recalculado por agent-affinity-recalc.job.ts) pra essa fila. false = comportamento nativo
   // puro, sem AGI de pré-roteamento e sem o job mexendo no penalty dos membros. Pesquisa de
@@ -193,6 +197,7 @@ model Queue {
   @@index([companyId])
   @@index([surveyAudioId])
   @@index([surveyServiceAudioId])
+  @@index([surveyThanksAudioId])
   @@index([announce])
   @@index([periodicAnnounce])
   @@index([agentAnnounce])
@@ -500,6 +505,7 @@ model Audio {
   ivrMenus               IvrMenu[]
   surveyQueues           Queue[]        @relation("QueueSurveyAudio")
   surveyServiceQueues    Queue[]        @relation("QueueSurveyServiceAudio")
+  surveyThanksQueues     Queue[]        @relation("QueueSurveyThanksAudio")
   announceQueues         Queue[]        @relation("QueueAnnounceAudio")
   periodicAnnounceQueues Queue[]        @relation("QueuePeriodicAnnounceAudio")
   agentAnnounceQueues    Queue[]        @relation("QueueAgentAnnounceAudio")
