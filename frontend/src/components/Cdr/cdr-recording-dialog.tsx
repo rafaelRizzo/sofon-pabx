@@ -1,6 +1,7 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { DownloadIcon, Loader2Icon } from "lucide-react"
 
 import { AudioWaveform } from "@/components/ui/audio-waveform"
@@ -26,29 +27,20 @@ export function CdrRecordingDialog({
     companyId,
     onOpenChange,
 }: CdrRecordingDialogProps) {
-    const [audioUrl, setAudioUrl] = useState<string | null>(null)
-    const [loading, setLoading] = useState(false)
+    const { data: audioUrl = null, isFetching: loading } = useQuery({
+        queryKey: ["cdr-recording-audio", record?.id, companyId],
+        queryFn: () => loadCdrRecordingAudio(record!.id, companyId),
+        enabled: !!record,
+        gcTime: 0,
+    })
 
+    // Blob URL não sobrevive à troca de gravação (nova query) nem ao desmonte - revoga pra não
+    // vazar memória, já que o cache do useQuery não sabe liberar recursos do navegador
     useEffect(() => {
-        if (!record) return
-        let cancelled = false
-        let objectUrl: string | null = null
-
-        setAudioUrl(null)
-        setLoading(true)
-        loadCdrRecordingAudio(record.id, companyId).then((url) => {
-            if (cancelled) return
-            objectUrl = url
-            setLoading(false)
-            setAudioUrl(url)
-        })
-
         return () => {
-            cancelled = true
-            if (objectUrl) URL.revokeObjectURL(objectUrl)
+            if (audioUrl) URL.revokeObjectURL(audioUrl)
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [record?.id, companyId])
+    }, [audioUrl])
 
     return (
         <Dialog open={!!record} onOpenChange={onOpenChange}>

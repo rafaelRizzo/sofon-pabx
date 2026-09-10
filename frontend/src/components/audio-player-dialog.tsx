@@ -1,6 +1,7 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { DownloadIcon, Loader2Icon } from "lucide-react"
 
 import { AudioWaveform } from "@/components/ui/audio-waveform"
@@ -24,28 +25,20 @@ type Props = {
 // Dialog genérico de reprodução de áudio, reaproveitado por Announcements e Áudios: mesmo
 // padrão do CdrRecordingDialog (blob via api.get + AudioWaveform)
 export function AudioPlayerDialog({ audioId, name, onOpenChange }: Props) {
-    const [audioUrl, setAudioUrl] = useState<string | null>(null)
-    const [loading, setLoading] = useState(false)
+    const { data: audioUrl = null, isFetching: loading } = useQuery({
+        queryKey: ["audio-file", audioId],
+        queryFn: () => loadAudioFile(audioId as string),
+        enabled: !!audioId,
+        gcTime: 0,
+    })
 
+    // Blob URL não sobrevive à troca de áudio (nova query) nem ao desmonte - revoga pra não
+    // vazar memória, já que o cache do useQuery não sabe liberar recursos do navegador
     useEffect(() => {
-        if (!audioId) return
-        let cancelled = false
-        let objectUrl: string | null = null
-
-        setAudioUrl(null)
-        setLoading(true)
-        loadAudioFile(audioId).then((url) => {
-            if (cancelled) return
-            objectUrl = url
-            setLoading(false)
-            setAudioUrl(url)
-        })
-
         return () => {
-            cancelled = true
-            if (objectUrl) URL.revokeObjectURL(objectUrl)
+            if (audioUrl) URL.revokeObjectURL(audioUrl)
         }
-    }, [audioId])
+    }, [audioUrl])
 
     return (
         <Dialog open={!!audioId} onOpenChange={onOpenChange}>

@@ -1,9 +1,8 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
-import { toast } from "sonner"
+import { useQuery } from "@tanstack/react-query"
 
-import { api, apiError } from "@/lib/api"
+import { api } from "@/lib/api"
 
 // Espelha backend/src/modules/dashboard/schemas/dashboard.schema.ts
 export type DashboardOverview = {
@@ -37,60 +36,31 @@ const OVERVIEW_POLL_MS = 20_000
 const INFRA_POLL_MS = 30_000
 
 export function useDashboardOverview(companyId?: string) {
-    const [overview, setOverview] = useState<DashboardOverview | null>(null)
-    const [loading, setLoading] = useState(true)
-
-    const fetchOverview = useCallback(async () => {
-        try {
+    const { data: overview = null, isLoading: loading } = useQuery({
+        queryKey: ["dashboard-overview", companyId],
+        queryFn: async () => {
             const { data } = await api.get("/dashboard/overview", {
                 params: companyId ? { companyId } : undefined,
             })
-            setOverview(data.overview ?? null)
-        } catch (err) {
-            toast.error(apiError(err, "Erro ao buscar visão geral"))
-        } finally {
-            setLoading(false)
-        }
-    }, [companyId])
-
-    useEffect(() => {
-        setLoading(true)
-        fetchOverview()
-        const interval = setInterval(fetchOverview, OVERVIEW_POLL_MS)
-        return () => clearInterval(interval)
-    }, [fetchOverview])
+            return (data.overview ?? null) as DashboardOverview | null
+        },
+        refetchInterval: OVERVIEW_POLL_MS,
+    })
 
     return { overview, loading }
 }
 
 // Admin-only no backend (requireAdmin) - chamador decide se chama baseado em useAuth().user?.role
 export function useDashboardInfra(enabled: boolean) {
-    const [infra, setInfra] = useState<DashboardInfra | null>(null)
-    const [loading, setLoading] = useState(true)
-
-    const fetchInfra = useCallback(async () => {
-        if (!enabled) {
-            setInfra(null)
-            setLoading(false)
-            return
-        }
-        try {
+    const { data: infra = null, isLoading: loading } = useQuery({
+        queryKey: ["dashboard-infra"],
+        queryFn: async () => {
             const { data } = await api.get("/dashboard/infra")
-            setInfra(data.infra ?? null)
-        } catch (err) {
-            toast.error(apiError(err, "Erro ao buscar saúde da infraestrutura"))
-        } finally {
-            setLoading(false)
-        }
-    }, [enabled])
-
-    useEffect(() => {
-        setLoading(true)
-        fetchInfra()
-        if (!enabled) return
-        const interval = setInterval(fetchInfra, INFRA_POLL_MS)
-        return () => clearInterval(interval)
-    }, [fetchInfra, enabled])
+            return (data.infra ?? null) as DashboardInfra | null
+        },
+        enabled,
+        refetchInterval: INFRA_POLL_MS,
+    })
 
     return { infra, loading }
 }

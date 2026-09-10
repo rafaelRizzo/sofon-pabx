@@ -1,12 +1,18 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useState,
-} from "react"
+import { createContext, useCallback, useContext } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { api } from "@/lib/api"
+
+const AUTH_ME_QUERY_KEY = ["auth-me"]
+
+async function fetchMeRequest(): Promise<AuthUser | null> {
+  try {
+    const { data } = await api.get("/auth/me")
+    return data.user
+  } catch {
+    return null
+  }
+}
 
 // Espelha o catálogo do backend (backend/src/utils/auth/permissions.ts); só relevante para
 // role "user" (admin/reseller têm acesso irrestrito, ver hasPermission abaixo).
@@ -63,23 +69,16 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null)
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
 
-  const fetchMe = useCallback(async () => {
-    try {
-      const { data } = await api.get("/auth/me")
-      setUser(data.user)
-    } catch {
-      setUser(null)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  const { data: user = null, isLoading: loading } = useQuery({
+    queryKey: AUTH_ME_QUERY_KEY,
+    queryFn: fetchMeRequest,
+  })
 
-  useEffect(() => {
-    fetchMe()
-  }, [fetchMe])
+  const refetch = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: AUTH_ME_QUERY_KEY })
+  }, [queryClient])
 
   // otimista enquanto carrega, evita flash de menu vazio; a garantia real é o backend
   // (requirePermission), isso aqui é só cosmético
@@ -93,9 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   )
 
   return (
-    <AuthContext.Provider
-      value={{ user, loading, hasPermission, refetch: fetchMe }}
-    >
+    <AuthContext.Provider value={{ user, loading, hasPermission, refetch }}>
       {children}
     </AuthContext.Provider>
   )

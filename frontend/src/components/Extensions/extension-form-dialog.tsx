@@ -1,6 +1,7 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm, useWatch } from "react-hook-form"
 
@@ -51,7 +52,6 @@ import {
     createExtensionSchema,
     updateExtensionSchema,
     useExtensions,
-    type Extension,
     type ExtensionCreateForm,
     type ExtensionUpdateForm,
 } from "@/hooks/use-extensions"
@@ -787,47 +787,26 @@ export function ExtensionFormDialog({
 }: ExtensionFormDialogProps) {
     const isEdit = !!extension
 
-    const [loadingExtension, setLoadingExtension] = useState(false)
-    const [currentExtension, setCurrentExtension] = useState<Extension | null>(
-        null
-    )
-
     const { getExtensionById } = useExtensions()
 
-    // Fetch do ramal ao editar
-    // Sempre busca da API ao editar (versão forte)
-    useEffect(() => {
-        const loadExtension = async () => {
-            if (!open || !isEdit) return
+    const extensionId = typeof extension === "string" ? extension : extension?.id
 
-            setLoadingExtension(true)
-
-            const id = typeof extension === "string" ? extension : extension?.id
-
-            if (!id) {
-                setLoadingExtension(false)
-                return
-            }
-
-            const freshExtension = await getExtensionById(id)
-
-            if (freshExtension) {
-                setCurrentExtension(freshExtension)
-            } else {
+    // Sempre busca da API ao editar (versão forte) - com fallback pros dados já em mãos
+    // (ex: erro de rede) em vez de deixar o dialog vazio
+    const { data: currentExtension = null, isFetching: loadingExtension } =
+        useQuery({
+            queryKey: ["extension", extensionId],
+            queryFn: async () => {
+                const freshExtension = await getExtensionById(extensionId as string)
+                if (freshExtension) return freshExtension
+                if (typeof extension !== "string" && extension) return extension
                 toast.error(
                     "Não foi possível carregar os dados atualizados do ramal"
                 )
-                // fallback caso a API falhe
-                if (typeof extension !== "string" && extension) {
-                    setCurrentExtension(extension)
-                }
-            }
-
-            setLoadingExtension(false)
-        }
-
-        loadExtension()
-    }, [open, extension, isEdit, getExtensionById])
+                return null
+            },
+            enabled: open && isEdit && !!extensionId,
+        })
 
     const extensionData = isEdit ? currentExtension : null
 

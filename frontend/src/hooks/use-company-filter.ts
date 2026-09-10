@@ -11,13 +11,14 @@ const STORAGE_KEY = "companyFilter"
  * entre páginas do dashboard ou recarregar a página.
  */
 export function useCompanyFilter() {
-    const [companyId, setCompanyId] = useState<string | undefined>(undefined)
+    // lazy initializer: restaura sincronamente no primeiro render, evitando
+    // que um useEffect concorrente (ex: auto-seleção da primeira empresa em
+    // dashboard/index.tsx) veja companyId undefined e sobrescreva a seleção
+    // salva antes do restore assíncrono acontecer
+    const [companyId, setCompanyId] = useState<string | undefined>(
+        () => localStorage.getItem(STORAGE_KEY) ?? undefined,
+    )
     const { companies, loading } = useCompanies()
-
-    useEffect(() => {
-        const stored = localStorage.getItem(STORAGE_KEY)
-        if (stored) setCompanyId(stored)
-    }, [])
 
     // limpa seleção persistida que não existe mais (empresa deletada ou sem acesso desde a
     // última sessão) - sem isso o companyId stale seguia sendo usado nos fetches e dava 404

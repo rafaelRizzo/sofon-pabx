@@ -1,6 +1,7 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useEffect, useState } from "react"
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { z } from "zod"
 
@@ -67,57 +68,39 @@ export function useCallRatings(
     filters: CallRatingFilters = {},
     limit = DEFAULT_LIMIT
 ) {
-    const [ratings, setRatings] = useState<CallRating[]>([])
-    const [total, setTotal] = useState(0)
+    const queryClient = useQueryClient()
     const [page, setPage] = useState(1)
-    const [loading, setLoading] = useState(true)
 
     const { extensionId, number, score, startDate, endDate, order } = filters
-
-    const fetchPage = useCallback(
-        async (targetPage: number) => {
-            if (!companyId) {
-                setRatings([])
-                setTotal(0)
-                setLoading(false)
-                return
-            }
-            setLoading(true)
-            try {
-                const { data } = await api.get("/callcenter/ratings", {
-                    params: filterParams(companyId, filters, { page: targetPage, limit }),
-                })
-                setRatings(data.records ?? [])
-                setTotal(data.total ?? 0)
-            } catch (err) {
-                toast.error(apiError(err, "Erro ao buscar notas de atendimento"))
-            } finally {
-                setLoading(false)
-            }
-        },
-        // filters é recriado a cada render do caller - usar os campos primitivos como deps reais
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-        [companyId, limit, extensionId, number, score, startDate, endDate, order]
-    )
 
     // qualquer mudança de filtro/empresa reseta a navegação para a 1ª página
     useEffect(() => {
         setPage(1)
-        fetchPage(1)
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [fetchPage])
+    }, [companyId, extensionId, number, score, startDate, endDate, order])
 
-    const goToPage = (targetPage: number) => {
-        setPage(targetPage)
-        fetchPage(targetPage)
-    }
+    const queryKey = ["call-ratings", companyId, filters, page, limit]
+
+    const { data, isLoading: loading } = useQuery({
+        queryKey,
+        queryFn: async () => {
+            const { data } = await api.get("/callcenter/ratings", {
+                params: filterParams(companyId as string, filters, { page, limit }),
+            })
+            return {
+                ratings: (data.records ?? []) as CallRating[],
+                total: (data.total ?? 0) as number,
+            }
+        },
+        enabled: !!companyId,
+        placeholderData: keepPreviousData,
+    })
 
     const createRating = async (form: CallRatingForm) => {
         const id = toast.loading("Registrando nota...")
         try {
             await api.post("/callcenter/ratings", form)
             toast.success("Nota registrada", { id })
-            await fetchPage(page)
+            await queryClient.invalidateQueries({ queryKey: ["call-ratings"] })
             return true
         } catch (err) {
             toast.error(apiError(err, "Erro ao registrar nota"), { id })
@@ -126,13 +109,13 @@ export function useCallRatings(
     }
 
     return {
-        ratings,
-        total,
+        ratings: data?.ratings ?? [],
+        total: data?.total ?? 0,
         limit,
         loading,
         page,
-        totalPages: Math.max(1, Math.ceil(total / limit)),
-        goToPage,
+        totalPages: Math.max(1, Math.ceil((data?.total ?? 0) / limit)),
+        goToPage: setPage,
         createRating,
     }
 }

@@ -1,9 +1,8 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
-import { toast } from "sonner"
+import { useQuery } from "@tanstack/react-query"
 
-import { api, apiError } from "@/lib/api"
+import { api } from "@/lib/api"
 
 export type CallsByRegionDirection = "all" | "inbound" | "outbound"
 
@@ -24,12 +23,9 @@ export function useDashboardCallsByRegion(
     companyId: string | undefined,
     filters: CallsByRegionFilters
 ) {
-    const [regions, setRegions] = useState<CallsByRegion[]>([])
-    const [loading, setLoading] = useState(true)
-
-    const fetchCallsByRegion = useCallback(async () => {
-        setLoading(true)
-        try {
+    const { data: regions = [], isLoading: loading } = useQuery({
+        queryKey: ["dashboard-calls-by-region", companyId, filters],
+        queryFn: async () => {
             const { data } = await api.get("/dashboard/calls-by-region", {
                 params: {
                     companyId: companyId || undefined,
@@ -38,17 +34,9 @@ export function useDashboardCallsByRegion(
                     direction: filters.direction ?? "all",
                 },
             })
-            setRegions(data.callsByRegion?.regions ?? [])
-        } catch (err) {
-            toast.error(apiError(err, "Erro ao buscar chamadas por região"))
-        } finally {
-            setLoading(false)
-        }
-    }, [companyId, filters.startDate, filters.endDate, filters.direction])
-
-    useEffect(() => {
-        fetchCallsByRegion()
-    }, [fetchCallsByRegion])
+            return (data.callsByRegion?.regions ?? []) as CallsByRegion[]
+        },
+    })
 
     return { regions, loading }
 }

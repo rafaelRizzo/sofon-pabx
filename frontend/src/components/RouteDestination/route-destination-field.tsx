@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useQuery } from "@tanstack/react-query"
 import {
     BracesIcon,
     CalendarDaysIcon,
@@ -17,10 +17,9 @@ import {
     WandSparklesIcon,
     type LucideIcon,
 } from "lucide-react"
-import { toast } from "sonner"
 import { z } from "zod"
 
-import { api, apiError } from "@/lib/api"
+import { api } from "@/lib/api"
 import { cn } from "@/lib/utils"
 import {
     Combobox,
@@ -339,35 +338,13 @@ export async function fetchDestinationOptions(
 }
 
 function useDestinationOptions(type: RouteDestinationType, companyId: string) {
-    const [options, setOptions] = useState<DestinationOption[]>([])
-    const [loading, setLoading] = useState(false)
-
-    useEffect(() => {
-        // Zera antes de buscar - sem isso, ao trocar de tipo a lista antiga (ex: filas)
-        // continua visível até a nova requisição resolver
-        setOptions([])
-        if (type === "hangup" || !companyId) {
-            return
-        }
-        let cancelled = false
-        setLoading(true)
-        fetchDestinationOptions(type, companyId)
-            .then((opts) => {
-                if (!cancelled) setOptions(opts)
-            })
-            .catch((err) => {
-                if (!cancelled)
-                    toast.error(
-                        apiError(err, "Erro ao buscar opções de destino")
-                    )
-            })
-            .finally(() => {
-                if (!cancelled) setLoading(false)
-            })
-        return () => {
-            cancelled = true
-        }
-    }, [type, companyId])
+    // key inclui `type` - ao trocar de tipo a lista antiga (ex: filas) não fica visível até a
+    // nova requisição resolver, cada combinação type+companyId tem seu próprio cache
+    const { data: options = [], isFetching: loading } = useQuery({
+        queryKey: ["destination-options", type, companyId],
+        queryFn: () => fetchDestinationOptions(type as FetchableType, companyId),
+        enabled: type !== "hangup" && !!companyId,
+    })
 
     return { options, loading }
 }

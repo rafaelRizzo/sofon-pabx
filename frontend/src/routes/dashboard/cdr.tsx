@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { CalendarIcon, DownloadIcon } from "lucide-react"
@@ -74,15 +74,12 @@ const STATUS_OPTIONS = [
 ] as const
 
 function CdrPage() {
-    const { companies, loading: companiesLoading } = useCompanies()
-    const [companyId, setCompanyId] = useCompanyFilter()
+    const { companies } = useCompanies()
+    const [selectedCompanyId, setCompanyId] = useCompanyFilter()
 
-    // companyId é obrigatório no GET /cdr (backend) - sem seleção salva, os hooks de CDR
-    // ficam parados esperando o usuário escolher; seleciona a primeira automaticamente
-    useEffect(() => {
-        if (companiesLoading || companyId || companies.length === 0) return
-        setCompanyId(companies[0].id)
-    }, [companiesLoading, companyId, companies, setCompanyId])
+    // companyId é obrigatório no GET /cdr (backend) - sem seleção salva, deriva a
+    // primeira empresa como padrão no render, sem persistir até o usuário escolher
+    const companyId = selectedCompanyId ?? companies[0]?.id
 
     const { extensions } = useExtensions(companyId)
     const { trunks } = useTrunks(companyId)

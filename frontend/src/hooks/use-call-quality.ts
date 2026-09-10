@@ -1,9 +1,9 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
-import { toast } from "sonner"
+import { useEffect, useState } from "react"
+import { keepPreviousData, useQuery } from "@tanstack/react-query"
 
-import { api, apiError } from "@/lib/api"
+import { api } from "@/lib/api"
 
 // Espelha backend/src/modules/call-quality/schemas/call-quality.schema.ts
 export type CallQualityRecord = {
@@ -60,90 +60,51 @@ export function useCallQualityRecords(
     filters: CallQualityFilters = {},
     limit = DEFAULT_LIMIT
 ) {
-    const [records, setRecords] = useState<CallQualityRecord[]>([])
-    const [total, setTotal] = useState(0)
     const [page, setPage] = useState(1)
-    const [loading, setLoading] = useState(true)
-
     const { trunkId, startDate, endDate, order } = filters
 
-    const fetchPage = useCallback(
-        async (targetPage: number) => {
-            if (!companyId) {
-                setRecords([])
-                setTotal(0)
-                setLoading(false)
-                return
-            }
-            setLoading(true)
-            try {
-                const { data } = await api.get("/call-quality", {
-                    params: filterParams(companyId, filters, { page: targetPage, limit }),
-                })
-                setRecords(data.records ?? [])
-                setTotal(data.total ?? 0)
-            } catch (err) {
-                toast.error(apiError(err, "Erro ao buscar qualidade de rede"))
-            } finally {
-                setLoading(false)
-            }
-        },
-        // filters é recriado a cada render do caller - usar os campos primitivos como deps reais
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-        [companyId, limit, trunkId, startDate, endDate, order]
-    )
-
+    // qualquer mudança de filtro/empresa reseta a navegação para a 1ª página
     useEffect(() => {
         setPage(1)
-        fetchPage(1)
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [fetchPage])
+    }, [companyId, trunkId, startDate, endDate, order])
 
-    const goToPage = (targetPage: number) => {
-        setPage(targetPage)
-        fetchPage(targetPage)
-    }
+    const { data, isLoading: loading } = useQuery({
+        queryKey: ["call-quality", companyId, filters, page, limit],
+        queryFn: async () => {
+            const { data } = await api.get("/call-quality", {
+                params: filterParams(companyId as string, filters, { page, limit }),
+            })
+            return {
+                records: (data.records ?? []) as CallQualityRecord[],
+                total: (data.total ?? 0) as number,
+            }
+        },
+        enabled: !!companyId,
+        placeholderData: keepPreviousData,
+    })
 
     return {
-        records,
-        total,
+        records: data?.records ?? [],
+        total: data?.total ?? 0,
         limit,
         loading,
         page,
-        totalPages: Math.max(1, Math.ceil(total / limit)),
-        goToPage,
+        totalPages: Math.max(1, Math.ceil((data?.total ?? 0) / limit)),
+        goToPage: setPage,
     }
 }
 
 export function useCallQualitySummary(companyId?: string, filters: CallQualityFilters = {}) {
-    const [summary, setSummary] = useState<CallQualitySummary | null>(null)
-    const [loading, setLoading] = useState(true)
-
-    const { trunkId, startDate, endDate } = filters
-
-    const fetchSummary = useCallback(async () => {
-        if (!companyId) {
-            setSummary(null)
-            setLoading(false)
-            return
-        }
-        setLoading(true)
-        try {
+    const { data: summary = null, isLoading: loading } = useQuery({
+        queryKey: ["call-quality-summary", companyId, filters],
+        queryFn: async () => {
             const { data } = await api.get("/call-quality/summary", {
-                params: filterParams(companyId, filters),
+                params: filterParams(companyId as string, filters),
             })
-            setSummary(data.summary ?? null)
-        } catch (err) {
-            toast.error(apiError(err, "Erro ao buscar média de qualidade de rede"))
-        } finally {
-            setLoading(false)
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [companyId, trunkId, startDate, endDate])
-
-    useEffect(() => {
-        fetchSummary()
-    }, [fetchSummary])
+            return (data.summary ?? null) as CallQualitySummary | null
+        },
+        enabled: !!companyId,
+    })
 
     return { summary, loading }
 }

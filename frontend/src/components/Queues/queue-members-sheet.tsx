@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { InfoIcon, PlusIcon, Trash2Icon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -40,27 +41,11 @@ import { type QueueMembersSheetProps } from "@/components/Queues/types"
 const MEMBER_ROW_COLS = "grid-cols-[1fr_3.5rem_6rem_1.75rem]"
 
 function useCompanyExtensions(companyId?: string) {
-    const [extensions, setExtensions] = useState<DestinationOption[]>([])
-    const [loading, setLoading] = useState(false)
-
-    useEffect(() => {
-        if (!companyId) {
-            setExtensions([])
-            return
-        }
-        let cancelled = false
-        setLoading(true)
-        fetchDestinationOptions("extension", companyId)
-            .then((opts) => {
-                if (!cancelled) setExtensions(opts)
-            })
-            .finally(() => {
-                if (!cancelled) setLoading(false)
-            })
-        return () => {
-            cancelled = true
-        }
-    }, [companyId])
+    const { data: extensions = [], isFetching: loading } = useQuery({
+        queryKey: ["destination-options", "extension", companyId],
+        queryFn: () => fetchDestinationOptions("extension", companyId as string),
+        enabled: !!companyId,
+    })
 
     return { extensions, loading }
 }

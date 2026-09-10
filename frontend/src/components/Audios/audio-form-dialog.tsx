@@ -1,6 +1,7 @@
 "use client"
 
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
@@ -297,28 +298,20 @@ export function AudioFormDialog({
     const [generatedAudioId, setGeneratedAudioId] = useState<string | null>(
         null
     )
-    const [generatedAudioUrl, setGeneratedAudioUrl] = useState<string | null>(
-        null
-    )
+    const { data: generatedAudioUrl = null } = useQuery({
+        queryKey: ["audio-file", generatedAudioId],
+        queryFn: () => loadAudioFile(generatedAudioId as string),
+        enabled: !!generatedAudioId,
+        gcTime: 0,
+    })
 
+    // Blob URL não sobrevive à troca de áudio gerado (nova query) nem ao desmonte - revoga pra
+    // não vazar memória, já que o cache do useQuery não sabe liberar recursos do navegador
     useEffect(() => {
-        if (!generatedAudioId) {
-            setGeneratedAudioUrl(null)
-            return
-        }
-        let cancelled = false
-        let objectUrl: string | null = null
-        setGeneratedAudioUrl(null)
-        loadAudioFile(generatedAudioId).then((url) => {
-            if (cancelled) return
-            objectUrl = url
-            setGeneratedAudioUrl(url)
-        })
         return () => {
-            cancelled = true
-            if (objectUrl) URL.revokeObjectURL(objectUrl)
+            if (generatedAudioUrl) URL.revokeObjectURL(generatedAudioUrl)
         }
-    }, [generatedAudioId])
+    }, [generatedAudioUrl])
 
     // Prévia gerada sob demanda no idioma selecionado (diferente do `previewUrl` fixo, geralmente
     // em inglês, que a ElevenLabs devolve em /audios/tts/voices) - passado como `getPreviewUrl`
