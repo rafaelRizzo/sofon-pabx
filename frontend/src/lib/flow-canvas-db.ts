@@ -122,3 +122,15 @@ export async function clearPendingForNode(flowId: string, nodeId: string) {
         )
             await clearPendingEdgeOp(flowId, key)
 }
+
+// Descartar alterações (ver discardDraft em flow-canvas.tsx): apaga toda posição/conexão ainda não
+// sincronizada deste flow de uma vez, sem precisar saber os ids envolvidos.
+export async function clearAllPendingForFlow(flowId: string) {
+    const db = await getDb()
+    const all = await db.getAll(STORE_NAME)
+    await Promise.all(
+        all
+            .filter((record) => record.flowId === flowId)
+            .map((record) => db.delete(STORE_NAME, record.id))
+    )
+}

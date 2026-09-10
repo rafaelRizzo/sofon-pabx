@@ -33,6 +33,7 @@ export function DashboardTrunksStatus({ companyId }: Props) {
                     <Button
                         variant="ghost"
                         size="sm"
+                        nativeButton={false}
                         render={<Link to="/dashboard/monitoring" />}
                     >
                         Ver tudo

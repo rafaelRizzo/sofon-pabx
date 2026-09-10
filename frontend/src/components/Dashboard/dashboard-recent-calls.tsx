@@ -51,7 +51,12 @@ export function DashboardRecentCalls({ companyId }: Props) {
             <CardHeader>
                 <CardTitle>Últimas ligações</CardTitle>
                 <CardAction>
-                    <Button variant="ghost" size="sm" render={<Link to="/dashboard/cdr" />}>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        nativeButton={false}
+                        render={<Link to="/dashboard/cdr" />}
+                    >
                         Ver tudo
                         <ArrowRightIcon />
                     </Button>

@@ -23,6 +23,7 @@ import {
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
 import "@/components/Flows/flow-canvas.css"
+import { useQuery } from "@tanstack/react-query"
 import {
     CloudIcon,
     CloudOffIcon,
@@ -32,6 +33,7 @@ import {
     PanelRightCloseIcon,
     PanelRightOpenIcon,
     PlusIcon,
+    RotateCcwIcon,
     SaveIcon,
     SearchIcon,
     UnlockIcon,
@@ -40,11 +42,28 @@ import {
 import { toast } from "sonner"
 
 import { api, apiError, isValidationError } from "@/lib/api"
+import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip"
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog"
 import {
     ROUTE_DEST_ICONS,
@@ -92,6 +111,7 @@ import {
     clearPendingEdgeOp,
     loadPendingForFlow,
     clearPendingForNode,
+    clearAllPendingForFlow,
     type EdgeOperation,
 } from "@/lib/flow-canvas-db"
 import {
@@ -385,30 +405,35 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
     )
     const [draftVersion, setDraftVersion] = useState(0)
     const [isSavingDraft, setIsSavingDraft] = useState(false)
+    const [isDiscardingDraft, setIsDiscardingDraft] = useState(false)
+    const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
+    const [showSaveConfirm, setShowSaveConfirm] = useState(false)
 
-    // Grava o snapshot inteiro do draft (debounced) - só o suficiente pra sobreviver a reload/fechar
-    // aba enquanto auto save está desligado; posição de nó e conexão de edge continuam usando o
-    // buffer próprio já existente (flow-canvas-db.ts), reaproveitado tal como está.
+    // Grava o snapshot inteiro do draft imediatamente - posição de nó e conexão de edge continuam
+    // usando o buffer próprio já existente (flow-canvas-db.ts), reaproveitado tal como está.
+    const flushDraftSnapshot = useCallback(() => {
+        void saveFlowDraft({
+            flowId: flow.id,
+            nodeCreations: [...draftNodeCreations.current.values()],
+            resourceCreations: [...draftResourceCreations.current.values()],
+            resourceUpdates: [...draftResourceUpdates.current.values()],
+            resourceDeletions: [...draftResourceDeletions.current.values()],
+            nodeDeletions: [...draftNodeDeletions.current],
+            entryDirty: draftEntry.current.dirty,
+            entryNodeId: draftEntry.current.nodeId,
+            entryIsEntry: draftEntry.current.isEntry,
+            startDirty: draftStart.current.dirty,
+            startPosition: draftStart.current.position,
+        })
+    }, [flow.id])
+
+    // Debounced (300ms) pra não bater no IndexedDB a cada tecla/drag - mas sobrevive a sair da
+    // página (ver useEffect de flush no unmount abaixo), que senão perdia qualquer edição feita
+    // nesses últimos 300ms.
     const persistDraftSnapshot = useCallback(() => {
         if (draftPersistTimer.current) clearTimeout(draftPersistTimer.current)
-        draftPersistTimer.current = setTimeout(() => {
-            void saveFlowDraft({
-                flowId: flow.id,
-                nodeCreations: [...draftNodeCreations.current.values()],
-                resourceCreations: [...draftResourceCreations.current.values()],
-                resourceUpdates: [...draftResourceUpdates.current.values()],
-                resourceDeletions: [
-                    ...draftResourceDeletions.current.values(),
-                ],
-                nodeDeletions: [...draftNodeDeletions.current],
-                entryDirty: draftEntry.current.dirty,
-                entryNodeId: draftEntry.current.nodeId,
-                entryIsEntry: draftEntry.current.isEntry,
-                startDirty: draftStart.current.dirty,
-                startPosition: draftStart.current.position,
-            })
-        }, 300)
-    }, [flow.id])
+        draftPersistTimer.current = setTimeout(flushDraftSnapshot, 300)
+    }, [flushDraftSnapshot])
 
     // Chamar depois de QUALQUER mutação nos refs de draft acima - persiste em IndexedDB e força
     // re-render pra badge de "N alterações pendentes" (refs sozinhos não disparam re-render).
@@ -416,6 +441,17 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
         persistDraftSnapshot()
         setDraftVersion((v) => v + 1)
     }, [persistDraftSnapshot])
+
+    // Trocar de flow ou sair da página (navegação SPA) desmonta este componente sem esperar o
+    // debounce acima - sem isso, a última edição em até 300ms ficava só na memória e sumia.
+    useEffect(() => {
+        return () => {
+            if (draftPersistTimer.current) {
+                clearTimeout(draftPersistTimer.current)
+                flushDraftSnapshot()
+            }
+        }
+    }, [flushDraftSnapshot])
 
     const draftDirtyCount = useMemo(
         () =>
@@ -2356,6 +2392,57 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
         setFlowEdges,
     ])
 
+    // joga fora o estado local/IndexedDB e volta a mostrar o que já está salvo. Confirmação fica na
+    // UI (AlertDialog abaixo), não aqui - essa função só executa quando já foi confirmado.
+    const discardDraft = useCallback(async () => {
+        if (isDiscardingDraft) return
+        setIsDiscardingDraft(true)
+        try {
+            // cancela qualquer flush/retry agendado - nada deve escrever no backend depois do
+            // descarte, mesmo que um timer de debounce ainda estivesse de pé
+            if (saveTimer.current) clearTimeout(saveTimer.current)
+            if (edgeSyncTimer.current) clearTimeout(edgeSyncTimer.current)
+            if (startSaveTimer.current) clearTimeout(startSaveTimer.current)
+            if (draftPersistTimer.current) clearTimeout(draftPersistTimer.current)
+
+            draftNodeCreations.current.clear()
+            draftResourceCreations.current.clear()
+            draftResourceUpdates.current.clear()
+            draftResourceDeletions.current.clear()
+            draftNodeDeletions.current.clear()
+            draftEntry.current = { dirty: false, nodeId: null, isEntry: true }
+            draftStart.current = { dirty: false, position: null }
+            pendingPositions.current.clear()
+            pendingEdgeOperations.current.clear()
+            pendingNodeIds.current.clear()
+            // ids remapeados (undo/redo) e o próprio histórico não fazem mais sentido depois de
+            // voltar ao estado salvo - um undo de uma ação já descartada só quebraria de novo.
+            nodeIdMapRef.current.clear()
+            history.clear()
+
+            await Promise.all([
+                clearFlowDraft(flow.id),
+                clearAllPendingForFlow(flow.id),
+            ])
+
+            const savedStart = flow.layout?.find(
+                (item) => item.nodeId === START_KEY
+            )
+            setStartPosition(
+                savedStart ? { x: savedStart.x, y: savedStart.y } : { x: 80, y: 40 }
+            )
+            markDraftDirty()
+            try {
+                await reconcileNodes()
+            } catch {
+                // O próximo carregamento busca o estado autoritativo.
+            }
+            toast.success("Alterações descartadas")
+        } finally {
+            setIsDiscardingDraft(false)
+        }
+    }, [isDiscardingDraft, flow.id, flow.layout, history, reconcileNodes, markDraftDirty])
+
     // Alterna auto save - ligar de novo com alterações pendentes dispara o "Salvar" automaticamente
     // (evita ficar num estado híbrido "toggle ligado mas ainda tem coisa só local").
     const handleToggleAutoSave = useCallback(
@@ -2416,141 +2503,181 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
         return () => window.removeEventListener("keydown", onKeyDown)
     }, [history])
 
+    // Leitura pontual do IndexedDB (posições/edges pendentes + draft de auto save desligado) via
+    // useQuery em vez de useEffect+fetch manual: o dedupe de promise em voo do TanStack Query já
+    // resolve certo o duplo-invoke do StrictMode (dev) sem precisar de flag "cancelled" nenhuma -
+    // era exatamente essa flag, fechada no closure do useEffect antigo, que causava um bug real
+    // (nó criado com auto save desligado sumia do card "N alterações pendentes" ao trocar de
+    // página e voltar: o cleanup da 1ª invocação do StrictMode marcava cancelled=true antes da
+    // promise resolver, e a 2ª invocação nem tentava de novo por causa do hydratedFlowRef abaixo).
+    // gcTime:0 pra nunca servir um resultado cacheado de uma montagem anterior deste MESMO flow.id
+    // - a montagem anterior pode ter gravado no IndexedDB um flush de unmount depois que este
+    // query rodou; sem isso, reabrir o flow serviria o draft de antes desse flush.
+    const draftHydrationQuery = useQuery({
+        queryKey: ["flow-draft-hydration", flow.id],
+        queryFn: () =>
+            Promise.all([loadPendingForFlow(flow.id), loadFlowDraft(flow.id)]),
+        enabled: !!flow.id && !loading,
+        staleTime: Infinity,
+        gcTime: 0,
+    })
+
     useEffect(() => {
-        if (!flow.id || loading) return
+        if (!draftHydrationQuery.data) return
         if (hydratedFlowRef.current === flow.id) return
         hydratedFlowRef.current = flow.id
-        let cancelled = false
-        void Promise.all([
-            loadPendingForFlow(flow.id),
-            loadFlowDraft(flow.id),
-        ]).then(([{ positions, edgeOps }, draft]) => {
-            if (cancelled) return
+        // Corpo síncrono agora (dado já resolvido pelo useQuery acima) - sem promise em voo, sem
+        // race de StrictMode possível: essa aplicação roda de uma vez só, na mesma invocação do
+        // effect que passou no guard de hydratedFlowRef.
+        const [{ positions, edgeOps }, draft] = draftHydrationQuery.data
 
-            // Rehidrata o draft (auto save desligado numa sessão anterior, aba fechada/recarregada
-            // antes de clicar em "Salvar") ANTES de calcular knownNodeIds - nó criado só no draft
-            // precisa contar como "conhecido" pra posição/edge dele (abaixo) não ser descartada como
-            // órfã, e nó/recurso marcado pra exclusão precisa sumir da base antes de tudo o resto.
-            if (draft) {
-                for (const creation of draft.resourceCreations)
-                    draftResourceCreations.current.set(creation.draftId, creation)
-                for (const update of draft.resourceUpdates)
-                    draftResourceUpdates.current.set(update.resourceId, update)
-                for (const deletion of draft.resourceDeletions)
-                    draftResourceDeletions.current.set(deletion.nodeId, deletion)
-                for (const nodeId of draft.nodeDeletions)
-                    draftNodeDeletions.current.add(nodeId)
-                if (draft.entryDirty)
-                    draftEntry.current = {
-                        dirty: true,
-                        nodeId: draft.entryNodeId,
-                        isEntry: draft.entryIsEntry,
-                    }
-                if (draft.startDirty && draft.startPosition) {
-                    draftStart.current = {
-                        dirty: true,
-                        position: draft.startPosition,
-                    }
-                    setStartPosition(draft.startPosition)
+        // Rehidrata o draft (auto save desligado numa sessão anterior, aba fechada/recarregada
+        // antes de clicar em "Salvar") ANTES de calcular knownNodeIds - nó criado só no draft
+        // precisa contar como "conhecido" pra posição/edge dele (abaixo) não ser descartada como
+        // órfã, e nó/recurso marcado pra exclusão precisa sumir da base antes de tudo o resto.
+        if (draft) {
+            for (const creation of draft.resourceCreations)
+                draftResourceCreations.current.set(creation.draftId, creation)
+            for (const update of draft.resourceUpdates)
+                draftResourceUpdates.current.set(update.resourceId, update)
+            for (const deletion of draft.resourceDeletions)
+                draftResourceDeletions.current.set(deletion.nodeId, deletion)
+            for (const nodeId of draft.nodeDeletions)
+                draftNodeDeletions.current.add(nodeId)
+            if (draft.entryDirty)
+                draftEntry.current = {
+                    dirty: true,
+                    nodeId: draft.entryNodeId,
+                    isEntry: draft.entryIsEntry,
                 }
-                const removedNodeIds = new Set([
-                    ...draft.resourceDeletions.map((d) => d.nodeId),
-                    ...draft.nodeDeletions,
-                ])
-                const now = new Date().toISOString()
-                setFlowNodes((current) => [
-                    ...current.filter((node) => !removedNodeIds.has(node.id)),
-                    ...draft.nodeCreations.map(
-                        (creation): FlowNodeInstance => ({
-                            id: creation.localId,
-                            flowId: flow.id,
-                            type: creation.type,
-                            resourceId: creation.resourceId,
-                            label: creation.label,
-                            position: creation.position,
-                            createdAt: now,
-                            updatedAt: now,
-                        })
-                    ),
-                ])
-                setFlowEdges((current) =>
-                    current.filter(
-                        (edge) =>
-                            !removedNodeIds.has(edge.sourceNodeId) &&
-                            !removedNodeIds.has(edge.targetNodeId)
-                    )
-                )
-                if (draft.entryDirty)
-                    setEntryNodeId(
-                        draft.entryIsEntry ? draft.entryNodeId : null
-                    )
-                for (const creation of draft.nodeCreations) {
-                    pendingNodeIds.current.add(creation.localId)
-                    draftNodeCreations.current.set(creation.localId, creation)
+            if (draft.startDirty && draft.startPosition) {
+                draftStart.current = {
+                    dirty: true,
+                    position: draft.startPosition,
                 }
-                if (isDraftDirty(draft)) markDraftDirty()
+                setStartPosition(draft.startPosition)
             }
-
-            const knownNodeIds = new Set([
-                START_KEY,
-                ...flowNodes.map((node) => node.id),
-                ...(draft?.nodeCreations.map((c) => c.localId) ?? []),
+            const removedNodeIds = new Set([
+                ...draft.resourceDeletions.map((d) => d.nodeId),
+                ...draft.nodeDeletions,
             ])
-            let hasPositions = false
-            for (const [nodeId, position] of positions) {
-                if (!knownNodeIds.has(nodeId)) {
-                    void clearPendingPosition(flow.id, nodeId)
-                    continue
-                }
-                pendingPositions.current.set(nodeId, position)
-                hasPositions = true
-            }
-            if (hasPositions) {
-                setFlowNodes((current) =>
-                    current.map((node) =>
-                        pendingPositions.current.has(node.id)
+            const now = new Date().toISOString()
+            setFlowNodes((current) => [
+                ...current
+                    .filter((node) => !removedNodeIds.has(node.id))
+                    // reflete no card o rename/edição de um recurso que já existia antes deste
+                    // draft (draftResourceUpdates acima) - sem isso o card volta a mostrar o
+                    // nome antigo até o usuário abrir o EditNodeDialog de novo, mesmo com o
+                    // rascunho certo já marcado como pendente.
+                    .map((node) => {
+                        const update = draft.resourceUpdates.find(
+                            (u) => u.resourceId === node.resourceId
+                        )
+                        return update
                             ? {
                                   ...node,
-                                  position: pendingPositions.current.get(
-                                      node.id
-                                  )!,
+                                  label: labelForDraftResource(
+                                      update.type,
+                                      update.form as Record<string, unknown>
+                                  ),
                               }
                             : node
-                    )
+                    }),
+                ...draft.nodeCreations.map(
+                    (creation): FlowNodeInstance => ({
+                        id: creation.localId,
+                        flowId: flow.id,
+                        type: creation.type,
+                        resourceId: creation.resourceId,
+                        label: creation.label,
+                        position: creation.position,
+                        createdAt: now,
+                        updatedAt: now,
+                    })
+                ),
+            ])
+            setFlowEdges((current) =>
+                current.filter(
+                    (edge) =>
+                        !removedNodeIds.has(edge.sourceNodeId) &&
+                        !removedNodeIds.has(edge.targetNodeId)
                 )
+            )
+            if (draft.entryDirty)
+                setEntryNodeId(draft.entryIsEntry ? draft.entryNodeId : null)
+            for (const creation of draft.nodeCreations) {
+                pendingNodeIds.current.add(creation.localId)
+                draftNodeCreations.current.set(creation.localId, creation)
+            }
+            if (isDraftDirty(draft)) markDraftDirty()
+        }
+
+        const knownNodeIds = new Set([
+            START_KEY,
+            ...flowNodes.map((node) => node.id),
+            ...(draft?.nodeCreations.map((c) => c.localId) ?? []),
+        ])
+        let hasPositions = false
+        for (const [nodeId, position] of positions) {
+            if (!knownNodeIds.has(nodeId)) {
+                void clearPendingPosition(flow.id, nodeId)
+                continue
+            }
+            pendingPositions.current.set(nodeId, position)
+            hasPositions = true
+        }
+        if (hasPositions) {
+            setFlowNodes((current) =>
+                current.map((node) =>
+                    pendingPositions.current.has(node.id)
+                        ? {
+                              ...node,
+                              position: pendingPositions.current.get(
+                                  node.id
+                              )!,
+                          }
+                        : node
+                )
+            )
+            // só reenvia pro backend sozinho se auto save está ligado - com ele desligado, a posição
+            // fica só no draft até o usuário clicar em "Salvar" (senão reabrir o flow já dispara um
+            // PUT que o auto save desligado deveria estar evitando).
+            if (autoSaveRef.current) {
                 if (saveTimer.current) clearTimeout(saveTimer.current)
                 saveTimer.current = setTimeout(() => void persistPositions(), 0)
             }
-
-            let hasEdgeOps = false
-            for (const [key, operation] of edgeOps) {
-                const sourceKnown = knownNodeIds.has(operation.sourceNodeId)
-                const targetKnown =
-                    operation.type === "disconnect" ||
-                    knownNodeIds.has(operation.targetNodeId)
-                if (!sourceKnown || !targetKnown) {
-                    void clearPendingEdgeOp(flow.id, key)
-                    continue
-                }
-                pendingEdgeOperations.current.set(key, operation)
-                hasEdgeOps = true
-            }
-            if (hasEdgeOps) {
-                setFlowEdges((current) =>
-                    applyEdgeOperations(
-                        current,
-                        pendingEdgeOperations.current.values()
-                    )
-                )
-                scheduleEdgeSync(0)
-            }
-        })
-        return () => {
-            cancelled = true
         }
+
+        let hasEdgeOps = false
+        for (const [key, operation] of edgeOps) {
+            const sourceKnown = knownNodeIds.has(operation.sourceNodeId)
+            const targetKnown =
+                operation.type === "disconnect" ||
+                knownNodeIds.has(operation.targetNodeId)
+            if (!sourceKnown || !targetKnown) {
+                void clearPendingEdgeOp(flow.id, key)
+                continue
+            }
+            pendingEdgeOperations.current.set(key, operation)
+            hasEdgeOps = true
+        }
+        if (hasEdgeOps) {
+            setFlowEdges((current) =>
+                applyEdgeOperations(
+                    current,
+                    pendingEdgeOperations.current.values()
+                )
+            )
+            scheduleEdgeSync(0)
+        }
+        // posição/edge pendente restaurada do IndexedDB também conta pro badge/botão de "Salvar" -
+        // sem isso, o ref ficava povoado (e persistia certinho) mas draftVersion nunca bumpava, então
+        // o botão reabria cinza mesmo com alteração pendente de verdade (draftDirtyCount não
+        // recalculava por não estar nos deps do useMemo).
+        if (!autoSaveRef.current && (hasPositions || hasEdgeOps)) markDraftDirty()
     }, [
         flow.id,
-        loading,
+        draftHydrationQuery.data,
         flowNodes,
         persistPositions,
         scheduleEdgeSync,
@@ -2558,6 +2685,7 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
         setFlowNodes,
         setEntryNodeId,
         markDraftDirty,
+        labelForDraftResource,
     ])
 
     const onConnect = useCallback(
@@ -2783,17 +2911,20 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
                         </ContextMenuContent>
                     </ContextMenu>
                 )}
-                <div className="absolute top-3 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-md border bg-card px-2.5 py-1.5 shadow-sm">
+                <div className="absolute top-3 left-1/2 z-20 flex max-w-[calc(100vw-1.5rem)] -translate-x-1/2 items-center gap-1.5 rounded-md border bg-card px-2 py-1.5 shadow-sm sm:gap-2 sm:px-2.5">
                     <Label
                         htmlFor="flow-autosave-toggle"
-                        className="flex items-center gap-1.5 text-xs font-medium"
+                        title="Salvamento automático"
+                        className="flex shrink-0 items-center gap-1.5 text-xs font-medium whitespace-nowrap"
                     >
                         {autoSave ? (
-                            <CloudIcon className="size-3.5 text-muted-foreground" />
+                            <CloudIcon className="size-3.5 shrink-0 text-muted-foreground" />
                         ) : (
-                            <CloudOffIcon className="size-3.5 text-muted-foreground" />
+                            <CloudOffIcon className="size-3.5 shrink-0 text-muted-foreground" />
                         )}
-                        Salvamento automático
+                        <span className="hidden sm:inline">
+                            Salvamento automático
+                        </span>
                     </Label>
                     <Switch
                         id="flow-autosave-toggle"
@@ -2801,31 +2932,147 @@ function FlowCanvasInner({ flow, companies, flowNodesState }: Props) {
                         checked={autoSave}
                         onCheckedChange={handleToggleAutoSave}
                         disabled={isSavingDraft}
+                        className="shrink-0"
                     />
                     {!autoSave && (
                         <>
-                            <span className="text-xs text-muted-foreground">
-                                {draftDirtyCount > 0
-                                    ? `${draftDirtyCount} alteração${draftDirtyCount === 1 ? "" : "ões"} pendente${draftDirtyCount === 1 ? "" : "s"}`
-                                    : "Tudo salvo"}
-                            </span>
+                            <TooltipProvider delay={200}>
+                                <Tooltip>
+                                    <TooltipTrigger
+                                        render={
+                                            <Button
+                                                size="icon-sm"
+                                                variant="ghost"
+                                                className="shrink-0 hover:bg-destructive/10 hover:text-destructive"
+                                                aria-label="Descartar alterações"
+                                                onClick={() =>
+                                                    setShowDiscardConfirm(true)
+                                                }
+                                                disabled={
+                                                    isSavingDraft ||
+                                                    isDiscardingDraft ||
+                                                    draftDirtyCount === 0
+                                                }
+                                            >
+                                                {isDiscardingDraft ? (
+                                                    <Loader2Icon className="size-3 animate-spin" />
+                                                ) : (
+                                                    <RotateCcwIcon className="size-3" />
+                                                )}
+                                            </Button>
+                                        }
+                                    />
+                                    <TooltipContent>
+                                        {draftDirtyCount > 0
+                                            ? `Descartar ${draftDirtyCount} ${draftDirtyCount === 1 ? "alteração não salva" : "alterações não salvas"}`
+                                            : "Descartar alterações"}
+                                    </TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
                             <Button
                                 size="sm"
                                 variant="secondary"
-                                className="h-6 gap-1 px-2 text-xs"
-                                onClick={() => void saveDraft()}
-                                disabled={isSavingDraft || draftDirtyCount === 0}
+                                className={cn(
+                                    "h-6 shrink-0 gap-1 px-2 text-xs whitespace-nowrap",
+                                    draftDirtyCount > 0 &&
+                                        "bg-emerald-500 text-emerald-50 hover:bg-emerald-500/20 dark:bg-emerald-900 dark:text-emerald-50 dark:hover:bg-emerald-900/90"
+                                )}
+                                onClick={() => setShowSaveConfirm(true)}
+                                disabled={
+                                    isSavingDraft ||
+                                    isDiscardingDraft ||
+                                    draftDirtyCount === 0
+                                }
                             >
                                 {isSavingDraft ? (
-                                    <Loader2Icon className="size-3 animate-spin" />
+                                    <Loader2Icon className="size-3 shrink-0 animate-spin" />
                                 ) : (
-                                    <SaveIcon className="size-3" />
+                                    <SaveIcon className="size-3 shrink-0" />
                                 )}
-                                Salvar
+                                <span className="hidden sm:inline">
+                                    Salvar
+                                </span>
+                                <span className="sm:hidden">
+                                    {draftDirtyCount > 0
+                                        ? `Salvar (${draftDirtyCount})`
+                                        : "Salvar"}
+                                </span>
                             </Button>
                         </>
                     )}
                 </div>
+                <AlertDialog
+                    open={showDiscardConfirm}
+                    onOpenChange={(next) => {
+                        if (!next && !isDiscardingDraft)
+                            setShowDiscardConfirm(false)
+                    }}
+                >
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>
+                                Descartar alterações
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                                {draftDirtyCount === 1
+                                    ? "1 alteração local não salva será perdida"
+                                    : `${draftDirtyCount} alterações locais não salvas serão perdidas`}{" "}
+                                e o flow volta ao último estado salvo. Essa
+                                ação não pode ser desfeita.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel disabled={isDiscardingDraft}>
+                                Cancelar
+                            </AlertDialogCancel>
+                            <AlertDialogAction
+                                disabled={isDiscardingDraft}
+                                onClick={async () => {
+                                    await discardDraft()
+                                    setShowDiscardConfirm(false)
+                                }}
+                            >
+                                {isDiscardingDraft
+                                    ? "Descartando..."
+                                    : "Descartar"}
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+                <AlertDialog
+                    open={showSaveConfirm}
+                    onOpenChange={(next) => {
+                        if (!next && !isSavingDraft) setShowSaveConfirm(false)
+                    }}
+                >
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>
+                                Salvar alterações
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                                {draftDirtyCount === 1
+                                    ? "1 alteração local será salva"
+                                    : `${draftDirtyCount} alterações locais serão salvas`}{" "}
+                                no flow.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel disabled={isSavingDraft}>
+                                Cancelar
+                            </AlertDialogCancel>
+                            <AlertDialogAction
+                                disabled={isSavingDraft}
+                                onClick={async () => {
+                                    await saveDraft()
+                                    setShowSaveConfirm(false)
+                                }}
+                            >
+                                {isSavingDraft ? "Salvando..." : "Salvar"}
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
                 {(refreshing || isSyncingEdges || deletingNodeCount > 0) && (
                     <div className="absolute top-14 left-1/2 z-20 flex -translate-x-1/2 items-center gap-1.5 rounded-md border bg-card px-2 py-1 text-xs text-muted-foreground shadow-sm">
                         <Loader2Icon className="size-3 animate-spin" />

@@ -18,6 +18,13 @@ export type HistoryAction =
     | { kind: "move-node"; nodeId: string; from: Point; to: Point }
     | { kind: "move-start"; from: Point; to: Point }
     | {
+        kind: "auto-layout"
+        // nodeId === START_KEY é o nó sintético "Início" (ver commitStartPosition em
+        // flow-canvas.tsx) - um único action pro reposicionamento inteiro, não um por nó movido
+        // (senão "Organizar automaticamente" empilharia dezenas de undos pra uma ação só)
+        changes: { nodeId: string; from: Point; to: Point }[]
+    }
+    | {
         kind: "create-node"
         nodeId: string
         type: CanvasNodeType
@@ -124,24 +131,34 @@ export function useFlowHistory() {
     const undo = useCallback(() => void run("undo"), [run])
     const redo = useCallback(() => void run("redo"), [run])
 
-    // push/undo/redo/setApplyAction são estáveis (deps vazias ou só de outras funções estáveis) -
-    // memoizar o objeto retornado por `tick` evita recriar sua identidade a cada render. Sem isso,
-    // qualquer código que ponha `history` (em vez de `history.push` etc.) numa lista de
-    // dependências de useCallback/useEffect recria essas dependências a cada render, o que pode
-    // reagendar efeitos que chamam setState incondicionalmente e travar em loop
-    // ("Maximum update depth exceeded"). `tick` muda só quando push/undo/redo de fato mexem nas
-    // pilhas, então canUndo/canRedo/isBusy continuam corretos.
+    // Zera as duas pilhas sem tentar desfazer nada - usado só por "Descartar alterações" (auto save
+    // desligado, ver discardDraft em flow-canvas.tsx), onde o estado local inteiro já foi jogado
+    // fora e qualquer ação antiga da pilha referenciaria ids que não existem mais.
+    const clear = useCallback(() => {
+        undoStack.current = []
+        redoStack.current = []
+        forceRender()
+    }, [])
+
+    // push/undo/redo/clear/setApplyAction são estáveis (deps vazias ou só de outras funções
+    // estáveis) - memoizar o objeto retornado por `tick` evita recriar sua identidade a cada
+    // render. Sem isso, qualquer código que ponha `history` (em vez de `history.push` etc.) numa
+    // lista de dependências de useCallback/useEffect recria essas dependências a cada render, o que
+    // pode reagendar efeitos que chamam setState incondicionalmente e travar em loop
+    // ("Maximum update depth exceeded"). `tick` muda só quando push/undo/redo/clear de fato mexem
+    // nas pilhas, então canUndo/canRedo/isBusy continuam corretos.
     return useMemo(
         () => ({
             push,
             undo,
             redo,
+            clear,
             setApplyAction,
             canUndo: undoStack.current.length > 0,
             canRedo: redoStack.current.length > 0,
             isBusy: busyRef.current,
         }),
         // eslint-disable-next-line react-hooks/exhaustive-deps
-        [push, undo, redo, setApplyAction, tick]
+        [push, undo, redo, clear, setApplyAction, tick]
     )
 }
