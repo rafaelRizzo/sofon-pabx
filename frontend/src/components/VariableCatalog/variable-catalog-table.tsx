@@ -19,18 +19,8 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { type Company } from "@/hooks/use-companies"
-import { type Variable } from "@/hooks/use-variable-catalog"
 import { UsedByBadge } from "@/components/RouteDestination/used-by-badge"
-
-type Props = {
-    variables: Variable[]
-    companies: Company[]
-    loading: boolean
-    companySelected: boolean
-    onEdit: (variable: Variable) => void
-    onDelete: (variable: Variable) => void
-}
+import { type VariableCatalogTableProps } from "@/components/VariableCatalog/types"
 
 export function VariableCatalogTable({
     variables,
@@ -39,7 +29,7 @@ export function VariableCatalogTable({
     companySelected,
     onEdit,
     onDelete,
-}: Props) {
+}: VariableCatalogTableProps) {
     const companyName = (companyId: string) =>
         companies.find((c) => c.id === companyId)?.name ?? companyId
 

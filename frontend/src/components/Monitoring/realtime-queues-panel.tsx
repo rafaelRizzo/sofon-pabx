@@ -9,7 +9,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { QueueMembersPopover } from "@/components/Monitoring/queue-members-popover"
 import { LiveDot } from "@/components/Monitoring/live-indicator"
-import type { RealtimeExtension, RealtimeQueue } from "@/hooks/use-realtime"
+import { type RealtimeQueuesPanelProps } from "@/components/Monitoring/types"
 
 function formatWait(seconds: number): string {
     if (seconds < 60) return `${seconds}s`
@@ -17,19 +17,12 @@ function formatWait(seconds: number): string {
     return `${minutes}m ${seconds % 60}s`
 }
 
-type Props = {
-    queues: RealtimeQueue[]
-    extensions: RealtimeExtension[]
-    loading: boolean
-    companySelected: boolean
-}
-
 export function RealtimeQueuesPanel({
     queues,
     extensions,
     loading,
     companySelected,
-}: Props) {
+}: RealtimeQueuesPanelProps) {
     if (loading) {
         return (
             <div className="flex flex-col gap-4">

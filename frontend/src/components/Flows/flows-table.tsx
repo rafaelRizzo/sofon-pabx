@@ -20,18 +20,7 @@ import {
 } from "@/components/ui/tooltip"
 import { RouteDestinationBadge } from "@/components/RouteDestination/route-destination-badge"
 import { UsedByBadge } from "@/components/RouteDestination/used-by-badge"
-import { type Flow } from "@/hooks/use-flows"
-
-type Props = {
-    flows: Flow[]
-    loading: boolean
-    companySelected: boolean
-    onOpen: (flow: Flow) => void
-    onEdit: (flow: Flow) => void
-    onDelete: (flow: Flow) => void
-    onExport: (flow: Flow) => void
-    exporting: boolean
-}
+import { type FlowsTableProps } from "@/components/Flows/types"
 
 export function FlowsTable({
     flows,
@@ -42,7 +31,7 @@ export function FlowsTable({
     onDelete,
     onExport,
     exporting,
-}: Props) {
+}: FlowsTableProps) {
     return (
         <div className="rounded-md border">
             <Table>

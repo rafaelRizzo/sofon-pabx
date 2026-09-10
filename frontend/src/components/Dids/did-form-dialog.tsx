@@ -40,35 +40,17 @@ import { type Company } from "@/hooks/use-companies"
 import {
     createDidSchema,
     updateDidSchema,
-    type Did,
     type DidCreateForm,
     type DidStatus,
     type DidUpdateForm,
 } from "@/hooks/use-dids"
+import { type DidFormDialogProps } from "@/components/Dids/types"
 
 const STATUS_OPTIONS: { value: DidStatus; label: string }[] = [
     { value: "active", label: "Ativo" },
     { value: "inactive", label: "Inativo" },
     { value: "blocked", label: "Bloqueado" },
 ]
-
-type Props =
-    | {
-          open: boolean
-          onOpenChange: (open: boolean) => void
-          did: null
-          companies: Company[]
-          onCreate: (form: DidCreateForm) => Promise<boolean>
-          onUpdate?: never
-      }
-    | {
-          open: boolean
-          onOpenChange: (open: boolean) => void
-          did: Did
-          companies: Company[]
-          onCreate?: never
-          onUpdate: (form: DidUpdateForm) => Promise<boolean>
-      }
 
 export function DidFormDialog({
     open,
@@ -77,7 +59,7 @@ export function DidFormDialog({
     companies,
     onCreate,
     onUpdate,
-}: Props) {
+}: DidFormDialogProps) {
     const isEdit = !!did
 
     const createForm = useForm<DidCreateForm>({

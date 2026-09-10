@@ -14,13 +14,8 @@ import { PresenceBadge } from "@/components/presence-badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import { formatElapsed } from "@/lib/realtime-format"
-import type { RealtimeTrunk, RealtimeTrunkActiveCall } from "@/hooks/use-realtime"
-
-type Props = {
-    trunks: RealtimeTrunk[]
-    loading: boolean
-    companySelected: boolean
-}
+import type { RealtimeTrunkActiveCall } from "@/hooks/use-realtime"
+import { type RealtimeTrunkCardsProps } from "@/components/Monitoring/types"
 
 // Cor do ícone por tipo de tronco: reforça a distinção pjsip (padrão) / sip (legado,
 // ver project_sip_peers_legacy) / iax (alternativo) sem precisar de badge extra por card.
@@ -70,7 +65,11 @@ function TrunkCallNetworkRow({ call }: { call: RealtimeTrunkActiveCall }) {
     )
 }
 
-export function RealtimeTrunkCards({ trunks, loading, companySelected }: Props) {
+export function RealtimeTrunkCards({
+    trunks,
+    loading,
+    companySelected,
+}: RealtimeTrunkCardsProps) {
     if (loading) {
         return (
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">

@@ -32,18 +32,9 @@ import { Input } from "@/components/ui/input"
 import { type Company } from "@/hooks/use-companies"
 import {
     createVariableFormSchema,
-    type Variable,
     type VariableForm,
 } from "@/hooks/use-variable-catalog"
-
-type Props = {
-    open: boolean
-    onOpenChange: (open: boolean) => void
-    variable: Variable | null
-    companies: Company[]
-    defaultCompanyId?: string
-    onSave: (form: VariableForm) => Promise<boolean>
-}
+import { type VariableCatalogFormDialogProps } from "@/components/VariableCatalog/types"
 
 export function VariableCatalogFormDialog({
     open,
@@ -52,7 +43,7 @@ export function VariableCatalogFormDialog({
     companies,
     defaultCompanyId,
     onSave,
-}: Props) {
+}: VariableCatalogFormDialogProps) {
     const isEdit = !!variable
 
     const {

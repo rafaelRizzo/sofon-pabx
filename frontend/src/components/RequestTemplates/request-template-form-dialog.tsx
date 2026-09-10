@@ -57,26 +57,14 @@ import {
     createRequestTemplateFormSchema,
     HTTP_METHODS,
     type HttpMethod,
-    type RequestTemplate,
     type RequestTemplateForm,
 } from "@/hooks/use-request-templates"
+import { type RequestTemplateFormDialogProps } from "@/components/RequestTemplates/types"
 
 const HTTP_METHOD_ITEMS = HTTP_METHODS.map((m) => ({ value: m, label: m }))
 
 const emptyHeader = { key: "", value: "" }
 const emptyVariableMapping = { path: "", variable: "" }
-
-type Props = {
-    open: boolean
-    onOpenChange: (open: boolean) => void
-    requestTemplate: RequestTemplate | null
-    // true enquanto o registro ainda está sendo buscado por id (ver EditNodeDialog) - nesse caso
-    // `requestTemplate` também é null, mas não significa "criação": mostra skeleton em vez do form
-    loading?: boolean
-    companies: Company[]
-    onSave: (form: RequestTemplateForm) => Promise<boolean>
-    onDelete?: () => void
-}
 
 export function RequestTemplateFormDialog({
     open,
@@ -86,7 +74,7 @@ export function RequestTemplateFormDialog({
     companies,
     onSave,
     onDelete,
-}: Props) {
+}: RequestTemplateFormDialogProps) {
     const isEdit = !!requestTemplate
     const defaultCompanyId =
         companies.length === 1 ? (companies[0]?.id ?? "") : ""

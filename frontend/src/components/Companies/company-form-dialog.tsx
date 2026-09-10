@@ -39,10 +39,10 @@ import {
 } from "@/components/ui/select"
 import {
     companyFormSchema,
-    type Company,
     type CompanyForm,
     type CompanyStatus,
 } from "@/hooks/use-companies"
+import { type CompanyFormDialogProps } from "@/components/Companies/types"
 
 const TIMEZONES = Intl.supportedValuesOf("timeZone")
 const DEFAULT_TIMEZONE = "America/Sao_Paulo"
@@ -52,13 +52,6 @@ const STATUSES: { value: CompanyStatus; label: string }[] = [
     { value: "inactive", label: "Inativo" },
     { value: "blocked", label: "Bloqueado" },
 ]
-
-type CompanyFormDialogProps = {
-    open: boolean
-    onOpenChange: (open: boolean) => void
-    company: Company | null
-    onSave: (form: CompanyForm) => Promise<boolean>
-}
 
 export function CompanyFormDialog({
     open,

@@ -21,15 +21,7 @@ import {
 } from "@/components/ui/tooltip"
 import { RouteDestinationBadge } from "@/components/RouteDestination/route-destination-badge"
 import { UsedByBadge } from "@/components/RouteDestination/used-by-badge"
-import { type TimeCondition } from "@/hooks/use-time-conditions"
-
-type Props = {
-    timeConditions: TimeCondition[]
-    loading: boolean
-    companySelected: boolean
-    onEdit: (timeCondition: TimeCondition) => void
-    onDelete: (timeCondition: TimeCondition) => void
-}
+import { type TimeConditionsTableProps } from "@/components/TimeConditions/types"
 
 export function TimeConditionsTable({
     timeConditions,
@@ -37,7 +29,7 @@ export function TimeConditionsTable({
     companySelected,
     onEdit,
     onDelete,
-}: Props) {
+}: TimeConditionsTableProps) {
     return (
         <div className="rounded-md border">
             <Table>

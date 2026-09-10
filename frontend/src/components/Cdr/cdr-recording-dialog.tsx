@@ -13,24 +13,19 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog"
-import {
-    downloadCdrRecording,
-    loadCdrRecordingAudio,
-    type CdrRecord,
-} from "@/hooks/use-cdr"
+import { downloadCdrRecording, loadCdrRecordingAudio } from "@/hooks/use-cdr"
+import { type CdrRecordingDialogProps } from "@/components/Cdr/types"
 
 function formatDateTime(value: string | null): string {
     if (!value) return "-"
     return new Date(value).toLocaleString("pt-BR")
 }
 
-type Props = {
-    record: CdrRecord | null
-    companyId: string
-    onOpenChange: (open: boolean) => void
-}
-
-export function CdrRecordingDialog({ record, companyId, onOpenChange }: Props) {
+export function CdrRecordingDialog({
+    record,
+    companyId,
+    onOpenChange,
+}: CdrRecordingDialogProps) {
     const [audioUrl, setAudioUrl] = useState<string | null>(null)
     const [loading, setLoading] = useState(false)
 

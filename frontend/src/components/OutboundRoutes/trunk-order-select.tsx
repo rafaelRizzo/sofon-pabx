@@ -23,13 +23,10 @@ import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { cn } from "@/lib/utils"
 import { type Trunk } from "@/hooks/use-trunks"
-
-type Props = {
-    trunks: Trunk[]
-    value: string[]
-    onChange: (trunkIds: string[]) => void
-    className?: string
-}
+import {
+    type SortableTrunkRowProps,
+    type TrunkOrderSelectProps,
+} from "@/components/OutboundRoutes/types"
 
 // Ordem da lista = ordem de failover enviada em trunkIds (posição 0 é o tronco primário).
 // Selecionados ficam no topo, em ordem, e podem ser arrastados para reordenar a prioridade.
@@ -38,7 +35,7 @@ export function TrunkOrderSelect({
     value,
     onChange,
     className,
-}: Props) {
+}: TrunkOrderSelectProps) {
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
         useSensor(KeyboardSensor, {
@@ -118,12 +115,6 @@ export function TrunkOrderSelect({
             ))}
         </div>
     )
-}
-
-type SortableTrunkRowProps = {
-    trunk: Trunk
-    index: number
-    onRemove: () => void
 }
 
 function SortableTrunkRow({ trunk, index, onRemove }: SortableTrunkRowProps) {

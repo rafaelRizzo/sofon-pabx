@@ -44,21 +44,9 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { type Audio, useAudios } from "@/hooks/use-audios"
 import {
     createAnnouncementFormSchema,
-    type Announcement,
     type AnnouncementForm,
 } from "@/hooks/use-announcements"
-
-type Props = {
-    open: boolean
-    onOpenChange: (open: boolean) => void
-    announcement: Announcement | null
-    // true enquanto o registro ainda está sendo buscado por id (ver EditNodeDialog) - nesse caso
-    // `announcement` também é null, mas não significa "criação": mostra skeleton em vez do form
-    loading?: boolean
-    companyId: string
-    onSave: (form: AnnouncementForm) => Promise<boolean>
-    onDelete?: () => void
-}
+import { type AnnouncementFormDialogProps } from "@/components/Announcements/types"
 
 export function AnnouncementFormDialog({
     open,
@@ -68,7 +56,7 @@ export function AnnouncementFormDialog({
     companyId,
     onSave,
     onDelete,
-}: Props) {
+}: AnnouncementFormDialogProps) {
     const isEdit = !!announcement
 
     const { audios } = useAudios(companyId)

@@ -58,10 +58,10 @@ import {
     VARIABLE_RULE_OPERATOR_LABELS,
     VARIABLE_RULE_OPERATORS,
     type Combinator,
-    type VariableCondition,
     type VariableConditionForm,
     type VariableRuleOperator,
 } from "@/hooks/use-variable-conditions"
+import { type VariableConditionFormDialogProps } from "@/components/VariableConditions/types"
 
 // Nome de identificador simples que não bate com nenhum builtin conhecido nem está no catálogo -
 // pode ser uma variável definida fora do fluxo (API, script externo), então o aviso é só
@@ -94,18 +94,6 @@ const emptyRule = {
     value: "",
 }
 
-type Props = {
-    open: boolean
-    onOpenChange: (open: boolean) => void
-    variableCondition: VariableCondition | null
-    // true enquanto o registro ainda está sendo buscado por id (ver EditNodeDialog) - nesse caso
-    // `variableCondition` também é null, mas não significa "criação": mostra skeleton em vez do form
-    loading?: boolean
-    companies: Company[]
-    onSave: (form: VariableConditionForm) => Promise<boolean>
-    onDelete?: () => void
-}
-
 export function VariableConditionFormDialog({
     open,
     onOpenChange,
@@ -114,7 +102,7 @@ export function VariableConditionFormDialog({
     companies,
     onSave,
     onDelete,
-}: Props) {
+}: VariableConditionFormDialogProps) {
     const isEdit = !!variableCondition
     const defaultCompanyId =
         companies.length === 1 ? (companies[0]?.id ?? "") : ""

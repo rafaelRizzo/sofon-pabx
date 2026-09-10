@@ -24,16 +24,7 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { type Audio } from "@/hooks/use-audios"
-
-type Props = {
-    audios: Audio[]
-    loading: boolean
-    companySelected: boolean
-    onPlay: (audio: Audio) => void
-    onEdit: (audio: Audio) => void
-    onDelete: (audio: Audio) => void
-}
+import { type AudiosTableProps } from "@/components/Audios/types"
 
 export function AudiosTable({
     audios,
@@ -42,7 +33,7 @@ export function AudiosTable({
     onPlay,
     onEdit,
     onDelete,
-}: Props) {
+}: AudiosTableProps) {
     return (
         <div className="rounded-md border">
             <Table>

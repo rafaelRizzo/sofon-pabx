@@ -1,14 +1,15 @@
-import { Component, type ReactNode } from "react"
+import { Component } from "react"
+
+import { type VoiceOrbBoundaryProps } from "@/components/voice-picker/types"
 
 // VoiceOrb (voice-orb.tsx) carrega uma textura externa (perlin-noise.png) via
 // react-three-fiber/drei - falha de rede/CSP nessa textura joga um erro não capturado que sobe
 // até o error boundary mais próximo. Sem isso aqui, essa falha derruba a rota inteira (ver
 // index.html, comentário do CSP) só por causa de um avatar decorativo. Precisa ser class
 // component - React error boundary não tem equivalente em hook.
-type Props = { fallback: ReactNode; children: ReactNode }
 type State = { hasError: boolean }
 
-export class VoiceOrbBoundary extends Component<Props, State> {
+export class VoiceOrbBoundary extends Component<VoiceOrbBoundaryProps, State> {
     state: State = { hasError: false }
 
     static getDerivedStateFromError() {

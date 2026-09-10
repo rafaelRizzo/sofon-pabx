@@ -58,10 +58,10 @@ import { type Company } from "@/hooks/use-companies"
 import {
     createIvrMenuFormSchema,
     IVR_MENU_TYPES,
-    type IvrMenu,
     type IvrMenuForm,
     type IvrMenuType,
 } from "@/hooks/use-ivr"
+import { type IvrMenuFormDialogProps } from "@/components/Ivr/types"
 
 const DTMF_OPTIONS = Array.from({ length: 10 }, (_, i) => String(i))
 
@@ -79,17 +79,6 @@ const DIGIT_COUNT_PRESETS = [
     { label: "CNPJ (14 dígitos)", digits: 14 },
 ]
 
-type Props = {
-    open: boolean
-    onOpenChange: (open: boolean) => void
-    ivrMenu: IvrMenu | null
-    companies: Company[]
-    defaultCompanyId?: string
-    flowNodeMode?: boolean
-    onSave: (form: IvrMenuForm) => Promise<boolean>
-    onDelete?: () => void
-}
-
 export function IvrMenuFormDialog({
     open,
     onOpenChange,
@@ -99,7 +88,7 @@ export function IvrMenuFormDialog({
     flowNodeMode = false,
     onSave,
     onDelete,
-}: Props) {
+}: IvrMenuFormDialogProps) {
     const isEdit = !!ivrMenu
 
     const {

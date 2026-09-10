@@ -17,9 +17,9 @@ import { cn } from "@/lib/utils"
 import {
     ACTION_LABEL,
     AUDIT_LOG_MODEL_LABEL,
-    type AuditLog,
     type AuditLogModel,
 } from "@/hooks/use-audit-logs"
+import { type AuditLogDetailDialogProps } from "@/components/AuditLogs/types"
 
 // updatedAt sempre muda junto de qualquer edição real (Prisma @updatedAt) - não é uma mudança de
 // negócio, então some da lista mesmo quando outros campos realmente mudaram (ver IGNORED_DIFF_FIELDS
@@ -258,12 +258,7 @@ function GroupedList<T extends { groupPath: string[] }>({
     )
 }
 
-type Props = {
-    log: AuditLog | null
-    onOpenChange: (open: boolean) => void
-}
-
-export function AuditLogDetailDialog({ log, onOpenChange }: Props) {
+export function AuditLogDetailDialog({ log, onOpenChange }: AuditLogDetailDialogProps) {
     const isBulk = Array.isArray(log?.before) || (log?.after && "affectedIds" in (log.after as object))
 
     const diff = log && !isBulk ? diffLeaves(log.before, log.after).filter((leaf) => leaf.changed) : []

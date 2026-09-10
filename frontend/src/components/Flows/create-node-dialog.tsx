@@ -20,37 +20,7 @@ import { VariableConditionFormDialog } from "@/components/VariableConditions/var
 import { useVariableConditions } from "@/hooks/use-variable-conditions"
 import { IvrMenuFormDialog } from "@/components/Ivr/ivr-menu-form-dialog"
 import { useIvr } from "@/hooks/use-ivr"
-import type { Company } from "@/hooks/use-companies"
-import type { CanvasNodeType } from "@/components/Flows/node-types"
-import type { DestinationOption } from "@/components/RouteDestination/route-destination-field"
-
-type Props = {
-    type: CanvasNodeType
-    open: boolean
-    onOpenChange: (open: boolean) => void
-    companyId: string
-    companies: Company[]
-    // false = auto save desligado - o form NÃO deve chamar a API de criação do recurso; em vez
-    // disso registra um recurso "de rascunho" (ver onCreateDraftResource) e segue o mesmo fluxo de
-    // onCreated com um id local, só materializado de verdade no backend quando o usuário clicar em
-    // "Salvar" no canvas (ver saveDraft em flow-canvas.tsx)
-    autoSave: boolean
-    // registra o form de criação como rascunho local (sem rede) e devolve um id local (draft-res:<uuid>)
-    // pra usar no lugar do id real - só chamado quando autoSave=false
-    onCreateDraftResource: (
-        type: CanvasNodeType,
-        form: unknown,
-        label: string,
-        companyId: string
-    ) => string
-    // creationDto é o form validado (sem companyId - recriação sempre usa a empresa do flow) do
-    // recurso recém-criado - o histórico de undo/redo do canvas guarda isso pra poder recriar o
-    // recurso caso o usuário desfaça essa criação (ver flow-canvas.tsx)
-    onCreated: (
-        option: DestinationOption,
-        creationDto: unknown
-    ) => Promise<void>
-}
+import { type CreateNodeDialogProps } from "@/components/Flows/types"
 
 // Cada tipo criável no canvas reaproveita o form dialog + hook já existentes daquele módulo - sem
 // recriar formulário nenhum. Sempre dentro da mesma empresa do flow, e o retorno da API permite
@@ -70,7 +40,7 @@ export function CreateNodeDialog({
     autoSave,
     onCreateDraftResource,
     onCreated,
-}: Props) {
+}: CreateNodeDialogProps) {
     switch (type) {
         case "announcement": {
             const { createAnnouncement } = useAnnouncements()

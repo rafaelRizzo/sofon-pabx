@@ -21,10 +21,8 @@ import {
 } from "@/components/ui/tooltip"
 import { RouteDestinationBadge } from "@/components/RouteDestination/route-destination-badge"
 import { UsedByBadge } from "@/components/RouteDestination/used-by-badge"
-import {
-    type HttpMethod,
-    type RequestTemplate,
-} from "@/hooks/use-request-templates"
+import { type HttpMethod } from "@/hooks/use-request-templates"
+import { type RequestTemplatesTableProps } from "@/components/RequestTemplates/types"
 
 const METHOD_BADGE_CLASS: Record<HttpMethod, string> = {
     GET: "border-blue-500/40 bg-blue-500/10 text-blue-700 dark:text-blue-400",
@@ -34,21 +32,13 @@ const METHOD_BADGE_CLASS: Record<HttpMethod, string> = {
     DELETE: "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-400",
 }
 
-type Props = {
-    requestTemplates: RequestTemplate[]
-    loading: boolean
-    companySelected: boolean
-    onEdit: (requestTemplate: RequestTemplate) => void
-    onDelete: (requestTemplate: RequestTemplate) => void
-}
-
 export function RequestTemplatesTable({
     requestTemplates,
     loading,
     companySelected,
     onEdit,
     onDelete,
-}: Props) {
+}: RequestTemplatesTableProps) {
     return (
         <div className="rounded-md border">
             <Table>

@@ -20,13 +20,12 @@ import {
     TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { WEEKDAY_LABELS } from "@/components/TimeGroups/weekday-checkboxes"
-import { type Company } from "@/hooks/use-companies"
 import {
     WEEKDAYS,
-    type TimeGroup,
     type TimeRange,
     type Weekday,
 } from "@/hooks/use-time-groups"
+import { type TimeGroupsTableProps } from "@/components/TimeGroups/types"
 
 const MONTH_LABELS: Record<string, string> = {
     jan: "Jan",
@@ -86,15 +85,6 @@ function formatRange(range: TimeRange): string {
     return parts.join(" · ")
 }
 
-type Props = {
-    timeGroups: TimeGroup[]
-    companies: Company[]
-    loading: boolean
-    companySelected: boolean
-    onEdit: (timeGroup: TimeGroup) => void
-    onDelete: (timeGroup: TimeGroup) => void
-}
-
 export function TimeGroupsTable({
     timeGroups,
     companies,
@@ -102,7 +92,7 @@ export function TimeGroupsTable({
     companySelected,
     onEdit,
     onDelete,
-}: Props) {
+}: TimeGroupsTableProps) {
     const companyName = (companyId: string) =>
         companies.find((c) => c.id === companyId)?.name ?? companyId
 

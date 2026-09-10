@@ -21,16 +21,7 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { type Company } from "@/hooks/use-companies"
-import { type Did } from "@/hooks/use-dids"
-
-type Props = {
-    dids: Did[]
-    companies: Company[]
-    loading: boolean
-    onEdit: (did: Did) => void
-    onDelete: (did: Did) => void
-}
+import { type DidsTableProps } from "@/components/Dids/types"
 
 export function DidsTable({
     dids,
@@ -38,7 +29,7 @@ export function DidsTable({
     loading,
     onEdit,
     onDelete,
-}: Props) {
+}: DidsTableProps) {
     const companyName = (companyId: string) =>
         companies.find((c) => c.id === companyId)?.name ?? companyId
 

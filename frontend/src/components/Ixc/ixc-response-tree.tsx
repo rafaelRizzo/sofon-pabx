@@ -5,11 +5,7 @@ import { ChevronRightIcon, ChevronDownIcon, Loader2Icon, PlusIcon } from "lucide
 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-
-type Props = {
-    data: unknown
-    onPick: (path: string, key: string) => void | Promise<void>
-}
+import { type IxcResponseTreeProps } from "@/components/Ixc/types"
 
 function buildPath(parentPath: string, key: string | number): string {
     if (typeof key === "number") return `${parentPath}[${key}]`
@@ -111,7 +107,7 @@ function JsonNode({
     )
 }
 
-export function IxcResponseTree({ data, onPick }: Props) {
+export function IxcResponseTree({ data, onPick }: IxcResponseTreeProps) {
     if (data === null || typeof data !== "object") {
         return <div className="p-2 font-mono text-xs text-muted-foreground">{formatLeaf(data)}</div>
     }

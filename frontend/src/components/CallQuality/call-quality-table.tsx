@@ -13,7 +13,7 @@ import {
     TableRow,
 } from "@/components/ui/table"
 import { cn } from "@/lib/utils"
-import type { CallQualityRecord } from "@/hooks/use-call-quality"
+import { type CallQualityTableProps } from "@/components/CallQuality/types"
 
 // Perda de pacote > 0 já é digno de nota num link de voz (destoa do resto, sem cor = "normal") -
 // mesmo critério usado no card ao vivo de tronco (realtime-trunk-cards.tsx)
@@ -27,12 +27,7 @@ function fmt(value: number | null, digits: number, suffix = ""): string {
     return `${value.toFixed(digits)}${suffix}`
 }
 
-type Props = {
-    records: CallQualityRecord[]
-    loading: boolean
-}
-
-export function CallQualityTable({ records, loading }: Props) {
+export function CallQualityTable({ records, loading }: CallQualityTableProps) {
     return (
         <Table>
             <TableHeader>

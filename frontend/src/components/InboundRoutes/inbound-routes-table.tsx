@@ -19,15 +19,7 @@ import {
     TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { RouteDestinationBadge } from "@/components/RouteDestination/route-destination-badge"
-import { type InboundRoute } from "@/hooks/use-inbound-routes"
-
-type Props = {
-    routes: InboundRoute[]
-    loading: boolean
-    companySelected: boolean
-    onEdit: (route: InboundRoute) => void
-    onDelete: (route: InboundRoute) => void
-}
+import { type InboundRoutesTableProps } from "@/components/InboundRoutes/types"
 
 export function InboundRoutesTable({
     routes,
@@ -35,7 +27,7 @@ export function InboundRoutesTable({
     companySelected,
     onEdit,
     onDelete,
-}: Props) {
+}: InboundRoutesTableProps) {
     return (
         <div className="rounded-md border">
             <Table>

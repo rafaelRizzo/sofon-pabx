@@ -37,6 +37,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
+import { type RouteDestinationFieldProps } from "@/components/RouteDestination/types"
 
 // Espelha routeDestinationSchema de backend/src/schemas/route-destination.schema.ts -
 // compartilhado por Inbound Routes, Time Conditions, Queues, IVR e Request Templates.
@@ -371,21 +372,13 @@ function useDestinationOptions(type: RouteDestinationType, companyId: string) {
     return { options, loading }
 }
 
-type Props = {
-    value: RouteDestination
-    onChange: (destination: RouteDestination) => void
-    companyId: string
-    className?: string
-    allowedTypes?: readonly RouteDestinationType[]
-}
-
 export function RouteDestinationField({
     value,
     onChange,
     companyId,
     className,
     allowedTypes = ROUTE_DEST_TYPES,
-}: Props) {
+}: RouteDestinationFieldProps) {
     const type: RouteDestinationType = value?.type ?? "hangup"
     const id = value && "id" in value ? value.id : ""
     const { options, loading } = useDestinationOptions(type, companyId)

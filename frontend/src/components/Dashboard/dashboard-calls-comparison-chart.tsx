@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import type { DashboardOverview } from "@/hooks/use-dashboard"
+import { type DashboardCallsComparisonChartProps } from "@/components/Dashboard/types"
 
 // Janelas de tempo aninhadas (ontem ⊂ hoje ⊂ mês ⊂ ano), não categorias soltas - por isso a
 // escala sequencial (--chart-1..4, mesmo hue, luminância crescente), não uma paleta categórica
@@ -60,12 +61,10 @@ function ChartTooltip({
     )
 }
 
-type Props = {
-    overview: DashboardOverview | null
-    loading: boolean
-}
-
-export function DashboardCallsComparisonChart({ overview, loading }: Props) {
+export function DashboardCallsComparisonChart({
+    overview,
+    loading,
+}: DashboardCallsComparisonChartProps) {
     const data = BARS.map((bar) => ({
         label: bar.label,
         value: overview?.[bar.key] ?? 0,

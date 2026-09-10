@@ -21,15 +21,7 @@ import {
 } from "@/components/ui/tooltip"
 import { RouteDestinationBadge } from "@/components/RouteDestination/route-destination-badge"
 import { UsedByBadge } from "@/components/RouteDestination/used-by-badge"
-import { type HolidayGroup } from "@/hooks/use-holiday-groups"
-
-type Props = {
-    holidayGroups: HolidayGroup[]
-    loading: boolean
-    companySelected: boolean
-    onEdit: (holidayGroup: HolidayGroup) => void
-    onDelete: (holidayGroup: HolidayGroup) => void
-}
+import { type HolidayGroupsTableProps } from "@/components/HolidayGroups/types"
 
 export function HolidayGroupsTable({
     holidayGroups,
@@ -37,7 +29,7 @@ export function HolidayGroupsTable({
     companySelected,
     onEdit,
     onDelete,
-}: Props) {
+}: HolidayGroupsTableProps) {
     return (
         <div className="rounded-md border">
             <Table>

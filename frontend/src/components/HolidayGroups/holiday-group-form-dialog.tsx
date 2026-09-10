@@ -56,9 +56,9 @@ import { EntityFormDialogSkeletonContent } from "@/components/entity-form-dialog
 import { type Company } from "@/hooks/use-companies"
 import {
     createHolidayGroupFormSchema,
-    type HolidayGroup,
     type HolidayGroupForm,
 } from "@/hooks/use-holiday-groups"
+import { type HolidayGroupFormDialogProps } from "@/components/HolidayGroups/types"
 
 const MODES = [
     { value: "manual", label: "Datas manuais" },
@@ -66,18 +66,6 @@ const MODES = [
 ]
 
 const EMPTY_DATE = { name: "", month: 1, day: 1 }
-
-type Props = {
-    open: boolean
-    onOpenChange: (open: boolean) => void
-    holidayGroup: HolidayGroup | null
-    // true enquanto o registro ainda está sendo buscado por id (ver EditNodeDialog) - nesse caso
-    // `holidayGroup` também é null, mas não significa "criação": mostra skeleton em vez do form
-    loading?: boolean
-    companies: Company[]
-    onSave: (form: HolidayGroupForm) => Promise<boolean>
-    onDelete?: () => void
-}
 
 export function HolidayGroupFormDialog({
     open,
@@ -87,7 +75,7 @@ export function HolidayGroupFormDialog({
     companies,
     onSave,
     onDelete,
-}: Props) {
+}: HolidayGroupFormDialogProps) {
     const isEdit = !!holidayGroup
     const defaultCompanyId =
         companies.length === 1 ? (companies[0]?.id ?? "") : ""

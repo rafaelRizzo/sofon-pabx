@@ -51,10 +51,10 @@ import {
     createUserSchema,
     updateUserSchema,
     type CreateUserForm,
-    type User,
     type UserRole,
 } from "@/hooks/use-users"
 import { cn } from "@/lib/utils"
+import { type UserFormDialogProps } from "@/components/Users/types"
 import { CompanySelect } from "./company-select"
 
 const ROLES: { value: UserRole; label: string }[] = [
@@ -79,13 +79,6 @@ const PERMISSION_CATEGORY_ORDER = [
     "Filas e atendimento",
     "Automação",
 ]
-
-type UserFormDialogProps = {
-    open: boolean
-    onOpenChange: (open: boolean) => void
-    user: User | null
-    onSave: (form: CreateUserForm) => Promise<boolean>
-}
 
 export function UserFormDialog({
     open,

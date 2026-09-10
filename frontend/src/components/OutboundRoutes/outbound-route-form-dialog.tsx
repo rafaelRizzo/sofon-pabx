@@ -45,14 +45,12 @@ import {
 import { ExtensionRestrictSelect } from "@/components/OutboundRoutes/extension-restrict-select"
 import { TrunkOrderSelect } from "@/components/OutboundRoutes/trunk-order-select"
 import { cn } from "@/lib/utils"
-import { type Extension } from "@/hooks/use-extensions"
-import { type Trunk } from "@/hooks/use-trunks"
 import {
     DIAL_PATTERN_PRESETS,
     outboundRouteFormSchema,
-    type OutboundRoute,
     type OutboundRouteForm,
 } from "@/hooks/use-outbound-routes"
+import { type OutboundRouteFormDialogProps } from "@/components/OutboundRoutes/types"
 
 const PATTERN_COLUMNS = [
     {
@@ -105,18 +103,6 @@ function PatternColumnLabel({
     )
 }
 
-type Props = {
-    open: boolean
-    onOpenChange: (open: boolean) => void
-    route: OutboundRoute | null
-    trunks: Trunk[]
-    extensions: Extension[]
-    // Todas as rotas da empresa (sem filtro de busca) - usadas só para checar padrão
-    // duplicado em tempo real; a validação que vale mesmo é a do backend (409 no save)
-    existingRoutes: OutboundRoute[]
-    onSave: (form: OutboundRouteForm) => Promise<boolean>
-}
-
 const emptyPattern = { pattern: "", prepend: "", prefix: "" }
 
 export function OutboundRouteFormDialog({
@@ -127,7 +113,7 @@ export function OutboundRouteFormDialog({
     extensions,
     existingRoutes,
     onSave,
-}: Props) {
+}: OutboundRouteFormDialogProps) {
     const isEdit = !!route
 
     const {

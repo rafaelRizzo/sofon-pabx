@@ -27,18 +27,8 @@ import {
 } from "@/components/ui/tooltip"
 import { RouteDestinationBadge } from "@/components/RouteDestination/route-destination-badge"
 import { UsedByBadge } from "@/components/RouteDestination/used-by-badge"
-import { type Company } from "@/hooks/use-companies"
-import { QUEUE_STRATEGY_LABELS, type Queue } from "@/hooks/use-queues"
-
-type Props = {
-    queues: Queue[]
-    companies: Company[]
-    loading: boolean
-    companySelected: boolean
-    onEdit: (queue: Queue) => void
-    onManageMembers: (queue: Queue) => void
-    onDelete: (queue: Queue) => void
-}
+import { QUEUE_STRATEGY_LABELS } from "@/hooks/use-queues"
+import { type QueuesTableProps } from "@/components/Queues/types"
 
 export function QueuesTable({
     queues,
@@ -48,7 +38,7 @@ export function QueuesTable({
     onEdit,
     onManageMembers,
     onDelete,
-}: Props) {
+}: QueuesTableProps) {
     const companyName = (companyId: string) =>
         companies.find((c) => c.id === companyId)?.name ?? companyId
 

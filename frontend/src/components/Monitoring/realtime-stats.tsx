@@ -6,13 +6,7 @@ import { Card, CardContent, CardDescription } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import { LiveDot } from "@/components/Monitoring/live-indicator"
-import type { RealtimeExtension, RealtimeQueue } from "@/hooks/use-realtime"
-
-type Props = {
-    extensions: RealtimeExtension[]
-    queues: RealtimeQueue[]
-    loading: boolean
-}
+import { type RealtimeStatsProps } from "@/components/Monitoring/types"
 
 const TONE = {
     emerald: {
@@ -82,7 +76,11 @@ function StatTile({
 // Asterisk o caller continua em queue.waiting até atender ou desligar, então enquanto toca no
 // ramal ele já está em "espera" (ver Filas). Contar ringing aqui também somaria a mesma chamada
 // duas vezes (1 tocando apareceria como 1 em andamento + 1 em espera ao mesmo tempo).
-export function RealtimeStats({ extensions, queues, loading }: Props) {
+export function RealtimeStats({
+    extensions,
+    queues,
+    loading,
+}: RealtimeStatsProps) {
     const idleCount = extensions.filter((e) => e.callState === "idle").length
     const inCallCount = extensions.filter(
         (e) => e.callState === "in_call"

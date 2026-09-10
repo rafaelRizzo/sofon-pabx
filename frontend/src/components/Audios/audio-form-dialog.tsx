@@ -62,8 +62,9 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { AudioWaveform } from "@/components/ui/audio-waveform"
-import { loadAudioFile, type Audio, type TtsVoiceSettings } from "@/hooks/use-audios"
+import { loadAudioFile, type TtsVoiceSettings } from "@/hooks/use-audios"
 import { useTtsVoices } from "@/hooks/use-tts-voices"
+import { type AudioFormDialogProps } from "@/components/Audios/types"
 
 // Lazy: o VoicePicker (voice-picker/) carrega three.js/react-three-fiber (avatar animado),
 // ~700KB - sem isso a rota /dashboard/audios inteira pagaria esse peso mesmo pra quem só
@@ -139,28 +140,13 @@ const audioFormSchema = z
         }
     })
 
-type AudioFormValues = z.infer<typeof audioFormSchema>
+export type AudioFormValues = z.infer<typeof audioFormSchema>
 
-type TtsPayload = {
+export type TtsPayload = {
     text: string
     voiceId: string
     language: "pt" | "en"
     voiceSettings: TtsVoiceSettings
-}
-
-type Props = {
-    open: boolean
-    onOpenChange: (open: boolean) => void
-    audio: Audio | null
-    // empresa já escolhida na tela (filtro da tabela, ou a do áudio em edição) - não dá pra
-    // trocar dentro do dialog, mesmo padrão de AnnouncementFormDialog/InboundRouteFormDialog
-    companyId: string
-    // null = falhou; string = audioId criado/editado (usado pra mostrar o preview após TTS)
-    onSave: (
-        form: AudioFormValues,
-        file: File | null,
-        tts: TtsPayload | null
-    ) => Promise<string | null>
 }
 
 // .gsm não tem MIME type padrão no browser; validação cai pra extensão quando o MIME não vem
@@ -222,7 +208,7 @@ export function AudioFormDialog({
     audio,
     companyId,
     onSave,
-}: Props) {
+}: AudioFormDialogProps) {
     const isEdit = !!audio
 
     const {

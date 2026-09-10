@@ -19,17 +19,8 @@ import {
     TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { activeCallLabel } from "@/lib/realtime-format"
-import type { RealtimeExtension, RealtimeQueue } from "@/hooks/use-realtime"
-
-type Props = {
-    extensions: RealtimeExtension[]
-    queues: RealtimeQueue[]
-    loading: boolean
-    companySelected: boolean
-    // sobrescreve a mensagem de "nenhum ramal" - usado quando o hideOffline filtrou tudo (front,
-    // ver monitoring/page.tsx), pra não parecer que a empresa não tem ramal nenhum cadastrado
-    emptyMessage?: string
-}
+import type { RealtimeQueue } from "@/hooks/use-realtime"
+import { type RealtimeExtensionCardsProps } from "@/components/Monitoring/types"
 
 export function RealtimeExtensionCards({
     extensions,
@@ -37,7 +28,7 @@ export function RealtimeExtensionCards({
     loading,
     companySelected,
     emptyMessage,
-}: Props) {
+}: RealtimeExtensionCardsProps) {
     const queuesByExtensionId = useMemo(() => {
         const result = new Map<string, RealtimeQueue[]>()
 

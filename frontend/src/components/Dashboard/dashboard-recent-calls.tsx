@@ -20,6 +20,7 @@ import {
     formatDuration,
 } from "@/components/Cdr/cdr-table"
 import { useCdrRecords } from "@/hooks/use-cdr"
+import { type DashboardRecentCallsProps } from "@/components/Dashboard/types"
 
 const STATUS_TONE: Record<string, string> = {
     ANSWERED:
@@ -35,11 +36,9 @@ const STATUS_TONE: Record<string, string> = {
 
 const LIMIT = 5
 
-type Props = {
-    companyId: string | undefined
-}
-
-export function DashboardRecentCalls({ companyId }: Props) {
+export function DashboardRecentCalls({
+    companyId,
+}: DashboardRecentCallsProps) {
     const { records, loading } = useCdrRecords(
         companyId,
         { order: "desc" },

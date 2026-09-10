@@ -46,23 +46,14 @@ import {
     updateIntegrationCredentialFormSchema,
     INTEGRATION_PROVIDERS,
     INTEGRATION_PROVIDER_LABELS,
-    type IntegrationCredential,
     type IntegrationCredentialForm,
     type IntegrationProvider,
 } from "@/hooks/use-integration-credentials"
+import { type IntegrationCredentialFormDialogProps } from "@/components/Integrations/types"
 
 const PROVIDER_ITEMS = INTEGRATION_PROVIDERS.map((p) => ({ value: p, label: INTEGRATION_PROVIDER_LABELS[p] }))
 
-type Props = {
-    open: boolean
-    onOpenChange: (open: boolean) => void
-    integrationCredential: IntegrationCredential | null
-    companies: Company[]
-    onSave: (form: IntegrationCredentialForm) => Promise<boolean>
-    onDelete?: () => void
-}
-
-export function IntegrationCredentialFormDialog({ open, onOpenChange, integrationCredential, companies, onSave, onDelete }: Props) {
+export function IntegrationCredentialFormDialog({ open, onOpenChange, integrationCredential, companies, onSave, onDelete }: IntegrationCredentialFormDialogProps) {
     const isEdit = !!integrationCredential
     const defaultCompanyId = companies.length === 1 ? (companies[0]?.id ?? "") : ""
 

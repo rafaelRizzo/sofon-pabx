@@ -21,16 +21,7 @@ import {
 } from "@/components/ui/tooltip"
 import { RouteDestinationBadge } from "@/components/RouteDestination/route-destination-badge"
 import { UsedByBadge } from "@/components/RouteDestination/used-by-badge"
-import { type Announcement } from "@/hooks/use-announcements"
-
-type Props = {
-    announcements: Announcement[]
-    loading: boolean
-    companySelected: boolean
-    onPlay: (announcement: Announcement) => void
-    onEdit: (announcement: Announcement) => void
-    onDelete: (announcement: Announcement) => void
-}
+import { type AnnouncementsTableProps } from "@/components/Announcements/types"
 
 export function AnnouncementsTable({
     announcements,
@@ -39,7 +30,7 @@ export function AnnouncementsTable({
     onPlay,
     onEdit,
     onDelete,
-}: Props) {
+}: AnnouncementsTableProps) {
     return (
         <div className="rounded-md border">
             <Table>

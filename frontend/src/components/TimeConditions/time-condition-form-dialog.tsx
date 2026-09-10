@@ -48,22 +48,10 @@ import { TimeGroupFormDialog } from "@/components/TimeGroups/time-group-form-dia
 import { type Company } from "@/hooks/use-companies"
 import {
     createTimeConditionFormSchema,
-    type TimeCondition,
     type TimeConditionForm,
 } from "@/hooks/use-time-conditions"
 import { useTimeGroups } from "@/hooks/use-time-groups"
-
-type Props = {
-    open: boolean
-    onOpenChange: (open: boolean) => void
-    timeCondition: TimeCondition | null
-    // true enquanto o registro ainda está sendo buscado por id (ver EditNodeDialog) - nesse caso
-    // `timeCondition` também é null, mas não significa "criação": mostra skeleton em vez do form
-    loading?: boolean
-    companies: Company[]
-    onSave: (form: TimeConditionForm) => Promise<boolean>
-    onDelete?: () => void
-}
+import { type TimeConditionFormDialogProps } from "@/components/TimeConditions/types"
 
 export function TimeConditionFormDialog({
     open,
@@ -73,7 +61,7 @@ export function TimeConditionFormDialog({
     companies,
     onSave,
     onDelete,
-}: Props) {
+}: TimeConditionFormDialogProps) {
     const isEdit = !!timeCondition
     const defaultCompanyId =
         companies.length === 1 ? (companies[0]?.id ?? "") : ""

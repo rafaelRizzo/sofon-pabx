@@ -53,10 +53,10 @@ import { WeekdayCheckboxes } from "@/components/TimeGroups/weekday-checkboxes"
 import { type Company } from "@/hooks/use-companies"
 import {
     createTimeGroupFormSchema,
-    type TimeGroup,
     type TimeGroupForm,
     type TimeRangeForm,
 } from "@/hooks/use-time-groups"
+import { type TimeGroupFormDialogProps } from "@/components/TimeGroups/types"
 
 const EMPTY_RANGE: TimeRangeForm = {
     startTime: "08:00",
@@ -79,21 +79,13 @@ const DEFAULT_RANGES: TimeRangeForm[] = [
     },
 ]
 
-type Props = {
-    open: boolean
-    onOpenChange: (open: boolean) => void
-    timeGroup: TimeGroup | null
-    companies: Company[]
-    onSave: (form: TimeGroupForm) => Promise<boolean>
-}
-
 export function TimeGroupFormDialog({
     open,
     onOpenChange,
     timeGroup,
     companies,
     onSave,
-}: Props) {
+}: TimeGroupFormDialogProps) {
     const isEdit = !!timeGroup
     // Só uma empresa disponível (ex: dialog aberto de dentro do Flow, já travado na empresa do
     // flow) - pré-seleciona e esconde o combobox, sem exigir reescolher o que já é sabido

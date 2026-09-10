@@ -6,21 +6,14 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
-import { type Company } from "@/hooks/use-companies"
-
-type Props = {
-    companies: Company[]
-    value: string[]
-    onChange: (companyIds: string[]) => void
-    className?: string
-}
+import { type CompanySelectProps } from "@/components/Users/types"
 
 export function CompanySelect({
     companies,
     value,
     onChange,
     className,
-}: Props) {
+}: CompanySelectProps) {
     const [search, setSearch] = useState("")
     const filtered = companies.filter((c) =>
         c.name.toLowerCase().includes(search.toLowerCase())

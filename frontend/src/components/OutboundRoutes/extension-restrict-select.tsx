@@ -6,21 +6,14 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
-import { type Extension } from "@/hooks/use-extensions"
-
-type Props = {
-    extensions: Extension[]
-    value: string[]
-    onChange: (extensionIds: string[]) => void
-    className?: string
-}
+import { type ExtensionRestrictSelectProps } from "@/components/OutboundRoutes/types"
 
 export function ExtensionRestrictSelect({
     extensions,
     value,
     onChange,
     className,
-}: Props) {
+}: ExtensionRestrictSelectProps) {
     const [search, setSearch] = useState("")
     const filtered = extensions.filter((e) =>
         `${e.alias} ${e.name}`.toLowerCase().includes(search.toLowerCase())

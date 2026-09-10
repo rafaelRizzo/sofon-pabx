@@ -21,15 +21,7 @@ import {
 } from "@/components/ui/tooltip"
 import { RouteDestinationBadge } from "@/components/RouteDestination/route-destination-badge"
 import { UsedByBadge } from "@/components/RouteDestination/used-by-badge"
-import { type IvrMenu } from "@/hooks/use-ivr"
-
-type Props = {
-    ivrMenus: IvrMenu[]
-    loading: boolean
-    companySelected: boolean
-    onEdit: (ivrMenu: IvrMenu) => void
-    onDelete: (ivrMenu: IvrMenu) => void
-}
+import { type IvrMenusTableProps } from "@/components/Ivr/types"
 
 export function IvrMenusTable({
     ivrMenus,
@@ -37,7 +29,7 @@ export function IvrMenusTable({
     companySelected,
     onEdit,
     onDelete,
-}: Props) {
+}: IvrMenusTableProps) {
     return (
         <div className="rounded-md border">
             <Table>

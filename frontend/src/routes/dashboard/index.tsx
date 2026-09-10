@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router"
 
+import { useEffect } from "react"
+
 import { DashboardCallsByRegionMap } from "@/components/Dashboard/dashboard-calls-by-region-map"
 import { DashboardCallsComparisonChart } from "@/components/Dashboard/dashboard-calls-comparison-chart"
 import { DashboardInfraCards } from "@/components/Dashboard/dashboard-infra-cards"
@@ -22,8 +24,15 @@ function DashboardPage() {
   const { user, hasPermission } = useAuth()
   const isAdmin = user?.role === "admin"
 
-  const { companies } = useCompanies()
+  const { companies, loading: companiesLoading } = useCompanies()
   const [companyId, setCompanyId] = useCompanyFilter()
+
+  // primeiro login/sem seleção salva: os cards de chamadas (CDR-based) dependem de
+  // companyId pra trazer dado - sem isso ficam zerados até o usuário escolher manualmente
+  useEffect(() => {
+    if (companiesLoading || companyId || companies.length === 0) return
+    setCompanyId(companies[0].id)
+  }, [companiesLoading, companyId, companies, setCompanyId])
 
   const { overview, loading: overviewLoading } = useDashboardOverview(companyId)
   const { infra, loading: infraLoading } = useDashboardInfra(isAdmin)

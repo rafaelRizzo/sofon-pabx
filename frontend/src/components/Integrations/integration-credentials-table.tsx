@@ -19,17 +19,10 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { INTEGRATION_PROVIDER_LABELS, type IntegrationCredential } from "@/hooks/use-integration-credentials"
+import { INTEGRATION_PROVIDER_LABELS } from "@/hooks/use-integration-credentials"
+import { type IntegrationCredentialsTableProps } from "@/components/Integrations/types"
 
-type Props = {
-    integrationCredentials: IntegrationCredential[]
-    loading: boolean
-    companySelected: boolean
-    onEdit: (integrationCredential: IntegrationCredential) => void
-    onDelete: (integrationCredential: IntegrationCredential) => void
-}
-
-export function IntegrationCredentialsTable({ integrationCredentials, loading, companySelected, onEdit, onDelete }: Props) {
+export function IntegrationCredentialsTable({ integrationCredentials, loading, companySelected, onEdit, onDelete }: IntegrationCredentialsTableProps) {
     return (
         <div className="rounded-md border">
             <Table>

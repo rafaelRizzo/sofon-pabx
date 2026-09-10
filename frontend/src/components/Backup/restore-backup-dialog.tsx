@@ -23,21 +23,10 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { summarizeBackup, type BackupPayload } from "@/hooks/use-backup"
+import { summarizeBackup } from "@/hooks/use-backup"
+import { type RestoreBackupDialogProps } from "@/components/Backup/types"
 
 const CONFIRM_WORD = "RESTAURAR"
-
-type Props = {
-    open: boolean
-    onOpenChange: (open: boolean) => void
-    payload: BackupPayload | null
-    restoring: boolean
-    onConfirm: () => void
-    // backup de segurança do estado ATUAL (todas as empresas) - obrigatório antes de liberar
-    // o "Continuar", pra sempre ter como reverter manualmente se o restore der problema
-    onDownloadCurrent: () => Promise<void>
-    downloadingCurrent: boolean
-}
 
 export function RestoreBackupDialog({
     open,
@@ -47,7 +36,7 @@ export function RestoreBackupDialog({
     onConfirm,
     onDownloadCurrent,
     downloadingCurrent,
-}: Props) {
+}: RestoreBackupDialogProps) {
     const [step, setStep] = useState<1 | 2>(1)
     const [confirmText, setConfirmText] = useState("")
     const [downloadedCurrent, setDownloadedCurrent] = useState(false)

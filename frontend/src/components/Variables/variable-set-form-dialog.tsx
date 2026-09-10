@@ -46,23 +46,11 @@ import { VariableCombobox } from "@/components/variable-combobox"
 import { type Company } from "@/hooks/use-companies"
 import {
     createVariableSetFormSchema,
-    type VariableSet,
     type VariableSetForm,
 } from "@/hooks/use-variables"
+import { type VariableSetFormDialogProps } from "@/components/Variables/types"
 
 const emptyAssignment = { variable: "", value: "" }
-
-type Props = {
-    open: boolean
-    onOpenChange: (open: boolean) => void
-    variableSet: VariableSet | null
-    // true enquanto o registro ainda está sendo buscado por id (ver EditNodeDialog) - nesse caso
-    // `variableSet` também é null, mas não significa "criação": mostra skeleton em vez do form
-    loading?: boolean
-    companies: Company[]
-    onSave: (form: VariableSetForm) => Promise<boolean>
-    onDelete?: () => void
-}
 
 export function VariableSetFormDialog({
     open,
@@ -72,7 +60,7 @@ export function VariableSetFormDialog({
     companies,
     onSave,
     onDelete,
-}: Props) {
+}: VariableSetFormDialogProps) {
     const isEdit = !!variableSet
     const defaultCompanyId =
         companies.length === 1 ? (companies[0]?.id ?? "") : ""

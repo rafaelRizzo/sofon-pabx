@@ -9,12 +9,9 @@ import { RoutingRuleFormDialog } from "@/components/Callcenter/routing-rule-form
 import { RoutingRulesTable } from "@/components/Callcenter/routing-rules-table"
 import { useRoutingRules, type RoutingRule } from "@/hooks/use-routing-rules"
 import { useTrunks } from "@/hooks/use-trunks"
+import { type RoutingRulesPanelProps } from "@/components/Callcenter/types"
 
-type Props = {
-    companyId: string
-}
-
-export function RoutingRulesPanel({ companyId }: Props) {
+export function RoutingRulesPanel({ companyId }: RoutingRulesPanelProps) {
     const {
         routingRules,
         loading,

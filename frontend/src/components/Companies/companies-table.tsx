@@ -25,16 +25,7 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { type Company } from "@/hooks/use-companies"
-
-type CompaniesTableProps = {
-    companies: Company[]
-    loading: boolean
-    onEdit: (company: Company) => void
-    onDelete: (company: Company) => void
-    onResyncDialplan: (company: Company) => void
-    onImportIssabel: (company: Company) => void
-}
+import { type CompaniesTableProps } from "@/components/Companies/types"
 
 export function CompaniesTable({
     companies,

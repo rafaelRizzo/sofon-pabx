@@ -30,15 +30,9 @@ import {
     type FlowImportPreview,
     type FlowImportResolutions,
 } from "@/hooks/use-flow-transfer"
+import { type FlowImportDialogProps } from "@/components/Flows/types"
 
-type Props = {
-    open: boolean
-    onOpenChange: (open: boolean) => void
-    companyId: string
-    onImported: (flowId: string) => void
-}
-
-export function FlowImportDialog({ open, onOpenChange, companyId, onImported }: Props) {
+export function FlowImportDialog({ open, onOpenChange, companyId, onImported }: FlowImportDialogProps) {
     const { analyzing, importing, previewImport, importFlow } = useFlowImport()
 
     const [fileName, setFileName] = useState<string | null>(null)

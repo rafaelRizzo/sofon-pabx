@@ -21,15 +21,7 @@ import {
 } from "@/components/ui/tooltip"
 import { RouteDestinationBadge } from "@/components/RouteDestination/route-destination-badge"
 import { UsedByBadge } from "@/components/RouteDestination/used-by-badge"
-import { type VariableSet } from "@/hooks/use-variables"
-
-type Props = {
-    variableSets: VariableSet[]
-    loading: boolean
-    companySelected: boolean
-    onEdit: (variableSet: VariableSet) => void
-    onDelete: (variableSet: VariableSet) => void
-}
+import { type VariableSetsTableProps } from "@/components/Variables/types"
 
 export function VariableSetsTable({
     variableSets,
@@ -37,7 +29,7 @@ export function VariableSetsTable({
     companySelected,
     onEdit,
     onDelete,
-}: Props) {
+}: VariableSetsTableProps) {
     return (
         <div className="rounded-md border">
             <Table>

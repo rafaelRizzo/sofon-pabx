@@ -32,14 +32,8 @@ import {
     type DestinationOption,
 } from "@/components/RouteDestination/route-destination-field"
 import { useQueueMembers, type QueueMember } from "@/hooks/use-queue-members"
-import { type Queue } from "@/hooks/use-queues"
 import { cn } from "@/lib/utils"
-
-type Props = {
-    open: boolean
-    onOpenChange: (open: boolean) => void
-    queue: Queue | null
-}
+import { type QueueMembersSheetProps } from "@/components/Queues/types"
 
 // Colunas compartilhadas pelo cabeçalho e por cada MemberRow - grid (não flex com larguras
 // soltas) garante que rótulo e valor fiquem sempre alinhados verticalmente.
@@ -179,7 +173,11 @@ function MemberRow({
     )
 }
 
-export function QueueMembersSheet({ open, onOpenChange, queue }: Props) {
+export function QueueMembersSheet({
+    open,
+    onOpenChange,
+    queue,
+}: QueueMembersSheetProps) {
     const { members, loading, addMember, updateMember, removeMember } =
         useQueueMembers(open ? queue?.id : undefined)
     const { extensions } = useCompanyExtensions(

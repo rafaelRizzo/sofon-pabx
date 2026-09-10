@@ -12,7 +12,7 @@ import {
 import { Card, CardContent, CardDescription } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
-import type { DashboardOverview } from "@/hooks/use-dashboard"
+import { type DashboardOverviewCardsProps } from "@/components/Dashboard/types"
 
 const TONE = {
     emerald: {
@@ -82,12 +82,10 @@ function StatTile({
     )
 }
 
-type Props = {
-    overview: DashboardOverview | null
-    loading: boolean
-}
-
-export function DashboardOverviewCards({ overview, loading }: Props) {
+export function DashboardOverviewCards({
+    overview,
+    loading,
+}: DashboardOverviewCardsProps) {
     return (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
             <StatTile

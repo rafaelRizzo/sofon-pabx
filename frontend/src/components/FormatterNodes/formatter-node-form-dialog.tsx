@@ -61,27 +61,15 @@ import {
 import { type Company } from "@/hooks/use-companies"
 import {
     createFormatterNodeFormSchema,
-    type FormatterNode,
     type FormatterNodeForm,
 } from "@/hooks/use-formatter-nodes"
+import { type FormatterNodeFormDialogProps } from "@/components/FormatterNodes/types"
 
 const MASK_PRESETS = [
     { label: "CPF/CNPJ", masks: ["000.000.000-00", "00.000.000/0000-00"] },
     { label: "CEP", masks: ["00000-000"] },
     { label: "Telefone BR", masks: ["(00) 0000-0000", "(00) 00000-0000"] },
 ]
-
-type Props = {
-    open: boolean
-    onOpenChange: (open: boolean) => void
-    formatterNode: FormatterNode | null
-    // true enquanto o registro ainda está sendo buscado por id (ver EditNodeDialog) - nesse caso
-    // `formatterNode` também é null, mas não significa "criação": mostra skeleton em vez do form
-    loading?: boolean
-    companies: Company[]
-    onSave: (form: FormatterNodeForm) => Promise<boolean>
-    onDelete?: () => void
-}
 
 export function FormatterNodeFormDialog({
     open,
@@ -91,7 +79,7 @@ export function FormatterNodeFormDialog({
     companies,
     onSave,
     onDelete,
-}: Props) {
+}: FormatterNodeFormDialogProps) {
     const isEdit = !!formatterNode
     const defaultCompanyId = companies.length === 1 ? (companies[0]?.id ?? "") : ""
 

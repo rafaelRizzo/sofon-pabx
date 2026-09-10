@@ -12,7 +12,7 @@ import {
 import { Card, CardContent, CardDescription } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
-import type { CdrMetrics } from "@/hooks/use-cdr"
+import { type CdrMetricsCardsProps } from "@/components/Cdr/types"
 
 const TONE = {
     blue: {
@@ -91,12 +91,7 @@ function formatDuration(seconds: number | null): string {
     return `${mins}:${secs.toString().padStart(2, "0")}`
 }
 
-type Props = {
-    metrics: CdrMetrics | null
-    loading: boolean
-}
-
-export function CdrMetricsCards({ metrics, loading }: Props) {
+export function CdrMetricsCards({ metrics, loading }: CdrMetricsCardsProps) {
     const answerRate = metrics ? Math.round(metrics.answerRate * 100) : 0
     const missed = metrics ? Math.max(0, metrics.total - metrics.answered) : 0
 

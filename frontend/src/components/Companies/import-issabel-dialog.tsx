@@ -29,6 +29,7 @@ import {
     type ImportIssabelSummary,
     type ImportResult,
 } from "@/hooks/use-issabel-import"
+import { type ImportIssabelDialogProps } from "@/components/Companies/types"
 
 const BACKUP_ACCEPT = ".tar,.tgz,.gz,.sql"
 
@@ -55,13 +56,6 @@ async function prepareUpload(
         )
         return { upload: file, extracted: false }
     }
-}
-
-type ImportIssabelDialogProps = {
-    open: boolean
-    onOpenChange: (open: boolean) => void
-    companyId: string
-    companyName: string
 }
 
 function ResultSection({

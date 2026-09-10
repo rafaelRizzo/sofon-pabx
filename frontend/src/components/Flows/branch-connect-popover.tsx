@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, type ReactElement } from "react"
+import { useEffect, useState } from "react"
 
 import {
     Popover,
@@ -34,20 +34,12 @@ import {
     type CanvasNodeType,
 } from "@/components/Flows/node-types"
 import { Button } from "@/components/ui/button"
+import { type BranchConnectPopoverProps } from "@/components/Flows/types"
 
 const TYPE_ITEMS = CANVAS_NODE_TYPES.map((t) => ({
     value: t,
     label: ROUTE_DEST_LABELS[t],
 }))
-
-type Props = {
-    companyId: string
-    defaultType?: CanvasNodeType
-    currentOption?: DestinationOption | null
-    trigger: ReactElement
-    onSelect: (type: CanvasNodeType, option: DestinationOption) => void
-    onCreate?: (type: CanvasNodeType) => void
-}
 
 // Picker compacto pra conectar um slot (true/false/success/error/default) direto a um destino já
 // configurado, sem precisar arrastar uma linha no canvas - mesmos helpers do painel lateral
@@ -60,7 +52,7 @@ export function BranchConnectPopover({
     trigger,
     onSelect,
     onCreate,
-}: Props) {
+}: BranchConnectPopoverProps) {
     const [open, setOpen] = useState(false)
     const [type, setType] = useState<CanvasNodeType>(defaultType)
     const [selected, setSelected] = useState<DestinationOption | null>(

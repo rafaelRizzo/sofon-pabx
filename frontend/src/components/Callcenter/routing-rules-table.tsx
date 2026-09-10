@@ -15,15 +15,7 @@ import {
 } from "@/components/ui/table"
 import { WEEKDAY_LABELS } from "@/components/TimeGroups/weekday-checkboxes"
 import { type RoutingRule } from "@/hooks/use-routing-rules"
-import { type Trunk } from "@/hooks/use-trunks"
-
-type Props = {
-    routingRules: RoutingRule[]
-    trunks: Trunk[]
-    loading: boolean
-    onEdit: (routingRule: RoutingRule) => void
-    onDelete: (routingRule: RoutingRule) => void
-}
+import { type RoutingRulesTableProps } from "@/components/Callcenter/types"
 
 function conditionsSummary(
     rule: RoutingRule,
@@ -54,7 +46,7 @@ export function RoutingRulesTable({
     loading,
     onEdit,
     onDelete,
-}: Props) {
+}: RoutingRulesTableProps) {
     const trunkNameById = new Map(trunks.map((t) => [t.id, t.name]))
     return (
         <div className="rounded-md border">

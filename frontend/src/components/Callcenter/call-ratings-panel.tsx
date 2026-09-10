@@ -48,16 +48,13 @@ import {
 } from "@/hooks/use-call-ratings"
 import { useExtensions, type Extension } from "@/hooks/use-extensions"
 import { apiError } from "@/lib/api"
+import { type CallRatingsPanelProps } from "@/components/Callcenter/types"
 
 // "YYYY-MM-DD" -> Date local (evita o shift de fuso de "new Date(string)", que interpreta como UTC)
 function parseDateOnly(value: string): Date | undefined {
     if (!value) return undefined
     const [y, m, d] = value.split("-").map(Number)
     return new Date(y, m - 1, d)
-}
-
-type Props = {
-    companyId: string
 }
 
 const ORDER_OPTIONS = [
@@ -92,7 +89,7 @@ const SCORE_OPTIONS = [
     { value: "1", label: "1 estrela" },
 ] as const
 
-export function CallRatingsPanel({ companyId }: Props) {
+export function CallRatingsPanel({ companyId }: CallRatingsPanelProps) {
     const { extensions } = useExtensions(companyId)
     const [extensionId, setExtensionId] = useState<string>("")
     const [number, setNumber] = useState("")

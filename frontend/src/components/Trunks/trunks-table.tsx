@@ -22,8 +22,7 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { type RealtimeTrunk } from "@/hooks/use-realtime"
-import { type Trunk } from "@/hooks/use-trunks"
+import { type TrunksTableProps } from "@/components/Trunks/types"
 
 const CODEC_PREVIEW_COUNT = 3
 
@@ -70,16 +69,6 @@ function CodecBadges({ codecs }: { codecs: string }) {
     )
 }
 
-type Props = {
-    trunks: Trunk[]
-    realtimeTrunks: RealtimeTrunk[]
-    loading: boolean
-    companySelected: boolean
-    onEdit: (trunk: Trunk) => void
-    onDelete: (trunk: Trunk) => void
-    onToggleActive: (trunk: Trunk, active: boolean) => void
-}
-
 export function TrunksTable({
     trunks,
     realtimeTrunks,
@@ -88,7 +77,7 @@ export function TrunksTable({
     onEdit,
     onDelete,
     onToggleActive,
-}: Props) {
+}: TrunksTableProps) {
     const presenceById = new Map(
         realtimeTrunks.map((rt) => [rt.id, rt.presence])
     )

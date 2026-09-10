@@ -13,20 +13,12 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { CallStateBadge } from "@/components/presence-badge"
 import { activeCallLabel } from "@/lib/realtime-format"
-import type {
-    RealtimeExtension,
-    RealtimeQueueMember,
-} from "@/hooks/use-realtime"
+import { type QueueMembersPopoverProps } from "@/components/Monitoring/types"
 
-type Props = {
-    members: RealtimeQueueMember[]
-    // ligação ativa mostrada por membro vem do estado do ramal (rt:ext:calls:*), não é escopada
-    // à fila - mas como um ramal só atende uma chamada por vez na prática, já resolve "quem esse
-    // membro está atendendo agora"
-    extensions: RealtimeExtension[]
-}
-
-export function QueueMembersPopover({ members, extensions }: Props) {
+export function QueueMembersPopover({
+    members,
+    extensions,
+}: QueueMembersPopoverProps) {
     const activeCallByExtensionId = useMemo(() => {
         const result = new Map<string, string>()
         for (const ext of extensions) {

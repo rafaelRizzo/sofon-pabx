@@ -15,7 +15,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
-import type { DashboardInfra } from "@/hooks/use-dashboard"
+import { type DashboardInfraCardsProps } from "@/components/Dashboard/types"
 
 function formatBytes(bytes: number): string {
     if (bytes <= 0) return "0 B"
@@ -143,12 +143,10 @@ function InfraTile({
     )
 }
 
-type Props = {
-    infra: DashboardInfra | null
-    loading: boolean
-}
-
-export function DashboardInfraCards({ infra, loading }: Props) {
+export function DashboardInfraCards({
+    infra,
+    loading,
+}: DashboardInfraCardsProps) {
     return (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <InfraTile label="CPU" icon={CpuIcon} loading={loading} skeleton={<CpuSkeleton />}>

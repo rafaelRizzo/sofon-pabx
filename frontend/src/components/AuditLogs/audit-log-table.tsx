@@ -20,8 +20,8 @@ import {
     type AuditLogAction,
     type AuditLogModel,
 } from "@/hooks/use-audit-logs"
-import type { Company } from "@/hooks/use-companies"
 import { AuditLogDetailDialog } from "./audit-log-detail-dialog"
+import { type AuditLogTableProps } from "@/components/AuditLogs/types"
 
 const ACTION_TONE: Record<AuditLogAction, string> = {
     CREATE:
@@ -32,14 +32,7 @@ const ACTION_TONE: Record<AuditLogAction, string> = {
         "border-transparent bg-red-500/15 text-red-600 dark:bg-red-400/20 dark:text-red-300",
 }
 
-type Props = {
-    records: AuditLog[]
-    companies: Company[]
-    loading: boolean
-    showCompanyColumn?: boolean
-}
-
-export function AuditLogTable({ records, companies, loading, showCompanyColumn = true }: Props) {
+export function AuditLogTable({ records, companies, loading, showCompanyColumn = true }: AuditLogTableProps) {
     const [selected, setSelected] = useState<AuditLog | null>(null)
 
     const companyName = (companyId: string | null) =>

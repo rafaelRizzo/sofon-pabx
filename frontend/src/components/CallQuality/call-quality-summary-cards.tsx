@@ -11,7 +11,7 @@ import {
 import { Card, CardContent, CardDescription } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
-import type { CallQualitySummary } from "@/hooks/use-call-quality"
+import { type CallQualitySummaryCardsProps } from "@/components/CallQuality/types"
 
 const TONE = {
     blue: {
@@ -78,14 +78,9 @@ function fmt(value: number | null, digits: number, suffix = ""): string {
     return `${value.toFixed(digits)}${suffix}`
 }
 
-type Props = {
-    summary: CallQualitySummary | null
-    loading: boolean
-}
-
 // Unidades de jitter são as nativas do RTP (timestamp units), não ms - o backend não converte
 // (não tem o codec da chamada disponível no evento RTCP) - ver use-call-quality.ts
-export function CallQualitySummaryCards({ summary, loading }: Props) {
+export function CallQualitySummaryCards({ summary, loading }: CallQualitySummaryCardsProps) {
     return (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
             <StatTile

@@ -52,11 +52,11 @@ import {
     createTrunkSchema,
     updateTrunkSchema,
     type RegistrationMode,
-    type Trunk,
     type TrunkCreateForm,
     type TrunkType,
     type TrunkUpdateForm,
 } from "@/hooks/use-trunks"
+import { type TrunkFormDialogProps } from "@/components/Trunks/types"
 
 const REGISTRATION_MODES = [
     { value: "outbound", label: "Outbound (registra no provedor)" },
@@ -185,24 +185,6 @@ function AdvancedSwitch({
 
 const emptyCustomHeader = { name: "", value: "" }
 
-type Props =
-    | {
-          open: boolean
-          onOpenChange: (open: boolean) => void
-          trunk: null
-          companies: Company[]
-          onCreate: (form: TrunkCreateForm) => Promise<Trunk | null>
-          onUpdate?: never
-      }
-    | {
-          open: boolean
-          onOpenChange: (open: boolean) => void
-          trunk: Trunk
-          companies: Company[]
-          onCreate?: never
-          onUpdate: (form: TrunkUpdateForm) => Promise<boolean>
-      }
-
 export function TrunkFormDialog({
     open,
     onOpenChange,
@@ -210,7 +192,7 @@ export function TrunkFormDialog({
     companies,
     onCreate,
     onUpdate,
-}: Props) {
+}: TrunkFormDialogProps) {
     const isEdit = !!trunk
     const [showPassword, setShowPassword] = useState(false)
 

@@ -26,18 +26,7 @@ import {
     TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { UsedByBadge } from "@/components/RouteDestination/used-by-badge"
-import { type Company } from "@/hooks/use-companies"
-import { type Extension } from "@/hooks/use-extensions"
-
-type Props = {
-    extensions: Extension[]
-    companies: Company[]
-    loading: boolean
-    companySelected: boolean
-    onEdit: (extension: Extension) => void
-    onResetPassword: (extension: Extension) => void
-    onDelete: (extension: Extension) => void
-}
+import { type ExtensionsTableProps } from "@/components/Extensions/types"
 
 export function ExtensionsTable({
     extensions,
@@ -47,7 +36,7 @@ export function ExtensionsTable({
     onEdit,
     onResetPassword,
     onDelete,
-}: Props) {
+}: ExtensionsTableProps) {
     const getCompanyName = (companyId: string) =>
         companies.find((c) => c.id === companyId)?.name ?? companyId
 

@@ -66,41 +66,8 @@ import {
     useIvr,
     type IvrMenu,
 } from "@/hooks/use-ivr"
-import type { Company } from "@/hooks/use-companies"
-import {
-    NODE_TYPE_CONFIG,
-    type CanvasNodeType,
-} from "@/components/Flows/node-types"
-
-type Props = {
-    type: CanvasNodeType
-    id: string
-    open: boolean
-    onOpenChange: (open: boolean) => void
-    companyId: string
-    companies: Company[]
-    // true = comportamento de sempre (chama a API de update na hora). false = auto save desligado -
-    // editar um recurso já existente no backend não chama a API, só enfileira a mudança (ver
-    // onDraftUpdate) pra aplicar de verdade quando o usuário clicar em "Salvar" no canvas.
-    autoSave: boolean
-    // presente quando `id` é um id de rascunho local (recurso criado nesta mesma sessão sem auto
-    // save, ainda não existe no backend) - o form dialog edita esse objeto em vez de buscar por
-    // GET/:id (que daria 404, o registro não existe). onSave nesse caso vira onDraftSave.
-    draftEntity?: unknown
-    // chamado no lugar do update real quando draftEntity está presente - só reescreve o rascunho
-    // local, sem nenhuma chamada de rede
-    onDraftSave?: (form: unknown) => void
-    // chamado no lugar do update real quando autoSave=false e o recurso já é real (existia antes
-    // deste draft) - enfileira a atualização pra aplicar no clique de "Salvar"
-    onDraftUpdate?: (form: unknown) => void
-    // dispara depois de salvar com sucesso - o canvas usa isso pra refazer o grafo (o nome exibido
-    // no nó, ou uma conexão feita através do próprio form, pode ter mudado)
-    onSaved: () => void
-    // recebe o DTO de criação montado a partir do registro carregado no editor (não do buffer não
-    // salvo do form) - o histórico de undo/redo do canvas usa isso pra poder recriar o recurso caso
-    // o usuário desfaça a exclusão (ver flow-canvas.tsx)
-    onDeleteResource?: (creationDto: unknown) => void
-}
+import { NODE_TYPE_CONFIG } from "@/components/Flows/node-types"
+import { type EditNodeDialogProps } from "@/components/Flows/types"
 
 // Busca genérica por id - usada por todo tipo que não tem hook de leitura única própria. A resposta
 // HTTP de GET/:id sempre é { success, message, <recurso singular> } (ver CLAUDE.md do backend), daí
@@ -154,7 +121,7 @@ export function EditNodeDialog({
     onDraftUpdate,
     onSaved,
     onDeleteResource,
-}: Props) {
+}: EditNodeDialogProps) {
     const isDraft = draftEntity !== undefined
     switch (type) {
         case "announcement": {

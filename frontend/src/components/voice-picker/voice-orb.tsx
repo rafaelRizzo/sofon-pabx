@@ -8,23 +8,9 @@ import { useTexture } from "@react-three/drei"
 import { Canvas, useFrame, useThree } from "@react-three/fiber"
 import * as THREE from "three"
 
-export type VoiceOrbState = null | "thinking" | "listening" | "talking"
+import { type VoiceOrbProps } from "@/components/voice-picker/types"
 
-type VoiceOrbProps = {
-    colors?: [string, string]
-    colorsRef?: React.RefObject<[string, string]>
-    resizeDebounce?: number
-    seed?: number
-    agentState?: VoiceOrbState
-    volumeMode?: "auto" | "manual"
-    manualInput?: number
-    manualOutput?: number
-    inputVolumeRef?: React.RefObject<number>
-    outputVolumeRef?: React.RefObject<number>
-    getInputVolume?: () => number
-    getOutputVolume?: () => number
-    className?: string
-}
+export type VoiceOrbState = null | "thinking" | "listening" | "talking"
 
 export function VoiceOrb({
     colors = ["#CADCFC", "#A0B9D1"],

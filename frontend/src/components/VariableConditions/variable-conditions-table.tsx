@@ -21,18 +21,8 @@ import {
 } from "@/components/ui/tooltip"
 import { RouteDestinationBadge } from "@/components/RouteDestination/route-destination-badge"
 import { UsedByBadge } from "@/components/RouteDestination/used-by-badge"
-import {
-    VARIABLE_RULE_OPERATOR_LABELS,
-    type VariableCondition,
-} from "@/hooks/use-variable-conditions"
-
-type Props = {
-    variableConditions: VariableCondition[]
-    loading: boolean
-    companySelected: boolean
-    onEdit: (variableCondition: VariableCondition) => void
-    onDelete: (variableCondition: VariableCondition) => void
-}
+import { VARIABLE_RULE_OPERATOR_LABELS } from "@/hooks/use-variable-conditions"
+import { type VariableConditionsTableProps } from "@/components/VariableConditions/types"
 
 export function VariableConditionsTable({
     variableConditions,
@@ -40,7 +30,7 @@ export function VariableConditionsTable({
     companySelected,
     onEdit,
     onDelete,
-}: Props) {
+}: VariableConditionsTableProps) {
     return (
         <div className="rounded-md border">
             <Table>

@@ -51,20 +51,11 @@ import { Switch } from "@/components/ui/switch"
 import { WeekdayCheckboxes } from "@/components/TimeGroups/weekday-checkboxes"
 import {
     createRoutingRuleFormSchema,
-    type RoutingRule,
     type RoutingRuleForm,
 } from "@/hooks/use-routing-rules"
 import { type Weekday } from "@/hooks/use-time-groups"
 import { type Trunk } from "@/hooks/use-trunks"
-
-type Props = {
-    open: boolean
-    onOpenChange: (open: boolean) => void
-    routingRule: RoutingRule | null
-    companyId: string
-    trunks: Trunk[]
-    onSave: (form: RoutingRuleForm) => Promise<boolean>
-}
+import { type RoutingRuleFormDialogProps } from "@/components/Callcenter/types"
 
 export function RoutingRuleFormDialog({
     open,
@@ -73,7 +64,7 @@ export function RoutingRuleFormDialog({
     companyId,
     trunks,
     onSave,
-}: Props) {
+}: RoutingRuleFormDialogProps) {
     const isEdit = !!routingRule
 
     const {

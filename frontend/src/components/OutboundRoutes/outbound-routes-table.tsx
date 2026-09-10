@@ -19,17 +19,7 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { type Trunk } from "@/hooks/use-trunks"
-import { type OutboundRoute } from "@/hooks/use-outbound-routes"
-
-type Props = {
-    routes: OutboundRoute[]
-    trunks: Trunk[]
-    loading: boolean
-    companySelected: boolean
-    onEdit: (route: OutboundRoute) => void
-    onDelete: (route: OutboundRoute) => void
-}
+import { type OutboundRoutesTableProps } from "@/components/OutboundRoutes/types"
 
 export function OutboundRoutesTable({
     routes,
@@ -38,7 +28,7 @@ export function OutboundRoutesTable({
     companySelected,
     onEdit,
     onDelete,
-}: Props) {
+}: OutboundRoutesTableProps) {
     const trunkName = (trunkId: string) =>
         trunks.find((t) => t.id === trunkId)?.name ?? trunkId
 

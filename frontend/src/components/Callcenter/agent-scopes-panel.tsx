@@ -24,12 +24,9 @@ import {
 } from "@/components/ui/table"
 import { useAgentScopes } from "@/hooks/use-agent-scopes"
 import { useExtensions, type Extension } from "@/hooks/use-extensions"
+import { type AgentScopesPanelProps } from "@/components/Callcenter/types"
 
-type Props = {
-    companyId: string
-}
-
-export function AgentScopesPanel({ companyId }: Props) {
+export function AgentScopesPanel({ companyId }: AgentScopesPanelProps) {
     const { scopes, loading, createScope, toggleScopeActive, deleteScope } =
         useAgentScopes(companyId)
     const { extensions } = useExtensions(companyId)

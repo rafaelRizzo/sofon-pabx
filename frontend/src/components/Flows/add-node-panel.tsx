@@ -3,18 +3,12 @@
 import { PlusIcon } from "lucide-react"
 
 import { ROUTE_DEST_ICONS } from "@/components/RouteDestination/route-destination-field"
-import {
-    NODE_ACTIONS,
-    type CanvasNodeAction,
-} from "@/components/Flows/node-types"
-
-type Props = {
-    onAdd: (action: CanvasNodeAction) => void
-}
+import { NODE_ACTIONS } from "@/components/Flows/node-types"
+import { type AddNodePanelProps } from "@/components/Flows/types"
 
 // O painel não exibe recursos (filas, anúncios, horários). Ele expõe somente ações do fluxo;
 // a configuração Asterisk é selecionada no diálogo depois que a ação é escolhida.
-export function AddNodePanel({ onAdd }: Props) {
+export function AddNodePanel({ onAdd }: AddNodePanelProps) {
     return (
         <aside className="space-y-4">
             <div className="rounded-xl border bg-card p-3 shadow-sm">

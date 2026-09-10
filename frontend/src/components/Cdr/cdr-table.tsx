@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/table"
 import { cn } from "@/lib/utils"
 import { downloadCdrRecording, type CdrRecord } from "@/hooks/use-cdr"
-import type { Trunk } from "@/hooks/use-trunks"
+import { type CdrTableProps } from "@/components/Cdr/types"
 import { CdrRecordingDialog } from "./cdr-recording-dialog"
 
 export const DIRECTION_LABEL: Record<string, string> = {
@@ -83,14 +83,12 @@ export function formatDateTime(value: string | null): string {
     return new Date(value).toLocaleString("pt-BR")
 }
 
-type Props = {
-    records: CdrRecord[]
-    trunks: Trunk[]
-    loading: boolean
-    companyId: string
-}
-
-export function CdrTable({ records, trunks, loading, companyId }: Props) {
+export function CdrTable({
+    records,
+    trunks,
+    loading,
+    companyId,
+}: CdrTableProps) {
     const trunkName = (trunkId: string | null) =>
         trunkId ? (trunks.find((t) => t.id === trunkId)?.name ?? trunkId) : "-"
 

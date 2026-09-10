@@ -63,25 +63,9 @@ import {
     QUEUE_STRATEGIES,
     QUEUE_STRATEGY_DESCRIPTIONS,
     QUEUE_STRATEGY_LABELS,
-    type Queue,
     type QueueForm,
 } from "@/hooks/use-queues"
-
-type Props = {
-    open: boolean
-    onOpenChange: (open: boolean) => void
-    queue: Queue | null
-    // true enquanto o registro ainda está sendo buscado por id (ver EditNodeDialog) - nesse caso
-    // `queue` também é null, mas não significa "criação": mostra skeleton em vez do form
-    loading?: boolean
-    companies: Company[]
-    onSave: (form: QueueForm) => Promise<boolean>
-    onDelete?: () => void
-    // abre o QueueMembersSheet - só passado por quem tem acesso à fila fora do fluxo normal da
-    // página de filas (ex: EditNodeDialog, que edita a fila a partir do canvas de Flows e não tem
-    // outro jeito de chegar no gerenciador de membros)
-    onManageMembers?: () => void
-}
+import { type QueueFormDialogProps } from "@/components/Queues/types"
 
 export function QueueFormDialog({
     open,
@@ -92,7 +76,7 @@ export function QueueFormDialog({
     onSave,
     onDelete,
     onManageMembers,
-}: Props) {
+}: QueueFormDialogProps) {
     const isEdit = !!queue
     const defaultCompanyId =
         companies.length === 1 ? (companies[0]?.id ?? "") : ""

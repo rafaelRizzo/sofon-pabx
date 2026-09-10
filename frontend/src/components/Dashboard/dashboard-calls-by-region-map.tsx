@@ -34,6 +34,7 @@ import {
     useDashboardCallsByRegion,
     type CallsByRegionDirection,
 } from "@/hooks/use-dashboard-calls-by-region"
+import { type DashboardCallsByRegionMapProps } from "@/components/Dashboard/types"
 
 const UF_NAMES: Record<string, string> = {
     AC: "Acre", AL: "Alagoas", AM: "Amazonas", AP: "Amapá", BA: "Bahia",
@@ -75,11 +76,9 @@ function parseDateOnly(value: string): Date | undefined {
     return new Date(y, m - 1, d)
 }
 
-type Props = {
-    companyId?: string
-}
-
-export function DashboardCallsByRegionMap({ companyId }: Props) {
+export function DashboardCallsByRegionMap({
+    companyId,
+}: DashboardCallsByRegionMapProps) {
     const [direction, setDirection] = useState<CallsByRegionDirection>("all")
     const [startDate, setStartDate] = useState("")
     const [endDate, setEndDate] = useState("")

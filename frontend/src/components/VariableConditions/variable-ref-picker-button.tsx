@@ -1,6 +1,7 @@
 "use client"
 
 import { VariablePickerCombobox } from "@/components/variable-picker-combobox"
+import { type VariableRefPickerButtonProps } from "@/components/VariableConditions/types"
 
 // Variáveis nativas do Asterisk aceitas por SAFE_VARIABLE_REF_REGEX
 // (backend/src/schemas/dialplan-safety.ts) além de identificadores simples - não reaproveita
@@ -34,17 +35,11 @@ const BUILTIN_VARIABLE_REFS = [
     },
 ]
 
-type Props = {
-    companyId: string
-    onSelect: (variable: string) => void
-    className?: string
-}
-
 // Botão que abre um picker de referências de variável válidas pra VariableCondition.rules[].variable
 // (mesmas 3 formas aceitas por SAFE_VARIABLE_REF_REGEX: nome do catálogo, CALLERID(...), DB(...)) -
 // ao contrário de VariableInsertButton, aqui o clique substitui o valor inteiro do campo pelo nome
 // cru da variável (sem {{}}). Comportamento real do picker vive em variable-picker-combobox.tsx.
-export function VariableRefPickerButton({ companyId, onSelect, className }: Props) {
+export function VariableRefPickerButton({ companyId, onSelect, className }: VariableRefPickerButtonProps) {
     return (
         <VariablePickerCombobox
             companyId={companyId}

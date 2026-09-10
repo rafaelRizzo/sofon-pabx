@@ -15,25 +15,15 @@ import {
 import {
     fetchDestinationOptions,
     RouteDestinationField,
-    type DestinationOption,
     type RouteDestination,
 } from "@/components/RouteDestination/route-destination-field"
 import {
-    type CanvasNodeAction,
     NODE_ACTIONS,
     NODE_TYPE_CONFIG,
     type CanvasNodeType,
 } from "@/components/Flows/node-types"
 import { apiError } from "@/lib/api"
-
-type Props = {
-    action: CanvasNodeAction | null
-    companyId: string
-    open: boolean
-    onOpenChange: (open: boolean) => void
-    onSelect: (type: CanvasNodeType, option: DestinationOption) => void
-    onCreate: (type: CanvasNodeType) => void
-}
+import { type NodeActionDialogProps } from "@/components/Flows/types"
 
 export function NodeActionDialog({
     action,
@@ -42,7 +32,7 @@ export function NodeActionDialog({
     onOpenChange,
     onSelect,
     onCreate,
-}: Props) {
+}: NodeActionDialogProps) {
     const definition = NODE_ACTIONS.find((item) => item.id === action)
     const [destination, setDestination] = useState<RouteDestination>(null)
     const [saving, setSaving] = useState(false)

@@ -64,11 +64,11 @@ import {
     IXC_NODE_ACTIONS,
     IXC_NODE_ACTION_LABELS,
     useIxcNodes,
-    type IxcNode,
     type IxcNodeAction,
     type IxcNodeForm,
     type IxcTestResult,
 } from "@/hooks/use-ixc-nodes"
+import { type IxcNodeFormDialogProps } from "@/components/Ixc/types"
 
 const IXC_NODE_ACTION_ITEMS = IXC_NODE_ACTIONS.map((a) => ({
     value: a,
@@ -76,18 +76,6 @@ const IXC_NODE_ACTION_ITEMS = IXC_NODE_ACTIONS.map((a) => ({
 }))
 
 const emptyVariableMapping = { path: "", variable: "" }
-
-type Props = {
-    open: boolean
-    onOpenChange: (open: boolean) => void
-    ixcNode: IxcNode | null
-    // true enquanto o registro ainda está sendo buscado por id (ver EditNodeDialog) - nesse caso
-    // `ixcNode` também é null, mas não significa "criação": mostra skeleton em vez do form
-    loading?: boolean
-    companies: Company[]
-    onSave: (form: IxcNodeForm) => Promise<boolean>
-    onDelete?: () => void
-}
 
 export function IxcNodeFormDialog({
     open,
@@ -97,7 +85,7 @@ export function IxcNodeFormDialog({
     companies,
     onSave,
     onDelete,
-}: Props) {
+}: IxcNodeFormDialogProps) {
     const isEdit = !!ixcNode
     const defaultCompanyId = companies.length === 1 ? (companies[0]?.id ?? "") : ""
 

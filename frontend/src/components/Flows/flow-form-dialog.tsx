@@ -41,24 +41,13 @@ import {
 import { Input } from "@/components/ui/input"
 import { EntityFormDialogSkeletonContent } from "@/components/entity-form-dialog-skeleton"
 import { type Company } from "@/hooks/use-companies"
-import { type Flow } from "@/hooks/use-flows"
+import { type FlowFormDialogProps } from "@/components/Flows/types"
 
 const flowNameFormSchema = z.object({
     name: z.string().min(1, "Informe o nome").max(80, "Máximo 80 caracteres"),
     companyId: z.string().min(1, "Selecione uma empresa"),
 })
-type FlowNameForm = z.infer<typeof flowNameFormSchema>
-
-type Props = {
-    open: boolean
-    onOpenChange: (open: boolean) => void
-    flow: Flow | null
-    // true enquanto o registro ainda está sendo buscado por id (ver EditNodeDialog) - nesse caso
-    // `flow` também é null, mas não significa "criação": mostra skeleton em vez do form
-    loading?: boolean
-    companies: Company[]
-    onSave: (form: FlowNameForm) => Promise<boolean>
-}
+export type FlowNameForm = z.infer<typeof flowNameFormSchema>
 
 // Só nome + empresa - o destino/conexões de um Flow são montados no canvas (ver
 // app/dashboard/flows/[id]/page.tsx), não num campo de formulário aqui.
@@ -69,7 +58,7 @@ export function FlowFormDialog({
     loading = false,
     companies,
     onSave,
-}: Props) {
+}: FlowFormDialogProps) {
     const isEdit = !!flow
 
     const {

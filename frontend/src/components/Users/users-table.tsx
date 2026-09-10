@@ -16,6 +16,7 @@ import {
     TableRow,
 } from "@/components/ui/table"
 import { type User, type UserRole } from "@/hooks/use-users"
+import { type UsersTableProps } from "@/components/Users/types"
 
 const ROLE_LABELS: Record<UserRole, string> = {
     admin: "Administrador",
@@ -53,13 +54,6 @@ function CompanyBadges({ companies }: { companies: User["companies"] }) {
             )}
         </div>
     )
-}
-
-type UsersTableProps = {
-    users: User[]
-    loading: boolean
-    onEdit: (user: User) => void
-    onDelete: (user: User) => void
 }
 
 export function UsersTable({

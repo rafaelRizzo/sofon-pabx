@@ -1,7 +1,7 @@
 "use client"
 
 import type { ReactNode } from "react"
-import { Handle, Position, type NodeProps } from "@xyflow/react"
+import { Handle, Position } from "@xyflow/react"
 import {
     ArrowLeftIcon,
     ArrowRightIcon,
@@ -31,6 +31,7 @@ import {
     type CanvasNodeType,
 } from "@/components/Flows/node-types"
 import { BranchConnectPopover } from "@/components/Flows/branch-connect-popover"
+import { type FlowNodeProps } from "@/components/Flows/types"
 
 export type SlotTarget = { type: string; id: string; name: string }
 
@@ -423,11 +424,7 @@ function Keypad({
 // Nó genérico do canvas - 1 handle de entrada (topo) + N handles de saída, um por slot (ex:
 // "true"/"false" pra Time Condition, "success"/"error" pra Request Template, teclado pra URA) -
 // resolvido antes de montar os nós, ver flow-canvas.tsx.
-export function FlowNode({
-    id,
-    data,
-    selected,
-}: NodeProps & { data: FlowNodeData }) {
+export function FlowNode({ id, data, selected }: FlowNodeProps) {
     const Icon = ROUTE_DEST_ICONS[data.nodeType]
     const slots = data.slots
     const isIvr = data.nodeType === "ivr"

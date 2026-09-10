@@ -56,6 +56,7 @@ import {
     type ExtensionUpdateForm,
 } from "@/hooks/use-extensions"
 import { toast } from "sonner"
+import { type ExtensionFormDialogProps } from "@/components/Extensions/types"
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -776,24 +777,6 @@ const TYPES = [
     // { value: "sip", label: "SIP (legado)" },
 ]
 
-type Props =
-    | {
-          open: boolean
-          onOpenChange: (open: boolean) => void
-          extension: null
-          companies: Company[]
-          onCreate: (form: ExtensionCreateForm) => Promise<any>
-          onUpdate?: never
-      }
-    | {
-          open: boolean
-          onOpenChange: (open: boolean) => void
-          extension: Extension | string
-          companies: Company[]
-          onCreate?: never
-          onUpdate: (form: ExtensionUpdateForm) => Promise<boolean>
-      }
-
 export function ExtensionFormDialog({
     open,
     onOpenChange,
@@ -801,7 +784,7 @@ export function ExtensionFormDialog({
     companies,
     onCreate,
     onUpdate,
-}: Props) {
+}: ExtensionFormDialogProps) {
     const isEdit = !!extension
 
     const [loadingExtension, setLoadingExtension] = useState(false)

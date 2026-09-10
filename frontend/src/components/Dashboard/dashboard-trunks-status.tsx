@@ -15,12 +15,11 @@ import { Button } from "@/components/ui/button"
 import { PresenceBadge } from "@/components/presence-badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useRealtimeTrunks } from "@/hooks/use-realtime"
+import { type DashboardTrunksStatusProps } from "@/components/Dashboard/types"
 
-type Props = {
-    companyId: string | undefined
-}
-
-export function DashboardTrunksStatus({ companyId }: Props) {
+export function DashboardTrunksStatus({
+    companyId,
+}: DashboardTrunksStatusProps) {
     const { trunks, loading } = useRealtimeTrunks(companyId)
     const sorted = [...trunks].sort((a, b) => a.name.localeCompare(b.name))
     const online = trunks.filter((t) => t.presence === "online").length

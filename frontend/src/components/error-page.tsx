@@ -11,10 +11,11 @@ export function ErrorPage({
     error,
     reset,
 }: {
-    error: Error
+    error: unknown
     reset?: () => void
 }) {
-    const isChunkLoadError = CHUNK_LOAD_ERROR_PATTERN.test(error.message ?? "")
+    const message = error instanceof Error ? error.message : String(error)
+    const isChunkLoadError = CHUNK_LOAD_ERROR_PATTERN.test(message)
 
     return (
         <div className="flex min-h-svh items-center justify-center p-6">
@@ -84,7 +85,7 @@ export function ErrorPage({
                                 Detalhes técnicos
                             </summary>
                             <pre className="mt-2 max-h-32 overflow-auto rounded-md border border-border/70 bg-muted/40 p-2 text-[0.6875rem] text-destructive">
-                                <code>{error.message}</code>
+                                <code>{message}</code>
                             </pre>
                         </details>
                     )}
