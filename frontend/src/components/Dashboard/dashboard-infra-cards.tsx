@@ -293,6 +293,9 @@ export function DashboardInfraCards({
                 className="lg:col-span-2"
             >
                 <div className="flex flex-col gap-1.5">
+                    {infra && infra.topProcesses.length === 0 && (
+                        <CardDescription>Dado indisponível</CardDescription>
+                    )}
                     {infra?.topProcesses.map((p) => (
                         <div key={p.pid} className="flex items-center justify-between gap-2 text-sm">
                             <span className="truncate">{p.name}</span>

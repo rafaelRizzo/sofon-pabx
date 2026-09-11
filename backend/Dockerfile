@@ -28,8 +28,10 @@ ENV NODE_ENV=production
 
 # sox: conversão de áudio em src/utils/audio-convert.ts. Reload do dialplan vai via AMI
 # (src/asterisk/ami-client.ts), não precisa mais do binário CLI do Asterisk aqui.
+# procps: `ps` usado em getTopProcesses (dashboard.service.ts) - não vem na imagem base do bun,
+# sem instalar o binário some e o endpoint /dashboard/infra quebra com 500.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends sox libsox-fmt-mp3
+    && apt-get install -y --no-install-recommends sox libsox-fmt-mp3 procps
 
 COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
