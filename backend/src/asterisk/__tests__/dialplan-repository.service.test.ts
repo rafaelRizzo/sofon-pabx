@@ -53,7 +53,7 @@ describe('DialplanRepository.ensureFallback', () => {
             context: 'ramais', exten: '_X.', priority: 2, app: 'Playback', appdata: 'pbx-invalid',
         })
         expect(data).toContainEqual({
-            context: 'ramais', exten: '_X.', priority: 3, app: 'Congestion', appdata: null,
+            context: 'ramais', exten: '_X.', priority: 3, app: 'HangUp', appdata: null,
         })
     })
 })
