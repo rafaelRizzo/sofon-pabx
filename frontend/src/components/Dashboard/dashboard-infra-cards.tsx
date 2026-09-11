@@ -2,6 +2,7 @@
 
 import {
     ArrowDownIcon,
+    ArrowLeftRightIcon,
     ArrowUpIcon,
     ClockIcon,
     CpuIcon,
@@ -33,11 +34,12 @@ function formatUptime(seconds: number): string {
     return `${minutes}m`
 }
 
-// > 85% já é digno de nota (disco/memória apertando) - mesmo critério de destaque usado em
-// outros lugares do dashboard (jitter/perda de qualidade de rede)
+// Escala de alerta em 3 níveis: >= 50% amarelo, >= 70% laranja, >= 85% vermelho -
+// mesmo critério de destaque usado em outros lugares do dashboard (jitter/perda de qualidade de rede)
 function usagePctClass(pct: number): string {
     if (pct >= 0.85) return "text-red-600 dark:text-red-400"
-    if (pct >= 0.7) return "text-amber-600 dark:text-amber-400"
+    if (pct >= 0.7) return "text-orange-600 dark:text-orange-400"
+    if (pct >= 0.5) return "text-yellow-600 dark:text-yellow-400"
     return ""
 }
 
@@ -51,8 +53,10 @@ function UsageBar({ pct }: { pct: number }) {
                     clamped >= 0.85
                         ? "bg-red-500"
                         : clamped >= 0.7
-                          ? "bg-amber-500"
-                          : "bg-emerald-500"
+                          ? "bg-orange-500"
+                          : clamped >= 0.5
+                            ? "bg-yellow-500"
+                            : "bg-emerald-500"
                 )}
                 style={{ width: `${clamped * 100}%` }}
             />
@@ -200,6 +204,29 @@ export function DashboardInfraCards({
                     </CardDescription>
                 </div>
                 <UsageBar pct={infra?.memory.usedPct ?? 0} />
+            </InfraTile>
+
+            <InfraTile label="Swap" icon={ArrowLeftRightIcon} loading={loading} skeleton={<BarStatSkeleton />}>
+                {infra && infra.swap.totalBytes === 0 ? (
+                    <CardDescription>Sem swap configurado</CardDescription>
+                ) : (
+                    <>
+                        <div className="flex items-baseline justify-between">
+                            <span
+                                className={cn(
+                                    "font-mono text-xl font-semibold tabular-nums",
+                                    usagePctClass(infra?.swap.usedPct ?? 0)
+                                )}
+                            >
+                                {infra ? `${Math.round(infra.swap.usedPct * 100)}%` : "-"}
+                            </span>
+                            <CardDescription>
+                                {infra ? formatBytes(infra.swap.totalBytes) : "-"}
+                            </CardDescription>
+                        </div>
+                        <UsageBar pct={infra?.swap.usedPct ?? 0} />
+                    </>
+                )}
             </InfraTile>
 
             <InfraTile label="Disco" icon={HardDriveIcon} loading={loading} skeleton={<BarStatSkeleton />}>

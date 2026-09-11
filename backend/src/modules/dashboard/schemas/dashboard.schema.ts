@@ -54,6 +54,11 @@ export const DashboardInfraSchema = z.object({
         freeBytes: z.number(),
         usedPct: z.number(),
     }),
+    swap: z.object({
+        totalBytes: z.number(),
+        freeBytes: z.number(),
+        usedPct: z.number(),
+    }),
     disk: z.object({
         totalBytes: z.number(),
         usedBytes: z.number(),

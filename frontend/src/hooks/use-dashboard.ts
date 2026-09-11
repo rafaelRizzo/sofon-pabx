@@ -25,6 +25,7 @@ export type DashboardInfra = {
         perCoreUsedPct: number[]
     }
     memory: { totalBytes: number; freeBytes: number; usedPct: number }
+    swap: { totalBytes: number; freeBytes: number; usedPct: number }
     disk: { totalBytes: number; usedBytes: number; freeBytes: number; usedPct: number }
     recordings: { sizeBytes: number }
     logs: { sizeBytes: number }

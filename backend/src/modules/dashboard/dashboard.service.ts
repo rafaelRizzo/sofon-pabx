@@ -249,6 +249,18 @@ async function readNetDevBytes(): Promise<{ rxBytes: number; txBytes: number }> 
     return { rxBytes, txBytes }
 }
 
+// SwapTotal/SwapFree em kB, layout fixo do /proc/meminfo do kernel Linux (mesma fonte usada em
+// readNetDevBytes pra /proc/net/dev). Sem swap configurado (comum em VPS), totalKb é 0 - usedPct
+// cai pra 0 em vez de NaN.
+async function getSwapUsage(): Promise<{ totalBytes: number; freeBytes: number; usedPct: number }> {
+    const output = await Bun.file('/proc/meminfo').text()
+    const totalKb = Number(output.match(/^SwapTotal:\s+(\d+)/m)?.[1] ?? 0)
+    const freeKb = Number(output.match(/^SwapFree:\s+(\d+)/m)?.[1] ?? 0)
+    const totalBytes = totalKb * 1024
+    const freeBytes = freeKb * 1024
+    return { totalBytes, freeBytes, usedPct: totalBytes > 0 ? (totalBytes - freeBytes) / totalBytes : 0 }
+}
+
 // Mesma técnica de getPerCoreUsage (2 amostras, janela de 1s) - contador cumulativo não dá
 // bytes/s direto, precisa do delta entre 2 leituras.
 async function getNetworkThroughput(sampleMs = 1000): Promise<{ rxBytesPerSec: number; txBytesPerSec: number }> {
@@ -263,12 +275,13 @@ async function getNetworkThroughput(sampleMs = 1000): Promise<{ rxBytesPerSec: n
 }
 
 export const getDashboardInfra = async () => {
-    const [disk, recordingsSizeBytes, logsSizeBytes, perCoreUsedPct, network] = await Promise.all([
+    const [disk, recordingsSizeBytes, logsSizeBytes, perCoreUsedPct, network, swap] = await Promise.all([
         getDiskUsage(),
         getRecordingsSize(),
         getLogsSize(),
         getPerCoreUsage(),
         getNetworkThroughput(),
+        getSwapUsage(),
     ])
     const totalBytes = os.totalmem()
     const freeBytes = os.freemem()
@@ -283,6 +296,7 @@ export const getDashboardInfra = async () => {
             perCoreUsedPct,
         },
         memory: { totalBytes, freeBytes, usedPct: (totalBytes - freeBytes) / totalBytes },
+        swap,
         disk,
         recordings: { sizeBytes: recordingsSizeBytes },
         logs: { sizeBytes: logsSizeBytes },
