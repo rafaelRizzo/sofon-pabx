@@ -72,10 +72,33 @@ export const DialplanRepository = {
         await tx.extensions.createMany({
             data: [
                 { context, exten: '_X.', priority: 1, app: 'NoOp', appdata: 'Destino nao encontrado: ${EXTEN}' },
+                // Esse fallback é atingido direto pelo canal de quem discou (nunca passou por um Dial
+                // que atendesse a ponta chamadora) - sem Answer() explícito aqui o Playback toca em canal
+                // ainda não atendido e o áudio não chega no chamador (ver inboundroute.repository.ts:73)
+                { context, exten: '_X.', priority: 2, app: 'Answer', appdata: null },
                 // Som padrão do Asterisk (core-sounds) - anuncia o erro antes de encerrar a chamada
-                { context, exten: '_X.', priority: 2, app: 'Playback', appdata: 'pbx-invalid' },
-                { context, exten: '_X.', priority: 3, app: 'HangUp', appdata: null },
+                { context, exten: '_X.', priority: 3, app: 'Playback', appdata: 'pbx-invalid' },
+                { context, exten: '_X.', priority: 4, app: 'HangUp', appdata: null },
             ],
         })
+    },
+
+    // Self-heal de boot (ver ensure-static-config.ts, chamado em server.ts) - sem isso, uma mudança
+    // no template de ensureGenericRoutingPattern/ensureFallback (ex: trocar Congestion por HangUp)
+    // só se propagava pras instalações já rodando quando um admin clicasse manualmente em "sync" numa
+    // empresa (resyncDialplan). Contexts vêm de TODAS as empresas (não filtra por companyId) porque o
+    // padrão é global e compartilhado - qualquer contexto usado por qualquer ramal precisa ser coberto.
+    async ensureAllRealtimeFallbacks(): Promise<number> {
+        const contexts = await prisma.extension.findMany({
+            select: { context: true },
+            distinct: ['context'],
+        })
+        await prisma.$transaction(async (tx) => {
+            for (const { context } of contexts) {
+                await DialplanRepository.ensureGenericRoutingPattern(tx, context)
+                await DialplanRepository.ensureFallback(tx, context)
+            }
+        })
+        return contexts.length
     },
 }

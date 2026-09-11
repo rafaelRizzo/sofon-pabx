@@ -1,6 +1,7 @@
 import { ensureBaseDialplan } from './base-dialplan.repository'
 import { ensureBaseMusiconhold } from './base-musiconhold.repository'
 import { bumpTransferDigitTimeout } from './features.repository'
+import { DialplanRepository } from './dialplan.repository'
 import { runAmiCommand } from '../transport/ami-client'
 import { logger } from '../../utils/logger'
 
@@ -11,6 +12,7 @@ export type StaticAsteriskConfigResult = {
     musiconholdReloadApplied: boolean
     transferDigitTimeoutBumped: boolean
     restartRequired: boolean
+    realtimeFallbackContextsSynced: number
 }
 
 // Autocura da config estática global do Asterisk (fora do escopo por-empresa de
@@ -29,6 +31,7 @@ export async function ensureStaticAsteriskConfig(): Promise<StaticAsteriskConfig
         musiconholdReloadApplied: false,
         transferDigitTimeoutBumped: false,
         restartRequired: false,
+        realtimeFallbackContextsSynced: 0,
     }
 
     try {
@@ -75,6 +78,19 @@ export async function ensureStaticAsteriskConfig(): Promise<StaticAsteriskConfig
     } catch (error) {
         logger.warn({
             event: 'asterisk.static_config.transfer_digit_timeout_failed',
+            error: error instanceof Error ? error.message : String(error),
+        })
+    }
+
+    try {
+        // Padrão genérico de "ramais" + fallback (Realtime, tabela extensions) - global e
+        // compartilhado entre TODAS as empresas, refeito aqui (delete+recreate) pra garantir que
+        // deploys de mudança de template (ex: trocar app do fallback) se apliquem sozinhos, sem
+        // depender de um admin clicar em "sync" numa empresa qualquer.
+        result.realtimeFallbackContextsSynced = await DialplanRepository.ensureAllRealtimeFallbacks()
+    } catch (error) {
+        logger.warn({
+            event: 'asterisk.static_config.realtime_fallbacks_failed',
             error: error instanceof Error ? error.message : String(error),
         })
     }
