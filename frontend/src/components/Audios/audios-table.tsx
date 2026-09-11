@@ -25,6 +25,51 @@ import {
     TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { type AudiosTableProps } from "@/components/Audios/types"
+import { type AudioUsage } from "@/hooks/use-audios"
+
+const USAGE_VISIBLE_LIMIT = 2
+
+function AudioUsageCell({ usage }: { usage: AudioUsage[] }) {
+    if (usage.length === 0) {
+        return <span className="text-muted-foreground">Não utilizado</span>
+    }
+
+    const visible = usage.slice(0, USAGE_VISIBLE_LIMIT)
+    const rest = usage.slice(USAGE_VISIBLE_LIMIT)
+
+    return (
+        <TooltipProvider delay={100}>
+            <div className="flex flex-wrap items-center gap-1">
+                {visible.map((u, i) => (
+                    <Tooltip key={i}>
+                        <TooltipTrigger
+                            render={
+                                <Badge variant="secondary" className="font-normal">
+                                    {u.label}
+                                </Badge>
+                            }
+                        />
+                        <TooltipContent>{u.resource}</TooltipContent>
+                    </Tooltip>
+                ))}
+                {rest.length > 0 && (
+                    <Tooltip>
+                        <TooltipTrigger
+                            render={
+                                <Badge variant="secondary" className="font-normal">
+                                    +{rest.length}
+                                </Badge>
+                            }
+                        />
+                        <TooltipContent>
+                            {rest.map((u) => `${u.label}: ${u.resource}`).join(", ")}
+                        </TooltipContent>
+                    </Tooltip>
+                )}
+            </div>
+        </TooltipProvider>
+    )
+}
 
 export function AudiosTable({
     audios,
@@ -40,6 +85,7 @@ export function AudiosTable({
                 <TableHeader>
                     <TableRow>
                         <TableHead>Nome</TableHead>
+                        <TableHead>Uso</TableHead>
                         <TableHead>Enviado em</TableHead>
                         <TableHead className="w-30 text-right">Ações</TableHead>
                     </TableRow>
@@ -48,7 +94,7 @@ export function AudiosTable({
                     {loading ? (
                         Array.from({ length: 3 }).map((_, i) => (
                             <TableRow key={i}>
-                                {Array.from({ length: 3 }).map((_, j) => (
+                                {Array.from({ length: 4 }).map((_, j) => (
                                     <TableCell key={j}>
                                         <Skeleton className="h-4 w-full" />
                                     </TableCell>
@@ -58,7 +104,7 @@ export function AudiosTable({
                     ) : audios.length === 0 ? (
                         <TableRow>
                             <TableCell
-                                colSpan={3}
+                                colSpan={4}
                                 className="h-24 text-center text-muted-foreground"
                             >
                                 {companySelected
@@ -82,6 +128,9 @@ export function AudiosTable({
                                             </Badge>
                                         )}
                                     </div>
+                                </TableCell>
+                                <TableCell>
+                                    <AudioUsageCell usage={audio.usage ?? []} />
                                 </TableCell>
                                 <TableCell>
                                     {new Date(audio.createdAt).toLocaleString(

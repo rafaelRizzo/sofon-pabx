@@ -26,11 +26,15 @@ const releaseConversionSlot = () => {
 // com os codecs configurados nas trunks (ulaw/alaw, sempre 8kHz), sem resample na chamada.
 // Usa sox (já instalado por setups/install-asterisk.sh) - detecta o formato de entrada
 // pela extensão/header, então funciona para wav/mp3/ogg/flac etc.
+// -G (guard) evita overflow/clipping no resample quando a fonte já vem "no talo" de volume;
+// `rate -v` troca o filtro de decimação padrão (medium) pelo very-high-quality do sox - mesmo
+// teto de 8kHz da telefonia, mas sem o artefato extra de um resample de qualidade mais baixa
+// em cima do corte de banda (perceptível principalmente em música/MOH tocada em loop longo).
 export async function convertToAsteriskWav(inputPath: string, outputPath: string) {
     await acquireConversionSlot()
     try {
         const proc = Bun.spawn(
-            ['sox', inputPath, '-r', '8000', '-c', '1', '-b', '16', '-e', 'signed-integer', outputPath],
+            ['sox', '-G', inputPath, '-r', '8000', '-c', '1', '-b', '16', '-e', 'signed-integer', outputPath, 'rate', '-v'],
             { stdout: 'pipe', stderr: 'pipe' },
         )
         let timedOut = false

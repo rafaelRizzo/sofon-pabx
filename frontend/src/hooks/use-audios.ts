@@ -14,6 +14,23 @@ export type TtsVoiceSettings = {
     speakerBoost?: boolean
 }
 
+export type AudioUsageType =
+    | "announcement"
+    | "ivr"
+    | "queueAnnounce"
+    | "queuePeriodicAnnounce"
+    | "queueAgentAnnounce"
+    | "queueMoh"
+    | "queueSurvey"
+    | "queueSurveyService"
+    | "queueSurveyThanks"
+
+export type AudioUsage = {
+    type: AudioUsageType
+    label: string
+    resource: string
+}
+
 export type Audio = {
     id: string
     name: string
@@ -25,6 +42,7 @@ export type Audio = {
     notes: string | null
     createdAt: string
     updatedAt: string
+    usage: AudioUsage[]
 }
 
 async function fetchAudiosRequest(companyId: string): Promise<Audio[]> {

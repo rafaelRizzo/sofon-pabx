@@ -31,6 +31,66 @@ const select = {
     updatedAt: true,
 } as const
 
+// Onde um Audio pode estar em uso - mesmo conjunto de campos checado por deleteAudio() abaixo
+// (Announcement/IvrMenu/Queue), só que aqui é read-only, pra exibir "usado em" na listagem sem
+// precisar de tabela própria por finalidade (MOH, anúncio, pesquisa etc. seguem sendo o mesmo
+// Audio reusado via FK, ver relations em schema.prisma)
+const USAGE_LABELS = {
+    announcement: 'Anúncio',
+    ivr: 'Menu IVR',
+    queueAnnounce: 'Anúncio de entrada',
+    queuePeriodicAnnounce: 'Anúncio periódico',
+    queueAgentAnnounce: 'Anúncio ao atendente',
+    queueMoh: 'Música de espera',
+    queueSurvey: 'Pesquisa (atendimento)',
+    queueSurveyService: 'Pesquisa (serviço)',
+    queueSurveyThanks: 'Pesquisa (agradecimento)',
+} as const
+
+type AudioUsageType = keyof typeof USAGE_LABELS
+export type AudioUsage = { type: AudioUsageType; label: string; resource: string }
+
+const buildUsageIndex = async (companyId: string) => {
+    const [announcements, ivrMenus, queues] = await Promise.all([
+        prisma.announcement.findMany({ where: { companyId, audioId: { not: null } }, select: { name: true, audioId: true } }),
+        prisma.ivrMenu.findMany({ where: { companyId, audioId: { not: null } }, select: { name: true, audioId: true } }),
+        prisma.queue.findMany({
+            where: { companyId },
+            select: {
+                name: true,
+                announce: true,
+                periodicAnnounce: true,
+                agentAnnounce: true,
+                mohAudioId: true,
+                surveyAudioId: true,
+                surveyServiceAudioId: true,
+                surveyThanksAudioId: true,
+            },
+        }),
+    ])
+
+    const index = new Map<string, AudioUsage[]>()
+    const add = (audioId: string | null, type: AudioUsageType, resource: string) => {
+        if (!audioId) return
+        const list = index.get(audioId) ?? []
+        list.push({ type, label: USAGE_LABELS[type], resource })
+        index.set(audioId, list)
+    }
+
+    for (const a of announcements) add(a.audioId, 'announcement', a.name)
+    for (const m of ivrMenus) add(m.audioId, 'ivr', m.name)
+    for (const q of queues) {
+        add(q.announce, 'queueAnnounce', q.name)
+        add(q.periodicAnnounce, 'queuePeriodicAnnounce', q.name)
+        add(q.agentAnnounce, 'queueAgentAnnounce', q.name)
+        add(q.mohAudioId, 'queueMoh', q.name)
+        add(q.surveyAudioId, 'queueSurvey', q.name)
+        add(q.surveyServiceAudioId, 'queueSurveyService', q.name)
+        add(q.surveyThanksAudioId, 'queueSurveyThanks', q.name)
+    }
+    return index
+}
+
 // Escreve o buffer em tmp e converte pro WAV final do Asterisk - usado tanto por upload quanto
 // por TTS. Em caso de falha na conversão, apaga o registro já criado (rollback).
 const persistAudioFile = async (company: Pick<CompanyDto, 'asteriskId'>, audioId: string, buffer: Buffer, ext: string) => {
@@ -50,15 +110,19 @@ const persistAudioFile = async (company: Pick<CompanyDto, 'asteriskId'>, audioId
     }
 }
 
+// usage NÃO entra no cache de audios:company - depende de Announcement/IvrMenu/Queue, que não
+// invalidam esse namespace ao mudar seu audioId (ex: setar MOH numa fila), então cachear junto
+// deixaria os badges "usado em" desatualizados até o próximo create/update/delete de Audio
 export const getAudiosByCompany = async (companyId: string) => {
-    const cached = await AudiosCache.getByCompany(companyId)
-    if (cached) return cached
+    let audios = (await AudiosCache.getByCompany(companyId)) as Awaited<ReturnType<typeof prisma.audio.findMany<{ select: typeof select }>>> | null
+    if (!audios) {
+        await getCompanyById(companyId)
+        audios = await prisma.audio.findMany({ where: { companyId }, select })
+        await AudiosCache.setByCompany(companyId, audios)
+    }
 
-    await getCompanyById(companyId)
-
-    const audios = await prisma.audio.findMany({ where: { companyId }, select })
-    await AudiosCache.setByCompany(companyId, audios)
-    return audios
+    const usageIndex = await buildUsageIndex(companyId)
+    return audios.map((audio) => ({ ...audio, usage: usageIndex.get(audio.id) ?? [] }))
 }
 
 export const getAudioById = async (id: string) => {
