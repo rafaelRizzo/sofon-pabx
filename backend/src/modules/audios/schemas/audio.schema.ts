@@ -63,6 +63,26 @@ export const AudioSchema = z.object({
     updatedAt: timestamp,
 })
 
+// Espelha AudioUsage de audios.service.ts - só na listagem (GetAudioResponse usa AudioSchema puro,
+// getAudioById não calcula uso)
+export const AudioUsageSchema = z.object({
+    type: z.enum([
+        'announcement',
+        'ivr',
+        'queueAnnounce',
+        'queuePeriodicAnnounce',
+        'queueAgentAnnounce',
+        'queueMoh',
+        'queueSurvey',
+        'queueSurveyService',
+        'queueSurveyThanks',
+    ]),
+    label: z.string(),
+    resource: z.string(),
+})
+
+export const AudioWithUsageSchema = AudioSchema.extend({ usage: z.array(AudioUsageSchema) })
+
 export const VoiceSchema = z.object({
     voiceId: z.string(),
     name: z.string(),
@@ -86,7 +106,7 @@ export const SubscriptionSchema = z.object({
     voiceLimit: z.number(),
 })
 
-export const ListAudiosResponse = ok({ message: z.string(), audios: z.array(AudioSchema) })
+export const ListAudiosResponse = ok({ message: z.string(), audios: z.array(AudioWithUsageSchema) })
 export const GetAudioResponse = ok({ message: z.string(), audio: AudioSchema })
 export const CreateAudioResponse = ok({ message: z.string(), audioId: z.string() })
 export const CreateAudioTtsResponse = ok({ message: z.string(), audioId: z.string() })
