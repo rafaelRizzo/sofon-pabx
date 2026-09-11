@@ -84,6 +84,7 @@ export type Queue = {
     // Liga, só nessa fila, prioridade dinâmica (RoutingRule) e roteamento por afinidade (penalty) -
     // motor opcional do módulo Callcenter (regras/notas configuradas por empresa em /dashboard/callcenter)
     callcenterEnabled: boolean
+    notes: string | null
     createdAt: string
     updatedAt: string
 }
@@ -139,6 +140,7 @@ const baseQueueFields = {
     surveyThanksAudioId: z.string().nullable(),
     // Liga o motor Callcenter (prioridade dinâmica + afinidade) só nessa fila
     callcenterEnabled: z.boolean().default(false),
+    notes: z.string().max(10000).optional(),
 }
 
 // Pesquisa de satisfação é all-or-nothing: os 2 áudios juntos ou nenhum (mesma regra validada no

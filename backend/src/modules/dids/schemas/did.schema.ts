@@ -19,12 +19,14 @@ export const didStatusSchema = z.enum(['active', 'inactive', 'blocked'])
 export const createDidSchema = z.object({
     number: z.string().regex(/^\d+$/, 'Only digits allowed'),
     companyId: z.cuid2(),
+    notes: z.string().max(10000).optional(),
 })
 
 export const updateDidSchema = z.object({
     number: z.string().regex(/^\d+$/, 'Only digits allowed').optional(),
     status: didStatusSchema.optional(),
     companyId: z.cuid2().optional(),
+    notes: z.string().max(10000).optional(),
 }).refine((d) => Object.keys(d).length > 0, { message: 'At least one field is required: number, status, companyId' })
 
 export type IdParam = z.infer<typeof idParamSchema>
@@ -44,6 +46,7 @@ export const DidSchema = z.object({
     companyId: z.string(),
     status: didStatusSchema,
     usedBy: didUsedBySchema,
+    notes: z.string().nullable(),
     createdAt: timestamp,
     updatedAt: timestamp,
 })

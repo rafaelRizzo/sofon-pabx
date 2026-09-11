@@ -30,6 +30,7 @@ export type Extension = {
     context: string
     allowOutbound: boolean
     usedBy: UsedByRef[]
+    notes: string | null
     createdAt: string
     updatedAt: string
     // SIP optional
@@ -188,6 +189,7 @@ const commonFields = {
     companyId: z.string().min(1, "Selecione a empresa"),
     context: z.string().min(1).default("ramais"),
     allowOutbound: z.boolean().default(true),
+    notes: z.string().max(10000, "Máximo de 10.000 caracteres").optional(),
 }
 
 export const createExtensionSchema = z.object({
@@ -233,6 +235,7 @@ export const updateExtensionSchema = z.object({
     alias: aliasSchema,
     context: z.string().min(1),
     allowOutbound: z.boolean(),
+    notes: z.string().max(10000, "Máximo de 10.000 caracteres").optional(),
     ...sipOptional,
     ...pjsipOptional,
     directMedia: z.union([z.string().max(10), z.boolean()]).optional(),
@@ -252,6 +255,7 @@ const COMMON_KEYS = new Set([
     "companyId",
     "context",
     "allowOutbound",
+    "notes",
 ])
 
 async function fetchExtensionsRequest(companyId: string): Promise<Extension[]> {

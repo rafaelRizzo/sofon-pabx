@@ -134,6 +134,7 @@ const baseShape = {
     companyId: z.cuid2(),
     context: z.string().max(40).default('ramais'),
     allowOutbound: z.boolean().default(true),
+    notes: z.string().max(10000).nullable().optional(),
 }
 
 // Defaults sensatos de chan_sip pra um ramal comum - só no create; update usa sipFields sem default
@@ -220,6 +221,7 @@ export const updateExtensionSchema = z
         alias: aliasSchema.optional(),
         context: z.string().max(40).optional(),
         allowOutbound: z.boolean().optional(),
+        notes: z.string().max(10000).nullable().optional(),
         ...sipFieldsForUpdate,
         ...pjsipFields,
         // shared fields - use most permissive constraint
@@ -371,6 +373,7 @@ export const ExtensionSchema = z.object({
     companyId: z.string(),
     context: z.string(),
     allowOutbound: z.boolean(),
+    notes: z.string().nullable(),
     usedBy: usedBySchema,
     createdAt: timestamp,
     updatedAt: timestamp,

@@ -51,6 +51,7 @@ export type Trunk = {
     encryption: boolean | null
     transfer: string | null
     jitterbuffer: boolean | null
+    notes: string | null
     createdAt: string
     updatedAt: string
 }
@@ -167,6 +168,7 @@ const minimalTrunkFields = {
         .max(20, "Máximo 20 caracteres")
         .regex(/^[a-z0-9_-]+$/i, "Apenas letras, números, - e _"),
     companyId: z.string().min(1, "Selecione a empresa"),
+    notes: z.string().max(10000).optional(),
 }
 
 // Espelha advancedTrunkShape de backend/src/modules/trunks/schemas/trunk.schema.ts
@@ -245,6 +247,7 @@ export const updateTrunkSchema = z.object({
     ...iaxTrunkFields,
     // Só aceito pelo backend quando o trunk existente é registrationMode="custom"
     context: customTrunkContextFieldSchema.optional(),
+    notes: z.string().max(10000).optional(),
 })
 
 export type TrunkCreateForm = z.infer<typeof createTrunkSchema>

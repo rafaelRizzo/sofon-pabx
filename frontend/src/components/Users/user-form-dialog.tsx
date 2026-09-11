@@ -38,6 +38,7 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Textarea } from "@/components/ui/textarea"
 import {
     Tooltip,
     TooltipContent,
@@ -112,6 +113,7 @@ export function UserFormDialog({
             permissions: [],
             companyIds: [],
             extensionId: null,
+            notes: "",
         },
     })
 
@@ -156,6 +158,7 @@ export function UserFormDialog({
                 permissions: user?.permissions ?? [],
                 companyIds: user?.companies.map((c) => c.id) ?? [],
                 extensionId: user?.extensionId ?? null,
+                notes: user?.notes ?? "",
             })
             setPermissionSearch("")
         }
@@ -671,6 +674,22 @@ export function UserFormDialog({
                                     />
                                 </Field>
                             )}
+                            <Field>
+                                <FieldLabel htmlFor="notes">
+                                    Observação (opcional)
+                                </FieldLabel>
+                                <Textarea
+                                    id="notes"
+                                    placeholder="Anotações internas sobre o usuário"
+                                    maxLength={10000}
+                                    {...register("notes")}
+                                />
+                                {errors.notes && (
+                                    <FieldError>
+                                        {errors.notes.message}
+                                    </FieldError>
+                                )}
+                            </Field>
                         </FieldGroup>
                     </ScrollArea>
                     <DialogFooter className="pt-4">

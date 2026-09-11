@@ -65,6 +65,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { AudioWaveform } from "@/components/ui/audio-waveform"
 import { loadAudioFile, type TtsVoiceSettings } from "@/hooks/use-audios"
 import { useTtsVoices } from "@/hooks/use-tts-voices"
+import { useElevenLabsSubscription } from "@/hooks/use-elevenlabs-subscription"
 import { type AudioFormDialogProps } from "@/components/Audios/types"
 
 // Lazy: o VoicePicker (voice-picker/) carrega three.js/react-three-fiber (avatar animado),
@@ -130,6 +131,7 @@ const audioFormSchema = z
         style: z.number().min(0).max(1),
         speed: z.number().min(0.7).max(1.2),
         speakerBoost: z.boolean(),
+        notes: z.string().max(10000, "Máximo 10000 caracteres").optional(),
     })
     .superRefine((data, ctx) => {
         if (data.mode !== "tts") return
@@ -226,6 +228,7 @@ export function AudioFormDialog({
             mode: "upload",
             text: "",
             voiceId: "",
+            notes: "",
             ...DEFAULT_VOICE_SETTINGS,
         },
     })
@@ -245,6 +248,11 @@ export function AudioFormDialog({
         refreshing: refreshingVoices,
         refreshVoices,
     } = useTtsVoices(companyId, { enabled: mode === "tts" })
+
+    const { subscription, loading: loadingSubscription } =
+        useElevenLabsSubscription(companyId, {
+            enabled: open && mode === "tts",
+        })
 
     const [languageFilter, setLanguageFilter] = useState(ALL_LANGUAGES)
     const filteredVoices = useMemo(
@@ -339,6 +347,7 @@ export function AudioFormDialog({
             mode: "upload",
             text: "",
             voiceId: "",
+            notes: audio?.notes ?? "",
             ...DEFAULT_VOICE_SETTINGS,
         })
         setFile(null)
@@ -448,7 +457,7 @@ export function AudioFormDialog({
                         <DialogTitle>{title}</DialogTitle>
                         <DialogDescription>
                             {isEdit
-                                ? `Apenas o nome pode ser alterado. Para trocar o conteúdo de "${audio.name}", delete este áudio e crie um novo.`
+                                ? `Nome e observação podem ser alterados. Para trocar o conteúdo de "${audio.name}", delete este áudio e crie um novo.`
                                 : mode === "tts"
                                   ? "Gere um áudio a partir de texto para usar em anúncios, URAs e filas"
                                   : "Envie um arquivo de áudio para usar em anúncios, URAs e filas"}
@@ -473,6 +482,23 @@ export function AudioFormDialog({
                                             {errors.name.message}
                                         </FieldError>
                                     )}
+                                </Field>
+
+                                <Field>
+                                    <FieldLabel>Observação</FieldLabel>
+                                    <Textarea
+                                        placeholder="Observações internas sobre este áudio"
+                                        maxLength={10000}
+                                        {...register("notes")}
+                                    />
+                                    {errors.notes && (
+                                        <FieldError>
+                                            {errors.notes.message}
+                                        </FieldError>
+                                    )}
+                                    <FieldDescription>
+                                        Opcional, máximo 10000 caracteres.
+                                    </FieldDescription>
                                 </Field>
 
                                 {!isEdit && (
@@ -616,6 +642,53 @@ export function AudioFormDialog({
                                                 value="tts"
                                                 className="mt-3 flex flex-col gap-4"
                                             >
+                                                {loadingSubscription && (
+                                                    <div className="text-xs text-muted-foreground">
+                                                        Carregando saldo
+                                                        ElevenLabs...
+                                                    </div>
+                                                )}
+                                                {subscription && (
+                                                    <div className="rounded-md border bg-muted/30 px-3 py-2">
+                                                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                                            <span>
+                                                                Plano{" "}
+                                                                {
+                                                                    subscription.tier
+                                                                }
+                                                            </span>
+                                                            <span>
+                                                                {subscription.characterCount.toLocaleString(
+                                                                    "pt-BR"
+                                                                )}{" "}
+                                                                /{" "}
+                                                                {subscription.characterLimit.toLocaleString(
+                                                                    "pt-BR"
+                                                                )}{" "}
+                                                                caracteres
+                                                            </span>
+                                                        </div>
+                                                        <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                                                            <div
+                                                                className="h-full rounded-full bg-primary"
+                                                                style={{
+                                                                    width: `${
+                                                                        subscription.characterLimit >
+                                                                        0
+                                                                            ? Math.min(
+                                                                                  100,
+                                                                                  (subscription.characterCount /
+                                                                                      subscription.characterLimit) *
+                                                                                      100
+                                                                              )
+                                                                            : 0
+                                                                    }%`,
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                )}
+
                                                 <Field>
                                                     <FieldLabel>
                                                         Idioma

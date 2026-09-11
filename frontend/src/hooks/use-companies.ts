@@ -17,6 +17,7 @@ export type Company = {
     timezone: string
     metadata: Record<string, unknown>
     elevenLabsApiKey: string | null
+    notes: string | null
     createdAt: string
     updatedAt: string
 }
@@ -35,6 +36,7 @@ export const companyFormSchema = z.object({
         })
     ),
     elevenLabsApiKey: z.string().optional(),
+    notes: z.string().max(10000, "Máximo de 10.000 caracteres").optional(),
 })
 
 export type CompanyForm = z.infer<typeof companyFormSchema>
@@ -102,6 +104,7 @@ export function useCompanies() {
                 timezone: form.timezone,
                 metadata: toMetadataRecord(form.metadata),
                 elevenLabsApiKey: form.elevenLabsApiKey || undefined,
+                notes: form.notes || undefined,
             }),
     })
 

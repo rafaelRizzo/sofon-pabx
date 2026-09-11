@@ -112,9 +112,15 @@ function AudiosPage() {
                                   tts.text,
                                   tts.voiceId,
                                   tts.language,
-                                  tts.voiceSettings
+                                  tts.voiceSettings,
+                                  form.notes
                               )
-                            : createAudio(file!, form.name, formCompanyId!)
+                            : createAudio(
+                                  file!,
+                                  form.name,
+                                  formCompanyId!,
+                                  form.notes
+                              )
                     }
                 />
             )}
@@ -125,7 +131,9 @@ function AudiosPage() {
                     onOpenChange={(open) => !open && setEditAudio(null)}
                     audio={editAudio}
                     companyId={formCompanyId!}
-                    onSave={(form) => updateAudio(editAudio.id, form.name)}
+                    onSave={(form) =>
+                        updateAudio(editAudio.id, form.name, form.notes)
+                    }
                 />
             )}
 

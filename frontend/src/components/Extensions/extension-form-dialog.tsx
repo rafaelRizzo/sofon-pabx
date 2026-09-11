@@ -47,6 +47,7 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
+import { Textarea } from "@/components/ui/textarea"
 import { type Company } from "@/hooks/use-companies"
 import {
     createExtensionSchema,
@@ -820,6 +821,7 @@ export function ExtensionFormDialog({
             companyId: "",
             context: "ramais",
             allowOutbound: true,
+            notes: "",
         },
     })
 
@@ -926,6 +928,7 @@ export function ExtensionFormDialog({
             companyId: "",
             context: "ramais",
             allowOutbound: true,
+            notes: "",
         })
         applyTypeDefaults("pjsip")
     }, [open, isEdit, createForm])
@@ -1157,6 +1160,23 @@ export function ExtensionFormDialog({
                                     </Field>
                                 )}
                             />
+
+                            <Field>
+                                <FieldLabel htmlFor="notes">
+                                    Observação (opcional)
+                                </FieldLabel>
+                                <Textarea
+                                    id="notes"
+                                    placeholder="Anotações internas sobre o ramal"
+                                    maxLength={10000}
+                                    {...r("notes")}
+                                />
+                                {errors.notes && (
+                                    <FieldError>
+                                        {errors.notes.message}
+                                    </FieldError>
+                                )}
+                            </Field>
 
                             {extType === "sip" ? (
                                 <SipSections r={r} c={c} />

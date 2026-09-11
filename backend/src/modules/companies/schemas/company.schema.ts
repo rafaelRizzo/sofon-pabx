@@ -21,6 +21,7 @@ export const createCompanySchema = z.object({
     timezone: timezoneSchema.optional(),
     metadata: z.record(z.string(), z.string()).optional().default({}),
     elevenLabsApiKey: z.string().trim().min(1).nullable().optional(),
+    notes: z.string().max(10000).nullable().optional(),
 })
 
 export const updateCompanySchema = z.object({
@@ -30,6 +31,7 @@ export const updateCompanySchema = z.object({
     timezone: timezoneSchema.optional(),
     metadata: z.record(z.string(), z.string()).optional(),
     elevenLabsApiKey: z.string().trim().min(1).nullable().optional(),
+    notes: z.string().max(10000).nullable().optional(),
 })
 
 export type IdParam = z.infer<typeof idParamSchema>
@@ -44,6 +46,7 @@ export const CompanySchema = z.object({
     timezone: z.string(),
     metadata: z.record(z.string(), z.unknown()),
     elevenLabsApiKey: z.string().nullable(),
+    notes: z.string().nullable(),
     createdAt: timestamp,
     updatedAt: timestamp,
 })

@@ -47,6 +47,7 @@ import {
 } from "@/components/ui/select"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Switch } from "@/components/ui/switch"
+import { Textarea } from "@/components/ui/textarea"
 import { type Company } from "@/hooks/use-companies"
 import {
     createTrunkSchema,
@@ -227,6 +228,7 @@ export function TrunkFormDialog({
             transfer: undefined,
             jitterbuffer: undefined,
             context: "",
+            notes: "",
         } as any,
     })
 
@@ -294,6 +296,7 @@ export function TrunkFormDialog({
                     trunk.registrationMode === "custom"
                         ? trunk.context
                         : undefined,
+                notes: trunk.notes ?? "",
             } as any)
         } else {
             createForm.reset({
@@ -325,6 +328,7 @@ export function TrunkFormDialog({
                 transfer: undefined,
                 jitterbuffer: undefined,
                 context: "",
+                notes: "",
             } as any)
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1167,6 +1171,23 @@ export function TrunkFormDialog({
                                     </Accordion>
                                 </>
                             )}
+
+                            <Field>
+                                <FieldLabel>Observação</FieldLabel>
+                                <Textarea
+                                    placeholder="Observações internas sobre este tronco"
+                                    maxLength={10000}
+                                    {...r("notes")}
+                                />
+                                {errors.notes && (
+                                    <FieldError>
+                                        {errors.notes.message}
+                                    </FieldError>
+                                )}
+                                <FieldDescription>
+                                    Opcional, até 10.000 caracteres.
+                                </FieldDescription>
+                            </Field>
                         </FieldGroup>
                     </ScrollArea>
                 </form>

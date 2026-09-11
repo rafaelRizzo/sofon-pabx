@@ -76,6 +76,7 @@ const trunkSelect = {
     transfer: true,
     jitterbuffer: true,
     metadata: true,
+    notes: true,
     createdAt: true,
     updatedAt: true,
 } as const
@@ -136,7 +137,7 @@ export const createTrunk = async (data: CreateTrunkInput) => {
 
     if (data.registrationMode === 'custom') {
         const created = await prisma.trunk.create({
-            data: { name: data.name, companyId: data.companyId, registrationMode: 'custom', context: data.context },
+            data: { name: data.name, companyId: data.companyId, registrationMode: 'custom', context: data.context, notes: data.notes ?? null },
         })
         const trunk = await prisma.trunk.findUnique({ where: { id: created.id }, select: trunkSelect })
         await TrunksCache.invalidateAllTrunks()
@@ -184,6 +185,7 @@ export const createTrunk = async (data: CreateTrunkInput) => {
                 encryption: data.encryption ?? null,
                 transfer: data.transfer ?? null,
                 jitterbuffer: data.jitterbuffer ?? null,
+                notes: data.notes ?? null,
             },
         })
 
@@ -258,7 +260,15 @@ export const updateTrunk = async (id: string, data: UpdateTrunkInput) => {
     if (existing.registrationMode === 'custom') {
         const contextChanged = data.context !== undefined && data.context !== existing.context
         await prisma.$transaction(async (tx) => {
-            if (data.context !== undefined) await tx.trunk.update({ where: { id }, data: { context: data.context } })
+            if (data.context !== undefined || data.notes !== undefined) {
+                await tx.trunk.update({
+                    where: { id },
+                    data: {
+                        ...(data.context !== undefined ? { context: data.context } : {}),
+                        ...(data.notes !== undefined ? { notes: data.notes } : {}),
+                    },
+                })
+            }
             if (contextChanged) {
                 const affectedRouteIds = (
                     await tx.outboundRouteTrunk.findMany({ where: { trunkId: id }, select: { routeId: true } })

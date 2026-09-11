@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Textarea } from "@/components/ui/textarea"
 import {
     Select,
     SelectContent,
@@ -76,6 +77,7 @@ export function CompanyFormDialog({
             timezone: DEFAULT_TIMEZONE,
             metadata: [],
             elevenLabsApiKey: "",
+            notes: "",
         },
     })
 
@@ -92,6 +94,7 @@ export function CompanyFormDialog({
                     ([key, value]) => ({ key, value: String(value) })
                 ),
                 elevenLabsApiKey: company?.elevenLabsApiKey ?? "",
+                notes: company?.notes ?? "",
             })
         }
     }, [open, company, reset])
@@ -306,6 +309,22 @@ export function CompanyFormDialog({
                                         </Button>
                                     </div>
                                 ))}
+                            </Field>
+                            <Field>
+                                <FieldLabel htmlFor="notes">
+                                    Observação (opcional)
+                                </FieldLabel>
+                                <Textarea
+                                    id="notes"
+                                    placeholder="Anotações internas sobre a empresa"
+                                    maxLength={10000}
+                                    {...register("notes")}
+                                />
+                                {errors.notes && (
+                                    <FieldError>
+                                        {errors.notes.message}
+                                    </FieldError>
+                                )}
                             </Field>
                         </FieldGroup>
                     </ScrollArea>

@@ -29,6 +29,7 @@ export type Flow = {
     entryDestination: RouteDestination
     layout: FlowLayoutNode[]
     usedBy: UsedByRef[]
+    notes: string | null
     createdAt: string
     updatedAt: string
 }
@@ -66,6 +67,7 @@ export const createFlowFormSchema = z.object({
     // opcional - na lista só se cria com nome/empresa, o entryDestination é montado depois no
     // canvas (conectar o nó "Início" a algum nó real, ver flow-canvas.tsx)
     entryDestination: routeDestinationSchema.optional(),
+    notes: z.string().max(10000, "Máximo 10000 caracteres").optional(),
 })
 
 export type FlowForm = z.infer<typeof createFlowFormSchema>

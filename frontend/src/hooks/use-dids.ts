@@ -22,6 +22,7 @@ export type Did = {
     companyId: string
     status: DidStatus
     usedBy: DidUsedByRef[]
+    notes: string | null
     createdAt: string
     updatedAt: string
 }
@@ -30,12 +31,14 @@ export type Did = {
 export const createDidSchema = z.object({
     number: z.string().regex(/^\d+$/, "Apenas dígitos são permitidos"),
     companyId: z.string().min(1, "Selecione a empresa"),
+    notes: z.string().max(10000).optional(),
 })
 
 export const updateDidSchema = z.object({
     number: z.string().regex(/^\d+$/, "Apenas dígitos são permitidos"),
     status: z.enum(["active", "inactive", "blocked"], "Selecione um status"),
     companyId: z.string().min(1, "Selecione a empresa"),
+    notes: z.string().max(10000).optional(),
 })
 
 export type DidCreateForm = z.infer<typeof createDidSchema>

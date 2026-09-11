@@ -39,6 +39,7 @@ const minimalTrunkShape = {
         .max(20)
         .regex(/^[a-z0-9_-]+$/i, 'Only alphanumeric, dash and underscore allowed'),
     companyId: z.cuid2(),
+    notes: z.string().max(10000).optional(),
 }
 
 // Só se aplica a type="pjsip" - sem equivalente em IAX2 (SIP headers, 100rel, session timers etc.)
@@ -136,6 +137,7 @@ export const updateTrunkSchema = z.object({
     jitterbuffer: z.boolean().nullable().optional(),
     // Só aceito pelo service quando o trunk existente é registrationMode='custom'
     context: customTrunkContextSchema.optional(),
+    notes: z.string().max(10000).nullable().optional(),
 })
 
 export const setTrunkActiveSchema = z.object({ active: z.boolean() })
@@ -181,6 +183,7 @@ export const TrunkSchema = z.object({
     encryption: z.boolean().nullable(),
     transfer: z.string().nullable(),
     jitterbuffer: z.boolean().nullable(),
+    notes: z.string().nullable(),
     createdAt: timestamp,
     updatedAt: timestamp,
 })

@@ -52,6 +52,7 @@ const companySelect = {
     timezone: true,
     metadata: true,
     elevenLabsApiKey: true,
+    notes: true,
     createdAt: true,
     updatedAt: true,
 } as const

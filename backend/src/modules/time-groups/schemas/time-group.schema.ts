@@ -20,11 +20,13 @@ export const createTimeGroupSchema = z.object({
     name: z.string().min(1).max(80),
     companyId: z.cuid2(),
     ranges: z.array(timeRangeSchema).min(1).max(20),
+    notes: z.string().max(10000).optional(),
 })
 
 export const updateTimeGroupSchema = z.object({
     name: z.string().min(1).max(80).optional(),
     ranges: z.array(timeRangeSchema).min(1).max(20).optional(),
+    notes: z.string().max(10000).optional(),
 }).refine((d) => Object.keys(d).length > 0, { message: 'At least one field is required: name, ranges' })
 
 export type CreateTimeGroupInput = z.infer<typeof createTimeGroupSchema>
@@ -45,6 +47,7 @@ export const TimeGroupSchema = z.object({
     name: z.string(),
     companyId: z.string(),
     ranges: z.array(TimeRangeSchema),
+    notes: z.string().nullable(),
     createdAt: timestamp,
     updatedAt: timestamp,
 })

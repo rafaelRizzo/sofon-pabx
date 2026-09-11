@@ -52,6 +52,7 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Textarea } from "@/components/ui/textarea"
 import { EntityFormDialogSkeletonContent } from "@/components/entity-form-dialog-skeleton"
 import { type Company } from "@/hooks/use-companies"
 import {
@@ -96,6 +97,7 @@ export function HolidayGroupFormDialog({
             mode: "manual",
             url: "",
             dates: [{ ...EMPTY_DATE }],
+            notes: "",
         },
     })
 
@@ -120,6 +122,7 @@ export function HolidayGroupFormDialog({
                           year: d.year ?? undefined,
                       }))
                     : [{ ...EMPTY_DATE }],
+            notes: holidayGroup?.notes ?? "",
         })
     }, [open, holidayGroup, reset, defaultCompanyId])
 
@@ -617,6 +620,24 @@ export function HolidayGroupFormDialog({
                                                 </div>
                                             </Field>
                                         )}
+
+                                        <Field>
+                                            <FieldLabel>Observação</FieldLabel>
+                                            <Textarea
+                                                placeholder="Observações internas sobre este grupo de feriados"
+                                                maxLength={10000}
+                                                {...register("notes")}
+                                            />
+                                            {errors.notes && (
+                                                <FieldError>
+                                                    {errors.notes.message}
+                                                </FieldError>
+                                            )}
+                                            <FieldDescription>
+                                                Opcional, máximo 10000
+                                                caracteres.
+                                            </FieldDescription>
+                                        </Field>
                                     </FieldGroup>
                                 </ScrollArea>
                             </form>

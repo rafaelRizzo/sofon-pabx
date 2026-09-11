@@ -31,6 +31,7 @@ export type OutboundRoute = {
     patterns: OutboundDialPattern[]
     trunks: OutboundRouteTrunkLink[]
     extensions: OutboundRouteExtensionLink[]
+    notes: string | null
     createdAt: string
     updatedAt: string
 }
@@ -60,6 +61,7 @@ export const outboundRouteFormSchema = z.object({
     patterns: z.array(patternFieldSchema).min(1, "Adicione ao menos um padrão"),
     // Opcional: restringe a rota a ramais específicos (vazio = disponível para todos)
     extensionIds: z.array(z.string()).optional(),
+    notes: z.string().max(10000, "Máximo 10000 caracteres").optional(),
 })
 
 // Presets de padrões de discagem comuns no Brasil - apenas preenche o campo "pattern",
@@ -95,6 +97,7 @@ const toPayload = (form: OutboundRouteForm) => ({
         prefix: p.prefix || undefined,
         position: i,
     })),
+    notes: form.notes,
 })
 
 // companyId opcional - enquanto não informado, a lista não é buscada (filtro de empresa

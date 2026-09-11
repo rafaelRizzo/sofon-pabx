@@ -21,6 +21,7 @@ export const createUserSchema = z.object({
     companyIds: z.array(z.cuid2()).min(1, 'Select at least one company'),
     // vincula direto ao ramal na criação (ver Extension.webrtc / softphone) - opcional
     extensionId: z.cuid2().nullable().optional(),
+    notes: z.string().max(10000).nullable().optional(),
 })
 
 export const updateUserSchema = z.object({
@@ -31,6 +32,7 @@ export const updateUserSchema = z.object({
     permissions: permissionsSchema.optional(),
     // omitido = mantém vínculos atuais; se enviado, substitui a lista completa (nunca vazio)
     companyIds: z.array(z.cuid2()).min(1, 'Select at least one company').optional(),
+    notes: z.string().max(10000).nullable().optional(),
 })
 
 export type IdParam = z.infer<typeof idParamSchema>
@@ -47,6 +49,7 @@ export const UserSchema = z.object({
     extensionId: z.string().nullable(),
     webhookSlug: z.string(),
     createdBy: z.string().nullable(),
+    notes: z.string().nullable(),
     companies: z.array(z.object({ id: z.string(), name: z.string() })),
     createdAt: timestamp,
     updatedAt: timestamp,

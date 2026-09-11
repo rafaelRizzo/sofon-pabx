@@ -15,6 +15,7 @@ export const createOutboundRouteSchema = z.object({
     trunkIds: z.array(z.cuid2()).min(1),
     patterns: z.array(patternSchema).min(1),
     extensionIds: z.array(z.cuid2()).optional(),
+    notes: z.string().max(10000).optional(),
 })
 
 export const updateOutboundRouteSchema = z
@@ -23,9 +24,10 @@ export const updateOutboundRouteSchema = z
         position: z.number().int().min(0).optional(),
         trunkIds: z.array(z.cuid2()).min(1).optional(),
         patterns: z.array(patternSchema).min(1).optional(),
+        notes: z.string().max(10000).optional(),
     })
     .refine((d) => Object.values(d).some((v) => v !== undefined), {
-        message: 'At least one field is required: name, position, trunkIds, patterns',
+        message: 'At least one field is required: name, position, trunkIds, patterns, notes',
     })
 
 export const addPatternSchema = patternSchema
@@ -77,6 +79,7 @@ export const OutboundRouteSchema = z.object({
     patterns: z.array(PatternSchema),
     trunks: z.array(z.object({ id: z.string(), trunkId: z.string(), position: z.number() })),
     extensions: z.array(z.object({ id: z.string(), extensionId: z.string() })),
+    notes: z.string().nullable(),
     createdAt: timestamp,
     updatedAt: timestamp,
 })

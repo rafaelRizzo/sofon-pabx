@@ -21,6 +21,7 @@ model Company {
   // key própria da empresa pra TTS (ver providers/elevenlabs.provider.ts) — null = TTS desabilitado
   // pra essa empresa, sem fallback global (cada empresa usa a própria conta/billing ElevenLabs)
   elevenLabsApiKey       String?
+  notes                  String?                 @db.Text
   createdAt              DateTime                @default(now()) @db.Timestamptz(3)
   updatedAt              DateTime                @updatedAt @db.Timestamptz(3)
   users                  UserCompany[]
@@ -63,6 +64,7 @@ model Did {
   company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
   inboundRoutes InboundRoute[]
   status        String         @default("active") // active | inactive | blocked
+  notes         String?        @db.Text
   createdAt     DateTime       @default(now()) @db.Timestamptz(3)
   updatedAt     DateTime       @updatedAt @db.Timestamptz(3)
 
@@ -83,6 +85,7 @@ model User {
   // relevante só para role="user"; admin/reseller têm acesso irrestrito (ver requirePermission)
   permissions  String[]      @default([])
   extensionId  String?       @unique
+  notes        String?       @db.Text
   createdBy    String?
   creator      User?         @relation("UserCreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
   createdUsers User[]        @relation("UserCreatedBy")
@@ -116,6 +119,7 @@ model Extension {
   allowOutbound      Boolean                  @default(true)
   companyId          String
   company            Company                  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  notes              String?                  @db.Text
   createdAt          DateTime                 @default(now()) @db.Timestamptz(3)
   updatedAt          DateTime                 @updatedAt @db.Timestamptz(3)
   queueMemberships   QueueMember[]
@@ -187,6 +191,7 @@ model Queue {
   // satisfação (surveyAudioId) e elegibilidade agente×empresa (AgentCompanyScope) têm toggle
   // próprio, independente deste
   callcenterEnabled         Boolean       @default(false)
+  notes                     String?       @db.Text
   createdAt                 DateTime      @default(now()) @db.Timestamptz(3)
   updatedAt                 DateTime      @updatedAt @db.Timestamptz(3)
   members                   QueueMember[]
@@ -264,6 +269,7 @@ model Trunk {
   // antes de cada Dial() de saída (ver outbound-routes.service.ts); só se aplica a chamadas outbound e type="pjsip"
   customHeaders     Json                 @default("[]")
   metadata          Json                 @default("{}")
+  notes             String?              @db.Text
   createdAt         DateTime             @default(now()) @db.Timestamptz(3)
   updatedAt         DateTime             @updatedAt @db.Timestamptz(3)
   outboundRoutes    OutboundRouteTrunk[]
@@ -318,6 +324,7 @@ model OutboundRoute {
   patterns   OutboundDialPattern[]
   trunks     OutboundRouteTrunk[]
   extensions OutboundRouteExtension[]
+  notes      String?                  @db.Text
   createdAt  DateTime                 @default(now()) @db.Timestamptz(3)
   updatedAt  DateTime                 @updatedAt @db.Timestamptz(3)
 
@@ -371,6 +378,7 @@ model TimeGroup {
   company    Company                  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   ranges     TimeRange[]
   conditions TimeConditionTimeGroup[]
+  notes      String?                  @db.Text
   createdAt  DateTime                 @default(now()) @db.Timestamptz(3)
   updatedAt  DateTime                 @updatedAt @db.Timestamptz(3)
 
@@ -431,6 +439,7 @@ model HolidayGroup {
   company   Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
   url       String?       @db.VarChar(500)
   dates     HolidayDate[]
+  notes     String?       @db.Text
   createdAt DateTime      @default(now()) @db.Timestamptz(3)
   updatedAt DateTime      @updatedAt @db.Timestamptz(3)
 
@@ -464,6 +473,7 @@ model InboundRoute {
   did       Did      @relation(fields: [didId], references: [id], onDelete: Cascade)
   trunkId   String
   trunk     Trunk    @relation(fields: [trunkId], references: [id], onDelete: Cascade)
+  notes     String?  @db.Text
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
@@ -490,16 +500,17 @@ model Announcement {
 }
 
 model Audio {
-  id         String      @id @default(cuid())
-  name       String      @db.VarChar(80)
-  companyId  String
-  company    Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  source     AudioSource @default(UPLOAD)
-  ttsText    String?     @db.Text
-  ttsVoiceId String?
+  id          String      @id @default(cuid())
+  name        String      @db.VarChar(80)
+  companyId   String
+  company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  source      AudioSource @default(UPLOAD)
+  ttsText     String?     @db.Text
+  ttsVoiceId  String?
   ttsSettings Json?
-  createdAt  DateTime    @default(now()) @db.Timestamptz(3)
-  updatedAt  DateTime    @updatedAt @db.Timestamptz(3)
+  notes       String?     @db.Text
+  createdAt   DateTime    @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime    @updatedAt @db.Timestamptz(3)
 
   announcements          Announcement[]
   ivrMenus               IvrMenu[]
@@ -760,6 +771,7 @@ model Flow {
   nodeEdges   FlowNodeEdge[]
   // [{ nodeType: "announcement", nodeId: "...", name?: "...", x: 120, y: 80 }]
   layout      Json           @default("[]")
+  notes       String?        @db.Text
   createdAt   DateTime       @default(now()) @db.Timestamptz(3)
   updatedAt   DateTime       @updatedAt @db.Timestamptz(3)
 

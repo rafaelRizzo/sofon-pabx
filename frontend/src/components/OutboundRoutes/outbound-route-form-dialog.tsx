@@ -36,6 +36,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { NumberInput } from "@/components/ui/number-input"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Textarea } from "@/components/ui/textarea"
 import {
     Tooltip,
     TooltipContent,
@@ -132,6 +133,7 @@ export function OutboundRouteFormDialog({
             trunkIds: [],
             patterns: [emptyPattern],
             extensionIds: [],
+            notes: "",
         },
     })
 
@@ -202,6 +204,7 @@ export function OutboundRouteFormDialog({
                       }))
                 : [emptyPattern],
             extensionIds: route?.extensions.map((e) => e.extensionId) ?? [],
+            notes: route?.notes ?? "",
         })
     }, [open, route, reset])
 
@@ -497,6 +500,20 @@ export function OutboundRouteFormDialog({
                                         fica disponível para todos os ramais da
                                         empresa.
                                     </FieldDescription>
+                                </Field>
+
+                                <Field>
+                                    <FieldLabel>Observação</FieldLabel>
+                                    <Textarea
+                                        placeholder="Observações internas sobre essa rota (opcional)"
+                                        maxLength={10000}
+                                        {...register("notes")}
+                                    />
+                                    {errors.notes && (
+                                        <FieldError>
+                                            {errors.notes.message}
+                                        </FieldError>
+                                    )}
                                 </Field>
                             </FieldGroup>
                         </ScrollArea>

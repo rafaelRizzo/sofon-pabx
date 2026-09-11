@@ -100,6 +100,7 @@ export const createFlowSchema = z.object({
   companyId: z.cuid2(),
   entryDestination: routeDestinationSchema.optional(),
   layout: z.array(layoutNodeSchema).max(200).optional(),
+  notes: z.string().max(10000).optional(),
 });
 
 export const updateFlowSchema = z
@@ -115,9 +116,10 @@ export const updateFlowSchema = z
       .optional(),
     entryDestination: routeDestinationSchema.optional(),
     layout: z.array(layoutNodeSchema).max(200).optional(),
+    notes: z.string().max(10000).optional(),
   })
   .refine((d) => Object.keys(d).length > 0, {
-    message: "At least one field is required: name, entryDestination, layout",
+    message: "At least one field is required: name, entryDestination, layout, notes",
   });
 
 // PUT /flows/:id/layout - separado do update geral pra permitir autosave de posição no canvas
@@ -137,6 +139,7 @@ export const FlowSchema = z.object({
   entryDestination: routeDestinationResponseSchema,
   layout: z.array(layoutNodeSchema),
   usedBy: usedBySchema,
+  notes: z.string().nullable(),
   createdAt: timestamp,
   updatedAt: timestamp,
 });

@@ -51,6 +51,7 @@ import {
 } from "@/components/ui/select"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Switch } from "@/components/ui/switch"
+import { Textarea } from "@/components/ui/textarea"
 import {
     Tooltip,
     TooltipContent,
@@ -114,6 +115,7 @@ export function QueueFormDialog({
             surveyServiceAudioId: null,
             surveyThanksAudioId: null,
             callcenterEnabled: false,
+            notes: "",
         },
     })
 
@@ -167,6 +169,7 @@ export function QueueFormDialog({
             surveyServiceAudioId: queue?.surveyServiceAudioId ?? null,
             surveyThanksAudioId: queue?.surveyThanksAudioId ?? null,
             callcenterEnabled: queue?.callcenterEnabled ?? false,
+            notes: queue?.notes ?? "",
         })
     }, [open, queue, reset, defaultCompanyId])
 
@@ -1041,6 +1044,24 @@ export function QueueFormDialog({
                                                     }
                                                 </FieldError>
                                             )}
+                                        </Field>
+
+                                        <Field>
+                                            <FieldLabel>Observação</FieldLabel>
+                                            <Textarea
+                                                placeholder="Observações internas sobre esta fila"
+                                                maxLength={10000}
+                                                {...register("notes")}
+                                            />
+                                            {errors.notes && (
+                                                <FieldError>
+                                                    {errors.notes.message}
+                                                </FieldError>
+                                            )}
+                                            <FieldDescription>
+                                                Opcional, até 10.000
+                                                caracteres.
+                                            </FieldDescription>
                                         </Field>
                                     </FieldGroup>
                                 </ScrollArea>

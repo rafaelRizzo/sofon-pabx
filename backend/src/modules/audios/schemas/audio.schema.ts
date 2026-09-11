@@ -9,6 +9,7 @@ export const listVoicesQuerySchema = companyQuerySchema.extend({
 
 export const updateAudioSchema = z.object({
     name: z.string().min(1).max(80),
+    notes: z.string().max(10000).optional(),
 })
 
 export type UpdateAudioInput = z.infer<typeof updateAudioSchema>
@@ -18,6 +19,7 @@ export type UpdateAudioInput = z.infer<typeof updateAudioSchema>
 export const createAudioFieldsSchema = z.object({
     name: z.string().min(1).max(80),
     companyId: z.cuid2(),
+    notes: z.string().max(10000).optional(),
 })
 
 // Espelha voice_settings da ElevenLabs (ver providers/elevenlabs.provider.ts) - todos opcionais,
@@ -39,6 +41,7 @@ export const createAudioTtsSchema = z.object({
     voiceId: z.string().min(1),
     language: z.enum(['pt', 'en']).default('pt'),
     voiceSettings: ttsVoiceSettingsSchema.optional(),
+    notes: z.string().max(10000).optional(),
 })
 
 export const voicePreviewQuerySchema = z.object({
@@ -55,6 +58,7 @@ export const AudioSchema = z.object({
     ttsText: z.string().nullable(),
     ttsVoiceId: z.string().nullable(),
     ttsSettings: ttsVoiceSettingsSchema.nullable(),
+    notes: z.string().nullable(),
     createdAt: timestamp,
     updatedAt: timestamp,
 })
@@ -70,9 +74,22 @@ export const VoiceSchema = z.object({
     description: z.string().nullable(),
 })
 
+export const SubscriptionSchema = z.object({
+    tier: z.string(),
+    characterCount: z.number(),
+    characterLimit: z.number(),
+    canExtendCharacterLimit: z.boolean(),
+    nextCharacterCountResetUnix: z.number().nullable(),
+    status: z.string(),
+    currency: z.string(),
+    voiceSlotsUsed: z.number(),
+    voiceLimit: z.number(),
+})
+
 export const ListAudiosResponse = ok({ message: z.string(), audios: z.array(AudioSchema) })
 export const GetAudioResponse = ok({ message: z.string(), audio: AudioSchema })
 export const CreateAudioResponse = ok({ message: z.string(), audioId: z.string() })
 export const CreateAudioTtsResponse = ok({ message: z.string(), audioId: z.string() })
 export const UpdateAudioResponse = ok({ message: z.string() })
 export const ListVoicesResponse = ok({ message: z.string(), voices: z.array(VoiceSchema) })
+export const GetSubscriptionResponse = ok({ message: z.string(), subscription: SubscriptionSchema })

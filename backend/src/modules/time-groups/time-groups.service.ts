@@ -21,6 +21,7 @@ const timeGroupSelect = {
     ranges: {
         select: { id: true, startTime: true, endTime: true, weekdays: true, monthdays: true, months: true, createdAt: true },
     },
+    notes: true,
     createdAt: true,
     updatedAt: true,
 } as const
@@ -80,6 +81,7 @@ export const createTimeGroup = async (data: CreateTimeGroupInput) => {
             name: data.name,
             companyId: data.companyId,
             ranges: { create: data.ranges },
+            notes: data.notes,
         },
         select: timeGroupSelect,
     })
@@ -109,7 +111,7 @@ export const updateTimeGroup = async (id: string, data: UpdateTimeGroupInput) =>
         }
         return tx.timeGroup.update({
             where: { id },
-            data: { name: data.name },
+            data: { name: data.name, notes: data.notes },
             select: timeGroupSelect,
         })
     })

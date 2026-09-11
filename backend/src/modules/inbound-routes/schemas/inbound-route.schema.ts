@@ -15,11 +15,13 @@ export const createInboundRouteSchema = z.object({
     didId: z.cuid2(),
     trunkId: z.cuid2(),
     destination: destinationSchema.optional(),
+    notes: z.string().max(10000).optional(),
 })
 
 export const updateInboundRouteSchema = z.object({
     name: z.string().min(1).max(80).optional(),
     destination: destinationSchema.optional(),
+    notes: z.string().max(10000).optional(),
 }).refine((d) => Object.keys(d).length > 0, { message: 'At least one field is required: name, destination' })
 
 export type CreateInboundRouteInput = z.infer<typeof createInboundRouteSchema>
@@ -34,6 +36,7 @@ export const InboundRouteSchema = z.object({
     did: z.object({ id: z.string(), number: z.string() }),
     trunk: z.object({ id: z.string(), name: z.string() }),
     destination: routeDestinationResponseSchema,
+    notes: z.string().nullable(),
     createdAt: timestamp,
     updatedAt: timestamp,
 })

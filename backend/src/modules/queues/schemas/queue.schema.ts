@@ -64,6 +64,7 @@ export const createQueueSchema = z.object({
     // Liga prioridade dinâmica (RoutingRule) e roteamento por afinidade (penalty) pra essa fila -
     // ver seção "Callcenter (Queue Engine)" no CLAUDE.md
     callcenterEnabled: z.boolean().default(false),
+    notes: z.string().max(10000).optional(),
 })
 
 export const updateQueueSchema = z.object({
@@ -94,6 +95,7 @@ export const updateQueueSchema = z.object({
     surveyServiceAudioId: z.cuid2().nullable().optional(),
     surveyThanksAudioId: z.cuid2().nullable().optional(),
     callcenterEnabled: z.boolean().optional(),
+    notes: z.string().max(10000).nullable().optional(),
 })
 
 export type CreateQueueInput = z.infer<typeof createQueueSchema>
@@ -126,6 +128,7 @@ export const QueueSchema = z.object({
     surveyThanksAudioId: z.string().nullable(),
     hasSurveyAudio: z.boolean(),
     callcenterEnabled: z.boolean(),
+    notes: z.string().nullable(),
     createdAt: timestamp,
     updatedAt: timestamp,
 })

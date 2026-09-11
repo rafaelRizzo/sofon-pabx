@@ -15,6 +15,7 @@ const select = {
     name: true,
     companyId: true,
     layout: true,
+    notes: true,
     createdAt: true,
     updatedAt: true,
     entryNodeId: true,
@@ -22,7 +23,7 @@ const select = {
 
 const toDto = <T extends { entryDestination: RouteDestination; usedBy: UsedByRef[] }>(f: T) => f
 
-type FlowRow = { id: string; name: string; companyId: string; layout: unknown; createdAt: Date; updatedAt: Date; entryNodeId: string | null; entryDestination: RouteDestination }
+type FlowRow = { id: string; name: string; companyId: string; layout: unknown; notes: string | null; createdAt: Date; updatedAt: Date; entryNodeId: string | null; entryDestination: RouteDestination }
 
 // O início "de verdade" de um Flow, no uso normal (conectar o nó Início a um nó no canvas), fica
 // em Flow.entryNodeId - escrito por updateFlowNode({isEntry:true}), nunca pelo slot abaixo. O
@@ -113,6 +114,7 @@ export const createFlow = async (data: CreateFlowInput) => {
                 name: data.name,
                 companyId: data.companyId,
                 layout: data.layout ?? [],
+                notes: data.notes,
             },
             select,
         })
@@ -147,6 +149,7 @@ export const updateFlow = async (id: string, data: UpdateFlowInput) => {
             data: {
                 name: data.name,
                 layout: data.layout,
+                notes: data.notes,
             },
             select,
         })

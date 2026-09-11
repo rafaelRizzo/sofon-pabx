@@ -33,6 +33,7 @@ export type TimeGroup = {
     name: string
     companyId: string
     ranges: TimeRange[]
+    notes: string | null
     createdAt: string
     updatedAt: string
 }
@@ -65,6 +66,7 @@ export const createTimeGroupFormSchema = z.object({
         .array(timeRangeFormSchema)
         .min(1, "Adicione ao menos um período")
         .max(20, "Máximo 20 períodos"),
+    notes: z.string().max(10000, "Máximo 10000 caracteres").optional(),
 })
 
 export const updateTimeGroupFormSchema = z.object({
@@ -73,6 +75,7 @@ export const updateTimeGroupFormSchema = z.object({
         .array(timeRangeFormSchema)
         .min(1, "Adicione ao menos um período")
         .max(20, "Máximo 20 períodos"),
+    notes: z.string().max(10000, "Máximo 10000 caracteres").optional(),
 })
 
 export type TimeGroupForm = z.infer<typeof createTimeGroupFormSchema>

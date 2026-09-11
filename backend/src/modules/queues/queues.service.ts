@@ -69,6 +69,7 @@ const queueSelect = {
     surveyServiceAudioId: true,
     surveyThanksAudioId: true,
     callcenterEnabled: true,
+    notes: true,
     createdAt: true,
     updatedAt: true,
     company: { select: { asteriskId: true } },

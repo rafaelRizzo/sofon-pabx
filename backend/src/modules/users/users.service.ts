@@ -17,6 +17,7 @@ const userSelect = {
     permissions: true,
     extensionId: true,
     createdBy: true,
+    notes: true,
     companies: { select: { company: { select: { id: true, name: true } } } },
     createdAt: true,
     updatedAt: true,

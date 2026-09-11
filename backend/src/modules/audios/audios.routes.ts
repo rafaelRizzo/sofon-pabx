@@ -6,7 +6,7 @@ import { requirePermission } from '../../middleware/permission.middleware'
 import {
     updateAudioSchema, createAudioTtsSchema, idParamSchema, companyQuerySchema, voicePreviewQuerySchema, listVoicesQuerySchema,
     ListAudiosResponse, GetAudioResponse, CreateAudioResponse, UpdateAudioResponse,
-    CreateAudioTtsResponse, ListVoicesResponse,
+    CreateAudioTtsResponse, ListVoicesResponse, GetSubscriptionResponse,
 } from './schemas/audio.schema'
 import { errors, deleted } from '../../schemas/responses'
 import { validateEnv } from '../../config/env'
@@ -114,6 +114,24 @@ export const audiosRoutes = async (app: FastifyInstance) => {
             },
         },
     }, AudiosController.getVoices as any)
+
+    router.get('/audios/tts/subscription', {
+        onRequest: [...protectedRoute, requirePermission('audios', 'view')],
+        schema: {
+            tags: ['Audios'],
+            summary: 'Saldo/limites da conta ElevenLabs configurada na empresa',
+            description: 'Sempre busca direto na ElevenLabs (sem cache) - reflete o consumo real de caracteres no momento da chamada.',
+            security: [{ bearerAuth: [] }],
+            querystring: companyQuerySchema,
+            response: {
+                200: GetSubscriptionResponse,
+                400: errors[400],
+                401: errors[401],
+                403: errors[403],
+                404: errors[404],
+            },
+        },
+    }, AudiosController.getSubscription as any)
 
     router.post('/audios/tts', {
         ...uploadRateLimit,

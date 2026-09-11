@@ -25,6 +25,7 @@ const select = {
     ttsText: true,
     ttsVoiceId: true,
     ttsSettings: true,
+    notes: true,
     createdAt: true,
     updatedAt: true,
 } as const
@@ -78,13 +79,13 @@ export const assertAudioBelongsToCompany = async (audioId: string | null | undef
     if (audio.companyId !== companyId) throw new AppError('Audio belongs to different company', 403)
 }
 
-export const createAudio = async (companyId: string, name: string, audio: Buffer, originalFilename: string) => {
+export const createAudio = async (companyId: string, name: string, audio: Buffer, originalFilename: string, notes?: string) => {
     const company = await getCompanyById(companyId)
 
     const existing = await prisma.audio.findUnique({ where: { name_companyId: { name, companyId } } })
     if (existing) throw new AppError('Audio already exists for this company', 409)
 
-    const created = await prisma.audio.create({ data: { name, companyId }, select })
+    const created = await prisma.audio.create({ data: { name, companyId, notes }, select })
     await persistAudioFile(company, created.id, audio, extname(originalFilename))
 
     await AudiosCache.invalidateByCompany(companyId)
@@ -97,7 +98,8 @@ export const createAudioFromText = async (
     text: string,
     voiceId: string,
     language: 'pt' | 'en',
-    voiceSettings?: TtsVoiceSettingsInput
+    voiceSettings?: TtsVoiceSettingsInput,
+    notes?: string
 ) => {
     const company = await getCompanyById(companyId)
     if (!company.elevenLabsApiKey) throw new AppError('ElevenLabs is not configured for this company', 400)
@@ -111,7 +113,7 @@ export const createAudioFromText = async (
     // áudio pra regenerar mostra os valores reais usados, mesmo os que caíram no default
     const effectiveSettings = { ...ElevenLabsProvider.DEFAULT_VOICE_SETTINGS, ...voiceSettings }
     const created = await prisma.audio.create({
-        data: { name, companyId, source: 'TTS', ttsText: text, ttsVoiceId: voiceId, ttsSettings: effectiveSettings },
+        data: { name, companyId, source: 'TTS', ttsText: text, ttsVoiceId: voiceId, ttsSettings: effectiveSettings, notes },
         select,
     })
     await persistAudioFile(company, created.id, buffer, '.mp3')
@@ -154,6 +156,15 @@ export const listVoices = async (companyId: string, forceRefresh = false) => {
     const voices = await ElevenLabsProvider.listVoices(company.elevenLabsApiKey.trim())
     await AudiosCache.setVoices(companyId, voices)
     return voices
+}
+
+// Sem cache: saldo/consumo de caracteres muda a cada geração de TTS, e a tela que consome isso
+// (abertura do dialog de áudio) precisa sempre do valor real da ElevenLabs, não uma foto de até 1h atrás.
+export const getSubscription = async (companyId: string) => {
+    const company = await getCompanyById(companyId)
+    if (!company.elevenLabsApiKey) throw new AppError('ElevenLabs is not configured for this company', 400)
+
+    return ElevenLabsProvider.getSubscription(company.elevenLabsApiKey.trim())
 }
 
 export const updateAudio = async (id: string, data: UpdateAudioInput) => {

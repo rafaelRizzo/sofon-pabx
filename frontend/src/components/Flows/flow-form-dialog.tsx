@@ -39,6 +39,7 @@ import {
     FieldLabel,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { EntityFormDialogSkeletonContent } from "@/components/entity-form-dialog-skeleton"
 import { type Company } from "@/hooks/use-companies"
 import { type FlowFormDialogProps } from "@/components/Flows/types"
@@ -46,6 +47,7 @@ import { type FlowFormDialogProps } from "@/components/Flows/types"
 const flowNameFormSchema = z.object({
     name: z.string().min(1, "Informe o nome").max(80, "Máximo 80 caracteres"),
     companyId: z.string().min(1, "Selecione uma empresa"),
+    notes: z.string().max(10000, "Máximo 10000 caracteres").optional(),
 })
 export type FlowNameForm = z.infer<typeof flowNameFormSchema>
 
@@ -70,7 +72,7 @@ export function FlowFormDialog({
         formState: { errors, isSubmitting, isDirty },
     } = useForm<FlowNameForm>({
         resolver: zodResolver(flowNameFormSchema) as any,
-        defaultValues: { name: "", companyId: "" },
+        defaultValues: { name: "", companyId: "", notes: "" },
     })
 
     const companyId = watch("companyId")
@@ -78,7 +80,11 @@ export function FlowFormDialog({
 
     useEffect(() => {
         if (!open) return
-        reset({ name: flow?.name ?? "", companyId: flow?.companyId ?? "" })
+        reset({
+            name: flow?.name ?? "",
+            companyId: flow?.companyId ?? "",
+            notes: flow?.notes ?? "",
+        })
     }, [open, flow, reset])
 
     const onSubmit = handleSubmit(async (form) => {
@@ -176,6 +182,20 @@ export function FlowFormDialog({
                                             )}
                                         </Field>
                                     )}
+
+                                    <Field>
+                                        <FieldLabel>Observação</FieldLabel>
+                                        <Textarea
+                                            placeholder="Observações internas sobre esse flow (opcional)"
+                                            maxLength={10000}
+                                            {...register("notes")}
+                                        />
+                                        {errors.notes && (
+                                            <FieldError>
+                                                {errors.notes.message}
+                                            </FieldError>
+                                        )}
+                                    </Field>
                                 </FieldGroup>
                             </form>
 

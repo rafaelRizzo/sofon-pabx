@@ -41,6 +41,7 @@ import {
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Textarea } from "@/components/ui/textarea"
 import { RouteDestinationField } from "@/components/RouteDestination/route-destination-field"
 import { type Did } from "@/hooks/use-dids"
 import {
@@ -76,6 +77,7 @@ export function InboundRouteFormDialog({
             didId: "",
             trunkId: "",
             destination: { type: "hangup" },
+            notes: "",
         },
     })
 
@@ -90,6 +92,7 @@ export function InboundRouteFormDialog({
             didId: route?.didId ?? "",
             trunkId: route?.trunkId ?? "",
             destination: route?.destination ?? { type: "hangup" },
+            notes: route?.notes ?? "",
         })
     }, [open, route, reset])
 
@@ -282,6 +285,20 @@ export function InboundRouteFormDialog({
                                         chegar nesse DID pelo tronco
                                         selecionado.
                                     </FieldDescription>
+                                </Field>
+
+                                <Field>
+                                    <FieldLabel>Observação</FieldLabel>
+                                    <Textarea
+                                        placeholder="Observações internas sobre essa rota (opcional)"
+                                        maxLength={10000}
+                                        {...register("notes")}
+                                    />
+                                    {errors.notes && (
+                                        <FieldError>
+                                            {errors.notes.message}
+                                        </FieldError>
+                                    )}
                                 </Field>
                             </FieldGroup>
                         </ScrollArea>

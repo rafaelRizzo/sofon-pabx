@@ -29,6 +29,7 @@ export type HolidayGroup = {
     trueRoute: RouteDestination
     falseRoute: RouteDestination
     dates: HolidayDate[]
+    notes: string | null
     usedBy: UsedByRef[]
     createdAt: string
     updatedAt: string
@@ -61,6 +62,7 @@ export const createHolidayGroupFormSchema = z
         mode: z.enum(["manual", "url"]),
         url: z.string().max(500).optional(),
         dates: z.array(holidayDateFormSchema).max(50),
+        notes: z.string().max(10000, "Máximo 10000 caracteres").optional(),
     })
     .refine((d) => d.mode !== "url" || (d.url?.trim().length ?? 0) > 0, {
         message: "Informe a URL",
@@ -90,6 +92,7 @@ export function toHolidayGroupCreationDto(
             day,
             year: year ?? undefined,
         })),
+        notes: holidayGroup.notes ?? undefined,
     }
 }
 
@@ -99,6 +102,7 @@ function toApiPayload(form: HolidayGroupUpdateForm) {
         name: form.name,
         url: form.mode === "url" ? form.url : null,
         dates: form.mode === "manual" ? form.dates : undefined,
+        notes: form.notes,
     }
 }
 

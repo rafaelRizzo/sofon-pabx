@@ -297,7 +297,7 @@ export async function regenerateAllPatterns(companyId: string) {
 async function fetchRoute(id: string) {
     const base = await prisma.outboundRoute.findUnique({
         where: { id },
-        select: { id: true, name: true, companyId: true, position: true, createdAt: true, updatedAt: true },
+        select: { id: true, name: true, companyId: true, position: true, notes: true, createdAt: true, updatedAt: true },
     })
     if (!base) return null
 
@@ -327,7 +327,7 @@ export const getOutboundRoutes = async (companyId: string) => {
     const bases = await prisma.outboundRoute.findMany({
         where: { companyId },
         orderBy: { position: 'asc' },
-        select: { id: true, name: true, companyId: true, position: true, createdAt: true, updatedAt: true },
+        select: { id: true, name: true, companyId: true, position: true, notes: true, createdAt: true, updatedAt: true },
     })
 
     if (bases.length === 0) {
@@ -380,7 +380,7 @@ export const getAllOutboundRoutes = async (companyIds?: string[], userId?: strin
     const bases = await prisma.outboundRoute.findMany({
         where: companyIds ? { companyId: { in: companyIds } } : undefined,
         orderBy: { position: 'asc' },
-        select: { id: true, name: true, companyId: true, position: true, createdAt: true, updatedAt: true },
+        select: { id: true, name: true, companyId: true, position: true, notes: true, createdAt: true, updatedAt: true },
     })
 
     if (bases.length === 0) {
@@ -477,7 +477,7 @@ export const createOutboundRoute = async (data: CreateOutboundRouteInput) => {
 
     await prisma.$transaction(async (tx) => {
         const route = await tx.outboundRoute.create({
-            data: { name: data.name, companyId: data.companyId, position: data.position },
+            data: { name: data.name, companyId: data.companyId, position: data.position, notes: data.notes },
         })
         routeId = route.id
 
@@ -518,7 +518,7 @@ export const updateOutboundRoute = async (id: string, data: UpdateOutboundRouteI
     })
     if (!existing) throw new AppError('Outbound route not found', 404)
 
-    const { name, position, trunkIds, patterns } = data
+    const { name, position, trunkIds, patterns, notes } = data
 
     // Fetch existing patterns separately (only when needed) - sequential, no multi-include
     const existingPatterns = patterns
@@ -538,10 +538,14 @@ export const updateOutboundRoute = async (id: string, data: UpdateOutboundRouteI
     }
 
     await prisma.$transaction(async (tx) => {
-        if (name !== undefined || position !== undefined) {
+        if (name !== undefined || position !== undefined || notes !== undefined) {
             await tx.outboundRoute.update({
                 where: { id },
-                data: { ...(name !== undefined && { name }), ...(position !== undefined && { position }) },
+                data: {
+                    ...(name !== undefined && { name }),
+                    ...(position !== undefined && { position }),
+                    ...(notes !== undefined && { notes }),
+                },
             })
         }
 

@@ -20,6 +20,7 @@ export type InboundRoute = {
     did: { id: string; number: string }
     trunk: { id: string; name: string }
     destination: RouteDestination
+    notes: string | null
     createdAt: string
     updatedAt: string
 }
@@ -31,11 +32,13 @@ export const createInboundRouteFormSchema = z.object({
     didId: z.string().min(1, "Selecione um DID"),
     trunkId: z.string().min(1, "Selecione um tronco"),
     destination: routeDestinationSchema,
+    notes: z.string().max(10000, "Máximo 10000 caracteres").optional(),
 })
 
 export const updateInboundRouteFormSchema = z.object({
     name: z.string().min(1, "Informe o nome").max(80, "Máximo 80 caracteres"),
     destination: routeDestinationSchema,
+    notes: z.string().max(10000, "Máximo 10000 caracteres").optional(),
 })
 
 export type InboundRouteForm = z.infer<typeof createInboundRouteFormSchema>

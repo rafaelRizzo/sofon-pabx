@@ -63,6 +63,59 @@ async function withTimeout<T>(fn: (signal: AbortSignal) => Promise<T>, event: st
     }
 }
 
+export type ElevenLabsSubscription = {
+    tier: string
+    characterCount: number
+    characterLimit: number
+    canExtendCharacterLimit: boolean
+    nextCharacterCountResetUnix: number | null
+    status: string
+    currency: string
+    voiceSlotsUsed: number
+    voiceLimit: number
+}
+
+type RawSubscription = {
+    tier: string
+    character_count: number
+    character_limit: number
+    can_extend_character_limit: boolean
+    next_character_count_reset_unix: number | null
+    status: string
+    currency: string
+    voice_slots_used: number
+    voice_limit: number
+}
+
+export async function getSubscription(apiKey: string): Promise<ElevenLabsSubscription> {
+    return withTimeout(async (signal) => {
+        const res = await fetch(`${env.ELEVENLABS_API_URL}/v1/user/subscription`, {
+            headers: { 'xi-api-key': apiKey },
+            signal,
+        })
+        if (!res.ok) {
+            const body = await res.text().catch(() => '')
+            logger.warn({ event: 'elevenlabs.subscription.error', status: res.status, body: body.slice(0, 500) })
+            const detail = parseElevenLabsError(body)
+            if (res.status === 401)
+                throw new AppError(`ElevenLabs: ${detail?.message ?? 'API key inválida'}`, 400)
+            throw new AppError('Failed to fetch subscription from ElevenLabs', 502)
+        }
+        const data = (await res.json()) as RawSubscription
+        return {
+            tier: data.tier,
+            characterCount: data.character_count,
+            characterLimit: data.character_limit,
+            canExtendCharacterLimit: data.can_extend_character_limit,
+            nextCharacterCountResetUnix: data.next_character_count_reset_unix ?? null,
+            status: data.status,
+            currency: data.currency,
+            voiceSlotsUsed: data.voice_slots_used,
+            voiceLimit: data.voice_limit,
+        }
+    }, 'elevenlabs.subscription.error')
+}
+
 export async function listVoices(apiKey: string): Promise<ElevenLabsVoice[]> {
     return withTimeout(async (signal) => {
         const res = await fetch(`${env.ELEVENLABS_API_URL}/v1/voices`, {

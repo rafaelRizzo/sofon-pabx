@@ -17,6 +17,7 @@ const inboundRouteSelect = {
     trunkId: true,
     did: { select: { id: true, number: true } },
     trunk: { select: { id: true, name: true } },
+    notes: true,
     createdAt: true,
     updatedAt: true,
 } as const
@@ -127,6 +128,7 @@ export const createInboundRoute = async (data: CreateInboundRouteInput) => {
                 companyId: data.companyId,
                 didId: data.didId,
                 trunkId: data.trunkId,
+                notes: data.notes,
             },
             select: inboundRouteSelect,
         })
@@ -160,7 +162,7 @@ export const updateInboundRoute = async (id: string, data: UpdateInboundRouteInp
     const route = await prisma.$transaction(async (tx) => {
         const updated = await tx.inboundRoute.update({
             where: { id },
-            data: { name: data.name },
+            data: { name: data.name, notes: data.notes },
             select: inboundRouteSelect,
         })
 

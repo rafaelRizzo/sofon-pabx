@@ -36,6 +36,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
 import { type Company } from "@/hooks/use-companies"
 import {
     createDidSchema,
@@ -64,7 +65,7 @@ export function DidFormDialog({
 
     const createForm = useForm<DidCreateForm>({
         resolver: zodResolver(createDidSchema),
-        defaultValues: { number: "", companyId: "" },
+        defaultValues: { number: "", companyId: "", notes: "" },
     })
 
     const updateForm = useForm<DidUpdateForm>({
@@ -78,9 +79,10 @@ export function DidFormDialog({
                 number: did.number,
                 status: did.status,
                 companyId: did.companyId,
+                notes: did.notes ?? "",
             })
         } else {
-            createForm.reset({ number: "", companyId: "" })
+            createForm.reset({ number: "", companyId: "", notes: "" })
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, isEdit, did])
@@ -307,6 +309,33 @@ export function DidFormDialog({
                                 )}
                             </Field>
                         )}
+
+                        <Field>
+                            <FieldLabel>Observação</FieldLabel>
+                            <Textarea
+                                placeholder="Observações internas sobre este DID"
+                                maxLength={10000}
+                                {...(isEdit
+                                    ? updateForm.register("notes")
+                                    : createForm.register("notes"))}
+                            />
+                            {(isEdit
+                                ? updateForm.formState.errors.notes
+                                : createForm.formState.errors.notes) && (
+                                <FieldError>
+                                    {
+                                        (isEdit
+                                            ? updateForm.formState.errors.notes
+                                            : createForm.formState.errors
+                                                  .notes
+                                        )?.message as string
+                                    }
+                                </FieldError>
+                            )}
+                            <FieldDescription>
+                                Opcional, até 10.000 caracteres.
+                            </FieldDescription>
+                        </Field>
                     </FieldGroup>
                 </form>
 

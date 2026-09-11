@@ -18,6 +18,7 @@ const holidayGroupSelect = {
     companyId: true,
     url: true,
     dates: { select: { id: true, name: true, month: true, day: true, year: true } },
+    notes: true,
     createdAt: true,
     updatedAt: true,
 } as const
@@ -167,6 +168,7 @@ export const createHolidayGroup = async (data: CreateHolidayGroupInput) => {
                 companyId: data.companyId,
                 url: data.url ?? null,
                 dates: initialDates.length > 0 ? { create: initialDates } : undefined,
+                notes: data.notes,
             },
             select: holidayGroupSelect,
         })
@@ -223,6 +225,7 @@ export const updateHolidayGroup = async (id: string, data: UpdateHolidayGroupInp
             data: {
                 name: data.name,
                 url: data.url === undefined ? undefined : data.url,
+                notes: data.notes,
             },
             select: holidayGroupSelect,
         })

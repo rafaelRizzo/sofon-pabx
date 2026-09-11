@@ -15,6 +15,7 @@ const select = {
     number: true,
     companyId: true,
     status: true,
+    notes: true,
     createdAt: true,
     updatedAt: true,
 }

@@ -20,6 +20,7 @@ export type User = {
     extensionId: string | null
     webhookSlug: string
     createdBy: string | null
+    notes: string | null
     companies: { id: string; name: string }[]
     createdAt: string
     updatedAt: string
@@ -36,6 +37,7 @@ export const createUserSchema = z.object({
     companyIds: z.array(z.string()).min(1, "Selecione ao menos uma empresa"),
     // vincula o usuário a um ramal (softphone WebRTC, ver Extension.webrtc) - opcional, null = nenhum
     extensionId: z.string().nullable().optional(),
+    notes: z.string().max(10000, "Máximo de 10.000 caracteres").optional(),
 })
 
 // Mesmo shape do create para o form; senha em branco = manter a atual.
@@ -100,6 +102,7 @@ export function useUsers() {
                 permissions: form.permissions,
                 companyIds: form.companyIds,
                 extensionId: form.extensionId ?? null,
+                notes: form.notes || undefined,
             }),
     })
 

@@ -22,6 +22,7 @@ export type Audio = {
     ttsText: string | null
     ttsVoiceId: string | null
     ttsSettings: TtsVoiceSettings | null
+    notes: string | null
     createdAt: string
     updatedAt: string
 }
@@ -96,13 +97,15 @@ export function useAudios(companyId?: string) {
     const createAudio = async (
         file: File,
         name: string,
-        targetCompanyId: string
+        targetCompanyId: string,
+        notes?: string
     ) => {
         const id = toast.loading("Enviando áudio...")
         try {
             const form = new FormData()
             form.append("name", name)
             form.append("companyId", targetCompanyId)
+            if (notes) form.append("notes", notes)
             form.append("file", file)
             const { data } = await api.post("/audios", form)
             toast.success("Áudio enviado", { id })
@@ -120,7 +123,8 @@ export function useAudios(companyId?: string) {
         text: string,
         voiceId: string,
         language: "pt" | "en",
-        voiceSettings?: TtsVoiceSettings
+        voiceSettings?: TtsVoiceSettings,
+        notes?: string
     ) => {
         const id = toast.loading("Gerando áudio...")
         try {
@@ -131,6 +135,7 @@ export function useAudios(companyId?: string) {
                 voiceId,
                 language,
                 voiceSettings,
+                notes,
             })
             toast.success("Áudio gerado", { id })
             await invalidate()
@@ -141,11 +146,11 @@ export function useAudios(companyId?: string) {
         }
     }
 
-    const updateAudio = async (audioId: string, name: string) => {
-        const id = toast.loading("Renomeando áudio...")
+    const updateAudio = async (audioId: string, name: string, notes?: string) => {
+        const id = toast.loading("Salvando áudio...")
         try {
-            await api.patch(`/audios/${audioId}`, { name })
-            toast.success("Áudio renomeado", { id })
+            await api.patch(`/audios/${audioId}`, { name, notes })
+            toast.success("Áudio salvo", { id })
             await invalidate()
             return audioId
         } catch (err) {

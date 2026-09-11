@@ -97,9 +97,10 @@ export const createAudio = async (req: FastifyRequest, reply: FastifyReply) => {
             throw new AppError('File must be .wav, .mp3 or .gsm', 400)
         }
 
-        const { name, companyId } = createAudioFieldsSchema.parse({
+        const { name, companyId, notes } = createAudioFieldsSchema.parse({
             name: file.fields.name && 'value' in file.fields.name ? file.fields.name.value : undefined,
             companyId: file.fields.companyId && 'value' in file.fields.companyId ? file.fields.companyId.value : undefined,
+            notes: file.fields.notes && 'value' in file.fields.notes ? file.fields.notes.value : undefined,
         })
         req.scope.assertAccess(companyId)
 
@@ -109,7 +110,7 @@ export const createAudio = async (req: FastifyRequest, reply: FastifyReply) => {
             throw new AppError('File content does not match a valid .wav/.mp3/.gsm file', 422)
         }
 
-        const audio = await AudiosService.createAudio(companyId, name, buffer, file.filename)
+        const audio = await AudiosService.createAudio(companyId, name, buffer, file.filename, notes)
         return reply.status(201).send({ success: true, message: 'Audio created successfully', audioId: audio.id })
     } catch (error) {
         return handleError(reply, error, req)
@@ -118,9 +119,9 @@ export const createAudio = async (req: FastifyRequest, reply: FastifyReply) => {
 
 export const createAudioTts = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
-        const { name, companyId, text, voiceId, language, voiceSettings } = createAudioTtsSchema.parse(req.body)
+        const { name, companyId, text, voiceId, language, voiceSettings, notes } = createAudioTtsSchema.parse(req.body)
         req.scope.assertAccess(companyId)
-        const audio = await AudiosService.createAudioFromText(companyId, name, text, voiceId, language, voiceSettings)
+        const audio = await AudiosService.createAudioFromText(companyId, name, text, voiceId, language, voiceSettings, notes)
         return reply.status(201).send({ success: true, message: 'Audio generated successfully', audioId: audio.id })
     } catch (error) {
         return handleError(reply, error, req)
@@ -133,6 +134,17 @@ export const getVoices = async (req: FastifyRequest, reply: FastifyReply) => {
         req.scope.assertAccess(companyId)
         const voices = await AudiosService.listVoices(companyId, refresh)
         return reply.send({ success: true, message: 'Voices fetched successfully', voices })
+    } catch (error) {
+        return handleError(reply, error, req)
+    }
+}
+
+export const getSubscription = async (req: FastifyRequest, reply: FastifyReply) => {
+    try {
+        const { companyId } = companyQuerySchema.parse(req.query)
+        req.scope.assertAccess(companyId)
+        const subscription = await AudiosService.getSubscription(companyId)
+        return reply.send({ success: true, message: 'Subscription fetched successfully', subscription })
     } catch (error) {
         return handleError(reply, error, req)
     }

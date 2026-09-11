@@ -47,6 +47,7 @@ import {
     InputGroupInput,
 } from "@/components/ui/input-group"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Textarea } from "@/components/ui/textarea"
 import { MonthdaysField } from "@/components/TimeGroups/monthdays-field"
 import { MonthsField } from "@/components/TimeGroups/months-field"
 import { WeekdayCheckboxes } from "@/components/TimeGroups/weekday-checkboxes"
@@ -106,6 +107,7 @@ export function TimeGroupFormDialog({
             name: "",
             companyId: defaultCompanyId,
             ranges: DEFAULT_RANGES.map((r) => ({ ...r })),
+            notes: "",
         } as any,
     })
 
@@ -130,6 +132,7 @@ export function TimeGroupFormDialog({
                       months: r.months,
                   }))
                 : DEFAULT_RANGES.map((r) => ({ ...r })),
+            notes: timeGroup?.notes ?? "",
         })
     }, [open, timeGroup, reset, defaultCompanyId])
 
@@ -469,6 +472,23 @@ export function TimeGroupFormDialog({
                                             </Card>
                                         ))}
                                     </div>
+                                </Field>
+
+                                <Field>
+                                    <FieldLabel>Observação</FieldLabel>
+                                    <Textarea
+                                        placeholder="Observações internas sobre este grupo de horário"
+                                        maxLength={10000}
+                                        {...register("notes")}
+                                    />
+                                    {errors.notes && (
+                                        <FieldError>
+                                            {errors.notes.message}
+                                        </FieldError>
+                                    )}
+                                    <FieldDescription>
+                                        Opcional, máximo 10000 caracteres.
+                                    </FieldDescription>
                                 </Field>
                             </FieldGroup>
                         </ScrollArea>

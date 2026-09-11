@@ -176,6 +176,7 @@ export const getAllExtensions = async (companyIds?: string[], userId?: string) =
             context: true,
             allowOutbound: true,
             companyId: true,
+            notes: true,
             createdAt: true,
             updatedAt: true,
         },
@@ -276,6 +277,7 @@ const extensionSelect = {
     context: true,
     allowOutbound: true,
     companyId: true,
+    notes: true,
     createdAt: true,
     updatedAt: true,
 } as const
@@ -289,6 +291,7 @@ type ExtensionDto = {
     context: string
     allowOutbound: boolean
     companyId: string
+    notes: string | null
     createdAt: Date
     updatedAt: Date
 }
@@ -333,7 +336,7 @@ export const getExtensionById = async (id: string): Promise<ExtensionDto & { syn
 }
 
 export const createExtension = async (data: CreateExtensionInput) => {
-    const { alias, type, name, companyId, context } = data
+    const { alias, type, name, companyId, context, notes } = data
     const password = generatePassword()
 
     const existing = await prisma.extension.findUnique({
@@ -352,7 +355,7 @@ export const createExtension = async (data: CreateExtensionInput) => {
     const allowOutboundSetvar = `ALLOW_OUTBOUND=${allowOutbound ? 1 : 0}`
 
     if (type === 'pjsip') {
-        const { alias: _a, type: _t, name: _n, companyId: _c, context: _ctx, allowOutbound: _ao, ...pjsipExtras } = data
+        const { alias: _a, type: _t, name: _n, companyId: _c, context: _ctx, allowOutbound: _ao, notes: _no, ...pjsipExtras } = data
         const mappedExtras = toPjsipDbFields(pjsipExtras)
         // accountcode sempre = asteriskId da empresa - isola CDR por empresa, sobrepõe accountCode enviado pelo cliente
         const pjsipExtrasWithGroups = applyGroupPrefixes(
@@ -364,10 +367,10 @@ export const createExtension = async (data: CreateExtensionInput) => {
             await PjsipRepository.createExtension(tx, number, { password, name, context, extras: pjsipExtrasWithGroups })
             await DialplanRepository.ensureGenericRoutingPattern(tx, context)
             await DialplanRepository.ensureFallback(tx, context)
-            await tx.extension.create({ data: { alias, number, type, name, context, allowOutbound, companyId } })
+            await tx.extension.create({ data: { alias, number, type, name, context, allowOutbound, companyId, notes } })
         })
     } else {
-        const { alias: _a, type: _t, name: _n, companyId: _c, context: _ctx, allowOutbound: _ao, peerType, ...sipExtras } = data
+        const { alias: _a, type: _t, name: _n, companyId: _c, context: _ctx, allowOutbound: _ao, notes: _no, peerType, ...sipExtras } = data
         const sipData: Record<string, any> = toSipDbFields(sipExtras)
         if (peerType) sipData.type = peerType
         sipData.setvar = sipData.setvar ? `${allowOutboundSetvar}\n${sipData.setvar}` : allowOutboundSetvar
@@ -380,7 +383,7 @@ export const createExtension = async (data: CreateExtensionInput) => {
             await SipRepository.createExtension(tx, number, password, context, sipData)
             await DialplanRepository.ensureGenericRoutingPattern(tx, context)
             await DialplanRepository.ensureFallback(tx, context)
-            await tx.extension.create({ data: { alias, number, type, name, context, allowOutbound, companyId } })
+            await tx.extension.create({ data: { alias, number, type, name, context, allowOutbound, companyId, notes } })
         })
     }
 
@@ -398,7 +401,7 @@ export const updateExtension = async (id: string, data: UpdateExtensionInput) =>
     if (!existing) throw new AppError('Extension not found', 404)
 
     const { alias, number, type, context, companyId } = existing
-    const { name, alias: newAlias, context: newContext, allowOutbound: newAllowOutbound, ...typeFields } = data
+    const { name, alias: newAlias, context: newContext, allowOutbound: newAllowOutbound, notes: newNotes, ...typeFields } = data
 
     const aliasChanged = newAlias !== undefined && newAlias !== alias
     const contextChanged = newContext !== undefined && newContext !== context
@@ -472,6 +475,7 @@ export const updateExtension = async (id: string, data: UpdateExtensionInput) =>
         if (aliasChanged) { extUpdate.alias = newAlias; extUpdate.number = effectiveNumber }
         if (contextChanged) extUpdate.context = effectiveContext
         if (newAllowOutbound !== undefined) extUpdate.allowOutbound = newAllowOutbound
+        if (newNotes !== undefined) extUpdate.notes = newNotes
 
         if (Object.keys(extUpdate).length > 0)
             await tx.extension.update({ where: { id }, data: extUpdate })
