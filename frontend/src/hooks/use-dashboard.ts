@@ -29,6 +29,7 @@ export type DashboardInfra = {
     disk: { totalBytes: number; usedBytes: number; freeBytes: number; usedPct: number }
     recordings: { sizeBytes: number }
     logs: { sizeBytes: number }
+    topProcesses: { pid: number; name: string; cpuPct: number; memPct: number }[]
 }
 
 // Poll simples (não SSE) - esse dado não é orientado a evento AMI, não faz sentido plugar no

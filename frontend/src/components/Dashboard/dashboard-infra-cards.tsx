@@ -1,6 +1,7 @@
 "use client"
 
 import {
+    ActivityIcon,
     ArrowDownIcon,
     ArrowLeftRightIcon,
     ArrowUpIcon,
@@ -112,6 +113,19 @@ function NetworkSkeleton() {
                 <Skeleton className="h-5 w-16" />
             </div>
             <Skeleton className="h-3 w-24" />
+        </div>
+    )
+}
+
+function TopProcessesSkeleton() {
+    return (
+        <div className="flex flex-col gap-2">
+            {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="flex items-center justify-between gap-2">
+                    <Skeleton className="h-3.5 w-24" />
+                    <Skeleton className="h-3.5 w-24" />
+                </div>
+            ))}
         </div>
     )
 }
@@ -269,6 +283,30 @@ export function DashboardInfraCards({
                     {infra ? formatUptime(infra.uptimeSeconds) : "-"}
                 </span>
                 <CardDescription className="mt-1">Desde o último restart</CardDescription>
+            </InfraTile>
+
+            <InfraTile
+                label="Processos"
+                icon={ActivityIcon}
+                loading={loading}
+                skeleton={<TopProcessesSkeleton />}
+                className="lg:col-span-2"
+            >
+                <div className="flex flex-col gap-1.5">
+                    {infra?.topProcesses.map((p) => (
+                        <div key={p.pid} className="flex items-center justify-between gap-2 text-sm">
+                            <span className="truncate">{p.name}</span>
+                            <div className="flex shrink-0 items-center gap-3 font-mono text-xs tabular-nums text-muted-foreground">
+                                <span className={cn("w-14 text-right", usagePctClass(p.cpuPct))}>
+                                    {Math.round(p.cpuPct * 100)}% cpu
+                                </span>
+                                <span className={cn("w-14 text-right", usagePctClass(p.memPct))}>
+                                    {Math.round(p.memPct * 100)}% mem
+                                </span>
+                            </div>
+                        </div>
+                    ))}
+                </div>
             </InfraTile>
 
             <InfraTile

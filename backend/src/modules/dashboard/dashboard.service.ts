@@ -261,6 +261,26 @@ async function getSwapUsage(): Promise<{ totalBytes: number; freeBytes: number; 
     return { totalBytes, freeBytes, usedPct: totalBytes > 0 ? (totalBytes - freeBytes) / totalBytes : 0 }
 }
 
+// Top processos por %CPU (ps já ordena, só recorta os N primeiros). %CPU do ps pode passar de
+// 100% em host multi-core (ex: 350% usando 3.5 núcleos) - mantém o valor bruto sem normalizar
+// pelo nº de núcleos, mesmo critério de "visão do processo/container" já aceito pra rede/CPU.
+async function getTopProcesses(limit = 5): Promise<{ pid: number; name: string; cpuPct: number; memPct: number }[]> {
+    const output = await runCommand(['ps', '-eo', 'pid,%cpu,%mem,comm', '--no-headers', '--sort=-%cpu'], 5000)
+    return output
+        .trim()
+        .split('\n')
+        .slice(0, limit)
+        .map((line) => {
+            const parts = line.trim().split(/\s+/)
+            return {
+                pid: Number(parts[0]),
+                cpuPct: Number(parts[1]) / 100,
+                memPct: Number(parts[2]) / 100,
+                name: parts.slice(3).join(' '),
+            }
+        })
+}
+
 // Mesma técnica de getPerCoreUsage (2 amostras, janela de 1s) - contador cumulativo não dá
 // bytes/s direto, precisa do delta entre 2 leituras.
 async function getNetworkThroughput(sampleMs = 1000): Promise<{ rxBytesPerSec: number; txBytesPerSec: number }> {
@@ -275,13 +295,14 @@ async function getNetworkThroughput(sampleMs = 1000): Promise<{ rxBytesPerSec: n
 }
 
 export const getDashboardInfra = async () => {
-    const [disk, recordingsSizeBytes, logsSizeBytes, perCoreUsedPct, network, swap] = await Promise.all([
+    const [disk, recordingsSizeBytes, logsSizeBytes, perCoreUsedPct, network, swap, topProcesses] = await Promise.all([
         getDiskUsage(),
         getRecordingsSize(),
         getLogsSize(),
         getPerCoreUsage(),
         getNetworkThroughput(),
         getSwapUsage(),
+        getTopProcesses(),
     ])
     const totalBytes = os.totalmem()
     const freeBytes = os.freemem()
@@ -300,5 +321,6 @@ export const getDashboardInfra = async () => {
         disk,
         recordings: { sizeBytes: recordingsSizeBytes },
         logs: { sizeBytes: logsSizeBytes },
+        topProcesses,
     }
 }

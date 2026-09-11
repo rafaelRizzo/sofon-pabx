@@ -67,6 +67,14 @@ export const DashboardInfraSchema = z.object({
     }),
     recordings: z.object({ sizeBytes: z.number() }),
     logs: z.object({ sizeBytes: z.number() }),
+    topProcesses: z.array(
+        z.object({
+            pid: z.number(),
+            name: z.string(),
+            cpuPct: z.number(),
+            memPct: z.number(),
+        })
+    ),
 })
 
 export const DashboardInfraResponse = ok({ infra: DashboardInfraSchema })
