@@ -112,7 +112,7 @@ function QueuesPage() {
                             name: form.name,
                             number: form.number,
                             strategy: form.strategy,
-                            musicOnHold: form.musicOnHold,
+                            mohAudioId: form.mohAudioId,
                             timeout: form.timeout,
                             retry: form.retry,
                             maxLen: form.maxLen,

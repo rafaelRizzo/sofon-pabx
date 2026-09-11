@@ -51,7 +51,12 @@ export type Queue = {
     number: string
     companyId: string
     strategy: QueueStrategy
+    // Classe MOH real gravada na realtime do Asterisk (moh-<mohAudioId> ou "default") - calculada
+    // pelo backend a partir de mohAudioId, somente informativo (não editável diretamente)
     musicOnHold: string
+    // Audio (POST /audios) escolhido pra tocar em loop durante a espera na fila - null usa a
+    // classe padrão do Asterisk
+    mohAudioId: string | null
     timeout: number
     retry: number
     maxLen: number
@@ -111,8 +116,9 @@ const baseQueueFields = {
         .max(20, "Máximo 20 caracteres")
         .regex(/^\d+$/, "Apenas dígitos"),
     strategy: z.enum(QUEUE_STRATEGIES).default("ringall"),
-    // Sem gestão de classes de MOH no Asterisk ainda - sempre "default" (única classe configurada)
-    musicOnHold: z.string().min(1).max(128).default("default"),
+    // Audio (id) escolhido pra tocar em loop durante a espera - null usa a classe padrão do
+    // Asterisk. musicOnHold (classe real) é calculado no backend, nunca enviado pelo form.
+    mohAudioId: z.string().nullable(),
     timeout: intWithDefault(1, 300, 15),
     retry: intWithDefault(1, 300, 5),
     maxLen: intWithDefault(0, Number.MAX_SAFE_INTEGER, 0),
@@ -176,7 +182,7 @@ export function toQueueCreationDto(queue: Queue): QueueUpdateForm {
         name: queue.name,
         number: queue.number,
         strategy: queue.strategy,
-        musicOnHold: queue.musicOnHold,
+        mohAudioId: queue.mohAudioId,
         timeout: queue.timeout,
         retry: queue.retry,
         maxLen: queue.maxLen,

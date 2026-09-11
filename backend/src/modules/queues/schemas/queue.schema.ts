@@ -34,7 +34,10 @@ export const createQueueSchema = z.object({
     number: z.coerce.string().min(1).max(20).regex(/^\d+$/, 'Only digits allowed'),
     companyId: z.cuid2(),
     strategy: z.enum(QUEUE_STRATEGIES).default('ringall'),
-    musicOnHold: z.string().min(1).max(128).default('default'),
+    // id de um Audio (POST /audios) tocado em loop durante a espera na fila - null/omitido usa a
+    // classe MOH padrão do Asterisk. musicOnHold (classe real gravada na realtime) é calculado no
+    // service a partir deste campo, nunca aceito cru do cliente (ver QueuesService).
+    mohAudioId: z.cuid2().nullable().optional(),
     timeout: z.number().int().min(1).max(300).default(15),
     retry: z.number().int().min(1).max(300).default(5),
     maxLen: z.number().int().min(0).default(0),
@@ -76,7 +79,7 @@ export const updateQueueSchema = z.object({
         .optional(),
     number: z.coerce.string().min(1).max(20).regex(/^\d+$/, 'Only digits allowed').optional(),
     strategy: z.enum(QUEUE_STRATEGIES).optional(),
-    musicOnHold: z.string().min(1).max(128).optional(),
+    mohAudioId: z.cuid2().nullable().optional(),
     timeout: z.number().int().min(1).max(300).optional(),
     retry: z.number().int().min(1).max(300).optional(),
     maxLen: z.number().int().min(0).optional(),
@@ -108,6 +111,7 @@ export const QueueSchema = z.object({
     companyId: z.string(),
     strategy: z.string(),
     musicOnHold: z.string(),
+    mohAudioId: z.string().nullable(),
     timeout: z.number(),
     retry: z.number(),
     maxLen: z.number(),

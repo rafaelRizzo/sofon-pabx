@@ -25,6 +25,7 @@ import {
 import type { RouteDestination } from '../../schemas/route-destination.schema'
 import { assertAudioBelongsToCompany } from '../audios/audios.service'
 import { audioSoundPath } from '../../asterisk/audio.repository'
+import { MusicOnHoldRepository, mohClassName } from '../../asterisk/musiconhold.repository'
 import { AppError } from '../../utils/errors/app.error'
 import { logger } from '../../utils/logger'
 
@@ -51,6 +52,7 @@ const queueSelect = {
     companyId: true,
     strategy: true,
     musicOnHold: true,
+    mohAudioId: true,
     timeout: true,
     retry: true,
     maxLen: true,
@@ -259,6 +261,7 @@ export const createQueue = async (data: CreateQueueInput) => {
     await assertAudioBelongsToCompany(data.announce, data.companyId)
     await assertAudioBelongsToCompany(data.periodicAnnounce, data.companyId)
     await assertAudioBelongsToCompany(data.agentAnnounce, data.companyId)
+    await assertAudioBelongsToCompany(data.mohAudioId, data.companyId)
 
     const asteriskName = toAsteriskQueueName(company.asteriskId, data.number)
 
@@ -266,7 +269,9 @@ export const createQueue = async (data: CreateQueueInput) => {
     // precisa do path absoluto do arquivo (ver AsteriskQueueRepository/audioSoundPath). `announce`
     // (join announcement, tocado ao caller uma única vez ao entrar) NÃO vai pra cá: vira um
     // Playback no dialplan (ver AsteriskQueueRepository.regenerate) - quem grava na coluna
-    // realtime `announce` (nativa do Asterisk, tocada pro AGENTE antes do bridge) é agentAnnounce
+    // realtime `announce` (nativa do Asterisk, tocada pro AGENTE antes do bridge) é agentAnnounce.
+    // musicOnHold (classe MOH real) é calculado aqui a partir de mohAudioId - nunca aceito cru do
+    // cliente (ver MusicOnHoldRepository)
     const asteriskData = {
         ...data,
         announce: data.agentAnnounce
@@ -274,7 +279,8 @@ export const createQueue = async (data: CreateQueueInput) => {
             : null,
         periodicAnnounce: data.periodicAnnounce
             ? audioSoundPath(company.asteriskId, data.periodicAnnounce)
-            : null
+            : null,
+        musicOnHold: data.mohAudioId ? mohClassName(data.mohAudioId) : 'default'
     }
 
     const { postQueueDestination, ...createData } = data
@@ -307,6 +313,11 @@ export const createQueue = async (data: CreateQueueInput) => {
     if (data.surveyAudioId && data.surveyServiceAudioId)
         await regenerateSafely(
             () => CallcenterSurveyRepository.regenerate(data.companyId),
+            data.companyId
+        )
+    if (data.mohAudioId)
+        await regenerateSafely(
+            () => MusicOnHoldRepository.regenerate(data.companyId),
             data.companyId
         )
     await QueuesCache.invalidateByCompany(data.companyId)
@@ -408,11 +419,15 @@ export const updateQueue = async (id: string, data: UpdateQueueInput) => {
             data.agentAnnounce,
             existing.companyId
         )
+    if (data.mohAudioId !== undefined)
+        await assertAudioBelongsToCompany(data.mohAudioId, existing.companyId)
 
     const asteriskUpdate: Record<string, any> = {}
     if (data.strategy !== undefined) asteriskUpdate.strategy = data.strategy
-    if (data.musicOnHold !== undefined)
-        asteriskUpdate.musiconhold = data.musicOnHold
+    // musicOnHold (classe MOH real) é calculado aqui a partir de mohAudioId - nunca aceito cru do
+    // cliente (ver MusicOnHoldRepository)
+    if (data.mohAudioId !== undefined)
+        asteriskUpdate.musiconhold = data.mohAudioId ? mohClassName(data.mohAudioId) : 'default'
     if (data.timeout !== undefined) asteriskUpdate.timeout = data.timeout
     if (data.retry !== undefined) asteriskUpdate.retry = data.retry
     if (data.maxLen !== undefined) asteriskUpdate.maxlen = data.maxLen
@@ -463,6 +478,8 @@ export const updateQueue = async (id: string, data: UpdateQueueInput) => {
             data.surveyServiceAudioId !== existing.surveyServiceAudioId) ||
         (data.surveyThanksAudioId !== undefined &&
             data.surveyThanksAudioId !== existing.surveyThanksAudioId)
+    const mohChanged =
+        data.mohAudioId !== undefined && data.mohAudioId !== existing.mohAudioId
 
     const queue = await prisma.$transaction(async (tx) => {
         await AsteriskQueueRepository.updateQueue(
@@ -499,6 +516,11 @@ export const updateQueue = async (id: string, data: UpdateQueueInput) => {
     if (surveyChanged)
         await regenerateSafely(
             () => CallcenterSurveyRepository.regenerate(existing.companyId),
+            existing.companyId
+        )
+    if (mohChanged)
+        await regenerateSafely(
+            () => MusicOnHoldRepository.regenerate(existing.companyId),
             existing.companyId
         )
     await QueuesCache.invalidateQueue(id)
@@ -544,6 +566,11 @@ export const deleteQueue = async (id: string) => {
     if (existing.surveyAudioId || existing.surveyServiceAudioId)
         await regenerateSafely(
             () => CallcenterSurveyRepository.regenerate(existing.companyId),
+            existing.companyId
+        )
+    if (existing.mohAudioId)
+        await regenerateSafely(
+            () => MusicOnHoldRepository.regenerate(existing.companyId),
             existing.companyId
         )
     await QueuesCache.invalidateQueue(id)

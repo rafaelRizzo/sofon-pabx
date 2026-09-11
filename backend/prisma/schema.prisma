@@ -185,6 +185,12 @@ model Queue {
   // e opcional (não entra na regra all-or-nothing das 2 perguntas acima)
   surveyThanksAudioId       String?
   surveyThanksAudio         Audio?        @relation("QueueSurveyThanksAudio", fields: [surveyThanksAudioId], references: [id], onDelete: SetNull)
+  // Música de espera: Audio escolhido pelo usuário pra tocar em loop durante a espera na fila.
+  // musicOnHold (acima) é a classe MOH real gravada na coluna realtime `musiconhold`, calculada
+  // a partir deste campo pelo QueuesService (moh-<mohAudioId> ou "default" quando nulo) — ver
+  // MusicOnHoldRepository. Nunca aceitar musicOnHold cru vindo do cliente.
+  mohAudioId                String?
+  mohAudio                  Audio?        @relation("QueueMohAudio", fields: [mohAudioId], references: [id], onDelete: SetNull)
   // Liga prioridade dinâmica (RoutingRule via QUEUE_PRIO) e roteamento por afinidade (penalty
   // recalculado por agent-affinity-recalc.job.ts) pra essa fila. false = comportamento nativo
   // puro, sem AGI de pré-roteamento e sem o job mexendo no penalty dos membros. Pesquisa de
@@ -206,6 +212,7 @@ model Queue {
   @@index([announce])
   @@index([periodicAnnounce])
   @@index([agentAnnounce])
+  @@index([mohAudioId])
   @@map("queues_app")
 }
 
@@ -520,6 +527,7 @@ model Audio {
   announceQueues         Queue[]        @relation("QueueAnnounceAudio")
   periodicAnnounceQueues Queue[]        @relation("QueuePeriodicAnnounceAudio")
   agentAnnounceQueues    Queue[]        @relation("QueueAgentAnnounceAudio")
+  mohQueues              Queue[]        @relation("QueueMohAudio")
 
   @@unique([name, companyId])
   @@index([companyId])

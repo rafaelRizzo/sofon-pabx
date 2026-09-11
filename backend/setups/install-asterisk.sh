@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-# INSTALADOR SOFON PBX v7.13 - PJSIP + IAX2 (sem Docker, sem chan_sip)
+# INSTALADOR SOFON PBX v7.14 - PJSIP + IAX2 (sem Docker, sem chan_sip)
 # Debian 11+ | Ubuntu 24.04+ | Asterisk 22.7.0 LTS
 # ============================================================
 
@@ -605,6 +605,21 @@ LANGUAGE=pt_BR
 ; arquivo estável e livre pra edição manual do cliente sem risco de sobrescrita pelo backend.
 #include sofon-managed.conf
 EOF
+
+# sofon-managed-moh.conf - materializa só o #tryinclude de classes MOH por fila (Audio cadastrado
+# como música de espera, ver src/asterisk/destinations/musiconhold.repository.ts). Não define
+# nenhuma classe própria - [default] do pacote asterisk-moh-* continua intocado. Backend se
+# auto-cura via ensureBaseMusiconhold() (base-musiconhold.repository.ts) se este arquivo for
+# perdido numa reinstalação parcial.
+cat > /etc/asterisk/sofon-managed-moh.conf << 'EOF'
+#tryinclude "musiconhold-extra/*.conf"
+EOF
+
+# Acrescenta o #tryinclude ao musiconhold.conf já existente (shipped com [default] pelo pacote
+# asterisk-moh-*) sem sobrescrever nada - mesma estratégia usada em extensions.conf acima.
+if ! grep -qi '^[[:space:]]*#tryinclude[[:space:]]*"\?sofon-managed-moh\.conf"\?[[:space:]]*$' /etc/asterisk/musiconhold.conf 2>/dev/null; then
+    printf '\n; Sofon PABX, classes MOH gerenciadas\n#tryinclude "sofon-managed-moh.conf"\n' >> /etc/asterisk/musiconhold.conf
+fi
 
 # features.conf - transferência DTMF atendida durante a chamada. Códigos: *2 atendida, *1 grava,
 # parkcall #72. Quem pode

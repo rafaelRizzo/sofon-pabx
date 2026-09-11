@@ -9,6 +9,7 @@ import { audioSoundDir, audioSoundPath } from '../../asterisk/audio.repository'
 import { AnnouncementRepository } from '../../asterisk/announcement.repository'
 import { IvrRepository } from '../../asterisk/ivr.repository'
 import { AsteriskQueueRepository, toAsteriskQueueName } from '../../asterisk/queue.repository'
+import { MusicOnHoldRepository, removeMohClassDir } from '../../asterisk/musiconhold.repository'
 import { AnnouncementsCache } from '../announcements/cache/announcements.cache'
 import { IvrCache } from '../ivr/cache/ivr.cache'
 import { QueuesCache } from '../queues/cache/queues.cache'
@@ -198,10 +199,10 @@ export const deleteAudio = async (id: string) => {
         prisma.announcement.findMany({ where: { audioId: id }, select: { id: true, companyId: true } }),
         prisma.ivrMenu.findMany({ where: { audioId: id }, select: { id: true, companyId: true } }),
         prisma.queue.findMany({
-            where: { OR: [{ announce: id }, { periodicAnnounce: id }, { agentAnnounce: id }] },
+            where: { OR: [{ announce: id }, { periodicAnnounce: id }, { agentAnnounce: id }, { mohAudioId: id }] },
             select: {
                 id: true, name: true, number: true, companyId: true,
-                announce: true, periodicAnnounce: true, agentAnnounce: true,
+                announce: true, periodicAnnounce: true, agentAnnounce: true, mohAudioId: true,
                 company: { select: { asteriskId: true } },
             },
         }),
@@ -209,16 +210,18 @@ export const deleteAudio = async (id: string) => {
 
     await prisma.$transaction(async (tx) => {
         await tx.audio.delete({ where: { id } })
-        // FK onDelete:SetNull já zera Queue.announce/periodicAnnounce/agentAnnounce no Prisma -
-        // mas a tabela realtime do Asterisk (queues) guarda o path absoluto resolvido, não o
-        // audioId, e não tem relação com Audio, então precisa ser zerada manualmente aqui.
-        // `announce` (join, tocado pro caller) não tem coluna realtime - é um Playback no
-        // dialplan, resolvido via regenerate() abaixo. `periodicAnnounce`/`agentAnnounce` viram
-        // as colunas realtime `periodicAnnounce`/`announce`, respectivamente
+        // FK onDelete:SetNull já zera Queue.announce/periodicAnnounce/agentAnnounce/mohAudioId no
+        // Prisma - mas a tabela realtime do Asterisk (queues) guarda o path absoluto resolvido (ou,
+        // no caso de MOH, o nome da classe), não o audioId, e não tem relação com Audio, então
+        // precisa ser zerada manualmente aqui. `announce` (join, tocado pro caller) não tem coluna
+        // realtime - é um Playback no dialplan, resolvido via regenerate() abaixo.
+        // `periodicAnnounce`/`agentAnnounce` viram as colunas realtime `periodicAnnounce`/`announce`,
+        // respectivamente; `mohAudioId` vira a coluna realtime `musiconhold`, revertida pra "default"
         for (const q of queuesWithAudio) {
-            const update: Record<string, null> = {}
+            const update: Record<string, string | null> = {}
             if (q.periodicAnnounce === id) update.periodicAnnounce = null
             if (q.agentAnnounce === id) update.announce = null
+            if (q.mohAudioId === id) update.musiconhold = 'default'
             if (Object.keys(update).length > 0) {
                 const name = toAsteriskQueueName(q.company.asteriskId, q.number ?? q.name)
                 await AsteriskQueueRepository.updateQueue(tx, q.id, name, name, update)
@@ -230,6 +233,9 @@ export const deleteAudio = async (id: string) => {
     if (ivrMenus.length > 0) await IvrRepository.regenerate(existing.companyId)
     const queueDialplanCompanyIds = [...new Set(queuesWithAudio.filter((q) => q.announce === id).map((q) => q.companyId))]
     for (const companyId of queueDialplanCompanyIds) await AsteriskQueueRepository.regenerate(companyId)
+    const mohCompanyIds = [...new Set(queuesWithAudio.filter((q) => q.mohAudioId === id).map((q) => q.companyId))]
+    for (const companyId of mohCompanyIds) await MusicOnHoldRepository.regenerate(companyId)
+    if (mohCompanyIds.length > 0) await removeMohClassDir(existing.company.asteriskId, id)
     await rm(`${audioSoundPath(existing.company.asteriskId, id)}.wav`, { force: true })
 
     await Promise.all([

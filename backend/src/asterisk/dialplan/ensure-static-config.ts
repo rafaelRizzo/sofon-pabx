@@ -1,4 +1,5 @@
 import { ensureBaseDialplan } from './base-dialplan.repository'
+import { ensureBaseMusiconhold } from './base-musiconhold.repository'
 import { bumpTransferDigitTimeout } from './features.repository'
 import { runAmiCommand } from '../transport/ami-client'
 import { logger } from '../../utils/logger'
@@ -6,6 +7,8 @@ import { logger } from '../../utils/logger'
 export type StaticAsteriskConfigResult = {
     baseDialplanRewritten: boolean
     dialplanReloadApplied: boolean
+    baseMusiconholdRewritten: boolean
+    musiconholdReloadApplied: boolean
     transferDigitTimeoutBumped: boolean
     restartRequired: boolean
 }
@@ -22,6 +25,8 @@ export async function ensureStaticAsteriskConfig(): Promise<StaticAsteriskConfig
     const result: StaticAsteriskConfigResult = {
         baseDialplanRewritten: false,
         dialplanReloadApplied: false,
+        baseMusiconholdRewritten: false,
+        musiconholdReloadApplied: false,
         transferDigitTimeoutBumped: false,
         restartRequired: false,
     }
@@ -37,6 +42,21 @@ export async function ensureStaticAsteriskConfig(): Promise<StaticAsteriskConfig
     } catch (error) {
         logger.warn({
             event: 'asterisk.static_config.base_dialplan_failed',
+            error: error instanceof Error ? error.message : String(error),
+        })
+    }
+
+    try {
+        result.baseMusiconholdRewritten = await ensureBaseMusiconhold()
+        if (result.baseMusiconholdRewritten) {
+            result.musiconholdReloadApplied = await runAmiCommand('module reload res_musiconhold.so')
+            if (!result.musiconholdReloadApplied) {
+                logger.warn({ event: 'asterisk.static_config.musiconhold_reload_failed' })
+            }
+        }
+    } catch (error) {
+        logger.warn({
+            event: 'asterisk.static_config.base_musiconhold_failed',
             error: error instanceof Error ? error.message : String(error),
         })
     }

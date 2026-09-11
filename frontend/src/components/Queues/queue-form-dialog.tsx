@@ -97,7 +97,7 @@ export function QueueFormDialog({
             companyId: defaultCompanyId,
             number: "",
             strategy: "ringall",
-            musicOnHold: "default",
+            mohAudioId: null,
             timeout: 15,
             retry: 5,
             maxLen: 0,
@@ -124,6 +124,7 @@ export function QueueFormDialog({
     const announcePosition = watch("announcePosition")
     const periodicAnnounce = watch("periodicAnnounce")
     const agentAnnounce = watch("agentAnnounce")
+    const mohAudioId = watch("mohAudioId")
     const surveyAudioId = watch("surveyAudioId")
     const surveyServiceAudioId = watch("surveyServiceAudioId")
     const surveyThanksAudioId = watch("surveyThanksAudioId")
@@ -137,6 +138,7 @@ export function QueueFormDialog({
         audios.find((a) => a.id === periodicAnnounce) ?? null
     const selectedAgentAnnounce =
         audios.find((a) => a.id === agentAnnounce) ?? null
+    const selectedMohAudio = audios.find((a) => a.id === mohAudioId) ?? null
     const selectedSurveyAudio =
         audios.find((a) => a.id === surveyAudioId) ?? null
     const selectedSurveyServiceAudio =
@@ -151,7 +153,7 @@ export function QueueFormDialog({
             companyId: queue?.companyId ?? defaultCompanyId,
             number: queue?.number ?? "",
             strategy: queue?.strategy ?? "ringall",
-            musicOnHold: "default",
+            mohAudioId: queue?.mohAudioId ?? null,
             timeout: queue?.timeout ?? 15,
             retry: queue?.retry ?? 5,
             maxLen: queue?.maxLen ?? 0,
@@ -183,6 +185,7 @@ export function QueueFormDialog({
         setValue("announce", null, { shouldDirty: true })
         setValue("periodicAnnounce", null, { shouldDirty: true })
         setValue("agentAnnounce", null, { shouldDirty: true })
+        setValue("mohAudioId", null, { shouldDirty: true })
         setValue("surveyAudioId", null, { shouldDirty: true })
         setValue("surveyServiceAudioId", null, { shouldDirty: true })
         setValue("surveyThanksAudioId", null, { shouldDirty: true })
@@ -724,6 +727,69 @@ export function QueueFormDialog({
                                                         errors.agentAnnounce
                                                             .message
                                                     }
+                                                </FieldError>
+                                            )}
+                                        </Field>
+
+                                        <Field>
+                                            <FieldLabel>
+                                                Música de espera
+                                            </FieldLabel>
+                                            {!companyId ? (
+                                                <FieldDescription>
+                                                    Selecione uma empresa
+                                                    primeiro.
+                                                </FieldDescription>
+                                            ) : (
+                                                <Combobox<Audio>
+                                                    items={audios}
+                                                    value={selectedMohAudio}
+                                                    itemToStringLabel={(a) =>
+                                                        a.name
+                                                    }
+                                                    isItemEqualToValue={(
+                                                        a,
+                                                        b
+                                                    ) => a.id === b.id}
+                                                    onValueChange={(a) =>
+                                                        setValue(
+                                                            "mohAudioId",
+                                                            a?.id ?? null,
+                                                            {
+                                                                shouldDirty: true,
+                                                            }
+                                                        )
+                                                    }
+                                                >
+                                                    <ComboboxInput placeholder="Nenhum (usa a padrão do Asterisk)" />
+                                                    <ComboboxContent>
+                                                        <ComboboxEmpty>
+                                                            {audios.length === 0
+                                                                ? "Nenhum áudio cadastrado para essa empresa"
+                                                                : "Nenhum resultado para essa busca"}
+                                                        </ComboboxEmpty>
+                                                        <ComboboxList>
+                                                            {(a: Audio) => (
+                                                                <ComboboxItem
+                                                                    key={a.id}
+                                                                    value={a}
+                                                                >
+                                                                    {a.name}
+                                                                </ComboboxItem>
+                                                            )}
+                                                        </ComboboxList>
+                                                    </ComboboxContent>
+                                                </Combobox>
+                                            )}
+                                            <FieldDescription>
+                                                Tocado em loop enquanto o
+                                                cliente espera na fila. Deixe
+                                                vazio para usar a classe padrão
+                                                do Asterisk.
+                                            </FieldDescription>
+                                            {errors.mohAudioId && (
+                                                <FieldError>
+                                                    {errors.mohAudioId.message}
                                                 </FieldError>
                                             )}
                                         </Field>

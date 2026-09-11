@@ -33,6 +33,15 @@ const MIGRATIONS: CacheMigration[] = [
         id: 'trunks-add-active-field-clear-all',
         run: () => cacheManager.clear(),
     },
+    {
+        // Adicionado `notes` (observação) a Company/Did/User/Extension/Queue/Trunk/OutboundRoute/
+        // TimeGroup/HolidayGroup/InboundRoute/Audio/Flow (12 módulos de uma vez) - cache antigo
+        // (sem TTL) não tem esse campo e falha a validação Zod de response ("Response doesn't
+        // match the schema"). clear() em vez de invalidate() por namespace: são 12 caches afetados
+        // ao mesmo tempo, mesmo raciocínio de trunks-add-active-field-clear-all acima.
+        id: 'notes-field-add-clear-all',
+        run: () => cacheManager.clear(),
+    },
 ]
 
 // Nunca lança - uma falha aqui (ex: Redis instável no boot) não pode derrubar o worker inteiro,
