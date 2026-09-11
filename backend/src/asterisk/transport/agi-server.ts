@@ -5,6 +5,7 @@ import { extKey } from './realtime-keys'
 import { resolveRouteDestinationToDialplan } from '../dialplan/route-destination-resolver'
 import { FlowEdgeRepository } from '../flows/flow-edge.repository'
 import { parseMemberInterface, QUEUE_APP_CONTEXT, queueAppExten } from '../destinations/queue.repository'
+import { extenPatternMatches } from '../dialplan/exten-pattern'
 import { FLOW_NODE_CONTEXT, SURVEY_CONTEXT, surveyExten, ROUTING_TRUNK_VAR, flowNodeExitExten } from '../dialplan/dialplan-names'
 import { FLOW_NODE_ID_VAR } from '../flows/flow-node-runtime'
 import { safeFetch } from '../../utils/net/safe-url'
@@ -745,8 +746,25 @@ async function handleTransferRoute(conn: AgiConn) {
         return
     }
 
+    // Passo 3: nem ramal nem fila da empresa - tenta como rota de saída. Os patterns de outbound route já
+    // são escritos no próprio contexto 'ramais' (ver outbound-routes.service.ts:syncPatternDialplan), então
+    // o Goto abaixo reaproveita o dialplan de outbound já montado (troncos, CDR, gravação) em vez de duplicar
+    // essa lógica aqui - só precisamos confirmar ANTES que existe algum candidato: sem essa checagem, um EXTEN
+    // que não é ramal/fila/rota nenhuma cairia no pattern genérico de ramal (_XX.._XXXXXX, sempre presente
+    // pra qualquer tamanho 2-6) e tentaria um Dial contra um PJSIP inexistente, terminando em Hangup silencioso
+    // em vez do Congestion() audível que o contexto [transfer] já dá quando o AGI retorna sem ter feito Goto.
+    const outboundPatterns = await prisma.outboundDialPattern.findMany({
+        where: { route: { companyId: company.id } },
+        select: { pattern: true },
+    })
+    if (outboundPatterns.some((p) => extenPatternMatches(p.pattern, exten))) {
+        await agiVerbose(conn, `Transfer Route: "${exten}" não é ramal nem fila, tentando rota de saída`)
+        await agiExecGoto(conn, { context: 'ramais', exten, priority: 1 })
+        return
+    }
+
     logger.info({ event: 'agi.transfer_route.not_found', exten, companyId: company.id })
-    await agiVerbose(conn, `Transfer Route: "${exten}" não é ramal nem fila da empresa`, 2)
+    await agiVerbose(conn, `Transfer Route: "${exten}" não é ramal, fila nem rota de saída da empresa`, 2)
 }
 
 export function startAgiServer(host: string, port: number) {
