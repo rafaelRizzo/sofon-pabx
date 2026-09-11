@@ -21,7 +21,11 @@ mock.module('../../../asterisk/timecondition.repository', () => ({
     TimeConditionRepository: { regenerate: mock(() => Promise.resolve()) },
 }))
 mock.module('../../time-conditions/cache/time-conditions.cache', () => ({
-    TimeConditionsCache: { invalidateTimeCondition: mock(() => Promise.resolve()), invalidateByCompany: mock(() => Promise.resolve()) },
+    TimeConditionsCache: {
+        invalidateTimeCondition: mock(() => Promise.resolve()),
+        invalidateAgiTimeCondition: mock(() => Promise.resolve()),
+        invalidateByCompany: mock(() => Promise.resolve()),
+    },
 }))
 
 import * as TimeGroupsService from '../time-groups.service'

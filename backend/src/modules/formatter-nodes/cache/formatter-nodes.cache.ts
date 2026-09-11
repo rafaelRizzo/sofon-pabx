@@ -51,4 +51,22 @@ export class FormatterNodesCache {
         await cacheManager.invalidateByKey(`${NAMESPACE}:company:${companyId}`)
         logger.info({ event: 'cache.invalidate', namespace: NAMESPACE, key: `company:${companyId}` })
     }
+
+    // Linha própria (key "agi-node") - getNode/setNode acima cacheiam o DTO enriquecido (onSuccess/
+    // onError/usedBy) da tela; o AGI server só precisa da linha crua.
+    static async getAgiNode(id: string) {
+        const cached = await cacheManager.get(`${NAMESPACE}:agi-node`, id)
+        logger.info({ event: cached ? 'cache.hit' : 'cache.miss', namespace: NAMESPACE, key: `agi-node:${id}` })
+        return cached
+    }
+
+    static async setAgiNode(id: string, data: any, config?: CacheConfig) {
+        await cacheManager.set(`${NAMESPACE}:agi-node`, id, data, config)
+        logger.info({ event: 'cache.set', namespace: NAMESPACE, key: `agi-node:${id}` })
+    }
+
+    static async invalidateAgiNode(id: string) {
+        await cacheManager.invalidateByKey(`${NAMESPACE}:agi-node:${id}`)
+        logger.info({ event: 'cache.invalidate', namespace: NAMESPACE, key: `agi-node:${id}` })
+    }
 }

@@ -13,6 +13,7 @@ mock.module('../cache/formatter-nodes.cache', () => ({
         getByCompany: mock(() => null), setByCompany: mock(),
         getNode: mock(() => null), setNode: mock(),
         invalidateNode: mock(), invalidateByCompany: mock(), invalidateAll: mock(),
+        getAgiNode: mock(() => null), setAgiNode: mock(), invalidateAgiNode: mock(),
     },
 }))
 mock.module('../../../asterisk/destinations/formatter-node.repository', () => ({

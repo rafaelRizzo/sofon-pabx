@@ -209,6 +209,7 @@ export const updateTimeCondition = async (id: string, data: UpdateTimeConditionI
         await TimeConditionRepository.regenerate(existing.companyId)
     } finally {
         await TimeConditionsCache.invalidateTimeCondition(id)
+        await TimeConditionsCache.invalidateAgiTimeCondition(id)
         await TimeConditionsCache.invalidateByCompany(existing.companyId)
         await TimeConditionsCache.invalidateAll()
     }
@@ -235,6 +236,7 @@ export const deleteTimeCondition = async (id: string) => {
         await TimeConditionRepository.regenerate(existing.companyId)
     } finally {
         await TimeConditionsCache.invalidateTimeCondition(id)
+        await TimeConditionsCache.invalidateAgiTimeCondition(id)
         await TimeConditionsCache.invalidateByCompany(existing.companyId)
         await TimeConditionsCache.invalidateAll()
     }

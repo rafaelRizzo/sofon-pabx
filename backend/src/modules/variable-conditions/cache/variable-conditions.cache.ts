@@ -56,4 +56,22 @@ export class VariableConditionsCache {
         await cacheManager.invalidate(NAMESPACE)
         logger.info({ event: 'cache.invalidate', namespace: NAMESPACE, key: 'all' })
     }
+
+    // Linha própria (key "agi-item") - getVariableCondition/setVariableCondition acima cacheiam o
+    // DTO enriquecido (trueRoute/falseRoute/usedBy) da tela; o AGI server só precisa da linha crua.
+    static async getAgiVariableCondition(id: string) {
+        const cached = await cacheManager.get(`${NAMESPACE}:agi-item`, id)
+        logger.info({ event: cached ? 'cache.hit' : 'cache.miss', namespace: NAMESPACE, key: `agi-item:${id}` })
+        return cached
+    }
+
+    static async setAgiVariableCondition(id: string, data: any, config?: CacheConfig) {
+        await cacheManager.set(`${NAMESPACE}:agi-item`, id, data, config)
+        logger.info({ event: 'cache.set', namespace: NAMESPACE, key: `agi-item:${id}` })
+    }
+
+    static async invalidateAgiVariableCondition(id: string) {
+        await cacheManager.invalidateByKey(`${NAMESPACE}:agi-item:${id}`)
+        logger.info({ event: 'cache.invalidate', namespace: NAMESPACE, key: `agi-item:${id}` })
+    }
 }

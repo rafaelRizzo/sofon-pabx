@@ -243,6 +243,7 @@ export const updateHolidayGroup = async (id: string, data: UpdateHolidayGroupInp
         await HolidayGroupRepository.regenerate(existing.companyId)
     } finally {
         await HolidayGroupsCache.invalidateHolidayGroup(id)
+        await HolidayGroupsCache.invalidateAgiHolidayGroup(id)
         await HolidayGroupsCache.invalidateByCompany(existing.companyId)
     }
     const [trueRoute, falseRoute, usedByMap] = await Promise.all([
@@ -268,6 +269,7 @@ export const deleteHolidayGroup = async (id: string) => {
         await HolidayGroupRepository.regenerate(existing.companyId)
     } finally {
         await HolidayGroupsCache.invalidateHolidayGroup(id)
+        await HolidayGroupsCache.invalidateAgiHolidayGroup(id)
         await HolidayGroupsCache.invalidateByCompany(existing.companyId)
     }
 }

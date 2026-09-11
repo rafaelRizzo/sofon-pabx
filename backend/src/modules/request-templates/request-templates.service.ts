@@ -206,6 +206,7 @@ export const updateRequestTemplate = async (id: string, data: UpdateRequestTempl
     if (data.name && data.name !== existing.name) await syncFlowNodeLabel('request', id, data.name)
 
     await RequestTemplatesCache.invalidateTemplate(id)
+    await RequestTemplatesCache.invalidateAgiTemplate(id)
     await RequestTemplatesCache.invalidateByCompany(existing.companyId)
     await RequestTemplatesCache.invalidateAll()
 
@@ -232,6 +233,7 @@ export const deleteRequestTemplate = async (id: string) => {
         await RequestTemplateRepository.regenerate(existing.companyId)
     } finally {
         await RequestTemplatesCache.invalidateTemplate(id)
+        await RequestTemplatesCache.invalidateAgiTemplate(id)
         await RequestTemplatesCache.invalidateByCompany(existing.companyId)
         await RequestTemplatesCache.invalidateAll()
     }

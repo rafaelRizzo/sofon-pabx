@@ -14,6 +14,7 @@ mock.module('../cache/request-templates.cache', () => ({
         getTemplate: mock(() => null), setTemplate: mock(),
         invalidateTemplate: mock(), invalidateByCompany: mock(), invalidateNamespace: mock(),
         invalidateAll: mock(),
+        getAgiTemplate: mock(() => null), setAgiTemplate: mock(), invalidateAgiTemplate: mock(),
     },
 }))
 mock.module('../../../asterisk/request-template.repository', () => ({

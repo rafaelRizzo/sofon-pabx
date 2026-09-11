@@ -13,6 +13,7 @@ mock.module('../cache/holiday-groups.cache', () => ({
         invalidateByCompany: mock(),
         getHolidayGroup: mock(() => null), setHolidayGroup: mock(),
         invalidateHolidayGroup: mock(),
+        getAgiHolidayGroup: mock(() => null), setAgiHolidayGroup: mock(), invalidateAgiHolidayGroup: mock(),
         invalidateNamespace: mock(),
     },
 }))

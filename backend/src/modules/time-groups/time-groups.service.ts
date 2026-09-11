@@ -120,6 +120,7 @@ export const updateTimeGroup = async (id: string, data: UpdateTimeGroupInput) =>
         if (data.ranges && affectedIds.length > 0) await TimeConditionRepository.regenerate(existing.companyId)
     } finally {
         for (const tcId of affectedIds) await TimeConditionsCache.invalidateTimeCondition(tcId)
+        for (const tcId of affectedIds) await TimeConditionsCache.invalidateAgiTimeCondition(tcId)
         await TimeGroupsCache.invalidateTimeGroup(id)
         await TimeGroupsCache.invalidateByCompany(existing.companyId)
         await TimeGroupsCache.invalidateAll()
@@ -141,6 +142,7 @@ export const deleteTimeGroup = async (id: string) => {
         if (affectedIds.length > 0) await TimeConditionRepository.regenerate(existing.companyId)
     } finally {
         for (const tcId of affectedIds) await TimeConditionsCache.invalidateTimeCondition(tcId)
+        for (const tcId of affectedIds) await TimeConditionsCache.invalidateAgiTimeCondition(tcId)
         await TimeConditionsCache.invalidateByCompany(existing.companyId)
         await TimeGroupsCache.invalidateTimeGroup(id)
         await TimeGroupsCache.invalidateByCompany(existing.companyId)

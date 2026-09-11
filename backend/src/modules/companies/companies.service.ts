@@ -34,6 +34,18 @@ import { HolidayGroupsCache } from '../holiday-groups/cache/holiday-groups.cache
 import { VariablesCache } from '../variables/cache/variables.cache'
 import { VariableConditionsCache } from '../variable-conditions/cache/variable-conditions.cache'
 import { UsersCache } from '../users/cache/users.cache'
+import { TimeConditionsCache } from '../time-conditions/cache/time-conditions.cache'
+import { FormatterNodesCache } from '../formatter-nodes/cache/formatter-nodes.cache'
+import { IxcNodesCache } from '../ixc-nodes/cache/ixc-nodes.cache'
+import { DidsCache } from '../dids/cache/dids.cache'
+import { InboundRoutesCache } from '../inbound-routes/cache/inbound-routes.cache'
+import { OutboundRoutesCache } from '../outbound-routes/cache/outbound-routes.cache'
+import { TrunksCache } from '../trunks/cache/trunks.cache'
+import { FlowsCache } from '../flows/cache/flows.cache'
+import { QueueMembersCache } from '../queue-members/cache/queue-members.cache'
+import { IntegrationCredentialsCache } from '../integration-credentials/cache/integration-credentials.cache'
+import { AgentScopesCache } from '../callcenter/agents/cache/agent-scope.cache'
+import { RoutingRulesCache } from '../callcenter/routing-rules/cache/routing-rule.cache'
 import { invalidateUserCompanyIds } from '../../utils/auth/access'
 
 const DIALPLAN_FILE_CONTEXTS = [
@@ -148,11 +160,15 @@ export const updateCompany = async (id: string, data: UpdateCompanyInput) => {
         select: companySelect,
     })
 
-    // HolidayGroup não precisa regenerar aqui: desde a migração pra AGI (ver holidaygroup.repository.ts),
-    // o timezone é lido ao vivo de Company a cada chamada, não fica mais baked no .conf estático como
-    // TimeCondition (GotoIfTime nativo, sem esse luxo)
+    // HolidayGroup não precisa regenerar arquivo aqui: desde a migração pra AGI (ver
+    // holidaygroup.repository.ts), o timezone é lido de Company a cada chamada - mas o cache
+    // AGI (HolidayGroupsCache.getAgiHolidayGroup, sem TTL) embute company.timezone dentro do
+    // objeto cacheado, então precisa ser invalidado manualmente aqui ou fica preso no timezone
+    // antigo até alguém editar o grupo de feriado em si (ver agi-server.ts:handleHolidayCheck)
     if (data.timezone !== undefined && data.timezone !== existing.timezone) {
         await TimeConditionRepository.regenerate(id)
+        const holidayGroups = await prisma.holidayGroup.findMany({ where: { companyId: id }, select: { id: true } })
+        await Promise.all(holidayGroups.map((g) => HolidayGroupsCache.invalidateAgiHolidayGroup(g.id)))
     }
 
     await CompaniesCache.invalidateCompany(id)
@@ -381,6 +397,26 @@ export const deleteCompany = async (id: string) => {
         HolidayGroupsCache.invalidateNamespace(),
         VariablesCache.invalidateNamespace(),
         VariableConditionsCache.invalidateNamespace(),
+        TimeConditionsCache.invalidateNamespace(),
+        InboundRoutesCache.invalidateNamespace(),
+        FlowsCache.invalidateNamespace(),
+        QueueMembersCache.invalidateNamespace(),
+        DidsCache.invalidateNamespace(),
+        // Esses 6 não têm invalidateNamespace() (só by-company/all) - invalidateByCompany(id) cobre
+        // o essencial; a entrada órfã por item (id de node/rota/trunk já deletado) só vaza memória
+        // no Redis até expirar, nunca serve dado errado pra outra empresa (ids são cuid, nunca
+        // reaproveitados). Ver auditoria de cache de 2026-09-11.
+        FormatterNodesCache.invalidateByCompany(id),
+        FormatterNodesCache.invalidateAll(),
+        IxcNodesCache.invalidateByCompany(id),
+        IxcNodesCache.invalidateAll(),
+        OutboundRoutesCache.invalidateByCompany(id),
+        OutboundRoutesCache.invalidateAll(),
+        TrunksCache.invalidateByCompany(id),
+        TrunksCache.invalidateAllTrunks(),
+        IntegrationCredentialsCache.invalidateByCompany(id),
+        AgentScopesCache.invalidateByCompany(id),
+        RoutingRulesCache.invalidateByCompany(id),
         ...existing.users.map((u) => CompaniesCache.invalidateCompaniesByUser(u.userId)),
         ...existing.users.map((u) => CompaniesCache.invalidateCompaniesForScope(u.userId)),
         ...existing.users.map((u) => invalidateUserCompanyIds(u.userId)),

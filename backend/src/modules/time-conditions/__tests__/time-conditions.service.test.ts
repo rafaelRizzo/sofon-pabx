@@ -14,6 +14,7 @@ mock.module('../cache/time-conditions.cache', () => ({
         invalidateByCompany: mock(),
         getTimeCondition: mock(() => null), setTimeCondition: mock(),
         invalidateTimeCondition: mock(),
+        getAgiTimeCondition: mock(() => null), setAgiTimeCondition: mock(), invalidateAgiTimeCondition: mock(),
         invalidateNamespace: mock(),
     },
 }))

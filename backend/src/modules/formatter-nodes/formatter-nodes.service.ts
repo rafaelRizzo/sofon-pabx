@@ -194,6 +194,7 @@ export const updateFormatterNode = async (id: string, data: UpdateFormatterNodeI
         await FormatterNodeRepository.regenerate(existing.companyId)
     } finally {
         await FormatterNodesCache.invalidateNode(id)
+        await FormatterNodesCache.invalidateAgiNode(id)
         await FormatterNodesCache.invalidateByCompany(existing.companyId)
         await FormatterNodesCache.invalidateAll()
     }
@@ -221,6 +222,7 @@ export const deleteFormatterNode = async (id: string) => {
         await FormatterNodeRepository.regenerate(existing.companyId)
     } finally {
         await FormatterNodesCache.invalidateNode(id)
+        await FormatterNodesCache.invalidateAgiNode(id)
         await FormatterNodesCache.invalidateByCompany(existing.companyId)
         await FormatterNodesCache.invalidateAll()
     }

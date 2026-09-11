@@ -222,6 +222,7 @@ export const updateIxcNode = async (id: string, data: UpdateIxcNodeInput) => {
         await IxcNodeRepository.regenerate(existing.companyId)
     } finally {
         await IxcNodesCache.invalidateNode(id)
+        await IxcNodesCache.invalidateAgiNode(id)
         await IxcNodesCache.invalidateByCompany(existing.companyId)
         await IxcNodesCache.invalidateAll()
     }
@@ -287,6 +288,7 @@ export const deleteIxcNode = async (id: string) => {
         await IxcNodeRepository.regenerate(existing.companyId)
     } finally {
         await IxcNodesCache.invalidateNode(id)
+        await IxcNodesCache.invalidateAgiNode(id)
         await IxcNodesCache.invalidateByCompany(existing.companyId)
         await IxcNodesCache.invalidateAll()
     }

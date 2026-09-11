@@ -68,4 +68,24 @@ export class RequestTemplatesCache {
         await cacheManager.invalidate(NAMESPACE)
         logger.info({ event: 'cache.invalidate', namespace: NAMESPACE, key: 'all' })
     }
+
+    // Linha própria (key "agi-template", não "template") pra não misturar com getTemplate/setTemplate
+    // acima: aquele cacheia o DTO enriquecido (onSuccess/onError/usedBy) que a tela usa, este cacheia
+    // só a linha crua que o AGI server precisa - shapes diferentes no mesmo id quebrariam um dos dois
+    // lados se compartilhassem chave. Ver uso em asterisk/transport/agi-server.ts.
+    static async getAgiTemplate(id: string) {
+        const cached = await cacheManager.get(`${NAMESPACE}:agi-template`, id)
+        logger.info({ event: cached ? 'cache.hit' : 'cache.miss', namespace: NAMESPACE, key: `agi-template:${id}` })
+        return cached
+    }
+
+    static async setAgiTemplate(id: string, data: any, config?: CacheConfig) {
+        await cacheManager.set(`${NAMESPACE}:agi-template`, id, data, config)
+        logger.info({ event: 'cache.set', namespace: NAMESPACE, key: `agi-template:${id}` })
+    }
+
+    static async invalidateAgiTemplate(id: string) {
+        await cacheManager.invalidateByKey(`${NAMESPACE}:agi-template:${id}`)
+        logger.info({ event: 'cache.invalidate', namespace: NAMESPACE, key: `agi-template:${id}` })
+    }
 }

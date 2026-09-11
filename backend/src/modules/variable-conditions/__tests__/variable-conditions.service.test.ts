@@ -13,6 +13,7 @@ mock.module('../cache/variable-conditions.cache', () => ({
         getByCompany: mock(() => null), setByCompany: mock(),
         getVariableCondition: mock(() => null), setVariableCondition: mock(),
         invalidateVariableCondition: mock(), invalidateByCompany: mock(), invalidateNamespace: mock(),
+        getAgiVariableCondition: mock(() => null), setAgiVariableCondition: mock(), invalidateAgiVariableCondition: mock(),
     },
 }))
 mock.module('../../../asterisk/variablecondition.repository', () => ({

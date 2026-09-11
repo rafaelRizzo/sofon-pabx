@@ -56,4 +56,23 @@ export class TimeConditionsCache {
         await cacheManager.invalidate(NAMESPACE)
         logger.info({ event: 'cache.invalidate', namespace: NAMESPACE, key: 'all' })
     }
+
+    // Linha própria (key "agi-item") - getTimeCondition/setTimeCondition acima cacheiam o DTO da
+    // tela; o AGI server precisa de um select com timeGroups.timeGroup.ranges aninhado (ver
+    // handleTimeConditionCheck em agi-server.ts), shape incompatível com o cache de tela.
+    static async getAgiTimeCondition(id: string) {
+        const cached = await cacheManager.get(`${NAMESPACE}:agi-item`, id)
+        logger.info({ event: cached ? 'cache.hit' : 'cache.miss', namespace: NAMESPACE, key: `agi-item:${id}` })
+        return cached
+    }
+
+    static async setAgiTimeCondition(id: string, data: any, config?: CacheConfig) {
+        await cacheManager.set(`${NAMESPACE}:agi-item`, id, data, config)
+        logger.info({ event: 'cache.set', namespace: NAMESPACE, key: `agi-item:${id}` })
+    }
+
+    static async invalidateAgiTimeCondition(id: string) {
+        await cacheManager.invalidateByKey(`${NAMESPACE}:agi-item:${id}`)
+        logger.info({ event: 'cache.invalidate', namespace: NAMESPACE, key: `agi-item:${id}` })
+    }
 }

@@ -19,6 +19,12 @@ import { evaluateRule, evaluateRules, type VariableRule, type Combinator } from 
 import { matchesHolidayDate } from '../destinations/holidaygroup.repository'
 import { applyMask } from '../../utils/format-mask'
 import { dateInTimeZone } from '../../utils/timezone'
+import { RequestTemplatesCache } from '../../modules/request-templates/cache/request-templates.cache'
+import { IxcNodesCache } from '../../modules/ixc-nodes/cache/ixc-nodes.cache'
+import { VariableConditionsCache } from '../../modules/variable-conditions/cache/variable-conditions.cache'
+import { HolidayGroupsCache } from '../../modules/holiday-groups/cache/holiday-groups.cache'
+import { TimeConditionsCache } from '../../modules/time-conditions/cache/time-conditions.cache'
+import { FormatterNodesCache } from '../../modules/formatter-nodes/cache/formatter-nodes.cache'
 
 // Servidor FastAGI - Asterisk conecta via AGI(agi://AGI_HOST:AGI_PORT/<script>,<args>) em 5 pontos:
 // - /run,<requestTemplateId> - RouteDestination type: "request"
@@ -172,7 +178,11 @@ function evalResponsePath(obj: unknown, path: string): unknown {
 }
 
 async function handleRequestTemplate(conn: AgiConn, templateId: string) {
-    const template = await prisma.requestTemplate.findUnique({ where: { id: templateId } })
+    let template = (await RequestTemplatesCache.getAgiTemplate(templateId)) as Awaited<ReturnType<typeof prisma.requestTemplate.findUnique>> | null
+    if (!template) {
+        template = await prisma.requestTemplate.findUnique({ where: { id: templateId } })
+        if (template) await RequestTemplatesCache.setAgiTemplate(templateId, template)
+    }
     if (!template) {
         logger.warn({ event: 'agi.request_template.not_found', templateId })
         return
@@ -260,7 +270,11 @@ async function handleRequestTemplate(conn: AgiConn, templateId: string) {
 // url/headers manuais: credencial (base URL + token, descriptografado só neste momento) + params
 // resolvidos por placeholder viram uma chamada fixa do catálogo IXC_ACTIONS (ver integrations/ixc/client.ts).
 async function handleIxcNode(conn: AgiConn, nodeId: string) {
-    const node = await prisma.ixcNode.findUnique({ where: { id: nodeId } })
+    let node = (await IxcNodesCache.getAgiNode(nodeId)) as Awaited<ReturnType<typeof prisma.ixcNode.findUnique>> | null
+    if (!node) {
+        node = await prisma.ixcNode.findUnique({ where: { id: nodeId } })
+        if (node) await IxcNodesCache.setAgiNode(nodeId, node)
+    }
     if (!node) {
         logger.warn({ event: 'agi.ixc_node.not_found', nodeId })
         return
@@ -347,7 +361,11 @@ async function handleIxcNode(conn: AgiConn, nodeId: string) {
 // no comentário de topo de variablecondition.repository.ts. Sequencial de propósito: comandos AGI
 // não podem ser concorrentes no mesmo socket.
 async function handleVariableCondition(conn: AgiConn, conditionId: string) {
-    const condition = await prisma.variableCondition.findUnique({ where: { id: conditionId } })
+    let condition = (await VariableConditionsCache.getAgiVariableCondition(conditionId)) as Awaited<ReturnType<typeof prisma.variableCondition.findUnique>> | null
+    if (!condition) {
+        condition = await prisma.variableCondition.findUnique({ where: { id: conditionId } })
+        if (condition) await VariableConditionsCache.setAgiVariableCondition(conditionId, condition)
+    }
     if (!condition) {
         logger.warn({ event: 'agi.variable_condition.not_found', conditionId })
         return
@@ -413,15 +431,19 @@ async function handleVariableCondition(conn: AgiConn, conditionId: string) {
 // porque GotoIfTime nativo do Asterisk nunca teve campo de ano (é tipo cron: times/weekdays/mdays/
 // months) - sem isso não dá pra expressar feriado móvel vindo da API (Carnaval, Sexta-feira Santa),
 // que muda de data ano a ano; ver year em HolidayDate/matchesHolidayDate.
+const holidayGroupAgiSelect = {
+    name: true,
+    dates: { select: { month: true, day: true, year: true } },
+    company: { select: { timezone: true } },
+} as const
+const _holidayGroupAgiRow = () => prisma.holidayGroup.findUnique({ where: { id: '' }, select: holidayGroupAgiSelect })
+
 async function handleHolidayCheck(conn: AgiConn, groupId: string) {
-    const group = await prisma.holidayGroup.findUnique({
-        where: { id: groupId },
-        select: {
-            name: true,
-            dates: { select: { month: true, day: true, year: true } },
-            company: { select: { timezone: true } },
-        },
-    })
+    let group = (await HolidayGroupsCache.getAgiHolidayGroup(groupId)) as Awaited<ReturnType<typeof _holidayGroupAgiRow>> | null
+    if (!group) {
+        group = await prisma.holidayGroup.findUnique({ where: { id: groupId }, select: holidayGroupAgiSelect })
+        if (group) await HolidayGroupsCache.setAgiHolidayGroup(groupId, group)
+    }
     if (!group) {
         logger.warn({ event: 'agi.holiday_group.not_found', groupId })
         return
@@ -471,14 +493,18 @@ async function handleHolidayCheck(conn: AgiConn, groupId: string) {
 // pra deixar visível no console do Asterisk quais períodos estão configurados numa ligação real -
 // a avaliação em si continua 100% nativa (GotoIfTime na priority seguinte), esse AGI não decide
 // nada nem faz Goto, só loga e deixa o dialplan seguir sozinho pra próxima priority.
+const timeConditionAgiSelect = {
+    name: true,
+    timeGroups: { select: { timeGroup: { select: { name: true, ranges: true } } } },
+} as const
+const _timeConditionAgiRow = () => prisma.timeCondition.findUnique({ where: { id: '' }, select: timeConditionAgiSelect })
+
 async function handleTimeConditionCheck(conn: AgiConn, tcId: string) {
-    const tc = await prisma.timeCondition.findUnique({
-        where: { id: tcId },
-        select: {
-            name: true,
-            timeGroups: { select: { timeGroup: { select: { name: true, ranges: true } } } },
-        },
-    })
+    let tc = (await TimeConditionsCache.getAgiTimeCondition(tcId)) as Awaited<ReturnType<typeof _timeConditionAgiRow>> | null
+    if (!tc) {
+        tc = await prisma.timeCondition.findUnique({ where: { id: tcId }, select: timeConditionAgiSelect })
+        if (tc) await TimeConditionsCache.setAgiTimeCondition(tcId, tc)
+    }
     if (!tc) {
         logger.warn({ event: 'agi.time_condition.not_found', tcId })
         return
@@ -512,7 +538,11 @@ async function handleTimeConditionCheck(conn: AgiConn, tcId: string) {
 // mesmo mecanismo de FlowEdge do IxcNode (FLOW_NODE_ID quando dentro de um Flow, senão
 // FlowEdgeRepository direto quando usado como RouteDestination solto).
 async function handleFormatterNode(conn: AgiConn, formatterNodeId: string) {
-    const node = await prisma.formatterNode.findUnique({ where: { id: formatterNodeId } })
+    let node = (await FormatterNodesCache.getAgiNode(formatterNodeId)) as Awaited<ReturnType<typeof prisma.formatterNode.findUnique>> | null
+    if (!node) {
+        node = await prisma.formatterNode.findUnique({ where: { id: formatterNodeId } })
+        if (node) await FormatterNodesCache.setAgiNode(formatterNodeId, node)
+    }
     if (!node) {
         logger.warn({ event: 'agi.formatter_node.not_found', formatterNodeId })
         return

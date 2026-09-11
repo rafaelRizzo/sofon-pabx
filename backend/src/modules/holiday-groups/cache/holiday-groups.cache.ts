@@ -40,4 +40,23 @@ export class HolidayGroupsCache {
         await cacheManager.invalidate(NAMESPACE)
         logger.info({ event: 'cache.invalidate', namespace: NAMESPACE, key: 'all' })
     }
+
+    // Linha própria (key "agi-item") - getHolidayGroup/setHolidayGroup acima cacheiam o DTO da
+    // tela (dates simples); o AGI server precisa de um select diferente (dates + company.timezone,
+    // ver handleHolidayCheck em agi-server.ts), shape incompatível com o cache de tela.
+    static async getAgiHolidayGroup(id: string) {
+        const cached = await cacheManager.get(`${NAMESPACE}:agi-item`, id)
+        logger.info({ event: cached ? 'cache.hit' : 'cache.miss', namespace: NAMESPACE, key: `agi-item:${id}` })
+        return cached
+    }
+
+    static async setAgiHolidayGroup(id: string, data: any, config?: CacheConfig) {
+        await cacheManager.set(`${NAMESPACE}:agi-item`, id, data, config)
+        logger.info({ event: 'cache.set', namespace: NAMESPACE, key: `agi-item:${id}` })
+    }
+
+    static async invalidateAgiHolidayGroup(id: string) {
+        await cacheManager.invalidateByKey(`${NAMESPACE}:agi-item:${id}`)
+        logger.info({ event: 'cache.invalidate', namespace: NAMESPACE, key: `agi-item:${id}` })
+    }
 }

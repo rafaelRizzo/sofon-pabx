@@ -198,6 +198,7 @@ export const updateVariableCondition = async (id: string, data: UpdateVariableCo
         await VariableConditionRepository.regenerate(existing.companyId)
     } finally {
         await VariableConditionsCache.invalidateVariableCondition(id)
+        await VariableConditionsCache.invalidateAgiVariableCondition(id)
         await VariableConditionsCache.invalidateByCompany(existing.companyId)
         await VariableConditionsCache.invalidateAll()
     }
@@ -224,6 +225,7 @@ export const deleteVariableCondition = async (id: string) => {
         await VariableConditionRepository.regenerate(existing.companyId)
     } finally {
         await VariableConditionsCache.invalidateVariableCondition(id)
+        await VariableConditionsCache.invalidateAgiVariableCondition(id)
         await VariableConditionsCache.invalidateByCompany(existing.companyId)
         await VariableConditionsCache.invalidateAll()
     }
