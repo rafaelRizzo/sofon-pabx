@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import {
     Grid3x3Icon,
     MicIcon,
@@ -10,12 +10,13 @@ import {
     PhoneIcon,
     PhoneOffIcon,
     PlayIcon,
+    XIcon,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
-import type { SoftphoneCallState } from "@/hooks/use-webphone"
+import type { AttendedTransferState, SoftphoneCallState } from "@/hooks/use-webphone"
 import { WebphoneCallTimer } from "@/components/Webphone/webphone-call-timer"
 import { WebphoneDialpad } from "@/components/Webphone/webphone-dialpad"
 
@@ -27,6 +28,8 @@ type WebphoneCallPanelProps = {
     held: boolean
     transferring: boolean
     callStartedAt: number | null
+    attendedState: AttendedTransferState
+    attendedRemoteIdentity: string | null
     call: (number: string) => void | Promise<void>
     answer: () => void | Promise<void>
     reject: () => void | Promise<void>
@@ -34,6 +37,9 @@ type WebphoneCallPanelProps = {
     toggleMute: () => void
     toggleHold: () => void | Promise<void>
     transfer: (target: string) => void | Promise<void>
+    startAttendedTransfer: (target: string) => void | Promise<void>
+    completeAttendedTransfer: () => void | Promise<void>
+    cancelAttendedTransfer: () => void | Promise<void>
     sendDtmf: (tone: string) => void
 }
 
@@ -65,6 +71,8 @@ export function WebphoneCallPanel({
     held,
     transferring,
     callStartedAt,
+    attendedState,
+    attendedRemoteIdentity,
     call,
     answer,
     reject,
@@ -72,12 +80,25 @@ export function WebphoneCallPanel({
     toggleMute,
     toggleHold,
     transfer,
+    startAttendedTransfer,
+    completeAttendedTransfer,
+    cancelAttendedTransfer,
     sendDtmf,
 }: WebphoneCallPanelProps) {
     const [number, setNumber] = useState("")
     const [showDtmf, setShowDtmf] = useState(false)
     const [showTransfer, setShowTransfer] = useState(false)
     const [transferTarget, setTransferTarget] = useState("")
+
+    // sem isso, o picker de transferência (ou o teclado DTMF) da chamada anterior ficaria aberto
+    // por cima da próxima ligação, já que esse componente nunca desmonta entre chamadas
+    useEffect(() => {
+        if (callState === "idle") {
+            setShowDtmf(false)
+            setShowTransfer(false)
+            setTransferTarget("")
+        }
+    }, [callState])
 
     if (callState === "idle") {
         return (
@@ -134,6 +155,7 @@ export function WebphoneCallPanel({
     }
 
     const inCall = callState === "in-call"
+    const inAttendedTransfer = attendedState !== "idle"
 
     return (
         <div className="flex flex-col gap-3">
@@ -151,8 +173,37 @@ export function WebphoneCallPanel({
                 </div>
             </div>
 
-            {inCall && showTransfer && (
-                <div className="flex gap-2">
+            {inCall && inAttendedTransfer && (
+                <div className="flex flex-col gap-2 rounded-md border p-2">
+                    <p className="text-xs text-muted-foreground">
+                        {attendedState === "calling" ? "Consultando" : "Em consulta com"}{" "}
+                        <span className="font-medium text-foreground">
+                            {attendedRemoteIdentity}
+                        </span>
+                    </p>
+                    <div className="flex gap-2">
+                        <Button
+                            size="sm"
+                            className="flex-1"
+                            disabled={attendedState !== "in-call"}
+                            onClick={completeAttendedTransfer}
+                        >
+                            Completar
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            className="flex-1"
+                            onClick={cancelAttendedTransfer}
+                        >
+                            Cancelar
+                        </Button>
+                    </div>
+                </div>
+            )}
+
+            {inCall && !inAttendedTransfer && showTransfer && (
+                <div className="flex flex-col gap-2">
                     <Input
                         autoFocus
                         value={transferTarget}
@@ -160,22 +211,32 @@ export function WebphoneCallPanel({
                         placeholder="Ramal destino"
                         disabled={transferring}
                         onKeyDown={(e) => {
-                            if (e.key === "Enter" && transferTarget.trim()) {
-                                transfer(transferTarget)
-                            }
                             if (e.key === "Escape") setShowTransfer(false)
                         }}
                     />
-                    <Button
-                        size="sm"
-                        disabled={transferring || !transferTarget.trim()}
-                        onClick={() => transfer(transferTarget)}
-                    >
-                        {transferring ? "Transferindo..." : "Confirmar"}
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => setShowTransfer(false)}>
-                        Cancelar
-                    </Button>
+                    <div className="flex gap-2">
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            className="flex-1"
+                            disabled={transferring || !transferTarget.trim()}
+                            onClick={() => transfer(transferTarget)}
+                        >
+                            {transferring ? "Transferindo..." : "Cega"}
+                        </Button>
+                        <Button
+                            size="sm"
+                            className="flex-1"
+                            disabled={!transferTarget.trim()}
+                            onClick={() => startAttendedTransfer(transferTarget)}
+                        >
+                            Assistida
+                        </Button>
+                        <Button size="icon" variant="ghost" onClick={() => setShowTransfer(false)}>
+                            <XIcon />
+                            <span className="sr-only">Cancelar</span>
+                        </Button>
+                    </div>
                 </div>
             )}
 
@@ -190,7 +251,7 @@ export function WebphoneCallPanel({
                         <span className="sr-only">Mudo</span>
                     </Button>
                 )}
-                {inCall && (
+                {inCall && !inAttendedTransfer && (
                     <Button
                         size="sm"
                         variant={held ? "default" : "outline"}
@@ -200,7 +261,7 @@ export function WebphoneCallPanel({
                         <span className="sr-only">{held ? "Retomar" : "Espera"}</span>
                     </Button>
                 )}
-                {inCall && (
+                {inCall && !inAttendedTransfer && (
                     <Button
                         size="sm"
                         variant={showTransfer ? "default" : "outline"}

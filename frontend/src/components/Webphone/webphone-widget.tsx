@@ -62,6 +62,8 @@ export function WebphoneWidget() {
         held,
         transferring,
         callStartedAt,
+        attendedState,
+        attendedRemoteIdentity,
         audioElRef,
         call,
         answer,
@@ -70,6 +72,9 @@ export function WebphoneWidget() {
         toggleMute,
         toggleHold,
         transfer,
+        startAttendedTransfer,
+        completeAttendedTransfer,
+        cancelAttendedTransfer,
         sendDtmf,
         retryMic,
     } = useWebphone()
@@ -152,6 +157,8 @@ export function WebphoneWidget() {
                     held={held}
                     transferring={transferring}
                     callStartedAt={callStartedAt}
+                    attendedState={attendedState}
+                    attendedRemoteIdentity={attendedRemoteIdentity}
                     call={call}
                     answer={answer}
                     reject={reject}
@@ -159,6 +166,9 @@ export function WebphoneWidget() {
                     toggleMute={toggleMute}
                     toggleHold={toggleHold}
                     transfer={transfer}
+                    startAttendedTransfer={startAttendedTransfer}
+                    completeAttendedTransfer={completeAttendedTransfer}
+                    cancelAttendedTransfer={cancelAttendedTransfer}
                     sendDtmf={sendDtmf}
                 />
             </div>

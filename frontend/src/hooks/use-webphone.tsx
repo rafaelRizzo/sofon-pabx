@@ -30,6 +30,10 @@ export type SoftphoneCallState = "idle" | "calling" | "ringing" | "in-call"
 // que seguem cobrindo o card de erro grave (motivo detalhado)
 export type WebphoneRegistrationStatus = "registered" | "connecting" | "error"
 
+// Perna de consulta da transferência assistida (2ª sessão SIP, paralela à principal) - "ringing"
+// não existe aqui porque essa perna é sempre discada por nós (nunca recebida)
+export type AttendedTransferState = "idle" | "calling" | "in-call"
+
 // navegadores só liberam getUserMedia em contexto seguro (https ou localhost) - sem domínio/TLS
 // ainda (ver install-asterisk.sh), o áudio real só funciona acessando o painel via localhost/VPN
 const MIC_INSECURE_CONTEXT_MESSAGE =
@@ -42,6 +46,16 @@ const MIC_GENERIC_MESSAGE = "Não foi possível acessar o microfone."
 function asWebSdh(session: Session | null): Web.SessionDescriptionHandler | null {
     const sdh = session?.sessionDescriptionHandler
     return sdh instanceof Web.SessionDescriptionHandler ? sdh : null
+}
+
+// Encerra uma sessão SIP no método certo pro estado em que ela está - estabelecida (BYE),
+// discando por nós (CANCEL) ou tocando pra nós (REJECT). Reaproveitado tanto pelo hangup da
+// chamada principal quanto pra descartar a perna de consulta de uma transferência assistida.
+async function endSession(session: Session | null) {
+    if (!session) return
+    if (session.state === SessionState.Established) await session.bye().catch(() => {})
+    else if (session instanceof Inviter) await session.cancel().catch(() => {})
+    else await (session as Invitation).reject().catch(() => {})
 }
 
 // Registra UM UserAgent/REGISTER por sessão de browser (mesmo ramal não pode registrar duas
@@ -63,11 +77,24 @@ function useWebphoneState() {
     const [held, setHeld] = useState(false)
     const [transferring, setTransferring] = useState(false)
     const [callStartedAt, setCallStartedAt] = useState<number | null>(null)
+    const [attendedState, setAttendedState] = useState<AttendedTransferState>("idle")
+    const [attendedRemoteIdentity, setAttendedRemoteIdentity] = useState<string | null>(null)
 
     const userAgentRef = useRef<UserAgent | null>(null)
     const registererRef = useRef<Registerer | null>(null)
     const sessionRef = useRef<Session | null>(null)
+    const consultSessionRef = useRef<Session | null>(null)
+    // true só quando foi o próprio startAttendedTransfer que colocou a chamada em espera - o
+    // cancelamento só retoma automaticamente nesse caso, nunca desfazendo um hold manual prévio
+    const heldForAttendedRef = useRef(false)
     const audioElRef = useRef<HTMLAudioElement | null>(null)
+
+    const resetConsult = useCallback(() => {
+        consultSessionRef.current = null
+        heldForAttendedRef.current = false
+        setAttendedState("idle")
+        setAttendedRemoteIdentity(null)
+    }, [])
 
     const resetCall = useCallback(() => {
         sessionRef.current = null
@@ -78,7 +105,11 @@ function useWebphoneState() {
         setTransferring(false)
         setCallStartedAt(null)
         if (audioElRef.current) audioElRef.current.srcObject = null
-    }, [])
+        // chamada principal terminou (ex: cliente desligou) com uma consulta em andamento -
+        // a perna de consulta fica órfã, sem sentido mantê-la viva
+        endSession(consultSessionRef.current)
+        resetConsult()
+    }, [resetConsult])
 
     const bindSession = useCallback(
         (session: Session, direction: "incoming" | "outgoing") => {
@@ -265,11 +296,7 @@ function useWebphoneState() {
     }, [])
 
     const hangup = useCallback(async () => {
-        const session = sessionRef.current
-        if (!session) return
-        if (session.state === SessionState.Established) await session.bye().catch(() => {})
-        else if (session instanceof Inviter) await session.cancel().catch(() => {})
-        else await (session as Invitation).reject().catch(() => {})
+        await endSession(sessionRef.current)
     }, [])
 
     const toggleMute = useCallback(() => {
@@ -281,20 +308,27 @@ function useWebphoneState() {
         })
     }, [])
 
-    const toggleHold = useCallback(async () => {
+    // Reaproveitado pelo toggle manual de hold e pelo início/cancelamento de transferência
+    // assistida (que precisa segurar a chamada original programaticamente) - retorna se conseguiu
+    const setHold = useCallback(async (next: boolean) => {
         const session = sessionRef.current
-        if (!session || session.state !== SessionState.Established) return
-        const next = !held
+        if (!session || session.state !== SessionState.Established) return false
         try {
             await session.invite({
                 sessionDescriptionHandlerOptions: { hold: next } as Web.SessionDescriptionHandlerOptions,
             })
             setHeld(next)
+            return true
         } catch (err) {
             // eslint-disable-next-line no-console
             console.error("[webphone] falha ao (re)colocar em espera", err)
+            return false
         }
-    }, [held])
+    }, [])
+
+    const toggleHold = useCallback(async () => {
+        await setHold(!held)
+    }, [held, setHold])
 
     const transfer = useCallback(async (target: string) => {
         const session = sessionRef.current
@@ -313,6 +347,86 @@ function useWebphoneState() {
             setTransferring(false)
         }
     }, [])
+
+    // Transferência assistida: segura a chamada principal, disca uma 2ª sessão de consulta pro
+    // ramal destino, e só depois de falar com ele o agente decide completar (refer com Replaces)
+    // ou cancelar (desliga a consulta e retoma a chamada original).
+    const startAttendedTransfer = useCallback(
+        async (target: string) => {
+            const userAgent = userAgentRef.current
+            const primary = sessionRef.current
+            if (!userAgent || !primary || primary.state !== SessionState.Established) return
+            if (attendedState !== "idle" || !target.trim()) return
+
+            const wasHeld = held
+            if (!wasHeld && !(await setHold(true))) return
+            heldForAttendedRef.current = !wasHeld
+
+            const uri = UserAgent.makeURI(`sip:${target}@${userAgent.configuration.uri.host}`)
+            if (!uri) {
+                if (heldForAttendedRef.current) await setHold(false)
+                heldForAttendedRef.current = false
+                return
+            }
+
+            const inviter = new Inviter(userAgent, uri)
+            consultSessionRef.current = inviter
+            setAttendedState("calling")
+            setAttendedRemoteIdentity(target)
+
+            inviter.stateChange.addListener((state: SessionState) => {
+                if (inviter !== consultSessionRef.current) return
+                if (state === SessionState.Established) {
+                    setAttendedState("in-call")
+                    setAttendedRemoteIdentity(
+                        inviter.remoteIdentity.displayName || inviter.remoteIdentity.uri.user || target
+                    )
+                } else if (state === SessionState.Terminated) {
+                    const shouldResumeHold = heldForAttendedRef.current
+                    resetConsult()
+                    if (shouldResumeHold) setHold(false)
+                }
+            })
+
+            // invite() pode rejeitar antes de qualquer stateChange pra Terminated (ex: falha de
+            // mídia local) - sem esse catch a consulta ficaria presa em "calling" pra sempre
+            await inviter.invite().catch(() => {
+                if (inviter !== consultSessionRef.current) return
+                const shouldResumeHold = heldForAttendedRef.current
+                resetConsult()
+                if (shouldResumeHold) setHold(false)
+            })
+        },
+        [attendedState, held, resetConsult, setHold]
+    )
+
+    const completeAttendedTransfer = useCallback(async () => {
+        const primary = sessionRef.current
+        const consult = consultSessionRef.current
+        if (!primary || !consult) return
+        if (primary.state !== SessionState.Established || consult.state !== SessionState.Established)
+            return
+        // sucesso: a ligação segue bridgeada no Asterisk sem o agente, retomar hold local não
+        // faz sentido - zera antes pra não disparar resume-hold quando a consulta terminar
+        heldForAttendedRef.current = false
+        try {
+            await primary.refer(consult)
+            await endSession(consult)
+        } catch (err) {
+            // eslint-disable-next-line no-console
+            console.error("[webphone] falha ao completar transferência assistida", err)
+        } finally {
+            resetConsult()
+        }
+    }, [resetConsult])
+
+    const cancelAttendedTransfer = useCallback(async () => {
+        const consult = consultSessionRef.current
+        const shouldResumeHold = heldForAttendedRef.current
+        resetConsult()
+        await endSession(consult)
+        if (shouldResumeHold) await setHold(false)
+    }, [resetConsult, setHold])
 
     const sendDtmf = useCallback((tone: string) => {
         const sdh = asWebSdh(sessionRef.current)
@@ -339,6 +453,8 @@ function useWebphoneState() {
         held,
         transferring,
         callStartedAt,
+        attendedState,
+        attendedRemoteIdentity,
         audioElRef,
         call,
         answer,
@@ -347,6 +463,9 @@ function useWebphoneState() {
         toggleMute,
         toggleHold,
         transfer,
+        startAttendedTransfer,
+        completeAttendedTransfer,
+        cancelAttendedTransfer,
         sendDtmf,
         retryMic: ensureMic,
     }

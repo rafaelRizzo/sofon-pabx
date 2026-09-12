@@ -42,6 +42,8 @@ function AgentPanelPage() {
         held,
         transferring,
         callStartedAt,
+        attendedState,
+        attendedRemoteIdentity,
         audioElRef,
         call,
         answer,
@@ -50,6 +52,9 @@ function AgentPanelPage() {
         toggleMute,
         toggleHold,
         transfer,
+        startAttendedTransfer,
+        completeAttendedTransfer,
+        cancelAttendedTransfer,
         sendDtmf,
         retryMic,
     } = useWebphone()
@@ -132,6 +137,8 @@ function AgentPanelPage() {
                             held={held}
                             transferring={transferring}
                             callStartedAt={callStartedAt}
+                            attendedState={attendedState}
+                            attendedRemoteIdentity={attendedRemoteIdentity}
                             call={call}
                             answer={answer}
                             reject={reject}
@@ -139,6 +146,9 @@ function AgentPanelPage() {
                             toggleMute={toggleMute}
                             toggleHold={toggleHold}
                             transfer={transfer}
+                            startAttendedTransfer={startAttendedTransfer}
+                            completeAttendedTransfer={completeAttendedTransfer}
+                            cancelAttendedTransfer={cancelAttendedTransfer}
                             sendDtmf={sendDtmf}
                         />
                     </CardContent>

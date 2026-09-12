@@ -182,6 +182,22 @@ async function handleDialBegin(block: AmiBlock) {
     emitRealtimeChange('extension')
 }
 
+// Corrige o callerNum gravado no Newchannel quando o Asterisk resolve o Caller ID depois de criar
+// o canal - típico de canal de TRONCO criado por Dial() de saída, que nasce com CallerIDNum
+// "<unknown>" (valor nativo que o próprio Asterisk usa antes de copiar o CID de quem disca) e só
+// recebe o valor real neste evento separado. handleDialBegin acima só corrige a perna de RAMAL
+// (destNumber) - sem este handler, o card de tronco ficava preso em "<unknown>" a chamada toda.
+async function handleNewCallerid(block: AmiBlock) {
+    if (!block.Uniqueid || !block.CallerIDNum) return
+    if (!(await redisClient.exists(callKey(block.Uniqueid)))) return
+
+    await redisClient.hSet(callKey(block.Uniqueid), { callerNum: block.CallerIDNum })
+    await redisClient.expire(callKey(block.Uniqueid), CALL_TTL_SECONDS)
+
+    const number = block.Channel ? extensionNumberFromChannel(block.Channel) : null
+    emitRealtimeChange(number && isTrunkId(number) ? 'trunk' : 'extension')
+}
+
 // Só perna de tronco - é o link com a operadora que importa pro histórico (CallQuality). Lê os
 // acumuladores de handleRtcpStats ANTES do del() em handleHangup, resolve trunkId/companyId a
 // partir do astId (nome do canal - não depende de AccountCode vir ou não nesse evento) e persiste.
@@ -452,6 +468,7 @@ async function routeEvent(block: AmiBlock): Promise<void> {
         case 'ContactStatus': return handleContactStatus(block)
         case 'DeviceStateChange': return handleDeviceState(block)
         case 'Newchannel': return handleNewchannel(block)
+        case 'NewCallerid': return handleNewCallerid(block)
         case 'DialBegin': return handleDialBegin(block)
         case 'Hangup': return handleHangup(block)
         case 'BridgeEnter': return handleBridgeEnter(block)
