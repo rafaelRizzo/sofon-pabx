@@ -8,7 +8,7 @@ const db = createPrismaMock();
 
 mock.module("../../../lib/prisma", () => ({ prisma: db }));
 mock.module("../cache/flows.cache", () => ({
-  FlowsCache: { invalidateFlow: mock(), invalidateByCompany: mock() },
+  FlowsCache: { invalidateFlow: mock(), invalidateByCompany: mock(), invalidateNamespace: mock() },
 }));
 mock.module("../../../asterisk/flow-node.repository", () => ({
   FlowNodeRepository: { regenerate: mock(() => Promise.resolve()) },

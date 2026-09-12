@@ -8,7 +8,7 @@ mock.module('../../../companies/cache/companies.cache', () => ({
     CompaniesCache: { getCompany: mock(() => null), setCompany: mock() },
 }))
 mock.module('../../../trunks/cache/trunks.cache', () => ({
-    TrunksCache: { getTrunk: mock(() => null), setTrunk: mock() },
+    TrunksCache: { getTrunk: mock(() => null), setTrunk: mock(), invalidateAllTrunks: mock(), invalidateByCompany: mock() },
 }))
 mock.module('../cache/routing-rule.cache', () => ({
     RoutingRulesCache: {

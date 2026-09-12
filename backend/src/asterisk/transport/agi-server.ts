@@ -47,6 +47,8 @@ import { FormatterNodesCache } from '../../modules/formatter-nodes/cache/formatt
 //   (callcenter-surveys), persiste a nota (category: "atendimento" ou "servico")
 // - /transfer-route (sem arg) - contexto estático [transfer], resolve EXTEN discado (ramal ou fila)
 //   pro accountcode do canal, chamado via TRANSFER_CONTEXT em toda transferência DTMF atendida (*2)
+// - /ramal-fallback (sem arg) - pattern genérico de ramal ([ramais], ver dialplan.repository.ts),
+//   chamado só quando o Dial direto pro ramal falha com CHANUNAVAIL - tenta fila, depois rota de saída
 // Protocolo AGI é estritamente request/response - nunca disparar dois comandos concorrentes no mesmo
 // socket, a ordem das respostas quebra.
 
@@ -701,6 +703,47 @@ async function getExtensionPresence(number: string): Promise<'online' | 'offline
     }
 }
 
+// Passos 2 e 3 da busca (fila, depois rota de saída) - compartilhado entre handleTransferRoute (chamado
+// já sabendo que EXTEN não é ramal, ver prisma.extension.findUnique ali) e handleRamalFallback (chamado
+// só quando o Dial contra PJSIP/<EXTEN>_<accountcode> falhou com CHANUNAVAIL, ou seja "não existe esse
+// ramal" já resolvido pelo próprio Asterisk). Retorna true quando fez EXEC GOTO (chamador não deve
+// prosseguir nem logar "não encontrado").
+async function resolveQueueOrOutboundFallback(
+    conn: AgiConn,
+    exten: string,
+    company: { id: string },
+    accountcode: string,
+    logPrefix: string,
+): Promise<boolean> {
+    const queue = await prisma.queue.findUnique({
+        where: { number_companyId: { number: exten, companyId: company.id } },
+        select: { number: true },
+    })
+    if (queue) {
+        await agiVerbose(conn, `${logPrefix}: encaminhando para fila ${queue.number}`)
+        await agiExecGoto(conn, { context: QUEUE_APP_CONTEXT, exten: queueAppExten(accountcode, queue.number), priority: 1 })
+        return true
+    }
+
+    // Nem ramal nem fila da empresa - tenta como rota de saída. Os patterns de outbound route já são
+    // escritos no próprio contexto 'ramais' (ver outbound-routes.service.ts:syncPatternDialplan), então o
+    // Goto abaixo reaproveita o dialplan de outbound já montado (troncos, CDR, gravação) em vez de duplicar
+    // essa lógica aqui - só precisamos confirmar ANTES que existe algum candidato: sem essa checagem, um
+    // EXTEN que não é ramal/fila/rota nenhuma cairia de novo no pattern genérico de ramal (_XX.._XXXXXX,
+    // sempre presente pra qualquer tamanho 2-6) e entraria num loop de Goto contra si mesmo.
+    const outboundPatterns = await prisma.outboundDialPattern.findMany({
+        where: { route: { companyId: company.id } },
+        select: { pattern: true },
+    })
+    if (outboundPatterns.some((p) => extenPatternMatches(p.pattern, exten))) {
+        await agiVerbose(conn, `${logPrefix}: "${exten}" não é ramal nem fila, tentando rota de saída`)
+        await agiExecGoto(conn, { context: 'ramais', exten, priority: 1 })
+        return true
+    }
+
+    return false
+}
+
 // Chamado pelo contexto estático [transfer] (extensions.conf) quando um agente/cliente dispara uma
 // transferência DTMF atendida (*2, ver features.conf) - TRANSFER_CONTEXT=transfer é setado desde a entrada
 // da chamada (ver inboundroute.repository.ts). EXTEN é o número discado pela parte que transferiu
@@ -736,35 +779,35 @@ async function handleTransferRoute(conn: AgiConn) {
         return
     }
 
-    const queue = await prisma.queue.findUnique({
-        where: { number_companyId: { number: exten, companyId: company.id } },
-        select: { number: true },
-    })
-    if (queue) {
-        await agiVerbose(conn, `Transfer Route: encaminhando para fila ${queue.number}`)
-        await agiExecGoto(conn, { context: QUEUE_APP_CONTEXT, exten: queueAppExten(accountcode, queue.number), priority: 1 })
-        return
-    }
-
-    // Passo 3: nem ramal nem fila da empresa - tenta como rota de saída. Os patterns de outbound route já
-    // são escritos no próprio contexto 'ramais' (ver outbound-routes.service.ts:syncPatternDialplan), então
-    // o Goto abaixo reaproveita o dialplan de outbound já montado (troncos, CDR, gravação) em vez de duplicar
-    // essa lógica aqui - só precisamos confirmar ANTES que existe algum candidato: sem essa checagem, um EXTEN
-    // que não é ramal/fila/rota nenhuma cairia no pattern genérico de ramal (_XX.._XXXXXX, sempre presente
-    // pra qualquer tamanho 2-6) e tentaria um Dial contra um PJSIP inexistente, terminando em Hangup silencioso
-    // em vez do Congestion() audível que o contexto [transfer] já dá quando o AGI retorna sem ter feito Goto.
-    const outboundPatterns = await prisma.outboundDialPattern.findMany({
-        where: { route: { companyId: company.id } },
-        select: { pattern: true },
-    })
-    if (outboundPatterns.some((p) => extenPatternMatches(p.pattern, exten))) {
-        await agiVerbose(conn, `Transfer Route: "${exten}" não é ramal nem fila, tentando rota de saída`)
-        await agiExecGoto(conn, { context: 'ramais', exten, priority: 1 })
-        return
-    }
+    if (await resolveQueueOrOutboundFallback(conn, exten, company, accountcode, 'Transfer Route')) return
 
     logger.info({ event: 'agi.transfer_route.not_found', exten, companyId: company.id })
     await agiVerbose(conn, `Transfer Route: "${exten}" não é ramal, fila nem rota de saída da empresa`, 2)
+}
+
+// Chamado pelo pattern genérico de ramal ([ramais], ver ensureGenericRoutingPattern em
+// dialplan.repository.ts) SÓ quando o Dial(PJSIP/<EXTEN>_<accountcode>) falhou com CHANUNAVAIL - ou
+// seja, o próprio Asterisk já confirmou que não existe esse ramal (passo 1, "busca ramal", já feito
+// nativamente pelo Dial em vez de uma query, já que endpoint PJSIP É a fonte de verdade de ramal
+// existente). Daqui em diante são exatamente os passos 2 (fila) e 3 (rota de saída) do
+// handleTransferRoute, compartilhados via resolveQueueOrOutboundFallback - permite discar direto uma
+// fila (ex: ramal do suporte ligando pra fila do financeiro) sem precisar de transferência DTMF (*2).
+async function handleRamalFallback(conn: AgiConn) {
+    const exten = (await agiGetVariable(conn, 'EXTEN')) ?? ''
+    const accountcode = (await agiGetVariable(conn, 'CHANNEL(accountcode)')) ?? ''
+    if (!exten || !accountcode) return
+
+    const company = await prisma.company.findUnique({ where: { asteriskId: accountcode }, select: { id: true } })
+    if (!company) {
+        logger.warn({ event: 'agi.ramal_fallback.unknown_accountcode', accountcode })
+        await agiVerbose(conn, `Ramal Fallback: accountcode "${accountcode}" não corresponde a nenhuma empresa`, 2)
+        return
+    }
+
+    if (await resolveQueueOrOutboundFallback(conn, exten, company, accountcode, 'Ramal Fallback')) return
+
+    logger.info({ event: 'agi.ramal_fallback.not_found', exten, companyId: company.id })
+    await agiVerbose(conn, `Ramal Fallback: "${exten}" não é fila nem rota de saída da empresa`, 2)
 }
 
 export function startAgiServer(host: string, port: number) {
@@ -804,6 +847,7 @@ async function handleConnection(conn: AgiConn) {
     try {
         // Único script sem argumento - resolve tudo via variáveis do canal (EXTEN/accountcode)
         if (script === 'transfer-route') { await handleTransferRoute(conn); return }
+        if (script === 'ramal-fallback') { await handleRamalFallback(conn); return }
         if (!arg1) return
 
         if (script === 'queue-route') await handleQueueRoute(conn, arg1)

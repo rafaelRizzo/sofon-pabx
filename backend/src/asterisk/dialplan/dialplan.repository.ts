@@ -57,11 +57,18 @@ export const DialplanRepository = {
             // direto pra ramal (route-destination-resolver.ts, type "extension"), então "T" daria
             // esse poder pro CLIENTE externo transferir a própria ligação, o que nunca é o desejado
             { context, exten, priority: 7, app: 'Dial', appdata: `${dialTarget},20,t` },
-            { context, exten, priority: 8, app: 'Set', appdata: 'CDR(hangup_cause)=${HANGUPCAUSE}' },
+            // CHANUNAVAIL = Asterisk não achou o endpoint PJSIP <EXTEN>_<accountcode>, ou seja "não existe
+            // esse ramal" (busca de ramal = tentativa nativa do Dial, sem query própria) - só nesse caso
+            // faz sentido tentar fila/rota de saída (ver handleRamalFallback em agi-server.ts). Qualquer
+            // outro DIALSTATUS (BUSY/NOANSWER/CANCEL/ANSWER) significa que o ramal existe e a chamada
+            // seguiu seu curso normal - pula direto pro encerramento, sem tentar fallback nenhum.
+            { context, exten, priority: 8, app: 'GotoIf', appdata: '$["${DIALSTATUS}"="CHANUNAVAIL"]?9:10' },
+            { context, exten, priority: 9, app: 'AGI', appdata: 'agi://127.0.0.1:4573/ramal-fallback' },
+            { context, exten, priority: 10, app: 'Set', appdata: 'CDR(hangup_cause)=${HANGUPCAUSE}' },
             // CHANNEL(hangupsource) só vem preenchido depois que o Dial retorna - identifica o canal exato
             // que mandou o BYE/CANCEL; DIALSTATUS cobre os casos sem hangupsource (ex: BUSY, NOANSWER)
-            { context, exten, priority: 9, app: 'NoOp', appdata: 'Chamada ${EXTEN} encerrada - status=${DIALSTATUS}, por=${CHANNEL(hangupsource)}' },
-            { context, exten, priority: 10, app: 'HangUp', appdata: null },
+            { context, exten, priority: 11, app: 'NoOp', appdata: 'Chamada ${EXTEN} encerrada - status=${DIALSTATUS}, por=${CHANNEL(hangupsource)}' },
+            { context, exten, priority: 12, app: 'HangUp', appdata: null },
         ])
         await tx.extensions.deleteMany({ where: { context, exten: { in: extens } } })
         await tx.extensions.createMany({ data })

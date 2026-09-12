@@ -25,6 +25,7 @@ mock.module('../../time-conditions/cache/time-conditions.cache', () => ({
         invalidateTimeCondition: mock(() => Promise.resolve()),
         invalidateAgiTimeCondition: mock(() => Promise.resolve()),
         invalidateByCompany: mock(() => Promise.resolve()),
+        invalidateNamespace: mock(() => Promise.resolve()),
     },
 }))
 

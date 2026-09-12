@@ -25,14 +25,21 @@ describe('DialplanRepository.ensureGenericRoutingPattern', () => {
 
         const { data, skipDuplicates } = tx.extensions.createMany.mock.calls[0][0]
         expect(skipDuplicates).toBeUndefined()
-        // 5 tamanhos de alias (2-6 dígitos) x 10 prioridades cada
-        expect(data).toHaveLength(50)
+        // 5 tamanhos de alias (2-6 dígitos) x 12 prioridades cada
+        expect(data).toHaveLength(60)
         expect(data).toContainEqual({
             context: 'ramais',
             exten: '_XXXX',
             priority: 6,
             app: 'Set',
             appdata: 'CDR(recording_file)=${MIXMONITOR_FILENAME}',
+        })
+        expect(data).toContainEqual({
+            context: 'ramais',
+            exten: '_XXXX',
+            priority: 12,
+            app: 'HangUp',
+            appdata: null,
         })
     })
 })

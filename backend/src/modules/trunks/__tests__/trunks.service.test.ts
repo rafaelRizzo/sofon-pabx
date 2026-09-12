@@ -38,7 +38,7 @@ mock.module('../../outbound-routes/outbound-routes.service', () => ({
     resyncAllPatterns: mock(() => Promise.resolve()),
 }))
 mock.module('../../outbound-routes/cache/outbound-routes.cache', () => ({
-    OutboundRoutesCache: { invalidateRoute: mock(), invalidateByCompany: mock() },
+    OutboundRoutesCache: { invalidateRoute: mock(), invalidateByCompany: mock(), invalidateAll: mock() },
 }))
 
 import * as TrunksService from '../trunks.service'

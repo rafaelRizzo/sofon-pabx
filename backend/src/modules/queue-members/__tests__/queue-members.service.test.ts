@@ -12,7 +12,7 @@ mock.module('../../queues/cache/queues.cache', () => ({
 }))
 mock.module('../cache/queue-members.cache', () => ({
     QueueMembersCache: {
-        getMembers: mock(() => null), setMembers: mock(), invalidateMembers: mock(),
+        getMembers: mock(() => null), setMembers: mock(), invalidateMembers: mock(), invalidateNamespace: mock(),
     },
 }))
 mock.module('../../extensions/cache/extensions.cache', () => ({

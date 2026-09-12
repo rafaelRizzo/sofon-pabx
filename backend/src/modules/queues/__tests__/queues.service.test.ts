@@ -30,7 +30,8 @@ mock.module('../../queue-members/cache/queue-members.cache', () => ({
     QueueMembersCache: {
         getMembers: mock(() => null),
         setMembers: mock(),
-        invalidateMembers: mock()
+        invalidateMembers: mock(),
+        invalidateNamespace: mock()
     }
 }))
 mock.module('../../../asterisk/queue.repository', () => ({
