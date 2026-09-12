@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { createFileRoute } from "@tanstack/react-router"
 
 import { PageHeader } from "@/components/page-header"
@@ -47,6 +47,14 @@ function AgentPanelPage() {
     } = useWebphone()
     const { status, loading: statusLoading, pause, resume } = useAgentStatus()
     const [reasonId, setReasonId] = useState("")
+
+    // Sem isso, um motivo selecionado que some da lista (catálogo mudou, ou refetch trouxe uma
+    // lista vazia) deixa o Select "orfão": o Base UI Select.Value não acha o item pra exibir o
+    // label e cai pra mostrar o próprio id cru no trigger.
+    useEffect(() => {
+        if (reasonId && !status?.availableReasons.some((r) => r.id === reasonId))
+            setReasonId("")
+    }, [reasonId, status?.availableReasons])
 
     if (!user?.extensionId) {
         return (

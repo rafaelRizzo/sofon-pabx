@@ -4,6 +4,7 @@ import helmet from '@fastify/helmet'
 import cors from '@fastify/cors'
 import rateLimit from '@fastify/rate-limit'
 import multipart from '@fastify/multipart'
+import fastifyHttpProxy from '@fastify/http-proxy'
 import swagger from '@fastify/swagger'
 import scalar from '@scalar/fastify-api-reference'
 import { serializerCompiler, jsonSchemaTransform } from 'fastify-type-provider-zod'
@@ -250,6 +251,17 @@ app.setErrorHandler((error: any, request, reply) => {
         reqId: request.id,
         message,
     })
+})
+
+// Proxy do WebSocket SIP (WebRTC) - Asterisk fala só ws:// puro na porta fixa que
+// install-asterisk.sh sempre usa (8088, host.docker.internal - mesmo mecanismo do AMI); aqui vira
+// wss:// reaproveitando o cert/porta 443 que o proxy reverso da frente (Traefik/NPM) já termina
+// pra este mesmo domínio, sem precisar de TLS no Asterisk. Não usar env.WS_PORT aqui - essa var
+// agora representa a porta PÚBLICA (443, ver /system/sip-config), não a porta interna do Asterisk.
+app.register(fastifyHttpProxy, {
+    upstream: 'http://host.docker.internal:8088',
+    prefix: '/ws',
+    websocket: true,
 })
 
 // Register routes
