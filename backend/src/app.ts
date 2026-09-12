@@ -261,6 +261,9 @@ app.setErrorHandler((error: any, request, reply) => {
 app.register(fastifyHttpProxy, {
     upstream: 'http://host.docker.internal:8088',
     prefix: '/ws',
+    // Sem isso, o plugin descarta o prefixo e encaminha pro Asterisk na raiz ("/") em vez de
+    // "/ws" - Asterisk responde 404 pra essa rota e o proxy fecha o cliente com 1011.
+    rewritePrefix: '/ws',
     websocket: true,
 })
 
