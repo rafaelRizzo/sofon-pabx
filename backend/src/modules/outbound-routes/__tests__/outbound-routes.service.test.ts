@@ -114,7 +114,7 @@ describe('Service.createOutboundRoute', () => {
         expect(entries).toContainEqual(expect.objectContaining({ app: 'Dial', appdata: 'PJSIP/${EXTEN}@ast1-trunk-tst-trunk,60,T' }))
     })
 
-    it('gera header customizado de tronco com herança de canal (__PJSIP_HEADER)', async () => {
+    it('gera um Set(PJSIP_HEADER(add,...)) por header customizado da trunk, antes do Dial', async () => {
         db.company.findUnique.mockResolvedValue(COMPANY)
         db.outboundRoute.findMany.mockResolvedValue([])
         db.trunk.findMany.mockResolvedValue([{
@@ -122,7 +122,10 @@ describe('Service.createOutboundRoute', () => {
             type: 'pjsip',
             maxOutChannels: null,
             techPrefix: null,
-            customHeaders: [{ name: 'X-leo', value: 'batatafrita' }],
+            customHeaders: [
+                { name: 'X-Custom-Header', value: 'valor-1' },
+                { name: 'X-Outro-Header', value: 'valor-2' },
+            ],
             context: 'ramais',
         }])
         db.outboundRoute.create.mockResolvedValue({ ...ROUTE, id: 'r1' })
@@ -136,10 +139,19 @@ describe('Service.createOutboundRoute', () => {
             patterns: [{ pattern: '_0XXXXXXXX', position: 0 }],
         })
 
-        const entries = db.extensions.createMany.mock.calls[0]![0].data
+        const entries = db.extensions.createMany.mock.calls[0]![0].data as { app: string; appdata: string | null }[]
         expect(entries).toContainEqual(expect.objectContaining({
-            app: 'Set', appdata: '__PJSIP_HEADER(add,X-leo)=batatafrita',
+            app: 'Set', appdata: 'PJSIP_HEADER(add,X-Custom-Header)=valor-1',
         }))
+        expect(entries).toContainEqual(expect.objectContaining({
+            app: 'Set', appdata: 'PJSIP_HEADER(add,X-Outro-Header)=valor-2',
+        }))
+
+        const dialIndex = entries.findIndex((e) => e.app === 'Dial')
+        const headerIndexes = entries
+            .map((e, i) => (e.appdata?.startsWith('PJSIP_HEADER(add,') ? i : -1))
+            .filter((i) => i !== -1)
+        expect(headerIndexes.every((i) => i < dialIndex)).toBe(true)
     })
 
     it('throws 409 when pattern is duplicated within the submitted form', async () => {
