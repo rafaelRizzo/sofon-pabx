@@ -114,6 +114,34 @@ describe('Service.createOutboundRoute', () => {
         expect(entries).toContainEqual(expect.objectContaining({ app: 'Dial', appdata: 'PJSIP/${EXTEN}@ast1-trunk-tst-trunk,60,T' }))
     })
 
+    it('gera header customizado de tronco com herança de canal (__PJSIP_HEADER)', async () => {
+        db.company.findUnique.mockResolvedValue(COMPANY)
+        db.outboundRoute.findMany.mockResolvedValue([])
+        db.trunk.findMany.mockResolvedValue([{
+            ...TRUNK,
+            type: 'pjsip',
+            maxOutChannels: null,
+            techPrefix: null,
+            customHeaders: [{ name: 'X-leo', value: 'batatafrita' }],
+            context: 'ramais',
+        }])
+        db.outboundRoute.create.mockResolvedValue({ ...ROUTE, id: 'r1' })
+        db.outboundDialPattern.create.mockResolvedValue(PATTERN)
+        db.outboundRouteTrunk.create.mockResolvedValue({})
+        db.extensions.deleteMany.mockResolvedValue({ count: 0 })
+        db.extensions.createMany.mockResolvedValue({ count: 1 })
+
+        await Service.createOutboundRoute({
+            name: 'Saídas', companyId: 'c1', position: 0, trunkIds: ['t1'],
+            patterns: [{ pattern: '_0XXXXXXXX', position: 0 }],
+        })
+
+        const entries = db.extensions.createMany.mock.calls[0]![0].data
+        expect(entries).toContainEqual(expect.objectContaining({
+            app: 'Set', appdata: '__PJSIP_HEADER(add,X-leo)=batatafrita',
+        }))
+    })
+
     it('throws 409 when pattern is duplicated within the submitted form', async () => {
         db.company.findUnique.mockResolvedValue(COMPANY)
         db.trunk.findMany.mockResolvedValue([TRUNK])

@@ -124,7 +124,7 @@ function buildDialplanEntries(
             for (const h of customHeaders ?? []) {
                 entries.push({
                     context, exten, priority: p++, app: 'Set',
-                    appdata: `PJSIP_HEADER(add,${h.name})=${h.value}`,
+                    appdata: `__PJSIP_HEADER(add,${h.name})=${h.value}`,
                 })
             }
         }
