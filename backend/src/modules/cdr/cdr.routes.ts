@@ -10,12 +10,33 @@ import {
     cdrQuerySchema,
     cdrRecordingQuerySchema,
     CdrMetricsResponse,
-    ListCdrResponse
+    ListCdrResponse,
+    MyRecentCallsResponse
 } from './schemas/cdr.schema'
 import { errors } from '../../schemas/responses'
 
 export const cdrRoutes = async (app: FastifyInstance) => {
     const router = app.withTypeProvider<ZodTypeProvider>()
+
+    router.get(
+        '/cdr/me',
+        {
+            onRequest: protectedRoute,
+            schema: {
+                tags: ['CDR'],
+                summary: 'Minhas últimas chamadas (softphone/Painel do Agente)',
+                description:
+                    'Últimas 100 chamadas do ramal vinculado ao usuário logado (origem/destino direto + filas atendidas como agente). Sem gate de permissão de cdr:view - é identidade, não relatório administrativo.',
+                security: [{ bearerAuth: [] }],
+                response: {
+                    200: MyRecentCallsResponse,
+                    401: errors[401],
+                    404: errors[404]
+                }
+            }
+        },
+        Controller.getMyRecentCalls as any
+    )
 
     router.get(
         '/cdr',

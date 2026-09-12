@@ -18,6 +18,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
+import { WebphoneCallHistory } from "@/components/Webphone/webphone-call-history"
 import { WebphoneCallPanel } from "@/components/Webphone/webphone-call-panel"
 import { WebphoneStatusBadge } from "@/components/Webphone/webphone-status-badge"
 import { cn } from "@/lib/utils"
@@ -31,19 +32,26 @@ import { useAgentStatus } from "@/hooks/use-agent-status"
 function AgentPanelPage() {
     const { user } = useAuth()
     const {
-        registered,
+        registrationStatus,
         unavailable,
         unavailableReason,
         callState,
         remoteIdentity,
         micError,
         muted,
+        held,
+        transferring,
+        callStartedAt,
         audioElRef,
         call,
         answer,
         reject,
         hangup,
         toggleMute,
+        toggleHold,
+        transfer,
+        sendDtmf,
+        retryMic,
     } = useWebphone()
     const { status, loading: statusLoading, pause, resume } = useAgentStatus()
     const [reasonId, setReasonId] = useState("")
@@ -93,7 +101,7 @@ function AgentPanelPage() {
                     <CardHeader>
                         <CardTitle className="flex items-center justify-between">
                             Softphone
-                            <WebphoneStatusBadge registered={registered} />
+                            <WebphoneStatusBadge status={registrationStatus} />
                         </CardTitle>
                         {unavailable && (
                             <CardDescription>
@@ -103,21 +111,35 @@ function AgentPanelPage() {
                     </CardHeader>
                     <CardContent>
                         {micError && (
-                            <p className="mb-2 text-xs text-destructive">
-                                {micError}
-                            </p>
+                            <div className="mb-2 flex items-center justify-between gap-2 rounded-md bg-destructive/10 px-2 py-1.5">
+                                <p className="text-xs text-destructive">{micError}</p>
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-6 px-2 text-xs"
+                                    onClick={retryMic}
+                                >
+                                    Tentar novamente
+                                </Button>
+                            </div>
                         )}
 
                         <WebphoneCallPanel
-                            registered={registered}
+                            registered={registrationStatus === "registered"}
                             callState={callState}
                             remoteIdentity={remoteIdentity}
                             muted={muted}
+                            held={held}
+                            transferring={transferring}
+                            callStartedAt={callStartedAt}
                             call={call}
                             answer={answer}
                             reject={reject}
                             hangup={hangup}
                             toggleMute={toggleMute}
+                            toggleHold={toggleHold}
+                            transfer={transfer}
+                            sendDtmf={sendDtmf}
                         />
                     </CardContent>
                 </Card>
@@ -215,6 +237,18 @@ function AgentPanelPage() {
                             Você não é membro de nenhuma fila
                         </p>
                     )}
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Últimas chamadas</CardTitle>
+                    <CardDescription>
+                        Suas últimas 100 chamadas (diretas e de fila atendidas)
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <WebphoneCallHistory />
                 </CardContent>
             </Card>
         </div>

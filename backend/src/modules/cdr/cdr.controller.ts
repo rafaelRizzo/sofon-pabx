@@ -32,6 +32,17 @@ export const getCdr = async (req: FastifyRequest, reply: FastifyReply) => {
     }
 }
 
+export const getMyRecentCalls = async (req: FastifyRequest, reply: FastifyReply) => {
+    try {
+        return reply.send({
+            success: true,
+            ...(await Service.getMyRecentCalls(req.user!.id))
+        })
+    } catch (e) {
+        return handleError(reply, e, req)
+    }
+}
+
 export const getCdrMetrics = async (
     req: FastifyRequest,
     reply: FastifyReply

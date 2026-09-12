@@ -55,6 +55,20 @@ export type CdrRecord = {
     queueTalkSeconds: number | null
 }
 
+// Últimas 100 chamadas do ramal do usuário logado (Painel do Agente) - sem companyId/paginação,
+// o backend resolve tudo a partir do token (/cdr/me, ver cdr.service.ts:getMyRecentCalls)
+export function useMyRecentCalls() {
+    const { data: records = [], isLoading: loading } = useQuery({
+        queryKey: ["cdr-me"],
+        queryFn: async () => {
+            const { data } = await api.get("/cdr/me")
+            return (data.records ?? []) as CdrRecord[]
+        },
+    })
+
+    return { records, loading }
+}
+
 export type CdrFilters = {
     startDate?: string // YYYY-MM-DD
     endDate?: string // YYYY-MM-DD

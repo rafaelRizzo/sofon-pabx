@@ -228,6 +228,71 @@ export const getCdrMetricsByCompany = async (query: CdrMetricsQueryInput) => {
     }
 }
 
+const MY_RECENT_CALLS_LIMIT = 100
+
+// Self-service do Painel do Agente (softphone web) - últimas N chamadas do ramal vinculado ao
+// usuário logado, sem gate de permissão de cdr:view (mesmo racional de getMyWebrtcCredentials
+// em extensions.service.ts: é identidade, não relatório administrativo).
+// "Minhas chamadas" cobre origem/destino direto (ramal-a-ramal, outbound) + chamadas de fila
+// que esse ramal atendeu como agente - CDR e QueueCall não têm FK entre si (só casam por
+// uniqueid/callerUniqueid), então os uniqueids das filas atendidas são resolvidos num passo
+// separado antes de entrar no OR do CDR.
+export const getMyRecentCalls = async (userId: string) => {
+    const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { extensionId: true }
+    })
+    if (!user?.extensionId) throw new AppError('Nenhum ramal vinculado a este usuário', 404)
+
+    const extension = await prisma.extension.findUnique({
+        where: { id: user.extensionId },
+        select: { number: true, companyId: true }
+    })
+    if (!extension) throw new AppError('Extension not found', 404)
+
+    const company = await getCompanyById(extension.companyId)
+
+    const answeredQueueCalls = await prisma.queueCall.findMany({
+        where: { companyId: company.id, agentExtensionId: user.extensionId },
+        orderBy: { enteredAt: 'desc' },
+        take: MY_RECENT_CALLS_LIMIT,
+        select: { callerUniqueid: true }
+    })
+
+    const where = {
+        accountcode: company.asteriskId,
+        OR: [
+            { originExtension: extension.number },
+            { src: extension.number },
+            { dst: extension.number },
+            ...(answeredQueueCalls.length
+                ? [{ uniqueid: { in: answeredQueueCalls.map((q) => q.callerUniqueid) } }]
+                : [])
+        ]
+    }
+
+    const rows = await prisma.cdr.findMany({
+        where,
+        orderBy: [{ startTime: 'desc' }, { id: 'desc' }],
+        take: MY_RECENT_CALLS_LIMIT,
+        select
+    })
+
+    const records = await enrichCdrRecords(
+        rows.map(({ disposition, ...r }) => ({
+            ...r,
+            id: r.id.toString(),
+            callStatus: disposition,
+            startTime: r.startTime && formatNaiveLocalISOString(r.startTime, TZ),
+            answerTime: r.answerTime && formatNaiveLocalISOString(r.answerTime, TZ),
+            endTime: r.endTime && formatNaiveLocalISOString(r.endTime, TZ)
+        })),
+        company
+    )
+
+    return { records }
+}
+
 // Não vaza existência de registro de outra empresa: qualquer descasamento (não achou, sem
 // gravação, accountcode de empresa diferente) devolve o mesmo 404 genérico
 export const getCdrRecordingPath = async (id: bigint, companyId: string) => {

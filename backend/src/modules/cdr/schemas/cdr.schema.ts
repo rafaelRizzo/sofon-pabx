@@ -107,6 +107,12 @@ export const ListCdrResponse = ok({
     page: z.number()
 })
 
+// /cdr/me - últimas N chamadas do ramal do usuário logado, sem paginação (é uma janela fixa,
+// não uma listagem navegável)
+export const MyRecentCallsResponse = ok({
+    records: z.array(CdrSchema)
+})
+
 export const CdrMetricsSchema = z.object({
     total: z.number(),
     answered: z.number(),
