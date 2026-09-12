@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
 import { AuthProvider } from "@/hooks/use-auth"
+import { WebphoneProvider } from "@/hooks/use-webphone"
 import { hasAuthToken } from "@/lib/auth-cookie"
 import { cn } from "@/lib/utils"
 
@@ -34,25 +35,27 @@ function DashboardLayout() {
 
   return (
     <AuthProvider>
-      <SidebarProvider>
-        <AppSidebar />
-        <SidebarInset className="min-w-0">
-          <header className="flex h-12 items-center gap-2 border-b px-4">
-            <SidebarTrigger />
-            <Separator orientation="vertical" className="mx-2 h-full" />
-            <DashboardBreadcrumb />
-          </header>
-          <main
-            className={cn(
-              "min-w-0 flex-1 overflow-x-hidden",
-              isFlowEditor ? "p-0" : "p-6"
-            )}
-          >
-            <Outlet />
-          </main>
-        </SidebarInset>
-      </SidebarProvider>
-      <WebphoneWidget />
+      <WebphoneProvider>
+        <SidebarProvider>
+          <AppSidebar />
+          <SidebarInset className="min-w-0">
+            <header className="flex h-12 items-center gap-2 border-b px-4">
+              <SidebarTrigger />
+              <Separator orientation="vertical" className="mx-2 h-full" />
+              <DashboardBreadcrumb />
+            </header>
+            <main
+              className={cn(
+                "min-w-0 flex-1 overflow-x-hidden",
+                isFlowEditor ? "p-0" : "p-6"
+              )}
+            >
+              <Outlet />
+            </main>
+          </SidebarInset>
+        </SidebarProvider>
+        <WebphoneWidget />
+      </WebphoneProvider>
     </AuthProvider>
   )
 }

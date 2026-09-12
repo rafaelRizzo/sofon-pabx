@@ -40,6 +40,7 @@ model Company {
   holidayGroups          HolidayGroup[]
   agentCompanyScopes     AgentCompanyScope[]
   routingRules           RoutingRule[]
+  pauseReasons           PauseReason[]
   callRatings            CallRating[]
   agentAffinities        AgentAffinity[]
   variableSets           VariableSet[]
@@ -866,6 +867,25 @@ model RoutingRule {
   @@unique([name, companyId])
   @@index([companyId])
   @@map("routing_rules")
+}
+
+// Catálogo de motivos de pausa do agente (Almoço, Reunião etc.) — governa o que o Painel do
+// Agente oferece no self-service (ver callcenter/agent-status). `label` é copiado como string
+// livre pra QueueMember.pauseReason/queue_members.reason_paused no momento da pausa (o Asterisk
+// nativo só entende string, não FK), então apagar/desativar um motivo aqui não afeta pausas já
+// registradas — só o que passa a ficar disponível pra novas pausas.
+model PauseReason {
+  id        String   @id @default(cuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  label     String   @db.VarChar(60)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@unique([companyId, label])
+  @@index([companyId])
+  @@map("pause_reasons")
 }
 
 // Nota de atendimento (1-5) capturada via IVR de pesquisa pós-chamada — fonte de dado para

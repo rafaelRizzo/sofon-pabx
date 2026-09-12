@@ -56,6 +56,7 @@ export function createPrismaMock() {
         audio: model(),
         agentCompanyScope: model(),
         routingRule: model(),
+        pauseReason: model(),
         callRating: model(),
         agentAffinity: model(),
         variableSet: model(),

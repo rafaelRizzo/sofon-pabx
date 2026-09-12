@@ -1,8 +1,28 @@
 import { type RoutingRule, type RoutingRuleForm } from "@/hooks/use-routing-rules"
+import { type PauseReason, type PauseReasonForm } from "@/hooks/use-pause-reasons"
 import { type Trunk } from "@/hooks/use-trunks"
 
 export type AgentScopesPanelProps = {
     companyId: string
+}
+
+export type PauseReasonsPanelProps = {
+    companyId: string
+}
+
+export type PauseReasonFormDialogProps = {
+    open: boolean
+    onOpenChange: (open: boolean) => void
+    pauseReason: PauseReason | null
+    companyId: string
+    onSave: (form: PauseReasonForm) => Promise<boolean>
+}
+
+export type PauseReasonsTableProps = {
+    pauseReasons: PauseReason[]
+    loading: boolean
+    onEdit: (pauseReason: PauseReason) => void
+    onDelete: (pauseReason: PauseReason) => void
 }
 
 export type CallRatingsPanelProps = {

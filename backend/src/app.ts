@@ -46,6 +46,8 @@ import { variableCatalogRoutes } from './modules/variable-catalog/variable-catal
 import { callcenterAgentsRoutes } from './modules/callcenter/agents/agents.routes'
 import { routingRulesRoutes } from './modules/callcenter/routing-rules/routing-rules.routes'
 import { callcenterRatingsRoutes } from './modules/callcenter/ratings/ratings.routes'
+import { pauseReasonsRoutes } from './modules/callcenter/pause-reasons/pause-reasons.routes'
+import { agentStatusRoutes } from './modules/callcenter/agent-status/agent-status.routes'
 import { flowsRoutes } from './modules/flows/flows.routes'
 import { queueCallsRoutes } from './modules/queue-calls/queue-calls.routes'
 import { realtimeRoutes } from './modules/realtime/realtime.routes'
@@ -280,6 +282,8 @@ app.register(variableCatalogRoutes)
 app.register(callcenterAgentsRoutes)
 app.register(routingRulesRoutes)
 app.register(callcenterRatingsRoutes)
+app.register(pauseReasonsRoutes)
+app.register(agentStatusRoutes)
 app.register(flowsRoutes)
 app.register(queueCallsRoutes)
 app.register(realtimeRoutes)

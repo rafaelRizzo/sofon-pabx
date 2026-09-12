@@ -5,6 +5,7 @@ import { CompanyFilter } from "@/components/company-filter"
 import { PageHeader } from "@/components/page-header"
 import { AgentScopesPanel } from "@/components/Callcenter/agent-scopes-panel"
 import { RoutingRulesPanel } from "@/components/Callcenter/routing-rules-panel"
+import { PauseReasonsPanel } from "@/components/Callcenter/pause-reasons-panel"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useCompanies } from "@/hooks/use-companies"
 import { useCompanyFilter } from "@/hooks/use-company-filter"
@@ -41,12 +42,18 @@ function CallcenterPage() {
                         <TabsTrigger value="routing-rules">
                             Regras de prioridade
                         </TabsTrigger>
+                        <TabsTrigger value="pause-reasons">
+                            Motivos de pausa
+                        </TabsTrigger>
                     </TabsList>
                     <TabsContent value="agent-scopes">
                         <AgentScopesPanel companyId={companyId} />
                     </TabsContent>
                     <TabsContent value="routing-rules">
                         <RoutingRulesPanel companyId={companyId} />
+                    </TabsContent>
+                    <TabsContent value="pause-reasons">
+                        <PauseReasonsPanel companyId={companyId} />
                     </TabsContent>
                 </Tabs>
             )}

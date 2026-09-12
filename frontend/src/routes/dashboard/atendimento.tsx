@@ -1,0 +1,218 @@
+import { useState } from "react"
+import { createFileRoute } from "@tanstack/react-router"
+
+import { PageHeader } from "@/components/page-header"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from "@/components/ui/card"
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select"
+import { WebphoneCallPanel } from "@/components/Webphone/webphone-call-panel"
+import { WebphoneStatusBadge } from "@/components/Webphone/webphone-status-badge"
+import { cn } from "@/lib/utils"
+import { useAuth } from "@/hooks/use-auth"
+import { useWebphone } from "@/hooks/use-webphone"
+import { useAgentStatus } from "@/hooks/use-agent-status"
+
+// Self-service do agente: atender/discar (mesmo UserAgent do widget flutuante, via
+// WebphoneProvider) + pausar/retomar em todas as filas de uma vez (PUT
+// /callcenter/agent-status/me, ver backend/src/modules/callcenter/agent-status).
+function AgentPanelPage() {
+    const { user } = useAuth()
+    const {
+        registered,
+        unavailable,
+        unavailableReason,
+        callState,
+        remoteIdentity,
+        micError,
+        muted,
+        audioElRef,
+        call,
+        answer,
+        reject,
+        hangup,
+        toggleMute,
+    } = useWebphone()
+    const { status, loading: statusLoading, pause, resume } = useAgentStatus()
+    const [reasonId, setReasonId] = useState("")
+
+    if (!user?.extensionId) {
+        return (
+            <div className="flex flex-col gap-4">
+                <PageHeader title="Atendimento" description="Painel do agente" />
+                <p className="text-sm text-muted-foreground">
+                    Seu usuário não tem ramal vinculado - peça a um
+                    administrador pra vincular um ramal em Usuários.
+                </p>
+            </div>
+        )
+    }
+
+    const paused = status?.paused ?? false
+
+    const handleTogglePause = async () => {
+        if (paused) {
+            await resume()
+            return
+        }
+        if (!reasonId) return
+        const ok = await pause(reasonId)
+        if (ok) setReasonId("")
+    }
+
+    return (
+        <div className="flex flex-col gap-4">
+            <PageHeader
+                title="Atendimento"
+                description="Softphone, pausa e filas do seu ramal"
+            />
+            <audio ref={audioElRef} autoPlay />
+
+            <div className="grid gap-4 md:grid-cols-2">
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center justify-between">
+                            Softphone
+                            <WebphoneStatusBadge registered={registered} />
+                        </CardTitle>
+                        {unavailable && (
+                            <CardDescription>
+                                {unavailableReason ?? "Softphone indisponível"}
+                            </CardDescription>
+                        )}
+                    </CardHeader>
+                    <CardContent>
+                        {micError && (
+                            <p className="mb-2 text-xs text-destructive">
+                                {micError}
+                            </p>
+                        )}
+
+                        <WebphoneCallPanel
+                            registered={registered}
+                            callState={callState}
+                            remoteIdentity={remoteIdentity}
+                            muted={muted}
+                            call={call}
+                            answer={answer}
+                            reject={reject}
+                            hangup={hangup}
+                            toggleMute={toggleMute}
+                        />
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center justify-between">
+                            Status
+                            <Badge
+                                className={cn(
+                                    "border-transparent",
+                                    paused
+                                        ? "bg-amber-500/15 text-amber-600 dark:bg-amber-400/20 dark:text-amber-300"
+                                        : "bg-emerald-500/15 text-emerald-600 dark:bg-emerald-400/20 dark:text-emerald-300"
+                                )}
+                            >
+                                {paused ? "Pausado" : "Disponível"}
+                            </Badge>
+                        </CardTitle>
+                        <CardDescription>
+                            Aplica em todas as filas que você participa
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex flex-col gap-3">
+                        {!paused && (
+                            <Select
+                                value={reasonId}
+                                onValueChange={(v) => setReasonId(v ?? "")}
+                            >
+                                <SelectTrigger className="w-full">
+                                    <SelectValue placeholder="Motivo da pausa" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {(status?.availableReasons ?? []).map(
+                                        (r) => (
+                                            <SelectItem key={r.id} value={r.id}>
+                                                {r.label}
+                                            </SelectItem>
+                                        )
+                                    )}
+                                </SelectContent>
+                            </Select>
+                        )}
+                        <Button
+                            variant={paused ? "default" : "outline"}
+                            disabled={
+                                statusLoading || (!paused && !reasonId)
+                            }
+                            onClick={handleTogglePause}
+                        >
+                            {paused ? "Retomar atendimento" : "Pausar"}
+                        </Button>
+                        {paused && status?.pauseReason && (
+                            <p className="text-xs text-muted-foreground">
+                                Motivo: {status.pauseReason}
+                            </p>
+                        )}
+                    </CardContent>
+                </Card>
+            </div>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Filas</CardTitle>
+                    <CardDescription>
+                        Suas filas e o estado individual de cada uma
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {status?.queues.length ? (
+                        <div className="flex flex-col gap-2">
+                            {status.queues.map((q) => (
+                                <div
+                                    key={q.queueId}
+                                    className="flex items-center justify-between rounded-md border px-3 py-2 text-sm"
+                                >
+                                    <span>
+                                        {q.queueName}{" "}
+                                        <span className="text-muted-foreground">
+                                            #{q.queueNumber}
+                                        </span>
+                                    </span>
+                                    <Badge variant={q.paused ? "outline" : "default"}>
+                                        {q.paused
+                                            ? q.pauseReason
+                                                ? `Pausado - ${q.pauseReason}`
+                                                : "Pausado"
+                                            : "Ativo"}
+                                    </Badge>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="text-sm text-muted-foreground">
+                            Você não é membro de nenhuma fila
+                        </p>
+                    )}
+                </CardContent>
+            </Card>
+        </div>
+    )
+}
+
+export const Route = createFileRoute("/dashboard/atendimento")({
+    component: AgentPanelPage,
+})

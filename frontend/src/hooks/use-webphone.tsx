@@ -1,6 +1,13 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import {
+    createContext,
+    useCallback,
+    useContext,
+    useEffect,
+    useRef,
+    useState,
+} from "react"
 import {
     Inviter,
     Registerer,
@@ -15,7 +22,9 @@ import {
 import { api, apiError } from "@/lib/api"
 import { useAuth } from "@/hooks/use-auth"
 
-export type CallState = "idle" | "calling" | "ringing" | "in-call"
+// Estado SIP local do softphone deste browser - não confundir com o CallState de
+// use-realtime.ts (estado de chamada do RAMAL inteiro via AMI, valores/semântica diferentes)
+export type SoftphoneCallState = "idle" | "calling" | "ringing" | "in-call"
 
 // navegadores só liberam getUserMedia em contexto seguro (https ou localhost) - sem domínio/TLS
 // ainda (ver install-asterisk.sh), o áudio real só funciona acessando o painel via localhost/VPN
@@ -27,14 +36,19 @@ function asWebSdh(session: Session | null): Web.SessionDescriptionHandler | null
     return sdh instanceof Web.SessionDescriptionHandler ? sdh : null
 }
 
-export function useWebphone() {
+// Registra UM UserAgent/REGISTER por sessão de browser (mesmo ramal não pode registrar duas
+// vezes ao mesmo tempo). WebphoneProvider é montado uma vez no layout do dashboard
+// (routes/dashboard.tsx); tanto o widget flutuante quanto o Painel do Agente
+// (routes/dashboard/atendimento.tsx) consomem o mesmo estado via useWebphone() abaixo -
+// nunca chamar useWebphoneState() diretamente fora daqui.
+function useWebphoneState() {
     const { user } = useAuth()
     const enabled = !!user?.extensionId
 
     const [registered, setRegistered] = useState(false)
     const [unavailable, setUnavailable] = useState(false)
     const [unavailableReason, setUnavailableReason] = useState<string | null>(null)
-    const [callState, setCallState] = useState<CallState>("idle")
+    const [callState, setCallState] = useState<SoftphoneCallState>("idle")
     const [remoteIdentity, setRemoteIdentity] = useState<string | null>(null)
     const [micError, setMicError] = useState<string | null>(null)
     const [muted, setMuted] = useState(false)
@@ -257,4 +271,23 @@ export function useWebphone() {
         hangup,
         toggleMute,
     }
+}
+
+type WebphoneContextValue = ReturnType<typeof useWebphoneState>
+
+const WebphoneContext = createContext<WebphoneContextValue | null>(null)
+
+export function WebphoneProvider({ children }: { children: React.ReactNode }) {
+    const value = useWebphoneState()
+    return (
+        <WebphoneContext.Provider value={value}>
+            {children}
+        </WebphoneContext.Provider>
+    )
+}
+
+export function useWebphone() {
+    const ctx = useContext(WebphoneContext)
+    if (!ctx) throw new Error("useWebphone must be used within WebphoneProvider")
+    return ctx
 }
