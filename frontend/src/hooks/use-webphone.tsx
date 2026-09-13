@@ -491,7 +491,11 @@ function useWebphoneState() {
         heldForAttendedRef.current = false
         try {
             await primary.refer(consult)
-            await endSession(consult)
+            // Sem BYE manual aqui: depois do REFER+Replaces aceito, é o Asterisk quem encerra
+            // as duas pernas do agente ao concluir a troca das bridges (Local/_attended@transfer
+            // ;1/;2). refer() resolve só com o 202 Accepted, antes da troca terminar - um BYE
+            // nosso nesse meio tempo derruba a perna de consulta cedo demais e o Asterisk falha
+            // com "Transfer failed probably due to an early hangup".
         } catch (err) {
             // eslint-disable-next-line no-console
             console.error("[webphone] falha ao completar transferência assistida", err)
