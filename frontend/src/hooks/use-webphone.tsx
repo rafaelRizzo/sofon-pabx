@@ -17,7 +17,9 @@ import {
     UserAgent,
     Web,
     type Invitation,
+    type Notification,
 } from "sip.js"
+import { toast } from "sonner"
 
 import { api, apiError } from "@/lib/api"
 import { useAuth } from "@/hooks/use-auth"
@@ -488,21 +490,37 @@ function useWebphoneState() {
             return
         // sucesso: a ligação segue bridgeada no Asterisk sem o agente, retomar hold local não
         // faz sentido - zera antes pra não disparar resume-hold quando a consulta terminar
+        const wasHeldForAttended = heldForAttendedRef.current
         heldForAttendedRef.current = false
         try {
-            await primary.refer(consult)
-            // Sem BYE manual aqui: depois do REFER+Replaces aceito, é o Asterisk quem encerra
-            // as duas pernas do agente ao concluir a troca das bridges (Local/_attended@transfer
-            // ;1/;2). refer() resolve só com o 202 Accepted, antes da troca terminar - um BYE
-            // nosso nesse meio tempo derruba a perna de consulta cedo demais e o Asterisk falha
-            // com "Transfer failed probably due to an early hangup".
+            await primary.refer(consult, {
+                // O 202 Accepted do refer() só confirma que o Asterisk aceitou processar - o
+                // resultado real da troca de bridge (Local/_attended@transfer;1/;2) chega async
+                // nesse NOTIFY (sipfrag "SIP/2.0 200 OK" ou 4xx/5xx). Sem isso, uma falha do lado
+                // do Asterisk (ex: "Transfer failed probably due to an early hangup") passava
+                // despercebida e a chamada original ficava presa em hold pra sempre.
+                onNotify: (notification: Notification) => {
+                    notification.accept()
+                    const statusCode = Number(
+                        /^SIP\/2\.0 (\d+)/.exec(notification.request.body ?? "")?.[1]
+                    )
+                    if (!statusCode || statusCode < 200) return // 1xx (ex: "100 Trying"), ainda em progresso
+                    if (statusCode >= 300 && primary.state === SessionState.Established) {
+                        if (wasHeldForAttended) setHold(false)
+                        toast.error(
+                            "Transferência assistida falhou no Asterisk - retomando a ligação original"
+                        )
+                    }
+                },
+            })
         } catch (err) {
             // eslint-disable-next-line no-console
             console.error("[webphone] falha ao completar transferência assistida", err)
+            if (wasHeldForAttended) await setHold(false)
         } finally {
             resetConsult()
         }
-    }, [resetConsult])
+    }, [resetConsult, setHold])
 
     const cancelAttendedTransfer = useCallback(async () => {
         const consult = consultSessionRef.current
