@@ -857,9 +857,12 @@ export function ExtensionFormDialog({
     }, [open, isEdit, extensionData, updateForm])
 
     // Espelha sipCreateDefaults/pjsipCreateDefaults de backend/src/modules/extensions/schemas/extension.schema.ts
+    // Nao setar "transport" aqui: ps_endpoints.transport fixo trava o endpoint num unico
+    // transport object, e o Contact real do ramal (registro dinamico) pode vir por outro -
+    // vira PJSIP_ETPNOTSUITABLE no INVITE/qualify. Deixar unset deixa o Asterisk resolver
+    // pelo Contact a cada request.
     const applyTypeDefaults = (type: "sip" | "pjsip") => {
         if (type === "pjsip") {
-            createForm.setValue("transport", "transport-udp")
             createForm.setValue("disallow", "all")
             createForm.setValue("allow", "ulaw,alaw")
             createForm.setValue("directMedia", false)
@@ -1135,11 +1138,6 @@ export function ExtensionFormDialog({
                                     />
                                 </Field>
                             )}
-
-                            <Field>
-                                <FieldLabel>Contexto</FieldLabel>
-                                <Input {...r("context")} />
-                            </Field>
 
                             <Controller
                                 control={control}

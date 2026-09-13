@@ -128,11 +128,16 @@ const pjsipFields = {
     webrtc: z.boolean().optional(),
 }
 
+// Fixo em "ramais": outbound routes, o AGI de resolução de destino e o Realtime do Asterisk
+// (extensions.conf estático) só reconhecem esse contexto - um valor diferente quebra ligação
+// de saída e o dialplan de entrada silenciosamente (ver seção "context de Extension" no CLAUDE.md)
+const EXTENSION_CONTEXT = 'ramais'
+
 const baseShape = {
     alias: aliasSchema,
     name: z.string().min(1).max(80),
     companyId: z.cuid2(),
-    context: z.string().max(40).default('ramais'),
+    context: z.literal(EXTENSION_CONTEXT).default(EXTENSION_CONTEXT),
     allowOutbound: z.boolean().default(true),
     notes: z.string().max(10000).nullable().optional(),
 }
@@ -193,7 +198,13 @@ const pjsipCreateDefaults = {
     aorQualifyTimeout: pjsipFields.aorQualifyTimeout.default(3),
     aorMinimumExpiration: pjsipFields.aorMinimumExpiration.default(60),
     aorMaximumExpiration: pjsipFields.aorMaximumExpiration.default(7200),
-    aorDefaultExpiration: pjsipFields.aorDefaultExpiration.default(3600),
+    // 120s (não 3600 default do Asterisk): ramal TCP atrás de NAT tem a conexão derrubada
+    // silenciosamente pelo NAT/firewall do cliente sem aviso nenhum pro Asterisk - o contato seguiria
+    // "registrado" no banco (dentro do prazo de expiração) mas inalcançável pra ligações de entrada até
+    // o próximo REGISTER reabrir a conexão. 120s encolhe essa janela de "contato morto" de até 1h pra
+    // no máximo 2min. WebRTC (transport=ws) não sofre disso - a conexão é persistente e rastreada
+    // direto pelo Asterisk, então esse ajuste importa só pro cenário TCP/UDP comum atrás de NAT.
+    aorDefaultExpiration: pjsipFields.aorDefaultExpiration.default(120),
     aorRemoveExisting: pjsipFields.aorRemoveExisting.default(true),
     aorAuthenticateQualify: pjsipFields.aorAuthenticateQualify.default(false),
     aorSupportPath: pjsipFields.aorSupportPath.default(false),
@@ -234,7 +245,6 @@ export const updateExtensionSchema = z
     .object({
         name: z.string().min(1).max(80).optional(),
         alias: aliasSchema.optional(),
-        context: z.string().max(40).optional(),
         allowOutbound: z.boolean().optional(),
         notes: z.string().max(10000).nullable().optional(),
         ...sipFieldsForUpdate,
@@ -251,7 +261,7 @@ export const updateExtensionSchema = z
         allowSubscribe: z.union([z.string().max(10), z.boolean()]).optional(),
     })
     .refine((data) => Object.values(data).some((v) => v !== undefined), {
-        message: 'At least one field is required: name, alias, context, allowOutbound, or type-specific SIP/PJSIP fields',
+        message: 'At least one field is required: name, alias, allowOutbound, or type-specific SIP/PJSIP fields',
     })
 
 // ─── Mapping: camelCase API → Asterisk DB column names ───────────────────────

@@ -45,6 +45,8 @@ function AgentPanelPage() {
         attendedState,
         attendedRemoteIdentity,
         audioElRef,
+        ringtoneVolume,
+        setRingtoneVolume,
         call,
         answer,
         reject,
@@ -139,6 +141,8 @@ function AgentPanelPage() {
                             callStartedAt={callStartedAt}
                             attendedState={attendedState}
                             attendedRemoteIdentity={attendedRemoteIdentity}
+                            ringtoneVolume={ringtoneVolume}
+                            setRingtoneVolume={setRingtoneVolume}
                             call={call}
                             answer={answer}
                             reject={reject}

@@ -65,6 +65,8 @@ export function WebphoneWidget() {
         attendedState,
         attendedRemoteIdentity,
         audioElRef,
+        ringtoneVolume,
+        setRingtoneVolume,
         call,
         answer,
         reject,
@@ -97,7 +99,7 @@ export function WebphoneWidget() {
     // pista que o usuário vinculado a um ramal tem pra saber que o softphone não conectou
     if (unavailable) {
         return (
-            <div className="fixed bottom-4 right-4 z-50 w-80 rounded-lg border bg-card p-3 text-xs text-muted-foreground shadow-lg">
+            <div className="fixed bottom-4 right-4 z-50 w-80 rounded-xl border bg-card p-3 text-xs text-muted-foreground shadow-xl">
                 <div className="flex items-center justify-between">
                     <p className="font-medium text-foreground">Softphone indisponível</p>
                     <div className="flex items-center gap-1">
@@ -119,7 +121,12 @@ export function WebphoneWidget() {
     }
 
     return (
-        <div className="fixed bottom-4 right-4 z-50 w-80 rounded-lg border bg-card p-4 shadow-lg">
+        <div
+            className={cn(
+                "fixed bottom-4 right-4 z-50 w-80 rounded-xl border bg-card/95 p-4 shadow-xl backdrop-blur-sm",
+                hasActiveCall && "ring-1 ring-primary/15"
+            )}
+        >
             <audio ref={audioElRef} autoPlay />
             <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">Softphone</span>
@@ -159,6 +166,8 @@ export function WebphoneWidget() {
                     callStartedAt={callStartedAt}
                     attendedState={attendedState}
                     attendedRemoteIdentity={attendedRemoteIdentity}
+                    ringtoneVolume={ringtoneVolume}
+                    setRingtoneVolume={setRingtoneVolume}
                     call={call}
                     answer={answer}
                     reject={reject}

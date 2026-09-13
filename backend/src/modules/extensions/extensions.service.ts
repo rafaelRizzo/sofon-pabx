@@ -401,12 +401,10 @@ export const updateExtension = async (id: string, data: UpdateExtensionInput) =>
     if (!existing) throw new AppError('Extension not found', 404)
 
     const { alias, number, type, context, companyId } = existing
-    const { name, alias: newAlias, context: newContext, allowOutbound: newAllowOutbound, notes: newNotes, ...typeFields } = data
+    const { name, alias: newAlias, allowOutbound: newAllowOutbound, notes: newNotes, ...typeFields } = data
 
     const aliasChanged = newAlias !== undefined && newAlias !== alias
-    const contextChanged = newContext !== undefined && newContext !== context
     const effectiveNumber = aliasChanged ? generateAsteriskNumber(newAlias, existing.company.asteriskId) : number
-    const effectiveContext = newContext ?? context
 
     if (aliasChanged) {
         const conflict = await prisma.extension.findUnique({
@@ -425,10 +423,6 @@ export const updateExtension = async (id: string, data: UpdateExtensionInput) =>
             context,
         })
 
-        if (contextChanged) {
-            await DialplanRepository.ensureGenericRoutingPattern(tx, effectiveContext)
-        }
-
         if (type === 'pjsip') {
             if (aliasChanged) {
                 await PjsipRepository.renameExtension(tx, number, effectiveNumber)
@@ -439,7 +433,6 @@ export const updateExtension = async (id: string, data: UpdateExtensionInput) =>
             const aorUpdate: Record<string, any> = {}
 
             if (name !== undefined) endpointUpdate.callerid = `${name} <${effectiveNumber}>`
-            if (contextChanged) endpointUpdate.context = effectiveContext
             if (newAllowOutbound !== undefined) endpointUpdate.setvar = `ALLOW_OUTBOUND=${newAllowOutbound ? 1 : 0}`
 
             for (const key of pjsipFieldKeys) {
@@ -459,7 +452,6 @@ export const updateExtension = async (id: string, data: UpdateExtensionInput) =>
             }
 
             const sipUpdate: Record<string, any> = {}
-            if (contextChanged) sipUpdate.context = effectiveContext
             if (newAllowOutbound !== undefined) sipUpdate.setvar = `ALLOW_OUTBOUND=${newAllowOutbound ? 1 : 0}`
 
             for (const key of sipFieldKeys) {
@@ -473,7 +465,6 @@ export const updateExtension = async (id: string, data: UpdateExtensionInput) =>
         const extUpdate: Record<string, any> = {}
         if (name !== undefined) extUpdate.name = name
         if (aliasChanged) { extUpdate.alias = newAlias; extUpdate.number = effectiveNumber }
-        if (contextChanged) extUpdate.context = effectiveContext
         if (newAllowOutbound !== undefined) extUpdate.allowOutbound = newAllowOutbound
         if (newNotes !== undefined) extUpdate.notes = newNotes
 
@@ -484,7 +475,7 @@ export const updateExtension = async (id: string, data: UpdateExtensionInput) =>
     await ExtensionsCache.invalidateExtension(id)
     await ExtensionsCache.invalidateLiveDetails(id)
     await ExtensionsCache.invalidateAllExtensions()
-    if (aliasChanged || contextChanged) regenerateFlowNodesSafely(existing.companyId)
+    if (aliasChanged) regenerateFlowNodesSafely(existing.companyId)
     if (name !== undefined && name !== existing.name) await syncFlowNodeLabel('extension', id, name)
     const updated = await getExtensionById(id)
     return provisionedPassword ? { ...updated, provisioned: true, password: provisionedPassword } : updated

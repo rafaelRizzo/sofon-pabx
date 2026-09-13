@@ -26,6 +26,29 @@ function decodeJwtExpSeconds(token: string): number | undefined {
   }
 }
 
+// margem de segurança pra renovar o access token antes dele expirar de verdade - cobre a
+// latência da própria requisição de refresh e o clock skew entre client/server
+const REFRESH_MARGIN_SECONDS = 60
+
+let refreshTimer: ReturnType<typeof setTimeout> | null = null
+
+// Renovação silenciosa em background, independente de qualquer ação do usuário (não só durante
+// uma ligação): sem isso o access token expira sozinho se a aba ficar parada (ex: agente numa
+// chamada, sem disparar nenhum request HTTP nesse meio tempo) e o cookie simplesmente some -
+// o guard de rota (auth-cookie.ts) então desloga na próxima navegação, o que no meio de uma
+// ligação derruba o softphone inteiro (WebphoneProvider desmonta com o logout). Agendar a
+// renovação pelo próprio `exp` do JWT, e não por atividade, garante que o token nunca chega a
+// expirar enquanto a aba estiver aberta - não precisa saber nada sobre o estado do softphone.
+function scheduleTokenRefresh(token: string) {
+  if (refreshTimer) clearTimeout(refreshTimer)
+  const remaining = decodeJwtExpSeconds(token)
+  if (remaining === undefined) return
+  const delay = Math.max(0, remaining - REFRESH_MARGIN_SECONDS) * 1000
+  refreshTimer = setTimeout(() => {
+    refreshToken().catch(() => {})
+  }, delay)
+}
+
 // cookie de sessão (sem maxAge) some ao fechar o navegador antes do refreshToken (7d) expirar -
 // o guard de rota (auth-cookie.ts) só olha esse cookie e desloga sem tentar refresh nesse caso
 export function setAccessTokenCookie(token: string) {
@@ -35,6 +58,15 @@ export function setAccessTokenCookie(token: string) {
     secure: import.meta.env.PROD,
     maxAge: decodeJwtExpSeconds(token) ?? 15 * 60,
   })
+  scheduleTokenRefresh(token)
+}
+
+// usado no logout - remove a sessão local e cancela a renovação agendada (sem isso ela dispara
+// depois de deslogado, tentando refresh sem cookie de sessão nenhum)
+export function clearAccessTokenCookie() {
+  if (refreshTimer) clearTimeout(refreshTimer)
+  refreshTimer = null
+  cookies.remove("token", { path: "/" })
 }
 
 async function requestNewToken(): Promise<string> {
@@ -79,11 +111,18 @@ export async function refreshToken(): Promise<string> {
     // só força logout quando o backend rejeitou a sessão de fato (401) - erro de rede/5xx
     // (ex: Redis fora do ar) é transiente e não pode derrubar o usuário
     if (axios.isAxiosError(error) && error.response?.status === 401) {
-      cookies.remove("token", { path: "/" })
+      clearAccessTokenCookie()
       if (typeof window !== "undefined") window.location.href = "/login"
     }
     throw error
   }
+}
+
+// dispara a renovação silenciosa a partir do cookie que já existe ao abrir/recarregar a aba -
+// sem isso o agendamento só começaria a valer depois do próximo login/refresh manual
+if (typeof window !== "undefined") {
+  const existingToken = cookies.get("token")
+  if (existingToken) scheduleTokenRefresh(existingToken)
 }
 
 // rotas de auth que não devem tentar refresh automático em 401 (evita loop) - só as que rodam

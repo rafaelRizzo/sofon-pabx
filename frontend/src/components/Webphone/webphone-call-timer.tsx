@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react"
 
+import { cn } from "@/lib/utils"
+
 function formatElapsed(ms: number) {
     const totalSeconds = Math.max(0, Math.floor(ms / 1000))
     const hours = Math.floor(totalSeconds / 3600)
@@ -14,7 +16,13 @@ function formatElapsed(ms: number) {
 
 // Isolado num componente próprio pra o tick de 1s não re-renderizar o resto do
 // painel/widget - só esse relógio pisca a cada segundo.
-export function WebphoneCallTimer({ startedAt }: { startedAt: number }) {
+export function WebphoneCallTimer({
+    startedAt,
+    className,
+}: {
+    startedAt: number
+    className?: string
+}) {
     const [now, setNow] = useState(() => Date.now())
 
     useEffect(() => {
@@ -23,7 +31,7 @@ export function WebphoneCallTimer({ startedAt }: { startedAt: number }) {
     }, [])
 
     return (
-        <span className="font-mono text-xs text-muted-foreground tabular-nums">
+        <span className={cn("font-mono text-xs text-muted-foreground tabular-nums", className)}>
             {formatElapsed(now - startedAt)}
         </span>
     )

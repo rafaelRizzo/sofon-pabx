@@ -43,6 +43,21 @@ const MIC_DENIED_MESSAGE =
 const MIC_NOT_FOUND_MESSAGE = "Nenhum microfone encontrado neste dispositivo."
 const MIC_GENERIC_MESSAGE = "Não foi possível acessar o microfone."
 
+// piso do volume do toque - nunca deixa o agente zerar e perder uma chamada entrante por engano
+const RINGTONE_MIN_VOLUME = 0.15
+const RINGTONE_VOLUME_STORAGE_KEY = "webphone:ringtoneVolume"
+
+function loadRingtoneVolume(): number {
+    try {
+        const raw = window.localStorage.getItem(RINGTONE_VOLUME_STORAGE_KEY)
+        const parsed = raw ? Number(raw) : NaN
+        if (Number.isFinite(parsed)) return Math.min(1, Math.max(RINGTONE_MIN_VOLUME, parsed))
+    } catch {
+        // localStorage indisponível (contexto privado etc) - segue no default
+    }
+    return 0.7
+}
+
 function asWebSdh(session: Session | null): Web.SessionDescriptionHandler | null {
     const sdh = session?.sessionDescriptionHandler
     return sdh instanceof Web.SessionDescriptionHandler ? sdh : null
@@ -88,6 +103,35 @@ function useWebphoneState() {
     // cancelamento só retoma automaticamente nesse caso, nunca desfazendo um hold manual prévio
     const heldForAttendedRef = useRef(false)
     const audioElRef = useRef<HTMLAudioElement | null>(null)
+    // não é o <audio ref={audioElRef}> da mídia remota (esse toca o stream RTP da chamada
+    // estabelecida) - toque de entrada não tem stream nenhum ainda, é só um mp3 local em loop
+    const ringtoneRef = useRef<HTMLAudioElement | null>(null)
+    const [ringtoneVolume, setRingtoneVolumeState] = useState(loadRingtoneVolume)
+    if (!ringtoneRef.current) {
+        ringtoneRef.current = new Audio("/ringtone.mp3")
+        ringtoneRef.current.loop = true
+        ringtoneRef.current.volume = ringtoneVolume
+    }
+
+    const stopRingtone = useCallback(() => {
+        const el = ringtoneRef.current
+        if (!el) return
+        el.pause()
+        el.currentTime = 0
+    }, [])
+
+    // nunca deixa passar do piso - controle de UI é só um slider "baixo <-> alto", zerar de
+    // verdade não é uma opção (senão o agente perde o toque de uma ligação entrante)
+    const setRingtoneVolume = useCallback((next: number) => {
+        const clamped = Math.min(1, Math.max(RINGTONE_MIN_VOLUME, next))
+        if (ringtoneRef.current) ringtoneRef.current.volume = clamped
+        setRingtoneVolumeState(clamped)
+        try {
+            window.localStorage.setItem(RINGTONE_VOLUME_STORAGE_KEY, String(clamped))
+        } catch {
+            // localStorage indisponível - só não persiste entre sessões
+        }
+    }, [])
 
     const resetConsult = useCallback(() => {
         consultSessionRef.current = null
@@ -105,11 +149,12 @@ function useWebphoneState() {
         setTransferring(false)
         setCallStartedAt(null)
         if (audioElRef.current) audioElRef.current.srcObject = null
+        stopRingtone()
         // chamada principal terminou (ex: cliente desligou) com uma consulta em andamento -
         // a perna de consulta fica órfã, sem sentido mantê-la viva
         endSession(consultSessionRef.current)
         resetConsult()
-    }, [resetConsult])
+    }, [resetConsult, stopRingtone])
 
     const bindSession = useCallback(
         (session: Session, direction: "incoming" | "outgoing") => {
@@ -118,10 +163,15 @@ function useWebphoneState() {
                 session.remoteIdentity.displayName || session.remoteIdentity.uri.user || null
             )
             setCallState(direction === "incoming" ? "ringing" : "calling")
+            // toca em loop enquanto a chamada tocar pra nós - reject()/accept() do usuário e
+            // cancelamento/timeout do lado de quem ligou convergem pro mesmo stateChange abaixo,
+            // então parar ali (Established ou Terminated) cobre os três casos sem duplicar lógica
+            if (direction === "incoming") ringtoneRef.current?.play().catch(() => {})
 
             session.stateChange.addListener((state: SessionState) => {
                 if (session !== sessionRef.current) return
                 if (state === SessionState.Established) {
+                    stopRingtone()
                     setCallState("in-call")
                     setCallStartedAt(Date.now())
                     const sdh = asWebSdh(session)
@@ -134,7 +184,7 @@ function useWebphoneState() {
                 }
             })
         },
-        [resetCall]
+        [resetCall, stopRingtone]
     )
 
     useEffect(() => {
@@ -236,12 +286,42 @@ function useWebphoneState() {
 
         return () => {
             disposed = true
-            registererRef.current?.unregister().catch(() => {})
-            userAgentRef.current?.stop().catch(() => {})
-            userAgentRef.current = null
-            registererRef.current = null
+            // sem isso, desmontar o provider (logout, ramal desvinculado) com uma ligação em
+            // curso derruba o transporte sem nunca mandar BYE - o Asterisk/o outro lado ficam
+            // com o dialog pendurado até o timeout de RTP, chamada "fantasma" com áudio vivo
+            void (async () => {
+                await endSession(sessionRef.current)
+                await endSession(consultSessionRef.current)
+                await registererRef.current?.unregister().catch(() => {})
+                await userAgentRef.current?.stop().catch(() => {})
+                userAgentRef.current = null
+                registererRef.current = null
+            })()
         }
     }, [enabled, bindSession])
+
+    // F5/fechar aba/navegar pra fora do domínio: o React nunca chega a rodar o cleanup acima
+    // (o JS morre no meio), então sem isso a ligação em curso não recebe BYE nenhum - some da
+    // tela mas continua com áudio de verdade rolando no Asterisk. "beforeunload" só avisa e
+    // NUNCA desliga por si (senão um F5 cancelado no prompt já teria derrubado a ligação de
+    // verdade); o BYE de fato só sai no "pagehide", que só dispara quando a saída é confirmada.
+    useEffect(() => {
+        const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+            if (!sessionRef.current && !consultSessionRef.current) return
+            event.preventDefault()
+            event.returnValue = ""
+        }
+        const handlePageHide = () => {
+            endSession(sessionRef.current)
+            endSession(consultSessionRef.current)
+        }
+        window.addEventListener("beforeunload", handleBeforeUnload)
+        window.addEventListener("pagehide", handlePageHide)
+        return () => {
+            window.removeEventListener("beforeunload", handleBeforeUnload)
+            window.removeEventListener("pagehide", handlePageHide)
+        }
+    }, [])
 
     const ensureMic = useCallback(async () => {
         if (!window.isSecureContext) {
@@ -456,6 +536,8 @@ function useWebphoneState() {
         attendedState,
         attendedRemoteIdentity,
         audioElRef,
+        ringtoneVolume,
+        setRingtoneVolume,
         call,
         answer,
         reject,

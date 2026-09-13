@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-# INSTALADOR SOFON PBX v7.18 - PJSIP + IAX2 (sem Docker, sem chan_sip)
+# INSTALADOR SOFON PBX v7.19 - PJSIP + IAX2 (sem Docker, sem chan_sip)
 # Debian 11+ | Ubuntu 24.04+ | Asterisk 22.7.0 LTS
 # ============================================================
 
@@ -794,13 +794,18 @@ touch /var/log/asterisk/messages /var/log/asterisk/full
 chown -R asterisk:asterisk /var/log/asterisk
 chmod 664 /var/log/asterisk/messages /var/log/asterisk/full
 
+# sem "debug" no full: nível de debug (CLI "core set debug <n>") liga informação de
+# desenvolvedor extremamente verbosa (dump de config/ODBC linha a linha, retransmissão SIP
+# crua etc) - inunda o log e deixa "tail -f"/grep inutilizável em produção. notice/warning/
+# error/verbose já cobrem tudo que interessa pra operação; debug é opt-in manual só quando
+# alguém precisa investigar algo específico (nunca fica ligado por padrão)
 cat > /etc/asterisk/logger.conf << 'EOF'
 [general]
 dateformat=%F %T
 
 [logfiles]
 /var/log/asterisk/messages => notice,warning,error
-/var/log/asterisk/full     => notice,warning,error,verbose,debug
+/var/log/asterisk/full     => notice,warning,error,verbose
 console                    => notice,warning,error
 EOF
 

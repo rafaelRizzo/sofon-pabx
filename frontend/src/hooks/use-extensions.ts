@@ -187,7 +187,8 @@ const commonFields = {
     alias: aliasSchema,
     name: z.string().min(1, "Informe o nome"),
     companyId: z.string().min(1, "Selecione a empresa"),
-    context: z.string().min(1).default("ramais"),
+    // Fixo em "ramais" (não editável) - ver comentário em createExtensionSchema do backend
+    context: z.literal("ramais").default("ramais"),
     allowOutbound: z.boolean().default(true),
     notes: z.string().max(10000, "Máximo de 10.000 caracteres").optional(),
 }
@@ -233,7 +234,6 @@ export const createExtensionSchema = z.object({
 export const updateExtensionSchema = z.object({
     name: z.string().min(1, "Informe o nome"),
     alias: aliasSchema,
-    context: z.string().min(1),
     allowOutbound: z.boolean(),
     notes: z.string().max(10000, "Máximo de 10.000 caracteres").optional(),
     ...sipOptional,
