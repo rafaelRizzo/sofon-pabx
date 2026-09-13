@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-# INSTALADOR SOFON PBX v7.15 - PJSIP + IAX2 (sem Docker, sem chan_sip)
+# INSTALADOR SOFON PBX v7.18 - PJSIP + IAX2 (sem Docker, sem chan_sip)
 # Debian 11+ | Ubuntu 24.04+ | Asterisk 22.7.0 LTS
 # ============================================================
 
@@ -407,11 +407,18 @@ show_header
 show_progress 10 14 "Criando configurações"
 
 # rtp.conf
+# icesupport=yes: liga o ICE de verdade no motor de RTP (res_rtp_asterisk) - sem essa flag
+# GLOBAL, o ice_support=yes por endpoint (shortcut do webrtc=yes, ver extension.schema.ts) só
+# negocia os atributos ICE no SDP mas nunca cria a instância de ICE de verdade ("ICE set role
+# failed; no ice instance" no log com PJSIP logger ligado) - resultado é resposta SDP sem
+# nenhum a=candidate e áudio morto em chamadas WebRTC. Confirmado em produção (2026-09-12) -
+# Asterisk vem com essa flag default 'no' no rtp.conf, nem sempre presente/documentada.
 # rtcpevents=yes: emite RTCPSent/RTCPReceived no AMI (jitter/packet loss/RTT por canal em
 # chamada) - default do Asterisk é 'no', sem isso o backend não tem como popular qualidade de
 # rede em tempo real (ver src/asterisk/transport/ami-events.ts)
 cat > /etc/asterisk/rtp.conf << 'EOF'
 [general]
+icesupport=yes
 rtpstart=10000
 rtpend=20000
 strictrtp=yes
@@ -449,10 +456,13 @@ local_net=$LOCAL_NET
 ; WebRTC (softphone no browser) - sinalização SIP sobre WebSocket, servida pelo HTTP embutido do
 ; Asterisk (ver http.conf, path fixo /ws). Sem TLS por enquanto (ver WS_PORT no topo do script).
 ; external_media_address/local_net iguais aos transports UDP/TCP acima - sem eles o Asterisk só
-; oferece candidato ICE com o IP PRIVADO da interface pro SDP de chamadas WebRTC (o único
-; transporte que ficava sem essa config), e esse candidato é inalcançável de fora da rede local:
-; sinalização (INVITE/200 OK) segue OK via WebSocket, mas nenhum pacote RTP flui em nenhuma
-; direção - áudio morto tanto do agente pro cliente quanto do cliente pro agente.
+; oferece candidato ICE com o IP PRIVADO da interface pro SDP de chamadas WebRTC, inalcançável de
+; fora da rede local. Mudança de transporte exige "core restart now" pra valer - "pjsip reload"
+; não é suficiente (transport tem allow_reload=false por padrão).
+; 2026-09-12: uma tentativa anterior pareceu piorar o áudio, mas a causa real era outra - o ramal
+; de teste (webrtc=yes) estava sendo usado ao mesmo tempo por um Zoiper comum (mesmo AOR, 1
+; contato só), e Zoiper não fala DTLS-SRTP/ICE (forçado por webrtc=yes no endpoint) - nada a ver
+; com este transporte. Nunca testar ramal com webrtc=yes num softphone SIP comum.
 [transport-ws]
 type=transport
 protocol=ws

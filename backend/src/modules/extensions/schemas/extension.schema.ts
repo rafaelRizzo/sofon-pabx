@@ -200,9 +200,24 @@ const pjsipCreateDefaults = {
     webrtc: pjsipFields.webrtc.default(false),
 }
 
+// ps_endpoints.callerid é VarChar(40) (schema.prisma) - pjsip.repository.ts monta o valor como
+// `${name} <${alias}_${asteriskId}>` (asteriskId sempre 10 chars, ver Company.asteriskId). Sem
+// esse limite, um name comprido estoura a coluna e o create quebra com 500 genérico do Postgres
+// ("value too long for the column's type") em vez de um 400 claro - já reproduzido em produção
+// (2026-09-12, name de 23 chars + alias de 4 dígitos).
+const CALLERID_MAX = 40
+const ASTERISK_ID_LENGTH = 10
+const CALLERID_WRAPPER_LENGTH = ' <_>'.length + ASTERISK_ID_LENGTH // " <" + "_" + ">" + asteriskId
+
 export const createExtensionSchema = z.discriminatedUnion('type', [
     z.object({ ...baseShape, type: z.literal('sip'), ...sipFields, ...sipCreateDefaults }).strict(),
-    z.object({ ...baseShape, type: z.literal('pjsip'), ...pjsipFields, ...pjsipCreateDefaults }).strict(),
+    z
+        .object({ ...baseShape, type: z.literal('pjsip'), ...pjsipFields, ...pjsipCreateDefaults })
+        .strict()
+        .refine((data) => data.name.length + data.alias.length + CALLERID_WRAPPER_LENGTH <= CALLERID_MAX, {
+            message: `Nome muito longo: nome + alias não pode passar de ${CALLERID_MAX - CALLERID_WRAPPER_LENGTH} caracteres combinados`,
+            path: ['name'],
+        }),
 ])
 
 // accountCode é sempre = company.asteriskId, controlado 100% pelo server (ver extensions.service.ts) -
