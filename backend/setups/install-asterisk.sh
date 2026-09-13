@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-# INSTALADOR SOFON PBX v7.14 - PJSIP + IAX2 (sem Docker, sem chan_sip)
+# INSTALADOR SOFON PBX v7.15 - PJSIP + IAX2 (sem Docker, sem chan_sip)
 # Debian 11+ | Ubuntu 24.04+ | Asterisk 22.7.0 LTS
 # ============================================================
 
@@ -448,10 +448,18 @@ local_net=$LOCAL_NET
 
 ; WebRTC (softphone no browser) - sinalização SIP sobre WebSocket, servida pelo HTTP embutido do
 ; Asterisk (ver http.conf, path fixo /ws). Sem TLS por enquanto (ver WS_PORT no topo do script).
+; external_media_address/local_net iguais aos transports UDP/TCP acima - sem eles o Asterisk só
+; oferece candidato ICE com o IP PRIVADO da interface pro SDP de chamadas WebRTC (o único
+; transporte que ficava sem essa config), e esse candidato é inalcançável de fora da rede local:
+; sinalização (INVITE/200 OK) segue OK via WebSocket, mas nenhum pacote RTP flui em nenhuma
+; direção - áudio morto tanto do agente pro cliente quanto do cliente pro agente.
 [transport-ws]
 type=transport
 protocol=ws
 bind=0.0.0.0
+external_media_address=$PUBLIC_ADDRESS
+external_signaling_address=$PUBLIC_ADDRESS
+local_net=$LOCAL_NET
 
 [global]
 type=global
