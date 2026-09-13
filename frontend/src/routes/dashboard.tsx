@@ -47,7 +47,10 @@ function DashboardLayout() {
             <main
               className={cn(
                 "min-w-0 flex-1 overflow-x-hidden",
-                isFlowEditor ? "p-0" : "p-6"
+                // pb-24 reserva espaço pra bolha/painel flutuante do softphone (fixed
+                // bottom-4 right-4, ver webphone-widget.tsx) não sobrepor paginação/
+                // conteúdo que termina rente ao fim da tela (ex: CDR com muitas linhas)
+                isFlowEditor ? "p-0" : "p-6 pb-24"
               )}
             >
               <Outlet />

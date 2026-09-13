@@ -1,15 +1,26 @@
+import { createReadStream } from 'fs'
+import { stat } from 'fs/promises'
+import { extname } from 'path'
 import type { FastifyRequest, FastifyReply } from 'fastify'
 import * as UsersService from './users.service'
 import { createUserSchema, updateUserSchema, idParamSchema } from './schemas/user.schema'
 import { handleError } from '../../utils/errors/handler.error'
 import { AppError } from '../../utils/errors/app.error'
 import { prisma } from '../../lib/prisma'
+import { processAvatarImage } from './avatar-image'
 
 const assertSelfOrAdmin = (req: FastifyRequest, id: string) => {
     if (!req.scope.isAdmin && req.user!.id !== id) {
         throw new AppError('Forbidden', 403)
     }
 }
+
+const MAX_AVATAR_SIZE_BYTES = 5 * 1024 * 1024
+
+// extensão só decide o que TENTAMOS validar - quem decide se é aceito é processAvatarImage()
+// lendo os bytes reais (mesmo aviso de audios.controller.ts). .gif nunca entra aqui mesmo que
+// o cliente minta o Content-Type.
+const ALLOWED_AVATAR_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg'])
 
 export const getAllUsers = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
@@ -120,6 +131,69 @@ export const getCompaniesByUser = async (req: FastifyRequest, reply: FastifyRepl
             message: 'Companies fetched successfully',
             companies,
         })
+    } catch (error) {
+        return handleError(reply, error, req)
+    }
+}
+
+export const uploadAvatar = async (req: FastifyRequest, reply: FastifyReply) => {
+    try {
+        const { id } = idParamSchema.parse(req.params)
+        assertSelfOrAdmin(req, id)
+
+        const file = await req.file({ limits: { fileSize: MAX_AVATAR_SIZE_BYTES } })
+        if (!file) throw new AppError('No image sent', 400)
+
+        const ext = extname(file.filename).toLowerCase()
+        if (!ALLOWED_AVATAR_EXTENSIONS.has(ext)) {
+            throw new AppError('File must be .png, .jpg or .jpeg', 400)
+        }
+
+        const buffer = await file.toBuffer()
+        if (buffer.length === 0) throw new AppError('Empty file', 400)
+
+        const processed = await processAvatarImage(buffer)
+        const user = await UsersService.uploadAvatar(id, processed)
+
+        return reply.send({ success: true, message: 'Avatar updated successfully', avatarUpdatedAt: user.avatarUpdatedAt })
+    } catch (error) {
+        // @fastify/multipart lança FST_REQ_FILE_TOO_LARGE (não é AppError/ZodError) quando o
+        // stream ultrapassa o limits.fileSize acima - sem esse mapeamento, handleError cai no
+        // branch genérico e devolve 500 em vez de uma mensagem acionável pro usuário
+        if ((error as { code?: string })?.code === 'FST_REQ_FILE_TOO_LARGE') {
+            return handleError(reply, new AppError('A imagem deve ter no máximo 5MB', 413), req)
+        }
+        return handleError(reply, error, req)
+    }
+}
+
+export const getAvatarFile = async (req: FastifyRequest, reply: FastifyReply) => {
+    try {
+        const { id } = idParamSchema.parse(req.params)
+        assertSelfOrAdmin(req, id)
+
+        const filePath = await UsersService.getAvatarFilePath(id)
+        try {
+            await stat(filePath)
+        } catch {
+            throw new AppError('Avatar file not found', 404)
+        }
+
+        reply.header('Content-Disposition', `inline; filename="${id}.webp"`)
+        reply.type('image/webp')
+        return reply.send(createReadStream(filePath))
+    } catch (error) {
+        return handleError(reply, error, req)
+    }
+}
+
+export const deleteAvatarFile = async (req: FastifyRequest, reply: FastifyReply) => {
+    try {
+        const { id } = idParamSchema.parse(req.params)
+        assertSelfOrAdmin(req, id)
+
+        await UsersService.deleteAvatar(id)
+        return reply.send({ success: true, message: 'Avatar removed successfully' })
     } catch (error) {
         return handleError(reply, error, req)
     }

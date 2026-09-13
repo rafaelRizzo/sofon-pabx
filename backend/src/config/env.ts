@@ -32,6 +32,12 @@ const envSchema = z.object({
     RATE_LIMIT_WINDOW: z.string().default('1 second'),
     AUDIO_UPLOAD_RATE_LIMIT_MAX: z.coerce.number().int().min(1).max(100).default(5),
     AUDIO_UPLOAD_RATE_LIMIT_WINDOW: z.string().default('1 minute'),
+    AVATAR_UPLOAD_RATE_LIMIT_MAX: z.coerce.number().int().min(1).max(100).default(10),
+    AVATAR_UPLOAD_RATE_LIMIT_WINDOW: z.string().default('1 minute'),
+    // Foto de perfil - 1 arquivo por usuário, path determinístico (ver avatar-storage.ts). Default
+    // relativo ao cwd do processo; em produção precisa ser um volume persistente (o container é
+    // efêmero - sem volume, toda foto some no próximo deploy).
+    AVATAR_STORAGE_DIR: z.string().default('./storage/avatars'),
     AUDIO_CONVERSION_CONCURRENCY: z.coerce.number().int().min(1).max(4).default(2),
     AUDIO_CONVERSION_QUEUE_MAX: z.coerce.number().int().min(0).max(100).default(10),
     AUDIO_CONVERSION_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120000).default(30000),

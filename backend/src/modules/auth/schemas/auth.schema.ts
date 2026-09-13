@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { ok } from '../../../schemas/responses'
+import { ok, timestamp } from '../../../schemas/responses'
 
 export const loginSchema = z.object({
     username: z.email(),
@@ -27,5 +27,6 @@ export const MeSchema = z.object({
     role: z.enum(['admin', 'reseller', 'user']),
     permissions: z.array(z.string()),
     extensionId: z.string().nullable(),
+    avatarUpdatedAt: timestamp.nullable(),
 })
 export const MeResponse = ok({ message: z.string(), user: MeSchema })

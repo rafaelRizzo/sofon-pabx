@@ -96,7 +96,7 @@ export const me = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
         const user = await prisma.user.findUnique({
             where: { id: req.user!.id },
-            select: { id: true, name: true, username: true, role: true, permissions: true, extensionId: true },
+            select: { id: true, name: true, username: true, role: true, permissions: true, extensionId: true, avatarUpdatedAt: true },
         })
 
         if (!user) {

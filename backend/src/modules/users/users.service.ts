@@ -1,3 +1,4 @@
+import { mkdir, rename, rm, writeFile } from 'fs/promises'
 import { prisma } from '../../lib/prisma'
 import { UsersCache } from './cache/users.cache'
 import { CompaniesCache } from '../companies/cache/companies.cache'
@@ -6,6 +7,8 @@ import argon2 from 'argon2'
 import { AppError } from '../../utils/errors/app.error'
 import { invalidateUserCompanyIds, invalidateUserPermissions } from '../../utils/auth/access'
 import { jtiManager } from '../../lib/jti'
+import { avatarDir, avatarPath, avatarTmpPath } from './avatar-storage'
+import { randomUUID } from 'crypto'
 
 const userSelect = {
     id: true,
@@ -18,6 +21,7 @@ const userSelect = {
     extensionId: true,
     createdBy: true,
     notes: true,
+    avatarUpdatedAt: true,
     companies: { select: { company: { select: { id: true, name: true } } } },
     createdAt: true,
     updatedAt: true,
@@ -192,11 +196,53 @@ export const getCompaniesByUser = async (id: string) => {
     return companies
 }
 
+// já recebe o buffer processado (webp reencodado, ver avatar-image.ts) - só grava em disco e
+// atualiza o carimbo. Escreve num tmp no MESMO diretório final e faz rename atômico: nunca deixa
+// um arquivo parcial no path final se o processo cair no meio da escrita.
+export const uploadAvatar = async (id: string, processedImage: Buffer) => {
+    const existing = await prisma.user.findUnique({ where: { id }, select: { id: true } })
+    if (!existing) throw new AppError('User not found', 404)
+
+    await mkdir(avatarDir(), { recursive: true })
+    const tmpPath = avatarTmpPath(id, randomUUID())
+    await writeFile(tmpPath, processedImage)
+    try {
+        await rename(tmpPath, avatarPath(id))
+    } catch (error) {
+        await rm(tmpPath, { force: true })
+        throw error
+    }
+
+    const updated = await prisma.user.update({ where: { id }, data: { avatarUpdatedAt: new Date() }, select: userSelect })
+
+    await UsersCache.invalidateUser(id)
+    await UsersCache.invalidateAllUsers()
+    return mapUser(updated)
+}
+
+export const deleteAvatar = async (id: string) => {
+    const existing = await prisma.user.findUnique({ where: { id }, select: { id: true } })
+    if (!existing) throw new AppError('User not found', 404)
+
+    await rm(avatarPath(id), { force: true })
+    await prisma.user.update({ where: { id }, data: { avatarUpdatedAt: null } })
+
+    await UsersCache.invalidateUser(id)
+    await UsersCache.invalidateAllUsers()
+}
+
+export const getAvatarFilePath = async (id: string) => {
+    const user = await prisma.user.findUnique({ where: { id }, select: { avatarUpdatedAt: true } })
+    if (!user || !user.avatarUpdatedAt) throw new AppError('Avatar not found', 404)
+    return avatarPath(id)
+}
+
 export const deleteUser = async (id: string) => {
     const user = await prisma.user.delete({
         where: { id },
     })
 
+    await rm(avatarPath(id), { force: true })
     await UsersCache.invalidateUser(id)
     await UsersCache.invalidateAllUsers()
     if (user.createdBy) await UsersCache.invalidateUsersByCreatedBy(user.createdBy)

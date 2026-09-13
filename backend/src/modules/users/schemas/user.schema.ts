@@ -50,6 +50,7 @@ export const UserSchema = z.object({
     webhookSlug: z.string(),
     createdBy: z.string().nullable(),
     notes: z.string().nullable(),
+    avatarUpdatedAt: timestamp.nullable(),
     companies: z.array(z.object({ id: z.string(), name: z.string() })),
     createdAt: timestamp,
     updatedAt: timestamp,
@@ -60,3 +61,5 @@ export const GetUserResponse = ok({ message: z.string(), user: UserSchema })
 export const GetUserCompaniesResponse = ok({ message: z.string(), companies: z.array(CompanySchema) })
 export const CreateUserResponse = ok({ message: z.string(), userId: z.string() })
 export const UpdateUserResponse = ok({ message: z.string() })
+export const UploadAvatarResponse = ok({ message: z.string(), avatarUpdatedAt: timestamp.nullable() })
+export const DeleteAvatarResponse = ok({ message: z.string() })

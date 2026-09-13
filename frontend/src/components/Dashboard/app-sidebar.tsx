@@ -30,6 +30,7 @@ import {
 } from "lucide-react"
 
 import { SofonMark } from "@/components/icons/sofon-mark"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   Sidebar,
   SidebarContent,
@@ -47,7 +48,9 @@ import {
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { useTheme } from "@/components/theme-provider"
 import { useAuth, type PermissionResourceKey } from "@/hooks/use-auth"
+import { useAvatarUrl } from "@/hooks/use-profile"
 import { useLogout } from "@/hooks/use-logout"
+import { getInitials } from "@/lib/utils"
 
 export type NavItem = {
   title: string
@@ -240,7 +243,8 @@ export function AppSidebar() {
   const { isMobile, setOpenMobile } = useSidebar()
   const { resolvedTheme, setTheme } = useTheme()
   const { logout } = useLogout()
-  const { hasPermission } = useAuth()
+  const { user, hasPermission } = useAuth()
+  const avatarUrl = useAvatarUrl(user?.id, user?.avatarUpdatedAt)
 
   const isActive = (href: string) =>
     href === "/dashboard" ? pathname === href : pathname.startsWith(href)
@@ -298,6 +302,28 @@ export function AppSidebar() {
         </SidebarContent>
         <SidebarFooter>
           <SidebarMenu>
+            {user && (
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={isActive("/dashboard/profile")}
+                  tooltip="Meu perfil"
+                  render={
+                    <Link
+                      to="/dashboard/profile"
+                      onClick={() => isMobile && setOpenMobile(false)}
+                    >
+                      <Avatar className="size-4 shrink-0">
+                        <AvatarImage src={avatarUrl ?? undefined} alt={user.name} />
+                        <AvatarFallback className="text-[9px]">
+                          {getInitials(user.name)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span>{user.name}</span>
+                    </Link>
+                  }
+                />
+              </SidebarMenuItem>
+            )}
             <SidebarMenuItem>
               <SidebarMenuButton
                 tooltip="Alternar tema"

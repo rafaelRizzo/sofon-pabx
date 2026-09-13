@@ -19,6 +19,7 @@ export const errors = {
     403: errorBody,
     404: errorBody,
     409: errorBody,
+    413: errorBody,
     422: errorBody,
 }
 

@@ -87,6 +87,10 @@ model User {
   permissions  String[]      @default([])
   extensionId  String?       @unique
   notes        String?       @db.Text
+  // null = sem foto (front usa fallback de iniciais); setado = timestamp do último upload,
+  // usado como cache-bust na URL de GET /users/:id/avatar (arquivo em disco é sempre o mesmo
+  // path determinístico por userId, ver avatar-storage.ts)
+  avatarUpdatedAt DateTime?  @db.Timestamptz(3)
   createdBy    String?
   creator      User?         @relation("UserCreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
   createdUsers User[]        @relation("UserCreatedBy")
