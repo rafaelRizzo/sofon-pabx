@@ -15,22 +15,22 @@ export const userIdParamSchema = z.object({
 })
 
 export const createCompanySchema = z.object({
-    name: z.string().min(1),
-    doc: z.string().optional(),
+    name: z.string().min(1).max(255),
+    doc: z.string().max(20).optional(),
     status: companyStatusSchema.optional(),
     timezone: timezoneSchema.optional(),
     metadata: z.record(z.string(), z.string()).optional().default({}),
-    elevenLabsApiKey: z.string().trim().min(1).nullable().optional(),
+    elevenLabsApiKey: z.string().trim().min(1).max(255).nullable().optional(),
     notes: z.string().max(10000).nullable().optional(),
 })
 
 export const updateCompanySchema = z.object({
-    name: z.string().min(1).optional(),
-    doc: z.string().optional(),
+    name: z.string().min(1).max(255).optional(),
+    doc: z.string().max(20).optional(),
     status: companyStatusSchema.optional(),
     timezone: timezoneSchema.optional(),
     metadata: z.record(z.string(), z.string()).optional(),
-    elevenLabsApiKey: z.string().trim().min(1).nullable().optional(),
+    elevenLabsApiKey: z.string().trim().min(1).max(255).nullable().optional(),
     notes: z.string().max(10000).nullable().optional(),
 })
 

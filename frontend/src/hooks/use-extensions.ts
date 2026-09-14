@@ -185,7 +185,7 @@ const pjsipOptional = {
 // Schema plano para o form (union de campos - frontend filtra por tipo no submit)
 const commonFields = {
     alias: aliasSchema,
-    name: z.string().min(1, "Informe o nome"),
+    name: z.string().min(1, "Informe o nome").max(80, "Máximo 80 caracteres"),
     companyId: z.string().min(1, "Selecione a empresa"),
     // Fixo em "ramais" (não editável) - ver comentário em createExtensionSchema do backend
     context: z.literal("ramais").default("ramais"),
@@ -232,7 +232,7 @@ export const createExtensionSchema = z.object({
 })
 
 export const updateExtensionSchema = z.object({
-    name: z.string().min(1, "Informe o nome"),
+    name: z.string().min(1, "Informe o nome").max(80, "Máximo 80 caracteres"),
     alias: aliasSchema,
     allowOutbound: z.boolean(),
     notes: z.string().max(10000, "Máximo de 10.000 caracteres").optional(),

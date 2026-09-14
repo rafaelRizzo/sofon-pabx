@@ -29,13 +29,13 @@ export type Did = {
 
 // Espelha createDidSchema/updateDidSchema de backend/src/modules/dids/schemas/did.schema.ts
 export const createDidSchema = z.object({
-    number: z.string().regex(/^\d+$/, "Apenas dígitos são permitidos"),
+    number: z.string().regex(/^\d+$/, "Apenas dígitos são permitidos").max(20, "Máximo 20 caracteres"),
     companyId: z.string().min(1, "Selecione a empresa"),
     notes: z.string().max(10000).optional(),
 })
 
 export const updateDidSchema = z.object({
-    number: z.string().regex(/^\d+$/, "Apenas dígitos são permitidos"),
+    number: z.string().regex(/^\d+$/, "Apenas dígitos são permitidos").max(20, "Máximo 20 caracteres"),
     status: z.enum(["active", "inactive", "blocked"], "Selecione um status"),
     companyId: z.string().min(1, "Selecione a empresa"),
     notes: z.string().max(10000).optional(),

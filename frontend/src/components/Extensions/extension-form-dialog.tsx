@@ -1049,6 +1049,7 @@ export function ExtensionFormDialog({
                                     <FieldLabel>Ramal</FieldLabel>
                                     <Input
                                         placeholder="Ex: 1001"
+                                        maxLength={6}
                                         {...r("alias")}
                                     />
                                     {errors.alias && (
@@ -1061,6 +1062,7 @@ export function ExtensionFormDialog({
                                     <FieldLabel>Nome</FieldLabel>
                                     <Input
                                         placeholder="Nome do usuário"
+                                        maxLength={80}
                                         {...r("name")}
                                     />
                                     {errors.name && (

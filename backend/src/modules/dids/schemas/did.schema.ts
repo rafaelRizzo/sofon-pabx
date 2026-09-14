@@ -17,13 +17,13 @@ export const companyIdParamSchema = z.object({
 export const didStatusSchema = z.enum(['active', 'inactive', 'blocked'])
 
 export const createDidSchema = z.object({
-    number: z.string().regex(/^\d+$/, 'Only digits allowed'),
+    number: z.string().regex(/^\d+$/, 'Only digits allowed').max(20),
     companyId: z.cuid2(),
     notes: z.string().max(10000).optional(),
 })
 
 export const updateDidSchema = z.object({
-    number: z.string().regex(/^\d+$/, 'Only digits allowed').optional(),
+    number: z.string().regex(/^\d+$/, 'Only digits allowed').max(20).optional(),
     status: didStatusSchema.optional(),
     companyId: z.cuid2().optional(),
     notes: z.string().max(10000).optional(),

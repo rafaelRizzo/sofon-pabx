@@ -25,8 +25,8 @@ export type Company = {
 // Espelha create/updateCompanySchema do backend. metadata é array no form (useFieldArray)
 // e vira Record no payload. Vínculo empresa↔usuário é gerenciado só pela tela de Usuários.
 export const companyFormSchema = z.object({
-    name: z.string().min(1, "Informe o nome"),
-    doc: z.string().optional(),
+    name: z.string().min(1, "Informe o nome").max(255, "Máximo 255 caracteres"),
+    doc: z.string().max(20, "Máximo 20 caracteres").optional(),
     status: z.enum(["active", "inactive", "blocked"], "Selecione um status"),
     timezone: z.string().min(1, "Selecione um fuso horário"),
     metadata: z.array(
@@ -35,7 +35,7 @@ export const companyFormSchema = z.object({
             value: z.string().min(1, "Informe o valor"),
         })
     ),
-    elevenLabsApiKey: z.string().optional(),
+    elevenLabsApiKey: z.string().max(255, "Máximo 255 caracteres").optional(),
     notes: z.string().max(10000, "Máximo de 10.000 caracteres").optional(),
 })
 

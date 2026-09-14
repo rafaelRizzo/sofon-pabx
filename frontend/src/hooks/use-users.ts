@@ -28,8 +28,8 @@ export type User = {
 
 // Espelham os schemas do backend (users/schemas/user.schema.ts), com mensagens customizadas
 export const createUserSchema = z.object({
-    name: z.string().min(1, "Informe o nome"),
-    username: z.email("E-mail inválido"),
+    name: z.string().min(1, "Informe o nome").max(255, "Máximo 255 caracteres"),
+    username: z.email("E-mail inválido").max(255, "Máximo 255 caracteres"),
     password: z.string().min(6, "A senha deve ter no mínimo 6 caracteres"),
     role: z.enum(["admin", "reseller", "user"], "Selecione uma permissão"),
     permissions: z.array(z.string()),

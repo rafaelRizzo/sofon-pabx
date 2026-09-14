@@ -217,6 +217,7 @@ export function UserFormDialog({
                                 <Input
                                     id="name"
                                     placeholder="Nome completo"
+                                    maxLength={255}
                                     {...register("name")}
                                 />
                                 {errors.name && (
@@ -234,6 +235,7 @@ export function UserFormDialog({
                                     type="email"
                                     placeholder="usuario@empresa.com.br"
                                     autoComplete="off"
+                                    maxLength={255}
                                     {...register("username")}
                                 />
                                 {errors.username && (

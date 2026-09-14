@@ -128,6 +128,7 @@ export function CompanyFormDialog({
                                 <Input
                                     id="name"
                                     placeholder="Nome da empresa"
+                                    maxLength={255}
                                     {...register("name")}
                                 />
                                 {errors.name && (
@@ -143,6 +144,7 @@ export function CompanyFormDialog({
                                 <Input
                                     id="doc"
                                     placeholder="CNPJ ou CPF"
+                                    maxLength={20}
                                     {...register("doc")}
                                 />
                                 {errors.doc && (
@@ -231,6 +233,7 @@ export function CompanyFormDialog({
                                     type="password"
                                     placeholder="Cole a API key da conta ElevenLabs da empresa"
                                     autoComplete="off"
+                                    maxLength={255}
                                     {...register("elevenLabsApiKey")}
                                 />
                                 {errors.elevenLabsApiKey && (

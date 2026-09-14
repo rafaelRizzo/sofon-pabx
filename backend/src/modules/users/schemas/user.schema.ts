@@ -13,8 +13,8 @@ export const permissionsSchema = z.array(z.enum(PERMISSION_KEYS)).default([])
 // Todo usuário precisa estar vinculado a pelo menos 1 empresa: sem isso, req.scope.companyIds
 // fica [] e o usuário não enxerga nada (nenhum recurso escopado por empresa)
 export const createUserSchema = z.object({
-    name: z.string().min(1),
-    username: z.email(),
+    name: z.string().min(1).max(255),
+    username: z.email().max(255),
     password: z.string().min(6),
     role: z.enum(['admin', 'reseller', 'user']).default('user'),
     permissions: permissionsSchema,
@@ -25,8 +25,8 @@ export const createUserSchema = z.object({
 })
 
 export const updateUserSchema = z.object({
-    name: z.string().min(1).optional(),
-    username: z.email().optional(),
+    name: z.string().min(1).max(255).optional(),
+    username: z.email().max(255).optional(),
     password: z.string().min(6).optional(),
     extensionId: z.cuid2().nullable().optional(),
     permissions: permissionsSchema.optional(),

@@ -248,6 +248,7 @@ export function DidFormDialog({
                             <FieldLabel>Número</FieldLabel>
                             <Input
                                 placeholder="Ex: 5511999999999"
+                                maxLength={20}
                                 {...(isEdit
                                     ? updateForm.register("number")
                                     : createForm.register("number"))}

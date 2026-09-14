@@ -12,15 +12,15 @@ datasource db {
 model Company {
   id                     String                  @id @default(cuid())
   asteriskId             String                  @unique @default(dbgenerated("substring(replace(gen_random_uuid()::text, '-', ''), 1, 10)")) @db.VarChar(10)
-  name                   String
-  doc                    String?
-  status                 String                  @default("active") // active | inactive | blocked
+  name                   String                  @db.VarChar(255)
+  doc                    String?                 @db.VarChar(20)
+  status                 String                  @default("active") @db.VarChar(20) // active | inactive | blocked
   // padrão de storage é sempre UTC (Timestamptz); este campo só define o fuso de exibição na API
   timezone               String                  @default("America/Sao_Paulo") @db.VarChar(64)
   metadata               Json                    @default("{}")
   // key própria da empresa pra TTS (ver providers/elevenlabs.provider.ts) — null = TTS desabilitado
   // pra essa empresa, sem fallback global (cada empresa usa a própria conta/billing ElevenLabs)
-  elevenLabsApiKey       String?
+  elevenLabsApiKey       String?                 @db.VarChar(255)
   notes                  String?                 @db.Text
   createdAt              DateTime                @default(now()) @db.Timestamptz(3)
   updatedAt              DateTime                @updatedAt @db.Timestamptz(3)
@@ -60,11 +60,11 @@ model Company {
 
 model Did {
   id            String         @id @default(cuid())
-  number        String
+  number        String         @db.VarChar(20)
   companyId     String
   company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
   inboundRoutes InboundRoute[]
-  status        String         @default("active") // active | inactive | blocked
+  status        String         @default("active") @db.VarChar(20) // active | inactive | blocked
   notes         String?        @db.Text
   createdAt     DateTime       @default(now()) @db.Timestamptz(3)
   updatedAt     DateTime       @updatedAt @db.Timestamptz(3)
@@ -75,29 +75,29 @@ model Did {
 }
 
 model User {
-  id           String        @id @default(cuid())
-  webhookSlug  String        @unique @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name         String
-  username     String        @unique
-  password     String
-  token        String?       @unique
-  role         String        @default("user")
-  status       String        @default("active")
+  id              String        @id @default(cuid())
+  webhookSlug     String        @unique @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name            String        @db.VarChar(255)
+  username        String        @unique @db.VarChar(255)
+  password        String        @db.VarChar(255)
+  token           String?       @unique @db.VarChar(1024)
+  role            String        @default("user") @db.VarChar(20)
+  status          String        @default("active") @db.VarChar(20)
   // relevante só para role="user"; admin/reseller têm acesso irrestrito (ver requirePermission)
-  permissions  String[]      @default([])
-  extensionId  String?       @unique
-  notes        String?       @db.Text
+  permissions     String[]      @default([])
+  extensionId     String?       @unique
+  notes           String?       @db.Text
   // null = sem foto (front usa fallback de iniciais); setado = timestamp do último upload,
   // usado como cache-bust na URL de GET /users/:id/avatar (arquivo em disco é sempre o mesmo
   // path determinístico por userId, ver avatar-storage.ts)
-  avatarUpdatedAt DateTime?  @db.Timestamptz(3)
-  createdBy    String?
-  creator      User?         @relation("UserCreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
-  createdUsers User[]        @relation("UserCreatedBy")
-  extension    Extension?    @relation(fields: [extensionId], references: [id], onDelete: SetNull)
-  createdAt    DateTime      @default(now()) @db.Timestamptz(3)
-  updatedAt    DateTime      @updatedAt @db.Timestamptz(3)
-  companies    UserCompany[]
+  avatarUpdatedAt DateTime?     @db.Timestamptz(3)
+  createdBy       String?
+  creator         User?         @relation("UserCreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
+  createdUsers    User[]        @relation("UserCreatedBy")
+  extension       Extension?    @relation(fields: [extensionId], references: [id], onDelete: SetNull)
+  createdAt       DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime      @updatedAt @db.Timestamptz(3)
+  companies       UserCompany[]
 
   @@index([createdBy])
   @@map("users")
@@ -116,11 +116,11 @@ model UserCompany {
 
 model Extension {
   id                 String                   @id @default(cuid())
-  alias              String
-  number             String                   @unique
-  type               String
-  name               String
-  context            String                   @default("ramais")
+  alias              String                   @db.VarChar(20)
+  number             String                   @unique @db.VarChar(20)
+  type               String                   @db.VarChar(20)
+  name               String                   @db.VarChar(255)
+  context            String                   @default("ramais") @db.VarChar(40)
   allowOutbound      Boolean                  @default(true)
   companyId          String
   company            Company                  @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -146,8 +146,8 @@ model Queue {
   number                    String        @db.VarChar(20)
   companyId                 String
   company                   Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  strategy                  String        @default("ringall")
-  musicOnHold               String        @default("default")
+  strategy                  String        @default("ringall") @db.VarChar(20)
+  musicOnHold               String        @default("default") @db.VarChar(128)
   timeout                   Int           @default(15)
   retry                     Int           @default(5)
   maxLen                    Int           @default(0)
@@ -304,10 +304,10 @@ model CallQuality {
   company          Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   trunkId          String
   trunk            Trunk    @relation(fields: [trunkId], references: [id], onDelete: Cascade)
-  uniqueid         String   @unique
-  linkedid         String?
-  callerNum        String?
-  channel          String
+  uniqueid         String   @unique @db.VarChar(150)
+  linkedid         String?  @db.VarChar(150)
+  callerNum        String?  @db.VarChar(80)
+  channel          String   @db.VarChar(80)
   startAt          DateTime
   endAt            DateTime
   // null = nenhuma amostra chegou nessa direção (chamada muito curta) - diferente de 0, que é
@@ -329,7 +329,7 @@ model CallQuality {
 
 model OutboundRoute {
   id         String                   @id @default(cuid())
-  name       String
+  name       String                   @db.VarChar(255)
   companyId  String
   company    Company                  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   position   Int                      @default(0)
@@ -518,7 +518,7 @@ model Audio {
   company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
   source      AudioSource @default(UPLOAD)
   ttsText     String?     @db.Text
-  ttsVoiceId  String?
+  ttsVoiceId  String?     @db.VarChar(255)
   ttsSettings Json?
   notes       String?     @db.Text
   createdAt   DateTime    @default(now()) @db.Timestamptz(3)
@@ -552,7 +552,7 @@ model IvrMenu {
   // "menu" = opções de 1 dígito (options); "collect" = coleta uma sequência fixa de dígitos
   // (ex: CPF/CNPJ) sem opções, expondo o valor em variableName pra outros módulos (Request
   // Template, Validar Variável): ver IvrRepository e ivr.service.ts:assertTypeConsistency
-  type           String      @default("menu")
+  type           String      @default("menu") @db.VarChar(20)
   // nome da variável de canal que recebe os dígitos coletados, só usado quando type="collect"
   variableName   String?     @db.VarChar(80)
   // null até vincular um Audio — mesmo padrão de Announcement.audioId (ver IvrRepository)
@@ -596,7 +596,7 @@ model RequestTemplate {
   companyId        String
   company          Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   method           String   @default("GET") @db.VarChar(10)
-  url              String
+  url              String   @db.VarChar(2048)
   headers          Json?
   body             Json?
   timeoutMs        Int      @default(5000)
@@ -637,7 +637,7 @@ model VariableCondition {
   name       String   @db.VarChar(80)
   companyId  String
   company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  combinator String   @default("and")
+  combinator String   @default("and") @db.VarChar(10)
   // [{ variable: "CALLERID(num)", operator: "length_gte", value: "11" }]
   rules      Json     @default("[]")
   createdAt  DateTime @default(now()) @db.Timestamptz(3)
@@ -678,10 +678,10 @@ model IntegrationCredential {
   name            String    @db.VarChar(80)
   companyId       String
   company         Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  baseUrl         String
-  tokenCiphertext String
-  tokenIv         String
-  tokenTag        String
+  baseUrl         String    @db.VarChar(500)
+  tokenCiphertext String    @db.VarChar(1024)
+  tokenIv         String    @db.VarChar(64)
+  tokenTag        String    @db.VarChar(64)
   createdAt       DateTime  @default(now()) @db.Timestamptz(3)
   updatedAt       DateTime  @updatedAt @db.Timestamptz(3)
   ixcNodes        IxcNode[]
@@ -751,10 +751,10 @@ model FlowEdge {
   id         String   @id @default(cuid())
   companyId  String
   company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  sourceType String
+  sourceType String   @db.VarChar(40)
   sourceId   String
-  slot       String
-  targetType String?
+  slot       String   @db.VarChar(40)
+  targetType String?  @db.VarChar(40)
   targetId   String?
   createdAt  DateTime @default(now()) @db.Timestamptz(3)
   updatedAt  DateTime @updatedAt @db.Timestamptz(3)
@@ -964,7 +964,7 @@ model QueueCall {
   talkSeconds      Int?
   initialPosition  Int?
   finalPosition    Int?
-  recordingFile    String?
+  recordingFile    String?    @db.VarChar(255)
   createdAt        DateTime   @default(now()) @db.Timestamptz(3)
   updatedAt        DateTime   @updatedAt @db.Timestamptz(3)
 
@@ -984,10 +984,10 @@ model QueueCall {
 model AuditLog {
   id        String   @id @default(cuid())
   actorId   String
-  actorName String?
-  ip        String?
-  action    String // CREATE | UPDATE | DELETE
-  model     String // nome do model Prisma afetado (ex: "Trunk", "Did")
+  actorName String?  @db.VarChar(255)
+  ip        String?  @db.VarChar(45)
+  action    String   @db.VarChar(20) // CREATE | UPDATE | DELETE
+  model     String   @db.VarChar(40) // nome do model Prisma afetado (ex: "Trunk", "Did")
   recordId  String?
   companyId String?
   before    Json?
@@ -1047,7 +1047,7 @@ model ps_contacts {
   expiration_time      BigInt?
   qualify_frequency    Int?
   outbound_proxy       String?  @db.VarChar(40)
-  path                 String?
+  path                 String?  @db.VarChar(255)
   user_agent           String?  @db.VarChar(255)
   qualify_timeout      Float?
   reg_server           String?  @db.VarChar(20)
