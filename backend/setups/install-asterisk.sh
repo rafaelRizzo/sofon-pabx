@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-# INSTALADOR SOFON PBX v7.20 - PJSIP + IAX2 (sem Docker, sem chan_sip)
+# INSTALADOR SOFON PBX v7.21 - PJSIP + IAX2 (sem Docker, sem chan_sip)
 # Debian 11+ | Ubuntu 24.04+ | Asterisk 22.7.0 LTS
 # ============================================================
 
@@ -780,6 +780,20 @@ mkdir -p /var/lib/asterisk/sounds
 chown -R asterisk:asterisk /var/lib/asterisk/sounds
 chmod 755 /var/lib/asterisk/sounds
 log "Diretório de anúncios criado → /var/lib/asterisk/sounds"
+
+# --- Prompts core em pt_BR (fila, ramal inválido, transferência etc.) - sem isso o Asterisk
+# cai no fallback em inglês do pacote core-sounds mesmo com language=pt_BR no endpoint, porque
+# /var/lib/asterisk/sounds/pt_BR nunca existe no servidor ---
+if [ -d "$SCRIPT_DIR/sounds/pt_BR" ]; then
+    mkdir -p /var/lib/asterisk/sounds/pt_BR
+    cp -f "$SCRIPT_DIR"/sounds/pt_BR/*.wav /var/lib/asterisk/sounds/pt_BR/
+    chown -R asterisk:asterisk /var/lib/asterisk/sounds/pt_BR
+    chmod 755 /var/lib/asterisk/sounds/pt_BR
+    chmod 644 /var/lib/asterisk/sounds/pt_BR/*.wav
+    log "Prompts core pt_BR instalados → /var/lib/asterisk/sounds/pt_BR"
+else
+    log "AVISO: $SCRIPT_DIR/sounds/pt_BR não encontrado, prompts core ficarão em inglês (fallback do core-sounds)"
+fi
 
 # --- Dialplan estático por empresa (queues-app/timeconditions/announcements/ivrs/holidays/
 # request-templates/variables/variable-conditions/callcenter-surveys) - arquivos gerados pela API, incluídos via #include em extensions.conf

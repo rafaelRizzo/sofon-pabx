@@ -45,8 +45,13 @@ async function buildResourceEntry(node: NodeRow, asteriskId: string): Promise<Di
 
     switch (node.type) {
         case 'extension': {
-            const resource = await prisma.extension.findUnique({ where: { id: node.resourceId }, select: { context: true, number: true } })
-            return resource ? go(resource.context, resource.number) : [{ context: FLOW_NODE_CONTEXT, exten, priority: 1, app: 'Hangup', appdata: null }]
+            // alias puro (ex: "1000"), não `number` ("1000_2de67dcb7e") - o dialplan genérico de
+            // ramal (DialplanRepository.ensureGenericRoutingPattern) só casa padrões de alias puro
+            // (2-6 dígitos); usar `number` aqui nunca bate com nenhuma exten real, caindo sempre no
+            // fallback `_X.` (pbx-invalid) mesmo com o ramal livre - mesmo cuidado de
+            // route-destination-resolver.ts, case 'extension'
+            const resource = await prisma.extension.findUnique({ where: { id: node.resourceId }, select: { context: true, alias: true } })
+            return resource ? go(resource.context, resource.alias) : [{ context: FLOW_NODE_CONTEXT, exten, priority: 1, app: 'Hangup', appdata: null }]
         }
         case 'queue': {
             const resource = await prisma.queue.findUnique({ where: { id: node.resourceId }, select: { number: true } })
