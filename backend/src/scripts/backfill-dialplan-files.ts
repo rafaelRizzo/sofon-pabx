@@ -21,6 +21,7 @@ import { FormatterNodeRepository } from '../asterisk/destinations/formatter-node
 import { IxcNodeRepository } from '../asterisk/destinations/ixc-node.repository'
 import { FlowRepository } from '../asterisk/flows/flow.repository'
 import { FlowNodeRepository } from '../asterisk/flows/flow-node.repository'
+import { reloadDialplanNow } from '../asterisk/dialplan/dialplan-file.repository'
 
 async function main() {
     const companies = await prisma.company.findMany({ select: { id: true, name: true } })
@@ -43,7 +44,12 @@ async function main() {
         await FlowNodeRepository.regenerate(company.id) // idempotente mesmo já rodado via Ivr/Queue acima
     }
 
-    console.log('Backfill concluído.')
+    // regenerate() só dispara reloadDialplan() fire-and-forget (debounced 500ms) - sem isso o
+    // `process.exit(0)` abaixo mata o processo antes do debounce/AMI completarem, e os .conf saem
+    // corretos no disco mas o Asterisk continua servindo o dialplan antigo em memória até alguém
+    // rodar reload manual ou editar algo pela API de novo (ver docs/runbooks/dialplan-reload-race.md)
+    const reloaded = await reloadDialplanNow()
+    console.log(`Backfill concluído. Dialplan reload via AMI: ${reloaded ? 'ok' : 'falhou (ver logs de warn ami.*)'}`)
 }
 
 main()
