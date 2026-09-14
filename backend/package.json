@@ -42,12 +42,13 @@
     "private": true,
     "scripts": {
         "dev": "bun run --watch src/server.ts",
-        "build": "bun build --target=bun src/server.ts src/scripts/backfill-dialplan-files.ts --outdir=dist --minify --sourcemap=external",
+        "build": "bun build --target=bun src/server.ts src/scripts/backfill-dialplan-files.ts src/scripts/bootstrap-admin.ts --outdir=dist --minify --sourcemap=external",
         "start": "bun dist/server.js",
         "migrate": "bun run prisma migrate dev",
         "deploy": "bun run prisma deploy",
         "generate": "bun run prisma generate",
         "reset": "bun run prisma migrate reset",
+        "bootstrap:admin": "bun run src/scripts/bootstrap-admin.ts",
         "test": "LOG_ENABLED=false bun test",
         "test:unit": "LOG_ENABLED=false bun test service.test",
         "test:integration": "LOG_ENABLED=false bun test routes.test"

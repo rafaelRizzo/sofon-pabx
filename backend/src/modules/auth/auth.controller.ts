@@ -109,6 +109,15 @@ export const me = async (req: FastifyRequest, reply: FastifyReply) => {
     }
 }
 
+export const status = async (req: FastifyRequest, reply: FastifyReply) => {
+    try {
+        const data = await AuthService.getStatus()
+        return reply.status(200).send({ success: true, ...data })
+    } catch (error) {
+        return handleError(reply, error, req)
+    }
+}
+
 export const register = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
         const data = registerSchema.parse(req.body)

@@ -19,6 +19,7 @@ export type RegisterInput = z.infer<typeof registerSchema>
 
 export const TokenResponse = ok({ message: z.string(), token: z.string() })
 export const LogoutResponse = ok({ message: z.string() })
+export const StatusResponse = ok({ hasUsers: z.boolean() })
 
 export const MeSchema = z.object({
     id: z.string(),

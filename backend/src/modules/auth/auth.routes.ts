@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import * as AuthController from './auth.controller'
 import { authMiddleware } from '../../middleware/auth.middleware'
-import { loginSchema, registerSchema, TokenResponse, LogoutResponse, MeResponse } from './schemas/auth.schema'
+import { loginSchema, registerSchema, TokenResponse, LogoutResponse, MeResponse, StatusResponse } from './schemas/auth.schema'
 import { errors } from '../../schemas/responses'
 
 // Throttle agressivo em auth: barra brute-force/credential-stuffing (o rate limit global de 1000/s
@@ -11,6 +11,17 @@ const authRateLimit = { config: { rateLimit: { max: 10, timeWindow: '1 minute' }
 
 export const authRoutes = async (app: FastifyInstance) => {
     const router = app.withTypeProvider<ZodTypeProvider>()
+
+    router.get('/auth/status', {
+        schema: {
+            tags: ['Auth'],
+            summary: 'Status do sistema',
+            description: 'Indica se já existe algum usuário cadastrado - o front usa isso pra decidir entre tela de login e tela de primeiro registro.',
+            response: {
+                200: StatusResponse,
+            },
+        },
+    }, AuthController.status as any)
 
     router.post('/auth/register', {
         ...authRateLimit,

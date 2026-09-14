@@ -69,6 +69,11 @@ export const refreshAccessToken = async (refreshToken: string) => {
     }
 }
 
+export const getStatus = async () => {
+    const userCount = await prisma.user.count()
+    return { hasUsers: userCount > 0 }
+}
+
 export const register = async (data: RegisterInput) => {
     // count + create numa transação serializável - sem isso, duas requisições concorrentes no bootstrap
     // (0 usuários) passariam ambas no check e criariam dois admins.
