@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-# INSTALADOR SOFON PBX v7.19 - PJSIP + IAX2 (sem Docker, sem chan_sip)
+# INSTALADOR SOFON PBX v7.20 - PJSIP + IAX2 (sem Docker, sem chan_sip)
 # Debian 11+ | Ubuntu 24.04+ | Asterisk 22.7.0 LTS
 # ============================================================
 
@@ -735,10 +735,11 @@ fi
 FIREWALL_MODE_FLAG=()
 [[ -f /etc/manage-fw/config.args ]] && FIREWALL_MODE_FLAG=(--update)
 
-# --local-tcp 5038 cobre o modelo padrão (bindaddr 127.0.0.1). --private-tcp 5038 é pro caso do
-# backend rodar em rede bridge (Dokploy/Swarm, ver backend/CLAUDE.md "Produção atual"), onde
-# bindaddr precisa virar 0.0.0.0 manualmente - sem essa liberação o AMI nunca é alcançável a
-# partir do container mesmo com o ACL do manager.conf certo (SYN cai no policy drop do host).
+# --local-tcp 5038 cobre o modelo network_mode:host (container fala via 127.0.0.1 do host).
+# --private-tcp 5038 cobre o modelo rede bridge Docker/Swarm (Dokploy, ver backend/CLAUDE.md
+# "Produção atual"), onde o manager.conf gerado no STEP 13 já sobe com bindaddr 0.0.0.0 -
+# sem essa liberação aqui o AMI não seria alcançável a partir do container (SYN cairia no
+# policy drop do host) mesmo com o ACL do manager.conf certo.
 bash "$MANAGE_FW_DIR/firewall.sh" \
     "${FIREWALL_MODE_FLAG[@]}" \
     --log "$LOG_FILE" \
@@ -822,19 +823,30 @@ cat > /etc/asterisk/manager.conf << EOF
 [general]
 enabled            = yes
 port               = 5038
-bindaddr           = 127.0.0.1
-# "no" derruba com SessionLimit qualquer 2ª conexão do mesmo usuário - o backend mantém uma
-# conexão AMI persistente (ami-events.ts, monitoramento em tempo real) o tempo todo logada como
-# "admin", e QUALQUER reload de dialplan (ami-client.ts) abre uma 2ª conexão com o mesmo usuário
-# em paralelo. Sem "yes" aqui, esse reload é rejeitado silenciosamente (best-effort, só loga
-# warning) e o dialplan nunca é recarregado de verdade. bindaddr/permit já restringem a 127.0.0.1.
+; bindaddr 0.0.0.0 (não 127.0.0.1): backend pode rodar em rede bridge Docker (Dokploy/Swarm,
+; ver backend/CLAUDE.md "Produção atual") onde o container não compartilha o namespace de rede
+; do host - 127.0.0.1 ali seria o loopback do próprio container, nunca alcançaria o Asterisk.
+; Exposição contida pelo ACL "permit" abaixo (só localhost + rede privada) e pelo firewall.sh do
+; STEP 12 (--local-tcp 5038 + --private-tcp 5038, nunca pública).
+bindaddr           = 0.0.0.0
+; "no" derruba com SessionLimit qualquer 2ª conexão do mesmo usuário - o backend mantém uma
+; conexão AMI persistente (ami-events.ts, monitoramento em tempo real) o tempo todo logada como
+; "admin", e QUALQUER reload de dialplan (ami-client.ts) abre uma 2ª conexão com o mesmo usuário
+; em paralelo. Sem "yes" aqui, esse reload é rejeitado silenciosamente (best-effort, só loga
+; warning) e o dialplan nunca é recarregado de verdade. bindaddr/permit já restringem o acesso.
 allowmultiplelogin = yes
 displayconnects    = no
 
 [admin]
 secret  = $AMI_SECRET
 deny    = 0.0.0.0/0.0.0.0
+; mesmas 3 faixas privadas liberadas pelo firewall.sh no STEP 12 (--private-tcp 5038) - cobre
+; tanto network_mode:host (container fala via 127.0.0.1) quanto rede bridge Docker/Swarm
+; (container fala via gateway, ex. docker_gwbridge em 172.16.0.0/12).
 permit  = 127.0.0.1/255.255.255.255
+permit  = 10.0.0.0/255.0.0.0
+permit  = 172.16.0.0/255.240.0.0
+permit  = 192.168.0.0/255.255.0.0
 read    = all
 write   = all
 EOF
