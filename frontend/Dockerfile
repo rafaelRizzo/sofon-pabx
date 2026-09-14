@@ -10,7 +10,7 @@ RUN corepack enable
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN --mount=type=cache,id=sofon-frontend-pnpm-store,target=/pnpm/store \
-    pnpm fetch --frozen-lockfile
+    pnpm fetch
 RUN --mount=type=cache,id=sofon-frontend-pnpm-store,target=/pnpm/store \
     pnpm install --frozen-lockfile --offline
 
