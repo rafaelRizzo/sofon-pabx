@@ -202,6 +202,11 @@ export const deleteAvatarFile = async (req: FastifyRequest, reply: FastifyReply)
 export const deleteUser = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
         const { id } = idParamSchema.parse(req.params)
+
+        if (req.user!.id === id) {
+            throw new AppError('Cannot delete your own user', 400)
+        }
+
         await UsersService.deleteUser(id)
 
         return reply.send({

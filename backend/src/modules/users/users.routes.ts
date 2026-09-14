@@ -171,6 +171,7 @@ export const usersRoutes = async (app: FastifyInstance) => {
             params: idParamSchema,
             response: {
                 200: deleted,
+                400: errors[400],
                 401: errors[401],
                 403: errors[403],
                 404: errors[404],
