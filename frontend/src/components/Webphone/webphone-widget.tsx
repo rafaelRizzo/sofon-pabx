@@ -1,14 +1,22 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { lazy, Suspense, useEffect, useState } from "react"
 import { useLocation } from "@tanstack/react-router"
 import { PhoneIcon, XIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { WebphoneCallPanel } from "@/components/Webphone/webphone-call-panel"
 import { WebphoneStatusBadge } from "@/components/Webphone/webphone-status-badge"
 import { useWebphone, type WebphoneRegistrationStatus } from "@/hooks/use-webphone"
+
+// Lazy: só carrega Slider/Dialpad (e o resto do módulo) quando o widget é aberto de fato -
+// evita puxar esse peso em toda navegação do /dashboard/**, onde o widget fica montado sempre
+// mas quase sempre fechado (ver comentário em WebphoneWidget)
+const WebphoneCallPanel = lazy(() =>
+    import("@/components/Webphone/webphone-call-panel").then((m) => ({
+        default: m.WebphoneCallPanel,
+    }))
+)
 
 const DOT_CLASS: Record<WebphoneRegistrationStatus, string> = {
     registered: "bg-emerald-500",
@@ -156,30 +164,32 @@ export function WebphoneWidget() {
             )}
 
             <div className="mt-3">
-                <WebphoneCallPanel
-                    registered={registrationStatus === "registered"}
-                    callState={callState}
-                    remoteIdentity={remoteIdentity}
-                    muted={muted}
-                    held={held}
-                    transferring={transferring}
-                    callStartedAt={callStartedAt}
-                    attendedState={attendedState}
-                    attendedRemoteIdentity={attendedRemoteIdentity}
-                    ringtoneVolume={ringtoneVolume}
-                    setRingtoneVolume={setRingtoneVolume}
-                    call={call}
-                    answer={answer}
-                    reject={reject}
-                    hangup={hangup}
-                    toggleMute={toggleMute}
-                    toggleHold={toggleHold}
-                    transfer={transfer}
-                    startAttendedTransfer={startAttendedTransfer}
-                    completeAttendedTransfer={completeAttendedTransfer}
-                    cancelAttendedTransfer={cancelAttendedTransfer}
-                    sendDtmf={sendDtmf}
-                />
+                <Suspense fallback={null}>
+                    <WebphoneCallPanel
+                        registered={registrationStatus === "registered"}
+                        callState={callState}
+                        remoteIdentity={remoteIdentity}
+                        muted={muted}
+                        held={held}
+                        transferring={transferring}
+                        callStartedAt={callStartedAt}
+                        attendedState={attendedState}
+                        attendedRemoteIdentity={attendedRemoteIdentity}
+                        ringtoneVolume={ringtoneVolume}
+                        setRingtoneVolume={setRingtoneVolume}
+                        call={call}
+                        answer={answer}
+                        reject={reject}
+                        hangup={hangup}
+                        toggleMute={toggleMute}
+                        toggleHold={toggleHold}
+                        transfer={transfer}
+                        startAttendedTransfer={startAttendedTransfer}
+                        completeAttendedTransfer={completeAttendedTransfer}
+                        cancelAttendedTransfer={cancelAttendedTransfer}
+                        sendDtmf={sendDtmf}
+                    />
+                </Suspense>
             </div>
         </div>
     )

@@ -28,6 +28,11 @@ x-backend-common: &backend-common
     - /var/spool/asterisk/monitor:/var/spool/asterisk/monitor:ro
     # Só leitura, pro dashboard medir o tamanho (GET /dashboard/infra, ver dashboard.service.ts)
     - /var/log/asterisk:/var/log/asterisk:ro
+    # AVATAR_STORAGE_DIR (users.service.ts) sem isso é disco local de cada container - com
+    # replicas: 3 (ver abaixo) cada réplica só enxerga o avatar que ELA mesma recebeu no upload,
+    # e o Traefik balanceia os GETs seguintes pras outras 2 réplicas, que respondem 404 (avatar
+    # "sumia"/trocava sozinho dependendo de qual réplica atendia o request)
+    - avatars_sofon_data:/app/storage/avatars
 
 services:
   postgres:
@@ -151,4 +156,7 @@ volumes:
     external: true
   redis_sofon_data:
     name: redis_sofon_data
+    external: true
+  avatars_sofon_data:
+    name: avatars_sofon_data
     external: true

@@ -65,6 +65,29 @@ function asWebSdh(session: Session | null): Web.SessionDescriptionHandler | null
     return sdh instanceof Web.SessionDescriptionHandler ? sdh : null
 }
 
+// Traduz o motivo da rejeição SIP do INVITE de saída - sem isso o agente só via a tela
+// "Chamando..." sumir e voltar pro discador, sem nenhuma pista do porquê (número errado,
+// ramal ocupado, indisponível etc).
+function dialFailureMessage(statusCode: number, reasonPhrase: string): string {
+    switch (statusCode) {
+        case 404:
+            return "Número ou ramal não encontrado"
+        case 484:
+            return "Número incompleto"
+        case 480:
+            return "Destino indisponível no momento"
+        case 486:
+        case 600:
+            return "Destino ocupado"
+        case 408:
+            return "Destino não respondeu"
+        case 603:
+            return "Chamada recusada pelo destino"
+        default:
+            return `Falha ao ligar: ${statusCode} ${reasonPhrase}`
+    }
+}
+
 // Encerra uma sessão SIP no método certo pro estado em que ela está - estabelecida (BYE),
 // discando por nós (CANCEL) ou tocando pra nós (REJECT). Reaproveitado tanto pelo hangup da
 // chamada principal quanto pra descartar a perna de consulta de uma transferência assistida.
@@ -101,6 +124,10 @@ function useWebphoneState() {
     const registererRef = useRef<Registerer | null>(null)
     const sessionRef = useRef<Session | null>(null)
     const consultSessionRef = useRef<Session | null>(null)
+    // true só quando o próprio agente pediu pra encerrar (hangup durante "calling"/CANCEL) - o
+    // onReject do INVITE cancelado também dispara (487 Request Terminated), sem essa flag a UI
+    // mostraria "falha na ligação" pra um cancelamento manual normal
+    const callCancelledByUserRef = useRef(false)
     // true só quando foi o próprio startAttendedTransfer que colocou a chamada em espera - o
     // cancelamento só retoma automaticamente nesse caso, nunca desfazendo um hold manual prévio
     const heldForAttendedRef = useRef(false)
@@ -234,6 +261,16 @@ function useWebphoneState() {
                 authorizationUsername: creds.username,
                 authorizationPassword: creds.password,
                 transportOptions: { server },
+                // sip.js loga cada REGISTER/OPTIONS/config em texto bruto por padrão (logLevel "log") -
+                // some com o console em qualquer sessão longa, só erro real interessa em produção/dev
+                logConfiguration: false,
+                logLevel: "error",
+                // default é 0 (sem reconexão automática): uma queda de WS (rede instável, restart do
+                // Asterisk) deixava o transporte morto pro resto da sessão, e o Registerer continuava
+                // tentando renovar o registro pra sempre, empilhando erro "Not connected"/503 no console
+                // sem nunca voltar sozinho - só um F5 recuperava o softphone
+                reconnectionAttempts: 100,
+                reconnectionDelay: 4,
                 delegate: {
                     onInvite: (invitation: Invitation) => {
                         bindSession(invitation, "incoming")
@@ -359,7 +396,28 @@ function useWebphoneState() {
 
             const inviter = new Inviter(userAgent, target)
             bindSession(inviter, "outgoing")
-            await inviter.invite().catch(() => resetCall())
+            callCancelledByUserRef.current = false
+            let sipRejected = false
+            await inviter
+                .invite({
+                    requestDelegate: {
+                        // resposta SIP final negativa (404/486/603 etc) pro nosso INVITE de saída -
+                        // sem isso o agente só via a tela "Chamando..." sumir e o discador voltar,
+                        // sem nenhuma pista do motivo
+                        onReject: (response) => {
+                            sipRejected = true
+                            if (callCancelledByUserRef.current) return
+                            const { statusCode, reasonPhrase } = response.message
+                            toast.error(dialFailureMessage(statusCode ?? 0, reasonPhrase ?? ""))
+                        },
+                    },
+                })
+                .catch(() => {
+                    if (!sipRejected && !callCancelledByUserRef.current) {
+                        toast.error("Não foi possível completar a ligação - tente novamente")
+                    }
+                    resetCall()
+                })
         },
         [bindSession, ensureMic, resetCall]
     )
@@ -378,6 +436,7 @@ function useWebphoneState() {
     }, [])
 
     const hangup = useCallback(async () => {
+        callCancelledByUserRef.current = true
         await endSession(sessionRef.current)
     }, [])
 

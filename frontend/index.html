@@ -15,10 +15,15 @@
       storage.googleapis.com pela textura perlin-noise que o VoiceOrb (componentes/voice-picker/
       voice-orb.tsx, shader Three.js) carrega via <img>/texture loader - sem isso o Canvas lança
       erro não capturado e derruba a rota inteira (react-three-fiber não engole falha de textura).
+      img-src também precisa de blob: pro avatar de perfil (useAvatarUrl busca via axios/blob e
+      exibe com URL.createObjectURL, ver use-profile.ts) - sem isso o <img> é bloqueado silenciosamente,
+      igual o caso do <audio> acima. worker-src precisa de 'self' blob: pro elkjs (Auto Layout do
+      Flows, flow-canvas.tsx) - a build "bundled" da lib ainda sobe um Web Worker via blob URL, e sem
+      worker-src o browser cai no fallback de script-src (que não tem blob:) e bloqueia a criação.
     -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://storage.googleapis.com; font-src 'self' data:; media-src 'self' blob: https://storage.googleapis.com https://*.elevenlabs.io; connect-src 'self' %VITE_API_URL% ws: wss:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://storage.googleapis.com; font-src 'self' data:; media-src 'self' blob: https://storage.googleapis.com https://*.elevenlabs.io; connect-src 'self' %VITE_API_URL% ws: wss:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
     />
     <title>Sofon PABX</title>
     <script src="/theme-init.js"></script>

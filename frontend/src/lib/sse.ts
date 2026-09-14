@@ -51,7 +51,8 @@ export function openEventStream<T>({ url, params, onMessage }: EventStreamOption
 
             if (res.status === 401) {
                 await refreshToken()
-                return connect()
+                reconnect()
+                return
             }
             if (!res.ok || !res.body) throw new Error(`stream failed: ${res.status}`)
 

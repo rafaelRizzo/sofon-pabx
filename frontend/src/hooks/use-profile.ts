@@ -11,8 +11,10 @@ const ALLOWED_AVATAR_TYPES = ["image/png", "image/jpeg"]
 
 // GET /users/:id/avatar exige Bearer token (mesmo motivo de use-audios.ts: EventSource/<img src>
 // não mandam header custom) - por isso busca como blob via axios em vez de <img src> direto.
-// queryKey inclui avatarUpdatedAt: troca automaticamente pra nova foto (ou some) sem precisar
-// de cache-busting manual na URL.
+// `v=avatarUpdatedAt` na querystring é cache-busting de verdade (força o navegador/proxy a tratar
+// como recurso novo) - sem isso a URL é sempre a mesma (/users/:id/avatar) e o cache HTTP podia
+// devolver bytes de uma foto antiga mesmo com o efeito refazendo o fetch, dando foto errada/
+// inconsistente entre telas que montaram o hook em momentos diferentes.
 export function useAvatarUrl(userId: string | null | undefined, avatarUpdatedAt: string | null | undefined) {
   const [url, setUrl] = useState<string | null>(null)
 
@@ -26,7 +28,10 @@ export function useAvatarUrl(userId: string | null | undefined, avatarUpdatedAt:
     let cancelled = false
 
     api
-      .get(`/users/${userId}/avatar`, { responseType: "blob" })
+      .get(`/users/${userId}/avatar`, {
+        responseType: "blob",
+        params: { v: avatarUpdatedAt },
+      })
       .then((res) => {
         if (cancelled) return
         objectUrl = URL.createObjectURL(res.data as Blob)
