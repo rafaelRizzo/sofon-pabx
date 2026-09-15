@@ -100,10 +100,13 @@ export const getDidById = async (id: string) => {
 export const createDid = async (data: CreateDidInput) => {
     await getCompanyById(data.companyId)
 
-    const existing = await prisma.did.findUnique({
-        where: { number_companyId: { number: data.number, companyId: data.companyId } },
-    })
-    if (existing) throw new AppError('DID already exists for this company', 409)
+    // Número é único GLOBALMENTE, não só por empresa - senão o roteamento de entrada (chave
+    // <did>_<companyAsteriskId>, ver inboundroute.repository.ts) fica ambíguo quando a operadora
+    // entrega a chamada por um tronco de empresa diferente da dona do DID (só o lookup rápido por
+    // accountcode do tronco de entrada não bastaria pra desambiguar - ver resolve-did-route em
+    // agi-server.ts)
+    const existing = await prisma.did.findUnique({ where: { number: data.number } })
+    if (existing) throw new AppError('DID already exists', 409)
 
     const did = await prisma.did.create({ data, select })
 
@@ -122,11 +125,11 @@ export const updateDid = async (id: string, data: UpdateDidInput) => {
     const oldCompany = await getCompanyById(existing.companyId)
     if (isReassign) await getCompanyById(data.companyId!)
 
-    if (data.number || isReassign) {
-        const conflict = await prisma.did.findUnique({
-            where: { number_companyId: { number: data.number ?? existing.number, companyId: targetCompanyId } },
-        })
-        if (conflict && conflict.id !== id) throw new AppError('DID already exists for this company', 409)
+    // Conflito só é possível trocando o número em si - reatribuir de empresa (isReassign) não muda
+    // o number, e a unicidade agora é global (não por companyId), então não depende de targetCompanyId
+    if (data.number && data.number !== existing.number) {
+        const conflict = await prisma.did.findUnique({ where: { number: data.number } })
+        if (conflict && conflict.id !== id) throw new AppError('DID already exists', 409)
     }
 
     if (isReassign) {

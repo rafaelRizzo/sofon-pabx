@@ -96,7 +96,7 @@ export function CdrTable({
 
     return (
         <div className="rounded-md border">
-            {/* w-max + min-w-full: cresce alem do container quando as 11 colunas (todas
+            {/* w-max + min-w-full: cresce alem do container quando as 12 colunas (todas
             whitespace-nowrap) nao cabem, acionando o overflow-x-auto do wrapper da Table em vez
             de forcar w-full e espremer as colunas sem scroll */}
             <Table className="w-max min-w-full">
@@ -110,6 +110,7 @@ export function CdrTable({
                         <TableHead className="text-center">Espera</TableHead>
                         <TableHead className="text-center">Atendido por</TableHead>
                         <TableHead className="text-center">Tronco</TableHead>
+                        <TableHead className="text-center">Tronco de entrada (real)</TableHead>
                         <TableHead className="text-center">Duração</TableHead>
                         <TableHead className="text-center">Status</TableHead>
                         <TableHead className="text-center">Gravação</TableHead>
@@ -119,7 +120,7 @@ export function CdrTable({
                     {loading ? (
                         Array.from({ length: 5 }).map((_, i) => (
                             <TableRow key={i}>
-                                {Array.from({ length: 11 }).map((_, j) => (
+                                {Array.from({ length: 12 }).map((_, j) => (
                                     <TableCell key={j}>
                                         <Skeleton className="mx-auto h-4 w-full" />
                                     </TableCell>
@@ -129,7 +130,7 @@ export function CdrTable({
                     ) : records.length === 0 ? (
                         <TableRow>
                             <TableCell
-                                colSpan={11}
+                                colSpan={12}
                                 className="h-24 text-center text-muted-foreground"
                             >
                                 Nenhum registro encontrado
@@ -191,6 +192,9 @@ export function CdrTable({
                                 </TableCell>
                                 <TableCell className="text-center text-muted-foreground">
                                     {trunkName(record.trunkId)}
+                                </TableCell>
+                                <TableCell className="text-center text-muted-foreground">
+                                    {trunkName(record.entryTrunkId)}
                                 </TableCell>
                                 <TableCell className="text-center font-mono tabular-nums">
                                     {formatDuration(record.billsec)}

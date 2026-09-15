@@ -123,6 +123,7 @@ const select = {
     originExtension: true,
     dialedNumber: true,
     trunkId: true,
+    entryTrunkId: true,
     recordingFile: true,
     hangupCause: true
 } as const
@@ -186,7 +187,9 @@ export async function* iterateCdrExportRecords(
         if (rows.length === 0) break
 
         const trunkIds = [
-            ...new Set(rows.map((r) => r.trunkId).filter((t): t is string => !!t))
+            ...new Set(
+                rows.flatMap((r) => [r.trunkId, r.entryTrunkId]).filter((t): t is string => !!t)
+            )
         ]
         const trunks = trunkIds.length
             ? await prisma.trunk.findMany({
@@ -212,7 +215,8 @@ export async function* iterateCdrExportRecords(
 
         yield enriched.map((r) => ({
             ...r,
-            trunkName: r.trunkId ? trunkNameById.get(r.trunkId) ?? r.trunkId : null
+            trunkName: r.trunkId ? trunkNameById.get(r.trunkId) ?? r.trunkId : null,
+            entryTrunkName: r.entryTrunkId ? trunkNameById.get(r.entryTrunkId) ?? r.entryTrunkId : null
         }))
 
         if (rows.length < EXPORT_BATCH_SIZE) break

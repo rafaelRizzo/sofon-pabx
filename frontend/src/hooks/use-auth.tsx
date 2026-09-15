@@ -22,7 +22,6 @@ export const PERMISSION_RESOURCES = [
   { key: "companies", label: "Empresas", category: "Administração" },
   { key: "users", label: "Usuários", category: "Administração" },
   { key: "extensions", label: "Ramais", category: "Telefonia" },
-  { key: "dids", label: "DIDs", category: "Telefonia" },
   { key: "trunks", label: "Troncos", category: "Telefonia" },
   { key: "inbound-routes", label: "Rotas de entrada", category: "Roteamento" },
   { key: "outbound-routes", label: "Rotas de saída", category: "Roteamento" },
@@ -61,7 +60,7 @@ type AuthContextValue = {
   user: AuthUser | null
   loading: boolean
   hasPermission: (
-    resource: PermissionResourceKey | "cdr" | "call-quality" | "audit-logs" | "backup",
+    resource: PermissionResourceKey | "cdr" | "call-quality" | "audit-logs" | "backup" | "dids",
     action?: PermissionAction
   ) => boolean
   refetch: () => Promise<void>

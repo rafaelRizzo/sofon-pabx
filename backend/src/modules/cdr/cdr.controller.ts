@@ -83,6 +83,7 @@ const CSV_HEADER = [
     'Espera',
     'Atendido por',
     'Tronco',
+    'Tronco de entrada (real)',
     'Duração',
     'Status'
 ]
@@ -125,6 +126,7 @@ async function* generateCdrExportCsv(
                 formatDuration(record.queueWaitSeconds),
                 record.answeredBy?.label ?? '-',
                 record.trunkName ?? '-',
+                record.entryTrunkName ?? '-',
                 formatDuration(record.billsec),
                 record.callStatus
                     ? STATUS_LABEL[record.callStatus] ?? record.callStatus

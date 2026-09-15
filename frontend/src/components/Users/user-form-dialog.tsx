@@ -64,11 +64,15 @@ const ROLES: { value: UserRole; label: string }[] = [
     { value: "admin", label: "Administrador" },
 ]
 
-// CDR é só-leitura no backend (sem ação "manage", ver PERMISSION_KEYS em
-// backend/src/utils/auth/permissions.ts) - entra na mesma lista/categoria pra render unificado
+// CDR/Call Quality são só-leitura no backend (sem ação "manage", ver PERMISSION_KEYS em
+// backend/src/utils/auth/permissions.ts) - entram na mesma lista/categoria pra render unificado.
+// DIDs também é view-only aqui: criar/editar/excluir DID é admin-only por role (não por permissão
+// granular) - só um admin pode disponibilizar/vincular número a uma empresa, nunca um "user" mesmo
+// com a permissão concedida (a chave "dids:manage" nem existe pra conceder no backend)
 const PERMISSION_ROWS = [
     { key: "cdr", label: "CDR", category: "Relatórios", manageable: false },
     { key: "call-quality", label: "Qualidade de rede", category: "Relatórios", manageable: false },
+    { key: "dids", label: "DIDs", category: "Telefonia", manageable: false },
     ...PERMISSION_RESOURCES.map((r) => ({ ...r, manageable: true as const })),
 ]
 

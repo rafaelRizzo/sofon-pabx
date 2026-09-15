@@ -82,6 +82,9 @@ export const CdrSchema = z.object({
     originExtension: z.string().nullable(),
     dialedNumber: z.string().nullable(),
     trunkId: z.string().nullable(),
+    // Só != trunkId quando a operadora entrega a ligação por um tronco de empresa diferente da
+    // dona do DID - só informativo/consistência, nunca usado pra roteamento (ver schema.prisma)
+    entryTrunkId: z.string().nullable(),
     recordingFile: z.string().nullable(),
     hangupCause: z.string().nullable(),
     // Resolvidos em tempo de leitura (cdr-enrichment.ts) - não vêm de coluna nenhuma do banco.

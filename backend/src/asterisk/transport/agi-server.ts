@@ -5,6 +5,7 @@ import { extKey } from './realtime-keys'
 import { resolveRouteDestinationToDialplan } from '../dialplan/route-destination-resolver'
 import { FlowEdgeRepository } from '../flows/flow-edge.repository'
 import { parseMemberInterface, QUEUE_APP_CONTEXT, queueAppExten } from '../destinations/queue.repository'
+import { TRUNK_ROUTED_CONTEXT, routedExten } from '../destinations/inboundroute.repository'
 import { extenPatternMatches } from '../dialplan/exten-pattern'
 import { FLOW_NODE_CONTEXT, SURVEY_CONTEXT, surveyExten, ROUTING_TRUNK_VAR, flowNodeExitExten } from '../dialplan/dialplan-names'
 import { FLOW_NODE_ID_VAR } from '../flows/flow-node-runtime'
@@ -27,7 +28,7 @@ import { HolidayGroupsCache } from '../../modules/holiday-groups/cache/holiday-g
 import { TimeConditionsCache } from '../../modules/time-conditions/cache/time-conditions.cache'
 import { FormatterNodesCache } from '../../modules/formatter-nodes/cache/formatter-nodes.cache'
 
-// Servidor FastAGI - Asterisk conecta via AGI(agi://AGI_HOST:AGI_PORT/<script>,<args>) em 5 pontos:
+// Servidor FastAGI - Asterisk conecta via AGI(agi://AGI_HOST:AGI_PORT/<script>,<args>) em vários pontos:
 // - /run,<requestTemplateId> - RouteDestination type: "request"
 // - /ixc,<ixcNodeId>         - RouteDestination type: "ixc"
 // - /varcond,<variableConditionId> - RouteDestination type: "variable-condition" (regras avaliadas
@@ -49,6 +50,9 @@ import { FormatterNodesCache } from '../../modules/formatter-nodes/cache/formatt
 //   pro accountcode do canal, chamado via TRANSFER_CONTEXT em toda transferência DTMF atendida (*2)
 // - /ramal-fallback (sem arg) - pattern genérico de ramal ([ramais], ver dialplan.repository.ts),
 //   chamado só quando o Dial direto pro ramal falha com CHANUNAVAIL - tenta fila, depois rota de saída
+// - /resolve-did-route (sem arg) - "i" de [from-trunk-routed] (ver base-dialplan.repository.ts),
+//   chamado só quando a chave rápida <did>_<accountcode do tronco de entrada> não bateu - lookup
+//   global por DID_ENTRY pra achar a empresa dona real (tronco de entrada != tronco da empresa)
 // Protocolo AGI é estritamente request/response - nunca disparar dois comandos concorrentes no mesmo
 // socket, a ordem das respostas quebra.
 
@@ -785,6 +789,43 @@ async function handleTransferRoute(conn: AgiConn) {
     await agiVerbose(conn, `Transfer Route: "${exten}" não é ramal, fila nem rota de saída da empresa`, 2)
 }
 
+// Chamado pelo "i" de [from-trunk-routed] (ver base-dialplan.repository.ts) SÓ quando a chave
+// rápida <did>_<accountcode do tronco de entrada> não bateu - ou seja, o DID discado existe mas a
+// chamada chegou por um tronco de empresa diferente da dona dele (operadora entregando por tronco
+// compartilhado/errado). DID_ENTRY guarda o número original (${EXTEN} já virou "i" nesse ponto).
+// DID.number é único globalmente (schema.prisma) - achar exatamente 1 match ativo com InboundRoute
+// configurada já garante a empresa dona certa, sem precisar saber por qual tronco a chamada entrou.
+async function handleResolveDidRoute(conn: AgiConn) {
+    const did = (await agiGetVariable(conn, 'DID_ENTRY')) ?? ''
+    if (!did) return
+
+    const matches = await prisma.did.findMany({
+        where: { number: did, status: 'active', inboundRoutes: { some: {} } },
+        select: { company: { select: { asteriskId: true } } },
+    })
+
+    if (matches.length === 0) {
+        logger.info({ event: 'agi.resolve_did_route.not_found', did })
+        return
+    }
+    // Nunca deveria acontecer (DID.number é único globalmente) - mas se um restore/tamper manual
+    // deixar 2 empresas com o mesmo número ativo, não adivinha: vazar a chamada pra empresa errada
+    // é pior que simplesmente não completar a ligação.
+    if (matches.length > 1) {
+        logger.error({
+            event: 'agi.resolve_did_route.ambiguous',
+            did,
+            companies: matches.map((m) => m.company.asteriskId),
+        })
+        await agiVerbose(conn, `Resolve DID Route: "${did}" ambíguo entre ${matches.length} empresas, abortando`, 3)
+        return
+    }
+
+    const companyAsteriskId = matches[0]!.company.asteriskId
+    await agiVerbose(conn, `Resolve DID Route: "${did}" pertence à empresa ${companyAsteriskId}, redirecionando`)
+    await agiExecGoto(conn, { context: TRUNK_ROUTED_CONTEXT, exten: routedExten(companyAsteriskId, did), priority: 1 })
+}
+
 // Chamado pelo pattern genérico de ramal ([ramais], ver ensureGenericRoutingPattern em
 // dialplan.repository.ts) SÓ quando o Dial(PJSIP/<EXTEN>_<accountcode>) falhou com CHANUNAVAIL - ou
 // seja, o próprio Asterisk já confirmou que não existe esse ramal (passo 1, "busca ramal", já feito
@@ -848,6 +889,7 @@ async function handleConnection(conn: AgiConn) {
         // Único script sem argumento - resolve tudo via variáveis do canal (EXTEN/accountcode)
         if (script === 'transfer-route') { await handleTransferRoute(conn); return }
         if (script === 'ramal-fallback') { await handleRamalFallback(conn); return }
+        if (script === 'resolve-did-route') { await handleResolveDidRoute(conn); return }
         if (!arg1) return
 
         if (script === 'queue-route') await handleQueueRoute(conn, arg1)

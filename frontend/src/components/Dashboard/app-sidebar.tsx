@@ -58,7 +58,7 @@ export type NavItem = {
   icon: LucideIcon
   // omitido = sempre visível (ex: Dashboard); presente = precisa de "<permission>:view"
   // (admin/reseller sempre veem tudo, só role "user" é filtrado; ver useAuth().hasPermission)
-  permission?: PermissionResourceKey | "cdr" | "call-quality" | "audit-logs" | "backup"
+  permission?: PermissionResourceKey | "cdr" | "call-quality" | "audit-logs" | "backup" | "dids"
 }
 
 export type NavGroup = {

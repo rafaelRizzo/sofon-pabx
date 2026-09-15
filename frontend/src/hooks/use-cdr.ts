@@ -39,6 +39,10 @@ export type CdrRecord = {
     originExtension: string | null
     dialedNumber: string | null
     trunkId: string | null
+    // Só != trunkId quando a operadora entrega a ligação (direction=inbound) por um tronco de
+    // empresa diferente da dona do DID - trunkId é o configurado na Inbound Route, entryTrunkId é
+    // o que o Asterisk de fato identificou pra essa chamada. Só informativo (ver backend/CLAUDE.md)
+    entryTrunkId: string | null
     recordingFile: string | null
     hangupCause: string | null
     // Resolvidos pelo backend em tempo de leitura (cdr-enrichment.ts) - cobrem chamadas roteadas

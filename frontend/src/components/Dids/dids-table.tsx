@@ -42,7 +42,9 @@ export function DidsTable({
                         <TableHead>Empresa</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Usado por</TableHead>
-                        <TableHead className="w-30 text-right">Ações</TableHead>
+                        {(onEdit || onDelete) && (
+                            <TableHead className="w-30 text-right">Ações</TableHead>
+                        )}
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -59,7 +61,7 @@ export function DidsTable({
                     ) : dids.length === 0 ? (
                         <TableRow>
                             <TableCell
-                                colSpan={5}
+                                colSpan={(onEdit || onDelete) ? 5 : 4}
                                 className="h-24 text-center text-muted-foreground"
                             >
                                 Nenhum DID encontrado
@@ -82,54 +84,60 @@ export function DidsTable({
                                 <TableCell>
                                     <DidRoutedToBadge usedBy={did.usedBy} />
                                 </TableCell>
-                                <TableCell>
-                                    <TooltipProvider delay={100}>
-                                        <div className="flex justify-end gap-1">
-                                            <Tooltip>
-                                                <TooltipTrigger
-                                                    render={
-                                                        <Button
-                                                            variant="outline"
-                                                            size="icon"
-                                                            onClick={() =>
-                                                                onEdit(did)
+                                {(onEdit || onDelete) && (
+                                    <TableCell>
+                                        <TooltipProvider delay={100}>
+                                            <div className="flex justify-end gap-1">
+                                                {onEdit && (
+                                                    <Tooltip>
+                                                        <TooltipTrigger
+                                                            render={
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="icon"
+                                                                    onClick={() =>
+                                                                        onEdit(did)
+                                                                    }
+                                                                >
+                                                                    <PencilIcon />
+                                                                    <span className="sr-only">
+                                                                        Editar
+                                                                    </span>
+                                                                </Button>
                                                             }
-                                                        >
-                                                            <PencilIcon />
-                                                            <span className="sr-only">
-                                                                Editar
-                                                            </span>
-                                                        </Button>
-                                                    }
-                                                />
-                                                <TooltipContent>
-                                                    Editar DID
-                                                </TooltipContent>
-                                            </Tooltip>
-                                            <Tooltip>
-                                                <TooltipTrigger
-                                                    render={
-                                                        <Button
-                                                            variant="destructive"
-                                                            size="icon"
-                                                            onClick={() =>
-                                                                onDelete(did)
+                                                        />
+                                                        <TooltipContent>
+                                                            Editar DID
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                )}
+                                                {onDelete && (
+                                                    <Tooltip>
+                                                        <TooltipTrigger
+                                                            render={
+                                                                <Button
+                                                                    variant="destructive"
+                                                                    size="icon"
+                                                                    onClick={() =>
+                                                                        onDelete(did)
+                                                                    }
+                                                                >
+                                                                    <Trash2Icon />
+                                                                    <span className="sr-only">
+                                                                        Deletar
+                                                                    </span>
+                                                                </Button>
                                                             }
-                                                        >
-                                                            <Trash2Icon />
-                                                            <span className="sr-only">
-                                                                Deletar
-                                                            </span>
-                                                        </Button>
-                                                    }
-                                                />
-                                                <TooltipContent>
-                                                    Deletar DID
-                                                </TooltipContent>
-                                            </Tooltip>
-                                        </div>
-                                    </TooltipProvider>
-                                </TableCell>
+                                                        />
+                                                        <TooltipContent>
+                                                            Deletar DID
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                )}
+                                            </div>
+                                        </TooltipProvider>
+                                    </TableCell>
+                                )}
                             </TableRow>
                         ))
                     )}

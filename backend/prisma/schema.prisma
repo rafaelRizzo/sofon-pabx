@@ -60,7 +60,7 @@ model Company {
 
 model Did {
   id            String         @id @default(cuid())
-  number        String         @db.VarChar(20)
+  number        String         @unique @db.VarChar(20)
   companyId     String
   company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
   inboundRoutes InboundRoute[]
@@ -69,7 +69,6 @@ model Did {
   createdAt     DateTime       @default(now()) @db.Timestamptz(3)
   updatedAt     DateTime       @updatedAt @db.Timestamptz(3)
 
-  @@unique([number, companyId])
   @@index([companyId])
   @@map("dids")
 }
@@ -1152,6 +1151,17 @@ model cdr {
   dialedNumber    String?   @map("dialed_number") @db.VarChar(80)
   // Trunk.id (cuid) da aplicação — não o astId interno do Asterisk (<asteriskId>-trunk-<name>)
   trunkId         String?   @map("trunk_id") @db.VarChar(40)
+  // Só em chamadas de ENTRADA (direction=inbound) — Trunk.id do endpoint que o Asterisk de fato
+  // identificou pra essa chamada (${TRUNKID}, setvar de todo endpoint, ver trunks.service.ts),
+  // != trunkId quando a operadora entrega a ligação por um tronco de empresa diferente da dona
+  // do DID (ver seção DIDs) - trunkId ali reflete o tronco CONFIGURADO na Inbound Route (a fonte
+  // de verdade pra CDR(trunk_id)/GROUP()/ROUTING_TRUNK_ID, ver inboundroute.repository.ts),
+  // enquanto entryTrunkId é só informativo/consistência: por qual tronco a ligação realmente
+  // entrou. Ressalva conhecida: quando 2 trunks da MESMA empresa compartilham host/IP, o
+  // Asterisk pode identificar o endpoint irmão errado (ps_identifies ambíguo, ver
+  // docs/runbooks/inbound-shared-ip-identify.md) - entryTrunkId herda essa mesma ambiguidade,
+  // não é bug novo, é limite conhecido do Asterisk.
+  entryTrunkId    String?   @map("entry_trunk_id") @db.VarChar(40)
   recordingFile   String?   @map("recording_file") @db.VarChar(255)
   // Só capturado logo após um Dial() ser executado (${HANGUPCAUSE}) — chamadas que desligam
   // antes de qualquer Dial (ex: abandono na URA) não preenchem este campo

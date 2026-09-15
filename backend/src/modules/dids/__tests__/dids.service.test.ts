@@ -35,7 +35,7 @@ describe('DidsService.createDid', () => {
         expect(did.number).toBe('551100001111')
     })
 
-    it('throws 409 with duplicate number in same company', async () => {
+    it('throws 409 with duplicate number', async () => {
         db.company.findUnique.mockResolvedValue(COMPANY)
         db.did.findUnique.mockResolvedValue(DID)
         await expect(DidsService.createDid({ number: '551100001111', companyId: 'c1' }))
@@ -127,7 +127,7 @@ describe('DidsService.updateDid', () => {
         expect(db.inboundRoute.findMany).not.toHaveBeenCalled()
     })
 
-    it('throws 409 when number already exists in same company', async () => {
+    it('throws 409 when number already exists', async () => {
         db.company.findUnique.mockResolvedValue(COMPANY)
         db.did.findUnique.mockResolvedValueOnce(DID).mockResolvedValueOnce({ id: 'd2', number: '551100002222', companyId: 'c1' })
         await expect(DidsService.updateDid('d1', { number: '551100002222' }))
@@ -162,13 +162,6 @@ describe('DidsService.updateDid', () => {
         db.company.findUnique.mockResolvedValue(null)
         await expect(DidsService.updateDid('d1', { companyId: 'c2' }))
             .rejects.toMatchObject({ statusCode: 404 })
-    })
-
-    it('throws 409 when number already exists in target company', async () => {
-        db.did.findUnique.mockResolvedValueOnce(DID).mockResolvedValueOnce({ id: 'd2', number: DID.number, companyId: 'c2' })
-        db.company.findUnique.mockResolvedValue(COMPANY2)
-        await expect(DidsService.updateDid('d1', { companyId: 'c2' }))
-            .rejects.toMatchObject({ statusCode: 409 })
     })
 })
 

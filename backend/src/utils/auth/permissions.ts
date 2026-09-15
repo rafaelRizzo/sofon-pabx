@@ -9,7 +9,6 @@ export const PERMISSION_RESOURCES = [
     'ivr',
     'announcements',
     'callcenter',
-    'dids',
     'inbound-routes',
     'outbound-routes',
     'trunks',
@@ -30,14 +29,18 @@ export const PERMISSION_RESOURCES = [
 export type PermissionResource = (typeof PERMISSION_RESOURCES)[number]
 export type PermissionAction = 'view' | 'manage'
 
-// CDR, Call Quality, Queue Calls, Audit Logs e Backup são só leitura, não têm ação "manage" -
-// restore (que de fato muta estado) é admin-only por role, não por permissão granular (ver backup.routes.ts)
+// CDR, Call Quality, Queue Calls, Audit Logs, Backup e DIDs são só leitura aqui, não têm ação
+// "manage" concedível: restore (Backup) é admin-only por role, não por permissão granular (ver
+// backup.routes.ts); criar/editar/excluir DID é admin-only por role (ver dids.routes.ts) - só um
+// admin pode disponibilizar/vincular número a uma empresa, nunca um role="user", mesmo que alguém
+// tentasse conceder essa permissão manualmente - "dids:manage" simplesmente não existe pra conceder
 export const PERMISSION_KEYS = [
     'cdr:view',
     'call-quality:view',
     'queue-calls:view',
     'audit-logs:view',
     'backup:view',
+    'dids:view',
     ...PERMISSION_RESOURCES.flatMap((r) => [`${r}:view`, `${r}:manage`] as const),
 ] as const
 

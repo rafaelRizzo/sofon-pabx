@@ -13,6 +13,7 @@ import { DidsTable } from "@/components/Dids/dids-table"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { useAuth } from "@/hooks/use-auth"
 import { useCompanies } from "@/hooks/use-companies"
 import { useCompanyFilter } from "@/hooks/use-company-filter"
 import { useDids, type Did } from "@/hooks/use-dids"
@@ -25,6 +26,11 @@ const DID_STATUS_LABELS: Record<Did["status"], string> = {
 }
 
 function DidsPage() {
+    const { user } = useAuth()
+    // Criar/editar/excluir DID é admin-only por role (não permissão granular) - só um admin pode
+    // disponibilizar/vincular número a uma empresa, nunca um "user" nem "reseller" (ver
+    // backend/CLAUDE.md, seção DIDs). Backend já recusa com 403 - isso é só a UI espelhando a regra.
+    const isAdmin = user?.role === "admin"
     const { companies } = useCompanies()
     const [companyFilter, setCompanyFilter] = useCompanyFilter()
 
@@ -92,10 +98,12 @@ function DidsPage() {
                         <DownloadIcon />
                         Exportar
                     </Button>
-                    <Button onClick={() => setCreateOpen(true)}>
-                        <PlusIcon />
-                        Novo DID
-                    </Button>
+                    {isAdmin && (
+                        <Button onClick={() => setCreateOpen(true)}>
+                            <PlusIcon />
+                            Novo DID
+                        </Button>
+                    )}
                 </div>
             </PageHeader>
 
@@ -118,8 +126,8 @@ function DidsPage() {
                 dids={paginated}
                 companies={companies}
                 loading={loading}
-                onEdit={setEditDid}
-                onDelete={setDeleteTarget}
+                onEdit={isAdmin ? setEditDid : undefined}
+                onDelete={isAdmin ? setDeleteTarget : undefined}
             />
 
             <DataPagination
@@ -129,31 +137,35 @@ function DidsPage() {
                 onPageChange={setPage}
             />
 
-            <DidFormDialog
-                open={createOpen}
-                onOpenChange={setCreateOpen}
-                did={null}
-                companies={companies}
-                onCreate={createDid}
-            />
+            {isAdmin && (
+                <>
+                    <DidFormDialog
+                        open={createOpen}
+                        onOpenChange={setCreateOpen}
+                        did={null}
+                        companies={companies}
+                        onCreate={createDid}
+                    />
 
-            {editDid && (
-                <DidFormDialog
-                    open={!!editDid}
-                    onOpenChange={(open) => !open && setEditDid(null)}
-                    did={editDid}
-                    companies={companies}
-                    onUpdate={(form) => updateDid(editDid.id, form)}
-                />
+                    {editDid && (
+                        <DidFormDialog
+                            open={!!editDid}
+                            onOpenChange={(open) => !open && setEditDid(null)}
+                            did={editDid}
+                            companies={companies}
+                            onUpdate={(form) => updateDid(editDid.id, form)}
+                        />
+                    )}
+
+                    <ConfirmDeleteDialog
+                        open={!!deleteTarget}
+                        onOpenChange={(open) => !open && setDeleteTarget(null)}
+                        title="Deletar DID"
+                        itemName={deleteTarget?.number}
+                        onConfirm={handleDelete}
+                    />
+                </>
             )}
-
-            <ConfirmDeleteDialog
-                open={!!deleteTarget}
-                onOpenChange={(open) => !open && setDeleteTarget(null)}
-                title="Deletar DID"
-                itemName={deleteTarget?.number}
-                onConfirm={handleDelete}
-            />
         </div>
     )
 }

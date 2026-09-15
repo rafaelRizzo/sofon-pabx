@@ -27,6 +27,6 @@ export type DidsTableProps = {
     dids: Did[]
     companies: Company[]
     loading: boolean
-    onEdit: (did: Did) => void
-    onDelete: (did: Did) => void
+    onEdit?: (did: Did) => void
+    onDelete?: (did: Did) => void
 }

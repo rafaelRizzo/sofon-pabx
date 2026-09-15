@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import * as DidsController from './dids.controller'
-import { protectedRoute } from '../../middleware/scope.middleware'
+import { protectedRoute, requireAdmin } from '../../middleware/scope.middleware'
 import { requirePermission } from '../../middleware/permission.middleware'
 import {
     createDidSchema, updateDidSchema, idParamSchema, companyIdParamSchema,
@@ -62,11 +62,11 @@ export const didsRoutes = async (app: FastifyInstance) => {
     }, DidsController.getDidsByCompanyId as any)
 
     router.post('/dids', {
-        onRequest: [...protectedRoute, requirePermission('dids', 'manage')],
+        onRequest: [...protectedRoute, requireAdmin],
         schema: {
             tags: ['DIDs'],
             summary: 'Criar DID',
-            description: 'O número deve ser único por empresa.',
+            description: 'Admin-only. O número deve ser único globalmente (não só por empresa).',
             security: [{ bearerAuth: [] }],
             body: createDidSchema,
             response: {
@@ -79,7 +79,7 @@ export const didsRoutes = async (app: FastifyInstance) => {
     }, DidsController.createDid as any)
 
     router.put('/dids/:id', {
-        onRequest: [...protectedRoute, requirePermission('dids', 'manage')],
+        onRequest: [...protectedRoute, requireAdmin],
         schema: {
             tags: ['DIDs'],
             summary: 'Atualizar DID',
@@ -96,7 +96,7 @@ export const didsRoutes = async (app: FastifyInstance) => {
     }, DidsController.updateDid as any)
 
     router.delete('/dids/:id', {
-        onRequest: [...protectedRoute, requirePermission('dids', 'manage')],
+        onRequest: [...protectedRoute, requireAdmin],
         schema: {
             tags: ['DIDs'],
             summary: 'Remover DID',

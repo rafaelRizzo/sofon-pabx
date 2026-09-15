@@ -28,7 +28,9 @@ export const TRUNK_ROUTED_CONTEXT = 'from-trunk-routed'
 // trunkId continua correto pra CDR(trunk_id)/GROUP()/ROUTING_TRUNK_ID (ver buildInboundEntries)
 // porque esses valores são gravados LITERAIS no dialplan a partir da própria InboundRoute no
 // momento do create/update - não dependem do TRUNKID resolvido em tempo de chamada.
-function routedExten(companyAsteriskId: string, didNumber: string) {
+// Exportado pro fallback de lookup global do AGI (resolve-did-route, ver agi-server.ts) montar a
+// mesma chave a partir da empresa dona do DID achada em tempo de chamada, sem duplicar o formato.
+export function routedExten(companyAsteriskId: string, didNumber: string) {
     return `${didNumber}_${companyAsteriskId}`
 }
 
@@ -73,6 +75,12 @@ function buildInboundEntries(
     push('Set', 'CDR(direction)=inbound')
     push('Set', `CDR(trunk_id)=${trunkId}`)
     push('Set', `CDR(dialed_number)=${didNumber}`)
+    // entry_trunk_id != trunk_id só quando a operadora entrega a ligação por um tronco de empresa
+    // diferente da dona do DID (ver resolve-did-route em agi-server.ts) - TRUNKID (setvar nativo
+    // do endpoint, não interpolado aqui, é lido em tempo de chamada) é o tronco que o Asterisk
+    // REALMENTE identificou pra esse canal, ao contrário de trunkId acima (configurado na Inbound
+    // Route). Só informativo/consistência - nunca usado pra roteamento (ver schema.prisma, model cdr)
+    push('Set', 'CDR(entry_trunk_id)=${TRUNKID}')
 
     let gotoIfIndex = -1
     if (maxIn != null) {

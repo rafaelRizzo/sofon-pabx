@@ -67,20 +67,32 @@ exten => s,1,Hangup()
 ; no mesmo IP), o Asterisk pode identificar o endpoint errado (ps_identifies ambíguo por IP) mesmo
 ; a chamada entrando certa - TRUNKID (setvar do endpoint) viria do trunk errado. accountcode não
 ; sofre disso: é idêntico nos 2 endpoints ambíguos (mesma empresa), então a rota acerta mesmo assim.
-exten => _X.,1,Goto(from-trunk-routed,\${EXTEN}_\${CHANNEL(accountcode)},1)
+; DID_ENTRY guarda o número discado ANTES do Goto: a extensão "i" (ver from-trunk-routed) reseta
+; \${EXTEN} pra "i" literal, perdendo o valor original - o fallback de lookup global por DID
+; (AGI resolve-did-route) precisa dele quando a chave rápida <did>_<accountcode> não bate.
+exten => _X.,1,Set(DID_ENTRY=\${EXTEN})
+ same => n,Goto(from-trunk-routed,\${EXTEN}_\${CHANNEL(accountcode)},1)
 
 [from-trunk-routed]
 ; Delega lookup de rotas de entrada para Realtime (tabela extensions no PostgreSQL)
 ; exten gravado como <didNumber>_<companyAsteriskId> por InboundRouteRepository
 switch => Realtime/from-trunk-routed@extensions
 
-; DID sem rota cadastrada - cause 1 (Unallocated number) -> PJSIP responde 404 Not Found
+; DID sem rota pela chave rápida <did>_<accountcode do tronco de ENTRADA> - acontece quando a
+; operadora entrega a chamada por um tronco de empresa DIFERENTE da dona do DID (tronco
+; compartilhado/errado, mas DID cadastrado e com rota configurada normalmente). Antes de desistir,
+; tenta lookup GLOBAL por DID_ENTRY via AGI (resolve-did-route, ver handleResolveDidRoute em
+; agi-server.ts): DID.number é único globalmente (não só por empresa), então achar exatamente 1
+; match ativo já garante a empresa dona certa - o AGI faz "SET CONTEXT/EXTENSION/PRIORITY" (Goto
+; real) pra chave certa quando acha, e não faz nada quando não acha (DID realmente inexistente).
 ; HANGUPCAUSE é função read-only (\${HANGUPCAUSE}); a cause real só é setada via argumento do Hangup()
 ; FIX: NÃO declarar um catch-all _X. estático aqui - padrão estático tem prioridade
 ; sobre "switch => Realtime/..." no mesmo contexto, então _X. bloquearia TODA rota
 ; realtime válida (qualquer exten <didNumber>_<companyAsteriskId> começa com dígito). O "i"
 ; já cobre o caso de nenhuma rota (estática ou realtime) ser encontrada.
-exten => i,1,Noop(DID sem rota: \${EXTEN})
+exten => i,1,Noop(DID sem rota pela chave rápida: \${DID_ENTRY})
+ same => n,AGI(agi://127.0.0.1:4573/resolve-did-route)
+ same => n,Noop(DID sem rota: \${DID_ENTRY})
  same => n,Hangup(1)
 
 ; queues-app, timeconditions, announcements, ivrs, holidays, request-templates, ixc-nodes, formatters,
