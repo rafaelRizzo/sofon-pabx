@@ -5,6 +5,7 @@ import { getCompanyById } from '../companies/companies.service'
 import { getExtensionDto } from '../extensions/extensions.service'
 import { AppError } from '../../utils/errors/app.error'
 import { OutboundRoutesCache } from './cache/outbound-routes.cache'
+import { ASTERISK_PATTERN_WILDCARDS } from './schemas/outbound-route.schema'
 import type {
     CreateOutboundRouteInput,
     UpdateOutboundRouteInput,
@@ -17,6 +18,16 @@ type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 
 function trunkAsteriskId(asteriskId: string, trunkName: string): string {
     return `${asteriskId}-trunk-${trunkName}`
+}
+
+// O usuário digita em "Padrão" só a parte variável do número - os dígitos de "prefix" (ex: o "0" do
+// interurbano) não podem ser repetidos ali, senão o Asterisk exigiria o dígito duas vezes. O exten
+// real gravado no dialplan é a concatenação prefix+pattern; "prefix" continua sendo usado à parte em
+// buildDialplanEntries pra calcular quantos caracteres remover do EXTEN antes de discar pro tronco.
+function buildFullExten(prefix: string | null | undefined, pattern: string): string {
+    const bare = pattern.startsWith('_') ? pattern.slice(1) : pattern
+    const combined = `${prefix ?? ''}${bare}`
+    return ASTERISK_PATTERN_WILDCARDS.test(combined) ? `_${combined}` : combined
 }
 
 type CustomHeader = { name: string; value: string }
@@ -192,39 +203,43 @@ const RESERVED_RAMAIS_PATTERNS = new Set<string>([
 // updateOutboundRoute); exclude.patternId ignora só um registro específico (edição pontual, updatePattern).
 async function assertPatternsAvailable(
     companyId: string,
-    patterns: string[],
+    patterns: Array<{ pattern: string; prefix?: string | null }>,
     exclude?: { routeId?: string; patternId?: string },
 ) {
-    for (const pattern of patterns) {
-        if (RESERVED_RAMAIS_PATTERNS.has(pattern)) {
-            throw new AppError(`Padrão "${pattern}" é reservado pelo sistema (contexto ramais) e não pode ser usado em outbound route`, 409)
+    const extens = patterns.map((p) => buildFullExten(p.prefix, p.pattern))
+
+    for (const exten of extens) {
+        if (RESERVED_RAMAIS_PATTERNS.has(exten)) {
+            throw new AppError(`Padrão "${exten}" é reservado pelo sistema (contexto ramais) e não pode ser usado em outbound route`, 409)
         }
     }
 
     const seen = new Set<string>()
-    for (const pattern of patterns) {
-        if (seen.has(pattern)) {
-            throw new AppError(`Padrão de discagem duplicado no formulário: "${pattern}"`, 409)
+    for (const exten of extens) {
+        if (seen.has(exten)) {
+            throw new AppError(`Padrão de discagem duplicado no formulário: "${exten}"`, 409)
         }
-        seen.add(pattern)
+        seen.add(exten)
     }
 
-    const conflict = await prisma.outboundDialPattern.findFirst({
+    // Full exten (prefix+pattern) é o que vira exten real no Asterisk - a coluna "pattern" sozinha
+    // só guarda a parte variável, então a comparação precisa ser feita em memória, não via WHERE.
+    const existing = await prisma.outboundDialPattern.findMany({
         where: {
-            pattern: { in: patterns },
             ...(exclude?.patternId && { id: { not: exclude.patternId } }),
             route: {
                 companyId,
                 ...(exclude?.routeId && { id: { not: exclude.routeId } }),
             },
         },
-        select: { pattern: true, route: { select: { name: true } } },
+        select: { pattern: true, prefix: true, route: { select: { name: true } } },
     })
-    if (conflict) {
-        throw new AppError(
-            `Padrão "${conflict.pattern}" já está em uso na rota "${conflict.route.name}"`,
-            409
-        )
+
+    for (const exten of extens) {
+        const conflict = existing.find((e) => buildFullExten(e.prefix, e.pattern) === exten)
+        if (conflict) {
+            throw new AppError(`Padrão "${exten}" já está em uso na rota "${conflict.route.name}"`, 409)
+        }
     }
 }
 
@@ -274,7 +289,7 @@ export async function resyncAllPatterns(tx: Tx, routeId: string) {
         customHeaders: rt.trunk.customHeaders as CustomHeader[],
     }))
     for (const p of ctx.patterns) {
-        await syncPatternDialplan(tx, 'ramais', p.pattern, trunkOpts, p.prefix, p.prepend, ctx.company.asteriskId, ctx.routeName)
+        await syncPatternDialplan(tx, 'ramais', buildFullExten(p.prefix, p.pattern), trunkOpts, p.prefix, p.prepend, ctx.company.asteriskId, ctx.routeName)
     }
 }
 
@@ -471,7 +486,7 @@ export const createOutboundRoute = async (data: CreateOutboundRouteInput) => {
         if (extensions.length !== data.extensionIds.length) throw new AppError('One or more extensions not found', 404)
     }
 
-    await assertPatternsAvailable(data.companyId, data.patterns.map((p) => p.pattern))
+    await assertPatternsAvailable(data.companyId, data.patterns.map((p) => ({ pattern: p.pattern, prefix: p.prefix })))
 
     let routeId: string
 
@@ -502,7 +517,7 @@ export const createOutboundRoute = async (data: CreateOutboundRouteInput) => {
         }
 
         for (const p of data.patterns) {
-            await syncPatternDialplan(tx, 'ramais', p.pattern, trunkOpts, p.prefix, p.prepend, company.asteriskId, data.name)
+            await syncPatternDialplan(tx, 'ramais', buildFullExten(p.prefix, p.pattern), trunkOpts, p.prefix, p.prepend, company.asteriskId, data.name)
         }
     })
 
@@ -522,7 +537,7 @@ export const updateOutboundRoute = async (id: string, data: UpdateOutboundRouteI
 
     // Fetch existing patterns separately (only when needed) - sequential, no multi-include
     const existingPatterns = patterns
-        ? await prisma.outboundDialPattern.findMany({ where: { routeId: id }, select: { pattern: true } })
+        ? await prisma.outboundDialPattern.findMany({ where: { routeId: id }, select: { pattern: true, prefix: true } })
         : []
 
     if (trunkIds) {
@@ -534,7 +549,7 @@ export const updateOutboundRoute = async (id: string, data: UpdateOutboundRouteI
     }
 
     if (patterns) {
-        await assertPatternsAvailable(existing.companyId, patterns.map((p) => p.pattern), { routeId: id })
+        await assertPatternsAvailable(existing.companyId, patterns.map((p) => ({ pattern: p.pattern, prefix: p.prefix })), { routeId: id })
     }
 
     await prisma.$transaction(async (tx) => {
@@ -558,7 +573,7 @@ export const updateOutboundRoute = async (id: string, data: UpdateOutboundRouteI
 
         if (patterns) {
             for (const p of existingPatterns) {
-                await tx.extensions.deleteMany({ where: { context: 'ramais', exten: p.pattern } })
+                await tx.extensions.deleteMany({ where: { context: 'ramais', exten: buildFullExten(p.prefix, p.pattern) } })
             }
             await tx.outboundDialPattern.deleteMany({ where: { routeId: id } })
             for (const p of patterns) {
@@ -597,12 +612,12 @@ export const deleteOutboundRoute = async (id: string) => {
 
     const patterns = await prisma.outboundDialPattern.findMany({
         where: { routeId: id },
-        select: { pattern: true },
+        select: { pattern: true, prefix: true },
     })
 
     await prisma.$transaction(async (tx) => {
         for (const p of patterns) {
-            await tx.extensions.deleteMany({ where: { context: 'ramais', exten: p.pattern } })
+            await tx.extensions.deleteMany({ where: { context: 'ramais', exten: buildFullExten(p.prefix, p.pattern) } })
         }
         await tx.outboundRoute.delete({ where: { id } })
     })
@@ -619,7 +634,7 @@ export const addPattern = async (routeId: string, data: AddPatternInput) => {
     })
     if (!route) throw new AppError('Outbound route not found', 404)
 
-    await assertPatternsAvailable(route.companyId, [data.pattern])
+    await assertPatternsAvailable(route.companyId, [{ pattern: data.pattern, prefix: data.prefix }])
 
     let patternId: string
 
@@ -649,13 +664,20 @@ export const updatePattern = async (routeId: string, patternId: string, data: Up
     })
     if (!pattern) throw new AppError('Pattern not found', 404)
 
-    if (data.pattern && data.pattern !== pattern.pattern) {
-        await assertPatternsAvailable(pattern.route.companyId, [data.pattern], { patternId })
+    // O exten real depende de prefix+pattern juntos - precisa comparar o combinado, não só o
+    // campo "pattern" isolado (ex: trocar só o prefix já muda o que é gravado no dialplan).
+    const newPatternText = data.pattern ?? pattern.pattern
+    const newPrefix = data.prefix !== undefined ? data.prefix : pattern.prefix
+    const oldExten = buildFullExten(pattern.prefix, pattern.pattern)
+    const newExten = buildFullExten(newPrefix, newPatternText)
+
+    if (newExten !== oldExten) {
+        await assertPatternsAvailable(pattern.route.companyId, [{ pattern: newPatternText, prefix: newPrefix }], { patternId })
     }
 
     await prisma.$transaction(async (tx) => {
-        if (pattern.pattern !== (data.pattern ?? pattern.pattern)) {
-            await tx.extensions.deleteMany({ where: { context: 'ramais', exten: pattern.pattern } })
+        if (newExten !== oldExten) {
+            await tx.extensions.deleteMany({ where: { context: 'ramais', exten: oldExten } })
         }
         await tx.outboundDialPattern.update({ where: { id: patternId }, data })
         await resyncAllPatterns(tx, routeId)
@@ -671,7 +693,7 @@ export const deletePattern = async (routeId: string, patternId: string) => {
     if (!pattern) throw new AppError('Pattern not found', 404)
 
     await prisma.$transaction(async (tx) => {
-        await tx.extensions.deleteMany({ where: { context: 'ramais', exten: pattern.pattern } })
+        await tx.extensions.deleteMany({ where: { context: 'ramais', exten: buildFullExten(pattern.prefix, pattern.pattern) } })
         await tx.outboundDialPattern.delete({ where: { id: patternId } })
     })
 

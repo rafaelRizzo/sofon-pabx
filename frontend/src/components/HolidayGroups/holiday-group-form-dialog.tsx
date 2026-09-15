@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useFieldArray, useForm } from "react-hook-form"
-import { InfoIcon, PlusIcon, Trash2Icon } from "lucide-react"
+import { format } from "date-fns"
+import { ptBR } from "date-fns/locale"
+import { CalendarIcon, InfoIcon, PlusIcon, Trash2Icon } from "lucide-react"
 
 import {
     AlertDialog,
@@ -18,7 +20,9 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Calendar } from "@/components/ui/calendar"
 import { Card, CardContent } from "@/components/ui/card"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
     Combobox,
     ComboboxContent,
@@ -43,7 +47,11 @@ import {
     FieldLabel,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { NumberInput } from "@/components/ui/number-input"
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover"
 import {
     Select,
     SelectContent,
@@ -67,6 +75,33 @@ const MODES = [
 ]
 
 const EMPTY_DATE = { name: "", month: 1, day: 1 }
+
+// Calendário sempre precisa de um ano real pra exibir o mês/dia (react-day-picker não tem modo
+// "sem ano") - usado só como referência visual em datas recorrentes, nunca enviado ao backend
+const CALENDAR_PLACEHOLDER_YEAR = new Date().getFullYear()
+
+type HolidayDateEntry = { month?: unknown; day?: unknown; year?: unknown }
+
+// "" vem do NumberInput vazio antes desta troca pro calendário; undefined/null cobrem o resto
+function isRecorrente(year: unknown): boolean {
+    return year === undefined || year === null || year === ""
+}
+
+function holidayEntryToDate(entry?: HolidayDateEntry): Date {
+    const month = Number(entry?.month) || 1
+    const day = Number(entry?.day) || 1
+    const year = isRecorrente(entry?.year)
+        ? CALENDAR_PLACEHOLDER_YEAR
+        : Number(entry?.year)
+    return new Date(year, month - 1, day)
+}
+
+function formatHolidayDateLabel(entry?: HolidayDateEntry): string {
+    const date = holidayEntryToDate(entry)
+    return isRecorrente(entry?.year)
+        ? format(date, "d 'de' MMMM", { locale: ptBR })
+        : format(date, "d 'de' MMMM 'de' yyyy", { locale: ptBR })
+}
 
 export function HolidayGroupFormDialog({
     open,
@@ -104,6 +139,7 @@ export function HolidayGroupFormDialog({
     const { fields, append, remove } = useFieldArray({ control, name: "dates" })
     const companyId = watch("companyId")
     const mode = watch("mode")
+    const dateEntries = watch("dates")
     const selectedCompany = companies.find((c) => c.id === companyId) ?? null
 
     useEffect(() => {
@@ -491,128 +527,196 @@ export function HolidayGroupFormDialog({
                                                                         )}
                                                                     </Field>
 
-                                                                    <div className="grid grid-cols-3 gap-3">
-                                                                        <Field>
+                                                                    <Field>
+                                                                        <div className="flex items-center justify-between">
                                                                             <FieldLabel>
-                                                                                Mês
+                                                                                Data
                                                                             </FieldLabel>
-                                                                            <NumberInput
-                                                                                min={
-                                                                                    1
-                                                                                }
-                                                                                max={
-                                                                                    12
-                                                                                }
-                                                                                {...register(
-                                                                                    `dates.${index}.month`
-                                                                                )}
-                                                                            />
-                                                                            {errors
-                                                                                .dates?.[
-                                                                                index
-                                                                            ]
-                                                                                ?.month && (
-                                                                                <FieldError>
-                                                                                    {
-                                                                                        errors
-                                                                                            .dates[
-                                                                                            index
-                                                                                        ]
-                                                                                            ?.month
-                                                                                            ?.message
-                                                                                    }
-                                                                                </FieldError>
-                                                                            )}
-                                                                        </Field>
-                                                                        <Field>
-                                                                            <FieldLabel>
-                                                                                Dia
-                                                                            </FieldLabel>
-                                                                            <NumberInput
-                                                                                min={
-                                                                                    1
-                                                                                }
-                                                                                max={
-                                                                                    31
-                                                                                }
-                                                                                {...register(
-                                                                                    `dates.${index}.day`
-                                                                                )}
-                                                                            />
-                                                                            {errors
-                                                                                .dates?.[
-                                                                                index
-                                                                            ]
-                                                                                ?.day && (
-                                                                                <FieldError>
-                                                                                    {
-                                                                                        errors
-                                                                                            .dates[
-                                                                                            index
-                                                                                        ]
-                                                                                            ?.day
-                                                                                            ?.message
-                                                                                    }
-                                                                                </FieldError>
-                                                                            )}
-                                                                        </Field>
-                                                                        <Field>
-                                                                            <FieldLabel>
-                                                                                Ano
-                                                                            </FieldLabel>
-                                                                            <NumberInput
-                                                                                placeholder="Todo ano"
-                                                                                min={
-                                                                                    1900
-                                                                                }
-                                                                                max={
-                                                                                    2100
-                                                                                }
-                                                                                {...register(
-                                                                                    `dates.${index}.year`
-                                                                                )}
-                                                                            />
-                                                                            {errors
-                                                                                .dates?.[
-                                                                                index
-                                                                            ]
-                                                                                ?.year && (
-                                                                                <FieldError>
-                                                                                    {
-                                                                                        errors
-                                                                                            .dates[
+                                                                            <label className="flex items-center gap-2 text-sm font-normal text-muted-foreground">
+                                                                                <Checkbox
+                                                                                    checked={isRecorrente(
+                                                                                        dateEntries?.[
                                                                                             index
                                                                                         ]
                                                                                             ?.year
-                                                                                            ?.message
+                                                                                    )}
+                                                                                    onCheckedChange={(
+                                                                                        checked
+                                                                                    ) =>
+                                                                                        setValue(
+                                                                                            `dates.${index}.year`,
+                                                                                            checked ===
+                                                                                                true
+                                                                                                ? undefined
+                                                                                                : new Date().getFullYear(),
+                                                                                            {
+                                                                                                shouldDirty:
+                                                                                                    true,
+                                                                                                shouldValidate:
+                                                                                                    true,
+                                                                                            }
+                                                                                        )
                                                                                     }
-                                                                                </FieldError>
-                                                                            )}
-                                                                        </Field>
-                                                                    </div>
-                                                                    <FieldDescription>
-                                                                        Deixe
-                                                                        "Ano"
-                                                                        em
-                                                                        branco
-                                                                        pra
-                                                                        feriado
-                                                                        recorrente
-                                                                        todo
-                                                                        ano.
-                                                                        Preencha
-                                                                        só se
-                                                                        for um
-                                                                        feriado
-                                                                        móvel
-                                                                        (ex:
-                                                                        Carnaval),
-                                                                        que
-                                                                        muda de
-                                                                        data a
-                                                                        cada
-                                                                        ano.
-                                                                    </FieldDescription>
+                                                                                />
+                                                                                Recorrente
+                                                                                todo
+                                                                                ano
+                                                                            </label>
+                                                                        </div>
+                                                                        <Popover>
+                                                                            <PopoverTrigger
+                                                                                render={
+                                                                                    <Button
+                                                                                        type="button"
+                                                                                        variant="outline"
+                                                                                        className="w-full justify-start font-normal capitalize"
+                                                                                    >
+                                                                                        <CalendarIcon />
+                                                                                        {formatHolidayDateLabel(
+                                                                                            dateEntries?.[
+                                                                                                index
+                                                                                            ]
+                                                                                        )}
+                                                                                    </Button>
+                                                                                }
+                                                                            />
+                                                                            <PopoverContent
+                                                                                className="w-auto p-0"
+                                                                                align="start"
+                                                                            >
+                                                                                <Calendar
+                                                                                    mode="single"
+                                                                                    locale={
+                                                                                        ptBR
+                                                                                    }
+                                                                                    defaultMonth={holidayEntryToDate(
+                                                                                        dateEntries?.[
+                                                                                            index
+                                                                                        ]
+                                                                                    )}
+                                                                                    selected={holidayEntryToDate(
+                                                                                        dateEntries?.[
+                                                                                            index
+                                                                                        ]
+                                                                                    )}
+                                                                                    onSelect={(
+                                                                                        d
+                                                                                    ) => {
+                                                                                        if (
+                                                                                            !d
+                                                                                        )
+                                                                                            return
+                                                                                        setValue(
+                                                                                            `dates.${index}.month`,
+                                                                                            d.getMonth() +
+                                                                                                1,
+                                                                                            {
+                                                                                                shouldDirty:
+                                                                                                    true,
+                                                                                                shouldValidate:
+                                                                                                    true,
+                                                                                            }
+                                                                                        )
+                                                                                        setValue(
+                                                                                            `dates.${index}.day`,
+                                                                                            d.getDate(),
+                                                                                            {
+                                                                                                shouldDirty:
+                                                                                                    true,
+                                                                                                shouldValidate:
+                                                                                                    true,
+                                                                                            }
+                                                                                        )
+                                                                                        if (
+                                                                                            !isRecorrente(
+                                                                                                dateEntries?.[
+                                                                                                    index
+                                                                                                ]
+                                                                                                    ?.year
+                                                                                            )
+                                                                                        ) {
+                                                                                            setValue(
+                                                                                                `dates.${index}.year`,
+                                                                                                d.getFullYear(),
+                                                                                                {
+                                                                                                    shouldDirty:
+                                                                                                        true,
+                                                                                                    shouldValidate:
+                                                                                                        true,
+                                                                                                }
+                                                                                            )
+                                                                                        }
+                                                                                    }}
+                                                                                />
+                                                                            </PopoverContent>
+                                                                        </Popover>
+                                                                        {(errors
+                                                                            .dates?.[
+                                                                            index
+                                                                        ]
+                                                                            ?.month ||
+                                                                            errors
+                                                                                .dates?.[
+                                                                                index
+                                                                            ]
+                                                                                ?.day ||
+                                                                            errors
+                                                                                .dates?.[
+                                                                                index
+                                                                            ]
+                                                                                ?.year) && (
+                                                                            <FieldError>
+                                                                                {errors
+                                                                                    .dates?.[
+                                                                                    index
+                                                                                ]
+                                                                                    ?.month
+                                                                                    ?.message ||
+                                                                                    errors
+                                                                                        .dates?.[
+                                                                                        index
+                                                                                    ]
+                                                                                        ?.day
+                                                                                        ?.message ||
+                                                                                    errors
+                                                                                        .dates?.[
+                                                                                        index
+                                                                                    ]
+                                                                                        ?.year
+                                                                                        ?.message}
+                                                                            </FieldError>
+                                                                        )}
+                                                                        <FieldDescription>
+                                                                            Deixe
+                                                                            "Recorrente"
+                                                                            marcado
+                                                                            pra
+                                                                            feriado
+                                                                            que
+                                                                            cai
+                                                                            no
+                                                                            mesmo
+                                                                            dia
+                                                                            todo
+                                                                            ano.
+                                                                            Desmarque
+                                                                            só
+                                                                            se
+                                                                            for
+                                                                            um
+                                                                            feriado
+                                                                            móvel
+                                                                            (ex:
+                                                                            Carnaval),
+                                                                            que
+                                                                            muda
+                                                                            de
+                                                                            data
+                                                                            a
+                                                                            cada
+                                                                            ano.
+                                                                        </FieldDescription>
+                                                                    </Field>
                                                                 </CardContent>
                                                             </Card>
                                                         )

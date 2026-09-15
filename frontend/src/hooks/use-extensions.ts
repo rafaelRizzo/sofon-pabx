@@ -233,7 +233,7 @@ export const createExtensionSchema = z.object({
 
 export const updateExtensionSchema = z.object({
     name: z.string().min(1, "Informe o nome").max(80, "Máximo 80 caracteres"),
-    alias: aliasSchema,
+    // Ramal (alias/número) é imutável após criado - ver comentário em updateExtensionSchema do backend
     allowOutbound: z.boolean(),
     notes: z.string().max(10000, "Máximo de 10.000 caracteres").optional(),
     ...sipOptional,

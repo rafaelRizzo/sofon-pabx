@@ -1,8 +1,19 @@
 import { z } from 'zod'
 import { timestamp, ok } from '../../../schemas/responses'
 
+// Sintaxe Asterisk: X/Z/N/./! só funcionam como wildcard de match pattern com o "_" inicial - sem ele
+// virariam match exato contra essas letras literais (nunca casa um número real, que é só dígitos).
+// Aceita o usuário digitar com ou sem "_" (padrão sem wildcard, ex: "1404", continua exato do mesmo jeito).
+export const ASTERISK_PATTERN_WILDCARDS = /[XZN.!]/i
+
+function normalizeDialPattern(raw: string): string {
+    const pattern = raw.trim()
+    if (pattern.startsWith('_')) return pattern
+    return ASTERISK_PATTERN_WILDCARDS.test(pattern) ? `_${pattern}` : pattern
+}
+
 const patternSchema = z.object({
-    pattern: z.string().min(1).max(40),
+    pattern: z.string().min(1).max(40).transform(normalizeDialPattern),
     prepend: z.string().max(40).nullable().optional(),
     prefix: z.string().max(40).nullable().optional(),
     position: z.number().int().min(0).default(0),
@@ -34,7 +45,7 @@ export const addPatternSchema = patternSchema
 
 export const updatePatternSchema = z
     .object({
-        pattern: z.string().min(1).max(40).optional(),
+        pattern: z.string().min(1).max(40).transform(normalizeDialPattern).optional(),
         prepend: z.string().max(40).nullable().optional(),
         prefix: z.string().max(40).nullable().optional(),
         position: z.number().int().min(0).optional(),

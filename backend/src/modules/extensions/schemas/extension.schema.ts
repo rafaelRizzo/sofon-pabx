@@ -244,7 +244,8 @@ const {
 export const updateExtensionSchema = z
     .object({
         name: z.string().min(1).max(80).optional(),
-        alias: aliasSchema.optional(),
+        // alias (número do ramal) é imutável após criado - renomear afetaria ps_endpoints/ps_aors/ps_auths
+        // em produção e qualquer integração/discagem que já dependa do número atual
         allowOutbound: z.boolean().optional(),
         notes: z.string().max(10000).nullable().optional(),
         ...sipFieldsForUpdate,
@@ -261,7 +262,7 @@ export const updateExtensionSchema = z
         allowSubscribe: z.union([z.string().max(10), z.boolean()]).optional(),
     })
     .refine((data) => Object.values(data).some((v) => v !== undefined), {
-        message: 'At least one field is required: name, alias, allowOutbound, or type-specific SIP/PJSIP fields',
+        message: 'At least one field is required: name, allowOutbound, or type-specific SIP/PJSIP fields',
     })
 
 // ─── Mapping: camelCase API → Asterisk DB column names ───────────────────────

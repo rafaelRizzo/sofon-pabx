@@ -47,6 +47,7 @@ import { ExtensionRestrictSelect } from "@/components/OutboundRoutes/extension-r
 import { TrunkOrderSelect } from "@/components/OutboundRoutes/trunk-order-select"
 import { cn } from "@/lib/utils"
 import {
+    buildFullDialPattern,
     DIAL_PATTERN_PRESETS,
     outboundRouteFormSchema,
     type OutboundRouteForm,
@@ -55,22 +56,22 @@ import { type OutboundRouteFormDialogProps } from "@/components/OutboundRoutes/t
 
 const PATTERN_COLUMNS = [
     {
-        label: "Padrão",
-        required: true,
-        tooltip:
-            "Formato de discagem (sintaxe Asterisk) que o número precisa casar para usar esta rota. Ex: _9XXXXXXXX = 9 dígitos começando com 9 (celular local).",
-    },
-    {
-        label: "Remover prefixo",
-        required: false,
-        tooltip:
-            "Dígitos do início do número discado que devem ser descartados antes de enviar ao tronco. Ex: se o ramal discou 0 + DDD + número, informe 0 para remover esse dígito.",
-    },
-    {
-        label: "Adicionar prefixo",
+        label: "Adicionar prefixo (Prepend)",
         required: false,
         tooltip:
             "Dígitos inseridos no início do número (após remover o prefixo) antes de discar pelo tronco. Ex: código da operadora ou o 9 do celular quando o tronco exige.",
+    },
+    {
+        label: "Remover prefixo (Prefix)",
+        required: false,
+        tooltip:
+            "Dígitos do início do número discado que devem ser descartados antes de enviar ao tronco. Esses dígitos já entram automaticamente no início do Padrão para o casamento - não repita-os lá. Ex: se o ramal discou 0 + DDD + número, informe 0 aqui e deixe o Padrão só com DDD + número.",
+    },
+    {
+        label: "Padrão (Match Pattern)",
+        required: true,
+        tooltip:
+            "Formato de discagem que o número precisa casar para usar esta rota, SEM repetir os dígitos já informados em Remover prefixo (eles são somados automaticamente na frente). X = qualquer dígito (0-9), Z = 1-9, N = 2-9. Ex: 9XXXXXXXX = 9 dígitos começando com 9 (celular local); ZX = DDD (nunca começa com 0). Pode digitar com ou sem o _ inicial (sintaxe Asterisk) - detectamos automaticamente.",
     },
 ] as const
 
@@ -143,13 +144,15 @@ export function OutboundRouteFormDialog({
     const patterns = watch("patterns")
 
     // Padrão => nome da rota que já usa ele, entre TODAS as rotas da empresa (exceto a que está
-    // sendo editada) - o dialplan é escrito por empresa, não por rota, então precisa ser único aqui
+    // sendo editada) - o dialplan é escrito por empresa, não por rota, então precisa ser único aqui.
+    // Chaveado pelo padrão completo (prefix+pattern), já que é isso que vira o exten real no Asterisk.
     const otherRoutesPatternMap = useMemo(() => {
         const map = new Map<string, string>()
         for (const r of existingRoutes) {
             if (r.id === route?.id) continue
             for (const p of r.patterns) {
-                if (!map.has(p.pattern)) map.set(p.pattern, r.name)
+                const fullPattern = buildFullDialPattern(p.prefix, p.pattern)
+                if (!map.has(fullPattern)) map.set(fullPattern, r.name)
             }
         }
         return map
@@ -159,10 +162,13 @@ export function OutboundRouteFormDialog({
     const patternConflicts = useMemo(
         () =>
             patterns.map((p, index) => {
-                const value = p.pattern?.trim()
-                if (!value) return null
+                if (!p.pattern?.trim()) return null
+                const value = buildFullDialPattern(p.prefix, p.pattern)
                 const duplicatedInForm = patterns.some(
-                    (other, i) => i < index && other.pattern?.trim() === value
+                    (other, i) =>
+                        i < index &&
+                        !!other.pattern?.trim() &&
+                        buildFullDialPattern(other.prefix, other.pattern) === value
                 )
                 if (duplicatedInForm) return "Padrão duplicado neste formulário"
                 const routeName = otherRoutesPatternMap.get(value)
@@ -176,11 +182,16 @@ export function OutboundRouteFormDialog({
 
     // Usado pelos presets (Celular local, Fixo local...) para desabilitar quem já está em uso -
     // mesma regra de "igual" do patternConflicts, não é checagem de sobreposição de padrão
-    function presetConflictReason(pattern: string): string | null {
-        if (patterns.some((p) => p.pattern?.trim() === pattern)) {
+    function presetConflictReason(prefix: string, pattern: string): string | null {
+        const value = buildFullDialPattern(prefix, pattern)
+        if (
+            patterns.some(
+                (p) => !!p.pattern?.trim() && buildFullDialPattern(p.prefix, p.pattern) === value
+            )
+        ) {
             return "Já adicionado neste formulário"
         }
-        const routeName = otherRoutesPatternMap.get(pattern)
+        const routeName = otherRoutesPatternMap.get(value)
         return routeName ? `Já usado na rota "${routeName}"` : null
     }
 
@@ -302,36 +313,19 @@ export function OutboundRouteFormDialog({
                                 </Field>
 
                                 <Field>
-                                    <div className="flex items-center justify-between">
-                                        <FieldLabel>
-                                            Padrões de discagem
-                                        </FieldLabel>
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() =>
-                                                patternFields.append(
-                                                    emptyPattern,
-                                                    {
-                                                        shouldFocus: false,
-                                                    }
-                                                )
-                                            }
-                                        >
-                                            <PlusIcon />
-                                            Adicionar
-                                        </Button>
-                                    </div>
+                                    <FieldLabel>
+                                        Padrões de discagem
+                                    </FieldLabel>
                                     <div className="flex flex-wrap gap-1.5">
                                         {DIAL_PATTERN_PRESETS.map((preset) => {
                                             const conflictReason =
                                                 presetConflictReason(
+                                                    preset.prefix,
                                                     preset.pattern
                                                 )
                                             return (
                                                 <Badge
-                                                    key={preset.pattern}
+                                                    key={preset.label}
                                                     variant="outline"
                                                     title={
                                                         conflictReason ??
@@ -350,7 +344,7 @@ export function OutboundRouteFormDialog({
                                                                 pattern:
                                                                     preset.pattern,
                                                                 prepend: "",
-                                                                prefix: "",
+                                                                prefix: preset.prefix,
                                                             },
                                                             {
                                                                 shouldFocus: false,
@@ -367,9 +361,10 @@ export function OutboundRouteFormDialog({
                                     <FieldDescription>
                                         Não achou o padrão do seu caso (ex: um
                                         código especial de 4 ou 5 dígitos)?
-                                        Digite o número exato na linha abaixo:
-                                        ex: <code>_1404</code> corresponde só a
-                                        esse número.
+                                        Digite o número exato no campo Padrão:
+                                        ex: <code>1404</code> corresponde só a
+                                        esse número. Aceita com ou sem{" "}
+                                        <code>_</code> no início.
                                     </FieldDescription>
                                     {errors.patterns?.root && (
                                         <FieldError>
@@ -379,6 +374,24 @@ export function OutboundRouteFormDialog({
 
                                     <TooltipProvider delay={150}>
                                         <div className="space-y-2 rounded-md border p-2">
+                                            <div className="flex justify-end">
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() =>
+                                                        patternFields.append(
+                                                            emptyPattern,
+                                                            {
+                                                                shouldFocus: false,
+                                                            }
+                                                        )
+                                                    }
+                                                >
+                                                    <PlusIcon />
+                                                    Adicionar
+                                                </Button>
+                                            </div>
                                             <div className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 px-1">
                                                 {PATTERN_COLUMNS.map((col) => (
                                                     <PatternColumnLabel
@@ -395,6 +408,18 @@ export function OutboundRouteFormDialog({
                                                         key={field.id}
                                                         className="grid grid-cols-[1fr_1fr_1fr_auto] items-start gap-2"
                                                     >
+                                                        <Input
+                                                            placeholder="Ex: 55"
+                                                            {...register(
+                                                                `patterns.${index}.prepend`
+                                                            )}
+                                                        />
+                                                        <Input
+                                                            placeholder="Ex: 0"
+                                                            {...register(
+                                                                `patterns.${index}.prefix`
+                                                            )}
+                                                        />
                                                         <div>
                                                             {!errors.patterns?.[
                                                                 index
@@ -415,7 +440,7 @@ export function OutboundRouteFormDialog({
                                                                     </Badge>
                                                                 )}
                                                             <Input
-                                                                placeholder="_9XXXXXXXX"
+                                                                placeholder="9XXXXXXXX"
                                                                 aria-invalid={
                                                                     !!patternConflicts[
                                                                         index
@@ -428,7 +453,7 @@ export function OutboundRouteFormDialog({
                                                             />
                                                             {errors.patterns?.[
                                                                 index
-                                                            ]?.pattern && (
+                                                            ]?.pattern ? (
                                                                 <FieldError>
                                                                     {
                                                                         errors
@@ -439,20 +464,34 @@ export function OutboundRouteFormDialog({
                                                                             ?.message
                                                                     }
                                                                 </FieldError>
+                                                            ) : (
+                                                                // Sem prefixo, "casa com" é idêntico ao próprio Padrão -
+                                                                // só vale mostrar quando o prefixo muda o número final
+                                                                patterns[
+                                                                    index
+                                                                ]?.pattern?.trim() &&
+                                                                patterns[
+                                                                    index
+                                                                ]?.prefix?.trim() && (
+                                                                    <p className="mt-1 text-[10px] text-muted-foreground">
+                                                                        Casa
+                                                                        com:{" "}
+                                                                        <code>
+                                                                            {buildFullDialPattern(
+                                                                                patterns[
+                                                                                    index
+                                                                                ]
+                                                                                    ?.prefix,
+                                                                                patterns[
+                                                                                    index
+                                                                                ]!
+                                                                                    .pattern
+                                                                            )}
+                                                                        </code>
+                                                                    </p>
+                                                                )
                                                             )}
                                                         </div>
-                                                        <Input
-                                                            placeholder="Ex: 0"
-                                                            {...register(
-                                                                `patterns.${index}.prefix`
-                                                            )}
-                                                        />
-                                                        <Input
-                                                            placeholder="Ex: 55"
-                                                            {...register(
-                                                                `patterns.${index}.prepend`
-                                                            )}
-                                                        />
                                                         <Button
                                                             type="button"
                                                             variant="outline"

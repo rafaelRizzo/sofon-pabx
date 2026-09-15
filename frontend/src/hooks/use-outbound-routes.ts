@@ -64,26 +64,46 @@ export const outboundRouteFormSchema = z.object({
     notes: z.string().max(10000, "Máximo 10000 caracteres").optional(),
 })
 
-// Presets de padrões de discagem comuns no Brasil - apenas preenche o campo "pattern",
-// prefix/prepend ficam a critério do usuário (dependem do tronco/operadora)
+// Presets de padrões de discagem comuns no Brasil. Prepend fica sempre a critério do usuário
+// (depende do tronco/operadora). O "0" de acesso interurbano vai no prefix, não no pattern -
+// senão o usuário teria que digitar esse dígito duas vezes (aqui e em "Remover prefixo") pra
+// funcionar, já que o Asterisk casa prefix+pattern combinados (ver buildFullDialPattern).
 export const DIAL_PATTERN_PRESETS = [
-    { label: "Celular local (9 dígitos)", pattern: `_9${"X".repeat(8)}` },
-    { label: "Fixo local (8 dígitos)", pattern: `_${"X".repeat(8)}` },
+    { label: "Celular local (9 dígitos)", prefix: "", pattern: `_9${"X".repeat(8)}` },
+    { label: "Fixo local (8 dígitos)", prefix: "", pattern: `_${"X".repeat(8)}` },
     {
+        // DDD nunca começa com 0 (Z = 1-9) - só o 2º dígito do DDD é livre (X = 0-9)
         label: "Interurbano fixo (0 + DDD + fixo)",
-        pattern: `_0${"X".repeat(10)}`,
+        prefix: "0",
+        pattern: `_ZX${"X".repeat(8)}`,
     },
     {
         label: "Interurbano celular (0 + DDD + celular)",
-        pattern: `_0${"X".repeat(11)}`,
+        prefix: "0",
+        pattern: `_ZX9${"X".repeat(8)}`,
     },
-    { label: "0800 (11 dígitos)", pattern: `_0800${"X".repeat(7)}` },
+    { label: "0800 (11 dígitos)", prefix: "", pattern: `_0800${"X".repeat(7)}` },
     {
         label: "Utilidade pública (3 dígitos, ex: 180, 190)",
+        prefix: "",
         pattern: `_${"X".repeat(3)}`,
     },
-    { label: "Internacional (00 + país)", pattern: "_00." },
+    { label: "Internacional (00 + país)", prefix: "", pattern: "_00." },
 ] as const
+
+const ASTERISK_PATTERN_WILDCARDS = /[XZN.!]/i
+
+// Espelha buildFullExten de backend/src/modules/outbound-routes/outbound-routes.service.ts - o
+// Asterisk casa prefix+pattern combinados, então o preview e a checagem de duplicidade no form
+// precisam considerar os dois campos juntos, não só o texto digitado em "Padrão".
+export function buildFullDialPattern(
+    prefix: string | null | undefined,
+    pattern: string
+): string {
+    const bare = pattern.startsWith("_") ? pattern.slice(1) : pattern
+    const combined = `${prefix ?? ""}${bare}`
+    return ASTERISK_PATTERN_WILDCARDS.test(combined) ? `_${combined}` : combined
+}
 
 export type OutboundRouteForm = z.infer<typeof outboundRouteFormSchema>
 

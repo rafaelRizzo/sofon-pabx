@@ -35,18 +35,17 @@ export type HolidayGroup = {
     updatedAt: string
 }
 
+// Validação de range fica no superRefine abaixo (só roda no modo "manual") - aqui só o shape,
+// senão o array `dates` residual do modo "url" (não usado, ver toApiPayload) bloqueia o submit
+// inteiro do form com erro invisível (não há UI de erro de `dates` no modo "url")
 const holidayDateFormSchema = z.object({
-    name: z.string().min(1, "Informe o nome").max(80, "Máximo 80 caracteres"),
-    month: z.coerce
-        .number()
-        .int()
-        .min(1, "Mês inválido")
-        .max(12, "Mês inválido"),
-    day: z.coerce.number().int().min(1, "Dia inválido").max(31, "Dia inválido"),
+    name: z.string().max(80, "Máximo 80 caracteres"),
+    month: z.coerce.number().int(),
+    day: z.coerce.number().int(),
     // vazio = recorrente todo ano; preenchido = só nesse ano (feriado móvel, ex: Carnaval)
     year: z.preprocess(
         (v) => (v === "" || v === undefined || v === null ? undefined : Number(v)),
-        z.number().int().min(1900, "Ano inválido").max(2100, "Ano inválido").optional()
+        z.number().int().optional()
     ),
 })
 
@@ -64,9 +63,50 @@ export const createHolidayGroupFormSchema = z
         dates: z.array(holidayDateFormSchema).max(50),
         notes: z.string().max(10000, "Máximo 10000 caracteres").optional(),
     })
-    .refine((d) => d.mode !== "url" || (d.url?.trim().length ?? 0) > 0, {
-        message: "Informe a URL",
-        path: ["url"],
+    .superRefine((d, ctx) => {
+        if (d.mode === "url") {
+            if (!(d.url?.trim().length ?? 0)) {
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    message: "Informe a URL",
+                    path: ["url"],
+                })
+            }
+            return
+        }
+        d.dates.forEach((date, i) => {
+            if (date.name.trim().length < 1) {
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    message: "Informe o nome",
+                    path: ["dates", i, "name"],
+                })
+            }
+            if (date.month < 1 || date.month > 12) {
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    message: "Mês inválido",
+                    path: ["dates", i, "month"],
+                })
+            }
+            if (date.day < 1 || date.day > 31) {
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    message: "Dia inválido",
+                    path: ["dates", i, "day"],
+                })
+            }
+            if (
+                date.year !== undefined &&
+                (date.year < 1900 || date.year > 2100)
+            ) {
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    message: "Ano inválido",
+                    path: ["dates", i, "year"],
+                })
+            }
+        })
     })
 
 export type HolidayGroupForm = z.infer<typeof createHolidayGroupFormSchema>

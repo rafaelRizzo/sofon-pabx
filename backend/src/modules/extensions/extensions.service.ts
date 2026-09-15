@@ -12,7 +12,6 @@ import { assertNotReferenced } from '../../schemas/route-destination.validate'
 import { resolveUsedByLabels, type UsedByRef } from '../../schemas/flow-reference-label'
 import { syncFlowNodeLabel } from '../flows/flow-nodes.service'
 import { AppError } from '../../utils/errors/app.error'
-import { logger } from '../../utils/logger'
 
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 
@@ -20,12 +19,6 @@ const CHARSET = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
 const generatePassword = () => {
     const bytes = randomBytes(20)
     return Array.from(bytes, (b) => CHARSET[b % CHARSET.length]).join('')
-}
-
-const regenerateFlowNodesSafely = (companyId: string) => {
-    void import('../../asterisk/flow-node.repository')
-        .then(({ FlowNodeRepository }) => FlowNodeRepository.regenerate(companyId))
-        .catch((error) => logger.warn({ event: 'flow-nodes.regenerate.failed', companyId, error: error instanceof Error ? error.message : String(error) }))
 }
 
 export type BatchResult = {
@@ -400,18 +393,8 @@ export const updateExtension = async (id: string, data: UpdateExtensionInput) =>
     })
     if (!existing) throw new AppError('Extension not found', 404)
 
-    const { alias, number, type, context, companyId } = existing
-    const { name, alias: newAlias, allowOutbound: newAllowOutbound, notes: newNotes, ...typeFields } = data
-
-    const aliasChanged = newAlias !== undefined && newAlias !== alias
-    const effectiveNumber = aliasChanged ? generateAsteriskNumber(newAlias, existing.company.asteriskId) : number
-
-    if (aliasChanged) {
-        const conflict = await prisma.extension.findUnique({
-            where: { alias_companyId: { alias: newAlias, companyId } },
-        })
-        if (conflict) throw new AppError('Extension alias already in use for this company', 409)
-    }
+    const { number, type, context } = existing
+    const { name, allowOutbound: newAllowOutbound, notes: newNotes, ...typeFields } = data
 
     let provisionedPassword: string | null = null
 
@@ -424,15 +407,10 @@ export const updateExtension = async (id: string, data: UpdateExtensionInput) =>
         })
 
         if (type === 'pjsip') {
-            if (aliasChanged) {
-                await PjsipRepository.renameExtension(tx, number, effectiveNumber)
-                await AsteriskQueueRepository.updateMemberInterfaces(tx, `PJSIP/${number}`, `PJSIP/${effectiveNumber}`)
-            }
-
             const endpointUpdate: Record<string, any> = {}
             const aorUpdate: Record<string, any> = {}
 
-            if (name !== undefined) endpointUpdate.callerid = `${name} <${effectiveNumber}>`
+            if (name !== undefined) endpointUpdate.callerid = `${name} <${number}>`
             if (newAllowOutbound !== undefined) endpointUpdate.setvar = `ALLOW_OUTBOUND=${newAllowOutbound ? 1 : 0}`
 
             for (const key of pjsipFieldKeys) {
@@ -444,13 +422,8 @@ export const updateExtension = async (id: string, data: UpdateExtensionInput) =>
             }
 
             const endpointUpdateWithGroups = applyGroupPrefixes(endpointUpdate, existing.company.asteriskId)
-            await PjsipRepository.updateExtension(tx, effectiveNumber, endpointUpdateWithGroups, aorUpdate)
+            await PjsipRepository.updateExtension(tx, number, endpointUpdateWithGroups, aorUpdate)
         } else {
-            if (aliasChanged) {
-                await SipRepository.renameExtension(tx, number, effectiveNumber)
-                await AsteriskQueueRepository.updateMemberInterfaces(tx, `SIP/${number}`, `SIP/${effectiveNumber}`)
-            }
-
             const sipUpdate: Record<string, any> = {}
             if (newAllowOutbound !== undefined) sipUpdate.setvar = `ALLOW_OUTBOUND=${newAllowOutbound ? 1 : 0}`
 
@@ -459,12 +432,11 @@ export const updateExtension = async (id: string, data: UpdateExtensionInput) =>
                 if (value !== undefined) sipUpdate[sipFieldMap[key] ?? key] = value
             }
 
-            await SipRepository.updateExtension(tx, effectiveNumber, sipUpdate)
+            await SipRepository.updateExtension(tx, number, sipUpdate)
         }
 
         const extUpdate: Record<string, any> = {}
         if (name !== undefined) extUpdate.name = name
-        if (aliasChanged) { extUpdate.alias = newAlias; extUpdate.number = effectiveNumber }
         if (newAllowOutbound !== undefined) extUpdate.allowOutbound = newAllowOutbound
         if (newNotes !== undefined) extUpdate.notes = newNotes
 
@@ -475,7 +447,6 @@ export const updateExtension = async (id: string, data: UpdateExtensionInput) =>
     await ExtensionsCache.invalidateExtension(id)
     await ExtensionsCache.invalidateLiveDetails(id)
     await ExtensionsCache.invalidateAllExtensions()
-    if (aliasChanged) regenerateFlowNodesSafely(existing.companyId)
     if (name !== undefined && name !== existing.name) await syncFlowNodeLabel('extension', id, name)
     const updated = await getExtensionById(id)
     return provisionedPassword ? { ...updated, provisioned: true, password: provisionedPassword } : updated

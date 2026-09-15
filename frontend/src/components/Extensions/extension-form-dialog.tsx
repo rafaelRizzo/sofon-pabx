@@ -845,6 +845,7 @@ export function ExtensionFormDialog({
                             "id",
                             "username",
                             "type",
+                            "alias",
                             "companyId",
                             "createdAt",
                             "updatedAt",
@@ -1047,15 +1048,30 @@ export function ExtensionFormDialog({
                             <G2>
                                 <Field>
                                     <FieldLabel>Ramal</FieldLabel>
-                                    <Input
-                                        placeholder="Ex: 1001"
-                                        maxLength={6}
-                                        {...r("alias")}
-                                    />
-                                    {errors.alias && (
-                                        <FieldError>
-                                            {errors.alias.message}
-                                        </FieldError>
+                                    {isEdit ? (
+                                        <div className="flex h-7 items-center rounded-md border border-input bg-input/20 px-2 font-mono text-sm select-all dark:bg-input/30">
+                                            {extensionData?.alias}
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <Input
+                                                placeholder="Ex: 1001"
+                                                maxLength={6}
+                                                {...createForm.register(
+                                                    "alias"
+                                                )}
+                                            />
+                                            {createForm.formState.errors
+                                                .alias && (
+                                                <FieldError>
+                                                    {
+                                                        createForm.formState
+                                                            .errors.alias
+                                                            .message
+                                                    }
+                                                </FieldError>
+                                            )}
+                                        </>
                                     )}
                                 </Field>
                                 <Field>
