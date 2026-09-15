@@ -57,18 +57,34 @@ export const DialplanRepository = {
             // direto pra ramal (route-destination-resolver.ts, type "extension"), então "T" daria
             // esse poder pro CLIENTE externo transferir a própria ligação, o que nunca é o desejado
             { context, exten, priority: 7, app: 'Dial', appdata: `${dialTarget},20,t` },
+            // disposition nativo do CDR vira ANSWERED assim que o canal é atendido (mais abaixo, no
+            // fallback de aviso) - independente do DIALSTATUS real do Dial. Captura o token bruto aqui,
+            // antes de qualquer Answer(), pra cdr.service.ts poder reportar o resultado de verdade
+            // (real_disposition) em vez do disposition nativo inflado
+            { context, exten, priority: 8, app: 'Set', appdata: 'CDR(real_disposition)=${DIALSTATUS}' },
             // CHANUNAVAIL = Asterisk não achou o endpoint PJSIP <EXTEN>_<accountcode>, ou seja "não existe
             // esse ramal" (busca de ramal = tentativa nativa do Dial, sem query própria) - só nesse caso
             // faz sentido tentar fila/rota de saída (ver handleRamalFallback em agi-server.ts). Qualquer
             // outro DIALSTATUS (BUSY/NOANSWER/CANCEL/ANSWER) significa que o ramal existe e a chamada
             // seguiu seu curso normal - pula direto pro encerramento, sem tentar fallback nenhum.
-            { context, exten, priority: 8, app: 'GotoIf', appdata: '$["${DIALSTATUS}"="CHANUNAVAIL"]?9:10' },
-            { context, exten, priority: 9, app: 'AGI', appdata: 'agi://127.0.0.1:4573/ramal-fallback' },
-            { context, exten, priority: 10, app: 'Set', appdata: 'CDR(hangup_cause)=${HANGUPCAUSE}' },
+            { context, exten, priority: 9, app: 'GotoIf', appdata: '$["${DIALSTATUS}"="CHANUNAVAIL"]?10:11' },
+            { context, exten, priority: 10, app: 'AGI', appdata: 'agi://127.0.0.1:4573/ramal-fallback' },
+            // DIALSTATUS=ANSWER = a chamada foi completada normalmente (uma das partes atendeu e depois
+            // desligou) - pula direto pro encerramento sem tocar nada. Qualquer outro status (CHANUNAVAIL
+            // sem fila/rota encontrada pelo AGI acima, BUSY, NOANSWER, CONGESTION, CANCEL) significa que o
+            // chamador nunca ouviu nada além de silêncio - toca aviso de ramal indisponível antes de
+            // desligar em vez de simplesmente cair a ligação sem explicação
+            { context, exten, priority: 11, app: 'GotoIf', appdata: '$["${DIALSTATUS}"="ANSWER"]?14:12' },
+            // Answer() idempotente (mesmo padrão de ensureFallback): em Dial ramal→ramal o canal de quem
+            // discou pode nunca ter sido atendido - sem isso o Playback toca em canal ainda não em progress
+            // e o áudio não chega no chamador
+            { context, exten, priority: 12, app: 'Answer', appdata: null },
+            { context, exten, priority: 13, app: 'Playback', appdata: 'ss-noservice' },
+            { context, exten, priority: 14, app: 'Set', appdata: 'CDR(hangup_cause)=${HANGUPCAUSE}' },
             // CHANNEL(hangupsource) só vem preenchido depois que o Dial retorna - identifica o canal exato
             // que mandou o BYE/CANCEL; DIALSTATUS cobre os casos sem hangupsource (ex: BUSY, NOANSWER)
-            { context, exten, priority: 11, app: 'NoOp', appdata: 'Chamada ${EXTEN} encerrada - status=${DIALSTATUS}, por=${CHANNEL(hangupsource)}' },
-            { context, exten, priority: 12, app: 'HangUp', appdata: null },
+            { context, exten, priority: 15, app: 'NoOp', appdata: 'Chamada ${EXTEN} encerrada - status=${DIALSTATUS}, por=${CHANNEL(hangupsource)}' },
+            { context, exten, priority: 16, app: 'HangUp', appdata: null },
         ])
         await tx.extensions.deleteMany({ where: { context, exten: { in: extens } } })
         await tx.extensions.createMany({ data })

@@ -255,6 +255,12 @@ export const AsteriskQueueRepository = {
                     // opção "c": sem ela, Queue() por padrão HANGUP o caller quando o agente desliga
                     // primeiro - precisa continuar no dialplan pra chegar em queue-outcome/queue-survey
                     { context: QUEUE_APP_CONTEXT, exten, priority: priority++, app: 'Queue', appdata: `${asteriskName},tc` },
+                    // disposition nativo do CDR vira ANSWERED assim que o Queue() atende o canal do
+                    // ligante pra tocar MOH, independente de um agente ter atendido de verdade - QUEUESTATUS
+                    // só vem preenchido nos casos de falha (mesmo sinal que finalizeByQueueStatus usa em
+                    // queue-calls.service.ts), vazio = agente atendeu. Grava o token bruto pra
+                    // cdr.service.ts reportar o resultado real (real_disposition) em vez do inflado
+                    { context: QUEUE_APP_CONTEXT, exten, priority: priority++, app: 'Set', appdata: 'CDR(real_disposition)=${IF($["${QUEUESTATUS}"=""]?ANSWER:${QUEUESTATUS})}' },
                     { context: QUEUE_APP_CONTEXT, exten, priority: priority++, app: 'AGI', appdata: buildQueueOutcomeAgiUrl(q.id) },
                     { context: QUEUE_APP_CONTEXT, exten, priority: priority++, app: 'AGI', appdata: buildQueueSurveyAgiUrl(q.id) },
                     nodeExitCheck(QUEUE_APP_CONTEXT, exten, priority++, 'default'),

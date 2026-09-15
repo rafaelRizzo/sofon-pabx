@@ -1156,6 +1156,13 @@ model cdr {
   // Só capturado logo após um Dial() ser executado (${HANGUPCAUSE}) — chamadas que desligam
   // antes de qualquer Dial (ex: abandono na URA) não preenchem este campo
   hangupCause     String?   @map("hangup_cause") @db.VarChar(45)
+  // Token bruto de DIALSTATUS (ramal→ramal, dialplan.repository.ts) ou QUEUESTATUS (fila,
+  // queue.repository.ts), setado via Set(CDR(x)=y) logo após o Dial()/Queue() rodar — corrige o
+  // `disposition` nativo, que vira ANSWERED assim que o CANAL é atendido (pra tocar aviso/MOH),
+  // independente do destino real ter sido atendido por alguém. null nos fluxos sem Dial/Queue
+  // (IVR/announcement/voicemail terminais) — ali o disposition nativo já é correto. Ver
+  // cdr.service.ts (mapRealDisposition/effectiveDispositionFilter) pra tradução no enum de callStatus.
+  realDisposition String?   @map("real_disposition") @db.VarChar(20)
 
   // composto: toda query filtra por accountcode e ordena por startTime desc — cobre WHERE+ORDER BY num único index scan
   @@index([accountcode, startTime(sort: Desc)])

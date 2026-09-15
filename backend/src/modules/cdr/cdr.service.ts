@@ -10,6 +10,43 @@ import type { CompanyDto } from '../companies/companies.service'
 // timezone do SO onde o Asterisk roda (setups/install-asterisk.sh) - ver comentário em schema.prisma no model cdr
 const TZ = process.env.TZ || 'America/Sao_Paulo'
 
+// Tradução do token bruto de real_disposition (DIALSTATUS/QUEUESTATUS, ver schema.prisma) pro
+// mesmo enum de callStatus.schema.ts (ANSWERED|NO ANSWER|BUSY|FAILED|CONGESTION) - fica em TS em
+// vez de IF() aninhado no dialplan, mais legível/testável
+const REAL_TOKEN_TO_STATUS: Record<string, string> = {
+    ANSWER: 'ANSWERED',
+    BUSY: 'BUSY',
+    CONGESTION: 'CONGESTION',
+    NOANSWER: 'NO ANSWER',
+    CANCEL: 'NO ANSWER',
+    CHANUNAVAIL: 'FAILED',
+    TIMEOUT: 'NO ANSWER',
+    FULL: 'NO ANSWER',
+    JOINEMPTY: 'NO ANSWER',
+    JOINUNAVAIL: 'NO ANSWER',
+    LEAVEEMPTY: 'NO ANSWER',
+    LEAVEUNAVAIL: 'NO ANSWER',
+}
+const mapRealDisposition = (raw: string | null): string | null => (raw ? REAL_TOKEN_TO_STATUS[raw] ?? raw : null)
+
+// Inverso do mapa acima - usado pra filtrar/agregar por callStatus quando o CDR tem real_disposition
+const STATUS_TO_REAL_TOKENS: Record<string, string[]> = {
+    ANSWERED: ['ANSWER'],
+    BUSY: ['BUSY'],
+    CONGESTION: ['CONGESTION'],
+    FAILED: ['CHANUNAVAIL'],
+    'NO ANSWER': ['NOANSWER', 'CANCEL', 'TIMEOUT', 'FULL', 'JOINEMPTY', 'JOINUNAVAIL', 'LEAVEEMPTY', 'LEAVEUNAVAIL'],
+}
+// real_disposition, quando presente, é a fonte de verdade (disposition nativo infla ANSWERED
+// assim que o canal é atendido pra tocar aviso/MOH, ver comentário em schema.prisma) - null (fluxos
+// sem Dial/Queue, ex: IVR/announcement terminal) cai no disposition nativo, que ali já é correto
+const effectiveDispositionFilter = (status: string) => ({
+    OR: [
+        { AND: [{ realDisposition: null }, { disposition: status }] },
+        { realDisposition: { in: STATUS_TO_REAL_TOKENS[status] ?? [] } },
+    ],
+})
+
 // queueId é friendly-facing (o front não sabe o formato interno "<asteriskId>-<number>" do
 // queue_name gravado pelo dialplan) - resolve pro nome real antes de montar o where. 404 se o id
 // não existir ou for de outra empresa, mesmo padrão de validação de posse usado em outros filtros
@@ -33,7 +70,7 @@ const buildWhere = async (company: { id: string; asteriskId: string }, query: Cd
         accountcode: company.asteriskId,
         ...(query.src && { src: { contains: query.src } }),
         ...(query.dst && { dst: { contains: query.dst } }),
-        ...(query.callStatus && { disposition: query.callStatus }),
+        ...(query.callStatus && effectiveDispositionFilter(query.callStatus)),
         ...(query.direction && { direction: query.direction }),
         ...(query.originExtension && {
             originExtension: { contains: query.originExtension }
@@ -77,6 +114,7 @@ const select = {
     duration: true,
     billsec: true,
     disposition: true,
+    realDisposition: true,
     uniqueid: true,
     queueName: true,
     linkedid: true,
@@ -105,10 +143,10 @@ export const getCdrByCompany = async (query: CdrQueryInput) => {
     ])
 
     const records = await enrichCdrRecords(
-        rows.map(({ disposition, ...r }) => ({
+        rows.map(({ disposition, realDisposition, ...r }) => ({
             ...r,
             id: r.id.toString(),
-            callStatus: disposition,
+            callStatus: mapRealDisposition(realDisposition) ?? disposition,
             startTime:
                 r.startTime && formatNaiveLocalISOString(r.startTime, TZ),
             answerTime:
@@ -186,18 +224,25 @@ export const getCdrMetricsByCompany = async (query: CdrMetricsQueryInput) => {
     const company = await getCompanyById(query.companyId)
     const where = await buildWhere(company, query)
 
-    const [total, answered, aggregate, byStatus, byDirection] =
+    const [total, answered, aggregate, byRawStatus, byRealStatus, byDirection] =
         await Promise.all([
             prisma.cdr.count({ where }),
-            prisma.cdr.count({ where: { ...where, disposition: 'ANSWERED' } }),
+            prisma.cdr.count({ where: { ...where, ...effectiveDispositionFilter('ANSWERED') } }),
             prisma.cdr.aggregate({
                 where,
                 _sum: { duration: true, billsec: true },
                 _avg: { duration: true, billsec: true }
             }),
+            // Prisma groupBy não faz coalesce(real_disposition, disposition) - divide em 2 queries
+            // (linhas com/sem real_disposition) e mescla abaixo
             prisma.cdr.groupBy({
                 by: ['disposition'],
-                where,
+                where: { ...where, realDisposition: null },
+                _count: { _all: true }
+            }),
+            prisma.cdr.groupBy({
+                by: ['realDisposition'],
+                where: { ...where, realDisposition: { not: null } },
                 _count: { _all: true }
             }),
             prisma.cdr.groupBy({
@@ -206,6 +251,14 @@ export const getCdrMetricsByCompany = async (query: CdrMetricsQueryInput) => {
                 _count: { _all: true }
             })
         ])
+
+    const statusCounts = new Map<string, number>()
+    const addStatusCount = (status: string | null, count: number) => {
+        const key = status ?? 'UNKNOWN'
+        statusCounts.set(key, (statusCounts.get(key) ?? 0) + count)
+    }
+    byRawStatus.forEach((row) => addStatusCount(row.disposition, row._count._all))
+    byRealStatus.forEach((row) => addStatusCount(mapRealDisposition(row.realDisposition), row._count._all))
 
     return {
         metrics: {
@@ -216,10 +269,7 @@ export const getCdrMetricsByCompany = async (query: CdrMetricsQueryInput) => {
             totalBillsec: aggregate._sum.billsec ?? 0,
             avgDuration: aggregate._avg.duration,
             avgBillsec: aggregate._avg.billsec,
-            byStatus: byStatus.map((row) => ({
-                callStatus: row.disposition,
-                calls: row._count._all
-            })),
+            byStatus: [...statusCounts].map(([callStatus, calls]) => ({ callStatus, calls })),
             byDirection: byDirection.map((row) => ({
                 direction: row.direction,
                 calls: row._count._all
@@ -279,10 +329,10 @@ export const getMyRecentCalls = async (userId: string) => {
     })
 
     const records = await enrichCdrRecords(
-        rows.map(({ disposition, ...r }) => ({
+        rows.map(({ disposition, realDisposition, ...r }) => ({
             ...r,
             id: r.id.toString(),
-            callStatus: disposition,
+            callStatus: mapRealDisposition(realDisposition) ?? disposition,
             startTime: r.startTime && formatNaiveLocalISOString(r.startTime, TZ),
             answerTime: r.answerTime && formatNaiveLocalISOString(r.answerTime, TZ),
             endTime: r.endTime && formatNaiveLocalISOString(r.endTime, TZ)

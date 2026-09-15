@@ -25,8 +25,8 @@ describe('DialplanRepository.ensureGenericRoutingPattern', () => {
 
         const { data, skipDuplicates } = tx.extensions.createMany.mock.calls[0][0]
         expect(skipDuplicates).toBeUndefined()
-        // 5 tamanhos de alias (2-6 dígitos) x 12 prioridades cada
-        expect(data).toHaveLength(60)
+        // 5 tamanhos de alias (2-6 dígitos) x 16 prioridades cada
+        expect(data).toHaveLength(80)
         expect(data).toContainEqual({
             context: 'ramais',
             exten: '_XXXX',
@@ -37,7 +37,28 @@ describe('DialplanRepository.ensureGenericRoutingPattern', () => {
         expect(data).toContainEqual({
             context: 'ramais',
             exten: '_XXXX',
-            priority: 12,
+            priority: 8,
+            app: 'Set',
+            appdata: 'CDR(real_disposition)=${DIALSTATUS}',
+        })
+        expect(data).toContainEqual({
+            context: 'ramais',
+            exten: '_XXXX',
+            priority: 11,
+            app: 'GotoIf',
+            appdata: '$["${DIALSTATUS}"="ANSWER"]?14:12',
+        })
+        expect(data).toContainEqual({
+            context: 'ramais',
+            exten: '_XXXX',
+            priority: 13,
+            app: 'Playback',
+            appdata: 'ss-noservice',
+        })
+        expect(data).toContainEqual({
+            context: 'ramais',
+            exten: '_XXXX',
+            priority: 16,
             app: 'HangUp',
             appdata: null,
         })

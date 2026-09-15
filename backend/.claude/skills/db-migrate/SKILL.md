@@ -16,7 +16,13 @@ Regra fixa deste projeto (`backend/CLAUDE.md`, seção "Convenções"): **"Nunca
    - Remoção de campo/model (perda de dado).
    - Mudança de tipo de coluna (pode truncar/converter dado existente).
 
-3. **Pare aqui.** Diga explicitamente ao usuário que ele precisa rodar `bun run migrate` (mapeia pra `prisma migrate dev`, gera **e** aplica a migration contra `DATABASE_URL` do `.env`) ele mesmo, no ambiente que ele escolher (local ou via SSH na VPS). Nunca rode esse comando no mesmo turno, mesmo que o pedido original tenha sido genérico ("migra o banco", "atualiza o schema e já aplica").
+3. **Pare aqui.** Diga explicitamente ao usuário que ele precisa rodar a migration ele mesmo, no ambiente que ele escolher (local ou via SSH na VPS). Nunca rode esse comando no mesmo turno, mesmo que o pedido original tenha sido genérico ("migra o banco", "atualiza o schema e já aplica"). Termine a resposta **sempre** neste formato fixo (nome em `snake_case`, verbo + o que muda, ex: `add_cdr_real_disposition`, `remove_company_legacy_flag`):
+
+   ```
+   bun run migrate -- --name <nome_sugerido>
+   ```
+
+   Isso mapeia pra `prisma migrate dev --name <nome_sugerido>` (gera **e** aplica a migration contra `DATABASE_URL` do `.env`) - já vem com o nome pra não cair no prompt interativo de nome.
 
 4. Se o usuário disser que já rodou e colar um erro, ajude a interpretar o erro (é leitura/diagnóstico, não execução) — mas a correção (reverter uma migration, editar o schema de novo) ainda segue o mesmo fluxo: editar, mostrar, parar, o usuário aplica.
 

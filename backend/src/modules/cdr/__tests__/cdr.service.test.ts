@@ -30,6 +30,7 @@ const CDR_ROW = {
     duration: 30,
     billsec: 25,
     disposition: 'ANSWERED',
+    realDisposition: null,
     uniqueid: '1234.5',
     queueName: 'ast1-queue-100',
     linkedid: '1234.1',
@@ -125,7 +126,10 @@ describe('CdrService.getCdrByCompany', () => {
                     accountcode: 'ast1',
                     src: { contains: '2001' },
                     dst: { contains: '2002' },
-                    disposition: 'ANSWERED',
+                    OR: [
+                        { AND: [{ realDisposition: null }, { disposition: 'ANSWERED' }] },
+                        { realDisposition: { in: ['ANSWER'] } }
+                    ],
                     direction: 'outbound',
                     originExtension: { contains: '2001' },
                     dialedNumber: { contains: '5511999999999' },
@@ -265,6 +269,39 @@ describe('CdrService.getCdrByCompany', () => {
             queueTalkSeconds: null
         })
     })
+
+    // Answer() no dialplan atende o CANAL pra tocar aviso/MOH mesmo quando o Dial/Queue real não foi
+    // atendido - disposition nativo vira ANSWERED indevidamente. real_disposition (DIALSTATUS/QUEUESTATUS
+    // bruto, ver dialplan.repository.ts/queue.repository.ts) é a fonte de verdade quando presente.
+    it('prefers real_disposition over the native (inflated) disposition when present', async () => {
+        db.company.findUnique.mockResolvedValue(COMPANY)
+        db.cdr.findMany.mockResolvedValue([
+            { ...CDR_ROW, disposition: 'ANSWERED', realDisposition: 'NOANSWER' }
+        ])
+        db.cdr.count.mockResolvedValue(1)
+        db.queue.findMany.mockResolvedValue([])
+        db.queueCall.findMany.mockResolvedValue([])
+        db.extension.findMany.mockResolvedValue([])
+
+        const result = (await CdrService.getCdrByCompany(BASE_QUERY)) as any
+
+        expect(result.records[0].callStatus).toBe('NO ANSWER')
+    })
+
+    it('falls back to the native disposition when real_disposition is null (no Dial/Queue in the flow)', async () => {
+        db.company.findUnique.mockResolvedValue(COMPANY)
+        db.cdr.findMany.mockResolvedValue([
+            { ...CDR_ROW, disposition: 'ANSWERED', realDisposition: null }
+        ])
+        db.cdr.count.mockResolvedValue(1)
+        db.queue.findMany.mockResolvedValue([])
+        db.queueCall.findMany.mockResolvedValue([])
+        db.extension.findMany.mockResolvedValue([])
+
+        const result = (await CdrService.getCdrByCompany(BASE_QUERY)) as any
+
+        expect(result.records[0].callStatus).toBe('ANSWERED')
+    })
 })
 
 describe('CdrService.getCdrMetricsByCompany', () => {
@@ -276,8 +313,13 @@ describe('CdrService.getCdrMetricsByCompany', () => {
             _avg: { duration: 30, billsec: 18 }
         })
         db.cdr.groupBy
+            // byRawStatus (linhas sem real_disposition - CDR nativo já correto)
             .mockResolvedValueOnce([
-                { disposition: 'ANSWERED', _count: { _all: 6 } }
+                { disposition: 'ANSWERED', _count: { _all: 4 } }
+            ])
+            // byRealStatus (linhas com real_disposition - fonte de verdade, ver effectiveDispositionFilter)
+            .mockResolvedValueOnce([
+                { realDisposition: 'ANSWER', _count: { _all: 2 } }
             ])
             .mockResolvedValueOnce([
                 { direction: 'outbound', _count: { _all: 8 } }
@@ -299,6 +341,17 @@ describe('CdrService.getCdrMetricsByCompany', () => {
                 })
             })
         )
+        expect(db.cdr.count).toHaveBeenNthCalledWith(
+            2,
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    OR: [
+                        { AND: [{ realDisposition: null }, { disposition: 'ANSWERED' }] },
+                        { realDisposition: { in: ['ANSWER'] } }
+                    ]
+                })
+            })
+        )
         expect(metrics).toMatchObject({
             total: 10,
             answered: 6,
@@ -307,6 +360,7 @@ describe('CdrService.getCdrMetricsByCompany', () => {
             totalBillsec: 180,
             avgDuration: 30,
             avgBillsec: 18,
+            // 4 (disposition nativo) + 2 (real_disposition traduzido ANSWER->ANSWERED) mesclados na mesma chave
             byStatus: [{ callStatus: 'ANSWERED', calls: 6 }],
             byDirection: [{ direction: 'outbound', calls: 8 }]
         })
