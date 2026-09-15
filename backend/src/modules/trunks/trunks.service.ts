@@ -40,6 +40,24 @@ export async function resolveTrunkByAstId(astId: string): Promise<{ id: string; 
     return trunk ? { id: trunk.id, companyId: company.id } : null
 }
 
+// Recalcula ps_identifies a partir dos DIDs atuais da trunk (ver PjsipRepository.syncIdentify) -
+// chamado sempre que o conjunto de InboundRoute de uma trunk muda, e após updateTrunk/setTrunkActive
+// porque ambos recriam/atualizam ps_identifies com match por host, o que apagaria um match_header
+// por DID já em vigor. No-op pra iax/custom/trunk inativa (sem ps_identifies aplicável).
+export const resyncTrunkIdentify = async (trunkId: string) => {
+    const trunk = await prisma.trunk.findUnique({
+        where: { id: trunkId },
+        include: { company: { select: { asteriskId: true } } },
+    })
+    if (!trunk || trunk.type !== 'pjsip' || trunk.registrationMode === 'custom' || !trunk.active) return
+
+    const astId = toAsteriskId(trunk.company.asteriskId, trunk.name)
+    const endpointId = trunk.identifyBy === 'username' && trunk.username ? trunk.username : astId
+
+    const routes = await prisma.inboundRoute.findMany({ where: { trunkId }, select: { did: { select: { number: true } } } })
+    await PjsipRepository.syncIdentify(prisma, astId, endpointId, trunk.host, routes.map((r) => r.did.number))
+}
+
 const trunkSelect = {
     id: true,
     name: true,
@@ -370,6 +388,7 @@ export const updateTrunk = async (id: string, data: UpdateTrunkInput) => {
     await TrunksCache.invalidateByCompany(existing.companyId)
     await TrunksCache.invalidateAllTrunks()
     if (existing.type !== 'iax' && existing.registrationMode === 'outbound') void reloadOutboundRegistrations()
+    if (existing.type === 'pjsip') await resyncTrunkIdentify(id)
     return getTrunkById(id)
 }
 
@@ -446,6 +465,7 @@ export const setTrunkActive = async (id: string, active: boolean) => {
     await TrunksCache.invalidateByCompany(existing.companyId)
     await TrunksCache.invalidateAllTrunks()
     if (existing.type !== 'iax' && existing.registrationMode === 'outbound') void reloadOutboundRegistrations()
+    if (active && existing.type === 'pjsip') await resyncTrunkIdentify(id)
     return getTrunkById(id)
 }
 

@@ -2,6 +2,7 @@ import { prisma } from '../../lib/prisma'
 import { getCompanyById } from '../companies/companies.service'
 import { InboundRoutesCache } from './cache/inbound-routes.cache'
 import { InboundRouteRepository } from '../../asterisk/inboundroute.repository'
+import { resyncTrunkIdentify } from '../trunks/trunks.service'
 import { FlowEdgeRepository } from '../../asterisk/flow-edge.repository'
 import { validateRouteDestination } from '../../schemas/route-destination.validate'
 import { resolveDestinationLabels, withDestinationLabel } from '../../schemas/route-destination-label'
@@ -140,6 +141,7 @@ export const createInboundRoute = async (data: CreateInboundRouteInput) => {
 
     await InboundRoutesCache.invalidateByCompany(data.companyId)
     await InboundRoutesCache.invalidateNamespace()
+    await resyncTrunkIdentify(data.trunkId)
     return { ...route, destination: data.destination ?? null }
 }
 
@@ -195,4 +197,5 @@ export const deleteInboundRoute = async (id: string) => {
     await InboundRoutesCache.invalidateRoute(id)
     await InboundRoutesCache.invalidateByCompany(existing.companyId)
     await InboundRoutesCache.invalidateNamespace()
+    await resyncTrunkIdentify(existing.trunkId)
 }

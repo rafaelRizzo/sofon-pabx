@@ -5,7 +5,7 @@ import { runAmiCommand } from '../transport/ami-client'
 
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 
-const isDynamicHost = (host?: string) => !host || host.toLowerCase() === 'dynamic'
+const isDynamicHost = (host?: string | null) => !host || host.toLowerCase() === 'dynamic'
 
 const isUniqueConstraintError = (err: unknown): boolean => (err as { code?: string })?.code === 'P2002'
 
@@ -210,6 +210,36 @@ export const PjsipRepository = {
                     data: { id, endpoint: endpointId, match: opts.host },
                 })
             }
+        }
+    },
+
+    // Reconcilia ps_identifies com os DIDs atuais da trunk. Duas trunks pjsip outbound que
+    // registram no mesmo host/provedor geram o mesmo match por IP - o Asterisk resolve o endpoint
+    // errado de forma não-determinística (sem ORDER BY na query Realtime), TRUNKID sai errado e a
+    // InboundRoute do DID não bate ("destino inválido" intermitente). Com >=1 DID vinculado, troca
+    // match (IP) por match_header ancorado no user-info do To (`sip:<did>@`) - identifica a chamada
+    // pelo número discado, não pela origem, então funciona mesmo com host compartilhado entre trunks.
+    // Sem DID vinculado ainda (trunk recém-criada, antes de qualquer InboundRoute), cai no fallback
+    // por host de sempre - chamado por resyncTrunkIdentify (trunks.service.ts) a cada mudança de
+    // InboundRoute/trunk que possa ter deixado ps_identifies desatualizado.
+    async syncIdentify(tx: Tx, astId: string, endpointId: string, host: string | null | undefined, didNumbers: string[]) {
+        if (isDynamicHost(host)) {
+            await tx.ps_identifies.deleteMany({ where: { id: astId } })
+            return
+        }
+        if (didNumbers.length > 0) {
+            const matchHeader = `To: sip:(${didNumbers.join('|')})@`
+            await tx.ps_identifies.upsert({
+                where: { id: astId },
+                create: { id: astId, endpoint: endpointId, match_header: matchHeader },
+                update: { match_header: matchHeader, match: null, endpoint: endpointId },
+            })
+        } else {
+            await tx.ps_identifies.upsert({
+                where: { id: astId },
+                create: { id: astId, endpoint: endpointId, match: host },
+                update: { match: host, match_header: null, endpoint: endpointId },
+            })
         }
     },
 
