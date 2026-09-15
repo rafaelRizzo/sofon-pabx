@@ -194,7 +194,7 @@ describe('CompaniesService.deleteCompany', () => {
         db.extension.findMany.mockResolvedValue([])
         db.queue.findMany.mockResolvedValue([{ id: 'q1', number: '100' }])
         db.trunk.findMany.mockResolvedValue([])
-        db.inboundRoute.findMany.mockResolvedValue([{ trunkId: 't1', did: { number: '5511999998888' } }])
+        db.inboundRoute.findMany.mockResolvedValue([{ did: { number: '5511999998888' } }])
         db.outboundDialPattern.findMany.mockResolvedValue([{ pattern: '_0.' }])
         db.extension.deleteMany.mockResolvedValue({ count: 0 })
         db.extensions.deleteMany.mockResolvedValue({ count: 0 })
@@ -203,7 +203,7 @@ describe('CompaniesService.deleteCompany', () => {
         await CompaniesService.deleteCompany('c1')
 
         expect(AsteriskQueueRepository.deleteManyQueues).toHaveBeenCalledWith(expect.anything(), ['q1'], ['ast1-100'])
-        expect(InboundRouteRepository.deleteMany).toHaveBeenCalledWith(expect.anything(), [{ trunkId: 't1', didNumber: '5511999998888' }])
+        expect(InboundRouteRepository.deleteMany).toHaveBeenCalledWith(expect.anything(), 'ast1', ['5511999998888'])
         expect(db.extensions.deleteMany).toHaveBeenCalledWith({ where: { context: 'ramais', exten: { in: ['_0.'] } } })
         expect(removeCompanyDialplanFiles).toHaveBeenCalledWith('ast1', expect.any(Array))
     })

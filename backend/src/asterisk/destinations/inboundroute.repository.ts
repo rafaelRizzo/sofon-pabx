@@ -17,8 +17,19 @@ export const TRUNK_ENTRY_CONTEXT = 'from-trunk'
 // isola trunks/empresas diferentes mesmo quando o mesmo número de DID é reusado entre elas
 export const TRUNK_ROUTED_CONTEXT = 'from-trunk-routed'
 
-function routedExten(trunkId: string, didNumber: string) {
-    return `${didNumber}_${trunkId}`
+// Chave de roteamento é <did>_<companyAsteriskId>, não <did>_<trunkId>. Motivo: o Asterisk
+// resolve qual endpoint recebeu a chamada ANTES do dialplan (ps_identifies, por IP/host) - quando
+// 2 trunks da MESMA empresa compartilham host/IP (operadora com várias contas SIP no mesmo IP,
+// caso comum), essa resolução é ambígua e não-determinística (ver PjsipRepository.syncIdentify),
+// então ${TRUNKID} (setvar do endpoint) pode vir do trunk errado mesmo a chamada tendo entrado
+// corretamente. ${CHANNEL(accountcode)} (= Company.asteriskId, setado em TODO endpoint/friend, ver
+// PjsipRepository/IaxRepository createTrunk) não sofre disso: é IDÊNTICO nos 2 endpoints
+// ambíguos (mesma empresa), então a chave de roteamento acerta mesmo com o TRUNKID errado.
+// trunkId continua correto pra CDR(trunk_id)/GROUP()/ROUTING_TRUNK_ID (ver buildInboundEntries)
+// porque esses valores são gravados LITERAIS no dialplan a partir da própria InboundRoute no
+// momento do create/update - não dependem do TRUNKID resolvido em tempo de chamada.
+function routedExten(companyAsteriskId: string, didNumber: string) {
+    return `${didNumber}_${companyAsteriskId}`
 }
 
 type Entry = { context: string; exten: string; priority: number; app: string; appdata: string | null }
@@ -92,36 +103,40 @@ function buildInboundEntries(
 }
 
 export const InboundRouteRepository = {
-    async create(tx: Tx, trunkId: string, didNumber: string, dest: InboundDest, maxIn?: number | null) {
-        const exten = routedExten(trunkId, didNumber)
+    async create(tx: Tx, trunkId: string, companyAsteriskId: string, didNumber: string, dest: InboundDest, maxIn?: number | null) {
+        const exten = routedExten(companyAsteriskId, didNumber)
         const { app, appdata } = await resolveDestination(dest)
         await tx.extensions.createMany({ data: buildInboundEntries(exten, app, appdata, trunkId, didNumber, maxIn) })
     },
 
-    async update(tx: Tx, trunkId: string, didNumber: string, dest: InboundDest, maxIn?: number | null) {
-        const exten = routedExten(trunkId, didNumber)
+    async update(tx: Tx, trunkId: string, companyAsteriskId: string, didNumber: string, dest: InboundDest, maxIn?: number | null) {
+        const exten = routedExten(companyAsteriskId, didNumber)
         await tx.extensions.deleteMany({ where: { context: TRUNK_ROUTED_CONTEXT, exten } })
         const { app, appdata } = await resolveDestination(dest)
         await tx.extensions.createMany({ data: buildInboundEntries(exten, app, appdata, trunkId, didNumber, maxIn) })
     },
 
-    async delete(tx: Tx, trunkId: string, didNumber: string) {
+    async delete(tx: Tx, companyAsteriskId: string, didNumber: string) {
         await tx.extensions.deleteMany({
-            where: { context: TRUNK_ROUTED_CONTEXT, exten: routedExten(trunkId, didNumber) },
+            where: { context: TRUNK_ROUTED_CONTEXT, exten: routedExten(companyAsteriskId, didNumber) },
         })
     },
 
-    async deleteMany(tx: Tx, routes: { trunkId: string; didNumber: string }[]) {
-        if (routes.length === 0) return
+    async deleteMany(tx: Tx, companyAsteriskId: string, didNumbers: string[]) {
+        if (didNumbers.length === 0) return
         await tx.extensions.deleteMany({
-            where: { context: TRUNK_ROUTED_CONTEXT, exten: { in: routes.map((r) => routedExten(r.trunkId, r.didNumber)) } },
+            where: { context: TRUNK_ROUTED_CONTEXT, exten: { in: didNumbers.map((n) => routedExten(companyAsteriskId, n)) } },
         })
     },
 
     // Regera o dialplan de TODAS as inbound routes da empresa a partir do template atual - cobre
-    // rotas criadas antes de uma mudança de template (ex: novos campos de CDR, gravação) que nunca
-    // foram salvas de novo via update() desde então. Usado por resyncDialplan (companies.service.ts).
+    // rotas criadas antes de uma mudança de template (ex: novos campos de CDR, gravação, ou a própria
+    // migração da chave de roteamento pra <did>_<companyAsteriskId>) que nunca foram salvas de novo
+    // via update() desde então. Usado por resyncDialplan (companies.service.ts) e pelo backfill de boot.
     async regenerateAll(companyId: string) {
+        const company = await prisma.company.findUnique({ where: { id: companyId }, select: { asteriskId: true } })
+        if (!company) return 0
+
         const routes = await prisma.inboundRoute.findMany({
             where: { companyId },
             select: { id: true, trunkId: true, did: { select: { number: true } }, trunk: { select: { maxInChannels: true } } },
@@ -133,7 +148,7 @@ export const InboundRouteRepository = {
         await prisma.$transaction(async (tx) => {
             for (const route of routes) {
                 const dest = edges.get(route.id)?.default ?? null
-                await this.update(tx, route.trunkId, route.did.number, dest, route.trunk.maxInChannels)
+                await this.update(tx, route.trunkId, company.asteriskId, route.did.number, dest, route.trunk.maxInChannels)
             }
         })
         return routes.length
@@ -141,20 +156,20 @@ export const InboundRouteRepository = {
 
     // Remove linhas Realtime de from-trunk-routed que sobraram de uma InboundRoute apagada por fora
     // do fluxo normal (delete()/deleteMany() já limpam na hora - isso cobre drift: tamper manual no
-    // banco, bug, restore parcial). Escopado às trunks da empresa via sufixo _<trunkId> no exten
-    // (trunkId é cuid único globalmente, sem risco de tocar exten de outra empresa).
+    // banco, bug, restore parcial). Escopado por sufixo _<companyAsteriskId> no exten (asteriskId é
+    // único globalmente, sem risco de tocar exten de outra empresa).
     async pruneOrphans(companyId: string) {
-        const trunks = await prisma.trunk.findMany({ where: { companyId }, select: { id: true } })
-        if (trunks.length === 0) return 0
+        const company = await prisma.company.findUnique({ where: { id: companyId }, select: { asteriskId: true } })
+        if (!company) return 0
 
         const routes = await prisma.inboundRoute.findMany({
             where: { companyId },
-            select: { trunkId: true, did: { select: { number: true } } },
+            select: { did: { select: { number: true } } },
         })
-        const validExtens = new Set(routes.map((r) => routedExten(r.trunkId, r.did.number)))
+        const validExtens = new Set(routes.map((r) => routedExten(company.asteriskId, r.did.number)))
 
         const existing = await prisma.extensions.findMany({
-            where: { context: TRUNK_ROUTED_CONTEXT, OR: trunks.map((t) => ({ exten: { endsWith: `_${t.id}` } })) },
+            where: { context: TRUNK_ROUTED_CONTEXT, exten: { endsWith: `_${company.asteriskId}` } },
             select: { exten: true },
             distinct: ['exten'],
         })

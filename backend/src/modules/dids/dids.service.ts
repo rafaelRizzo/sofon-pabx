@@ -119,6 +119,7 @@ export const updateDid = async (id: string, data: UpdateDidInput) => {
     const isReassign = data.companyId != null && data.companyId !== existing.companyId
     const targetCompanyId = data.companyId ?? existing.companyId
 
+    const oldCompany = await getCompanyById(existing.companyId)
     if (isReassign) await getCompanyById(data.companyId!)
 
     if (data.number || isReassign) {
@@ -136,7 +137,7 @@ export const updateDid = async (id: string, data: UpdateDidInput) => {
 
         const did = await prisma.$transaction(async (tx) => {
             for (const ir of inboundRoutes) {
-                await InboundRouteRepository.delete(tx, ir.trunkId, existing.number)
+                await InboundRouteRepository.delete(tx, oldCompany.asteriskId, existing.number)
             }
             if (inboundRoutes.length > 0) {
                 await tx.inboundRoute.deleteMany({ where: { didId: id } })
@@ -176,8 +177,8 @@ export const updateDid = async (id: string, data: UpdateDidInput) => {
         const updated = await tx.did.update({ where: { id }, data, select })
         for (const ir of inboundRoutes) {
             const dest = destinations.get(ir.id)?.default ?? null
-            await InboundRouteRepository.delete(tx, ir.trunkId, oldRoutingKey)
-            await InboundRouteRepository.create(tx, ir.trunkId, newRoutingKey, dest, ir.trunk.maxInChannels)
+            await InboundRouteRepository.delete(tx, oldCompany.asteriskId, oldRoutingKey)
+            await InboundRouteRepository.create(tx, ir.trunkId, oldCompany.asteriskId, newRoutingKey, dest, ir.trunk.maxInChannels)
         }
         return updated
     })
@@ -196,17 +197,16 @@ export const deleteDid = async (id: string) => {
     const existing = await prisma.did.findUnique({ where: { id } })
     if (!existing) throw new AppError('DID not found', 404)
 
+    const company = await getCompanyById(existing.companyId)
     const inboundRoutes = await prisma.inboundRoute.findMany({
         where: { didId: id },
-        select: { id: true, trunkId: true },
+        select: { id: true },
     })
 
     const routingKey = existing.number
 
     await prisma.$transaction(async (tx) => {
-        for (const ir of inboundRoutes) {
-            await InboundRouteRepository.delete(tx, ir.trunkId, routingKey)
-        }
+        if (inboundRoutes.length > 0) await InboundRouteRepository.delete(tx, company.asteriskId, routingKey)
         await tx.did.delete({ where: { id } })
     })
 

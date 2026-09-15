@@ -384,7 +384,7 @@ export const updateTrunk = async (id: string, data: UpdateTrunkInput) => {
             )
             for (const ir of inboundRoutes) {
                 const dest = edges.get(ir.id)?.default ?? null
-                await InboundRouteRepository.update(tx, id, ir.did.number, dest, newMax)
+                await InboundRouteRepository.update(tx, id, existing.company.asteriskId, ir.did.number, dest, newMax)
             }
         }
 
@@ -503,7 +503,7 @@ export const deleteTrunk = async (id: string) => {
 
     await prisma.$transaction(async (tx) => {
         for (const ir of inboundRoutes) {
-            await InboundRouteRepository.delete(tx, id, ir.did.number)
+            await InboundRouteRepository.delete(tx, existing.company.asteriskId, ir.did.number)
         }
         if (existing.registrationMode !== 'custom') {
             if (existing.type === 'iax') await IaxRepository.deleteTrunk(tx, endpointId)

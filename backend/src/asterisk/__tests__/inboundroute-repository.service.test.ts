@@ -29,7 +29,7 @@ describe('InboundRouteRepository dialplan shape', () => {
     it('builds the full sequence with MixMonitor + CDR recording (no maxIn)', async () => {
         const tx = fakeTx()
 
-        await InboundRouteRepository.create(tx, 'trunk1', '5511999998888', null, null)
+        await InboundRouteRepository.create(tx, 'trunk1', 'ast1', '5511999998888', null, null)
 
         const { data } = tx.extensions.createMany.mock.calls[0][0]
         expect(data.map((d: any) => d.app)).toEqual([
@@ -52,7 +52,7 @@ describe('InboundRouteRepository dialplan shape', () => {
     it('computes the GotoIf jump target dynamically when maxIn is set', async () => {
         const tx = fakeTx()
 
-        await InboundRouteRepository.create(tx, 'trunk1', '5511999998888', null, 5)
+        await InboundRouteRepository.create(tx, 'trunk1', 'ast1', '5511999998888', null, 5)
 
         const { data } = tx.extensions.createMany.mock.calls[0][0]
         const gotoIf = data.find((d: any) => d.app === 'GotoIf')
@@ -67,16 +67,25 @@ describe('InboundRouteRepository dialplan shape', () => {
     it('update deletes existing entries for that trunk+did before recreating', async () => {
         const tx = fakeTx()
 
-        await InboundRouteRepository.update(tx, 'trunk1', '5511999998888', null, null)
+        await InboundRouteRepository.update(tx, 'trunk1', 'ast1', '5511999998888', null, null)
 
         expect(tx.extensions.deleteMany).toHaveBeenCalledWith({
-            where: { context: 'from-trunk-routed', exten: '5511999998888_trunk1' },
+            where: { context: 'from-trunk-routed', exten: '5511999998888_ast1' },
         })
     })
 })
 
 describe('InboundRouteRepository.regenerateAll', () => {
+    it('does nothing when the company does not exist', async () => {
+        db.company.findUnique.mockResolvedValue(null)
+
+        await InboundRouteRepository.regenerateAll('c1')
+
+        expect(db.$transaction).not.toHaveBeenCalled()
+    })
+
     it('does nothing when the company has no inbound routes', async () => {
+        db.company.findUnique.mockResolvedValue({ asteriskId: 'ast1' })
         db.inboundRoute.findMany.mockResolvedValue([])
 
         await InboundRouteRepository.regenerateAll('c1')
@@ -85,6 +94,7 @@ describe('InboundRouteRepository.regenerateAll', () => {
     })
 
     it('regenerates every inbound route using its current destination and trunk maxInChannels', async () => {
+        db.company.findUnique.mockResolvedValue({ asteriskId: 'ast1' })
         db.inboundRoute.findMany.mockResolvedValue([
             { id: 'ir1', trunkId: 'trunk1', did: { number: '5511999998888' }, trunk: { maxInChannels: 5 } },
         ])
@@ -96,7 +106,7 @@ describe('InboundRouteRepository.regenerateAll', () => {
 
         expect(db.$transaction).toHaveBeenCalled()
         expect(db.extensions.deleteMany).toHaveBeenCalledWith({
-            where: { context: 'from-trunk-routed', exten: '5511999998888_trunk1' },
+            where: { context: 'from-trunk-routed', exten: '5511999998888_ast1' },
         })
     })
 })

@@ -19,8 +19,8 @@ mock.module('../../inbound-routes/cache/inbound-routes.cache', () => ({
 
 import * as DidsService from '../dids.service'
 
-const COMPANY = { id: 'c1', name: 'ACME' }
-const COMPANY2 = { id: 'c2', name: 'Other Co' }
+const COMPANY = { id: 'c1', name: 'ACME', asteriskId: 'ast1' }
+const COMPANY2 = { id: 'c2', name: 'Other Co', asteriskId: 'ast2' }
 const DID = { id: 'd1', number: '551100001111', companyId: 'c1', createdAt: new Date(), updatedAt: new Date() }
 
 beforeEach(() => clearPrismaMock(db))
@@ -98,6 +98,7 @@ describe('DidsService.getDidById', () => {
 // ─── updateDid ────────────────────────────────────────────────────────────────
 describe('DidsService.updateDid', () => {
     it('updates DID number', async () => {
+        db.company.findUnique.mockResolvedValue(COMPANY)
         db.did.findUnique.mockResolvedValueOnce(DID).mockResolvedValueOnce(null)
         db.did.update.mockResolvedValue({ ...DID, number: '551100009999' })
         db.inboundRoute.findMany.mockResolvedValue([])
@@ -107,16 +108,18 @@ describe('DidsService.updateDid', () => {
 
     it('regenerates dialplan of existing inbound routes when number changes', async () => {
         const { InboundRouteRepository } = await import('../../../asterisk/inboundroute.repository')
+        db.company.findUnique.mockResolvedValue(COMPANY)
         db.did.findUnique.mockResolvedValueOnce(DID).mockResolvedValueOnce(null)
         db.did.update.mockResolvedValue({ ...DID, number: '551100009998' })
         db.inboundRoute.findMany.mockResolvedValue([{ id: 'ir1', trunkId: 't1', trunk: { maxInChannels: 5 } }])
         db.flowEdge.findMany.mockResolvedValue([{ sourceId: 'ir1', slot: 'default', targetType: 'extension', targetId: 'e1' }])
         await DidsService.updateDid('d1', { number: '551100009998' })
-        expect(InboundRouteRepository.delete).toHaveBeenCalledWith(expect.anything(), 't1', DID.number)
-        expect(InboundRouteRepository.create).toHaveBeenCalledWith(expect.anything(), 't1', '551100009998', { type: 'extension', id: 'e1' }, 5)
+        expect(InboundRouteRepository.delete).toHaveBeenCalledWith(expect.anything(), 'ast1', DID.number)
+        expect(InboundRouteRepository.create).toHaveBeenCalledWith(expect.anything(), 't1', 'ast1', '551100009998', { type: 'extension', id: 'e1' }, 5)
     })
 
     it('does not touch dialplan when routing key is unchanged', async () => {
+        db.company.findUnique.mockResolvedValue(COMPANY)
         db.did.findUnique.mockResolvedValueOnce(DID).mockResolvedValueOnce(null)
         db.did.update.mockResolvedValue(DID)
         const did = await DidsService.updateDid('d1', { number: DID.number })
@@ -125,6 +128,7 @@ describe('DidsService.updateDid', () => {
     })
 
     it('throws 409 when number already exists in same company', async () => {
+        db.company.findUnique.mockResolvedValue(COMPANY)
         db.did.findUnique.mockResolvedValueOnce(DID).mockResolvedValueOnce({ id: 'd2', number: '551100002222', companyId: 'c1' })
         await expect(DidsService.updateDid('d1', { number: '551100002222' }))
             .rejects.toMatchObject({ statusCode: 409 })
@@ -139,14 +143,16 @@ describe('DidsService.updateDid', () => {
     it('reassigns DID to another company and wipes old inbound routes/dialplan', async () => {
         const { InboundRouteRepository } = await import('../../../asterisk/inboundroute.repository')
         db.did.findUnique.mockResolvedValueOnce(DID).mockResolvedValueOnce(null)
-        db.company.findUnique.mockResolvedValue(COMPANY2)
+        db.company.findUnique.mockImplementation((args: any) =>
+            Promise.resolve(args.where.id === 'c2' ? COMPANY2 : COMPANY)
+        )
         db.inboundRoute.findMany.mockResolvedValue([{ id: 'ir1', trunkId: 't1' }])
         db.did.update.mockResolvedValue({ ...DID, companyId: 'c2' })
 
         const did = await DidsService.updateDid('d1', { companyId: 'c2' }) as any
 
         expect(did.companyId).toBe('c2')
-        expect(InboundRouteRepository.delete).toHaveBeenCalledWith(expect.anything(), 't1', DID.number)
+        expect(InboundRouteRepository.delete).toHaveBeenCalledWith(expect.anything(), 'ast1', DID.number)
         expect(db.inboundRoute.deleteMany).toHaveBeenCalledWith({ where: { didId: 'd1' } })
         expect(db.flowEdge.deleteMany).toHaveBeenCalledWith({ where: { sourceType: 'inboundroute', sourceId: { in: ['ir1'] } } })
     })
@@ -169,6 +175,7 @@ describe('DidsService.updateDid', () => {
 // ─── deleteDid ────────────────────────────────────────────────────────────────
 describe('DidsService.deleteDid', () => {
     it('deletes DID', async () => {
+        db.company.findUnique.mockResolvedValue(COMPANY)
         db.did.findUnique.mockResolvedValue(DID)
         db.did.delete.mockResolvedValue(DID)
         db.inboundRoute.findMany.mockResolvedValue([])

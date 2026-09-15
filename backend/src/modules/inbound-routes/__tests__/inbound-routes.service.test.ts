@@ -31,7 +31,7 @@ mock.module('../../../asterisk/inboundroute.repository', () => ({
 
 import * as InboundRoutesService from '../inbound-routes.service'
 
-const COMPANY = { id: 'c1', name: 'ACME' }
+const COMPANY = { id: 'c1', name: 'ACME', asteriskId: 'ast1' }
 const DID = { id: 'd1', number: '5511999990001', companyId: 'c1' }
 const TRUNK = { id: 't1', name: 'trunk-vivo', companyId: 'c1' }
 const EXT = { id: 'e1', companyId: 'c1', context: 'ramais', number: '1001' }
@@ -41,7 +41,7 @@ const TC = { id: 'tc1', companyId: 'c1' }
 const ROUTE = {
     id: 'r1', name: 'entrada-principal', companyId: 'c1',
     didId: 'd1', trunkId: 't1',
-    did: DID, trunk: TRUNK,
+    did: DID, trunk: TRUNK, company: { asteriskId: 'ast1' },
     destination: null,
     createdAt: new Date(), updatedAt: new Date(),
 }
@@ -182,7 +182,7 @@ describe('InboundRoutesService.createInboundRoute', () => {
         db.company.findUnique.mockResolvedValue(COMPANY)
         db.did.findUnique.mockResolvedValue(DID)
         db.trunk.findUnique.mockResolvedValue(TRUNK)
-        db.inboundRoute.findUnique.mockResolvedValue(ROUTE)
+        db.inboundRoute.findFirst.mockResolvedValue(ROUTE)
         await expect(InboundRoutesService.createInboundRoute(BASE_INPUT))
             .rejects.toMatchObject({ statusCode: 409 })
     })

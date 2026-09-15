@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-# INSTALADOR SOFON PBX v7.21 - PJSIP + IAX2 (sem Docker, sem chan_sip)
+# INSTALADOR SOFON PBX v7.22 - PJSIP + IAX2 (sem Docker, sem chan_sip)
 # Debian 11+ | Ubuntu 24.04+ | Asterisk 22.7.0 LTS
 # ============================================================
 
@@ -542,19 +542,23 @@ exten => s,1,Hangup()
 
 [from-trunk]
 ; Todas as trunks inbound compartilham esse contexto (ps_endpoints.context=from-trunk).
-; TRUNKID vem do setvar do endpoint - isola o dialplan por trunk mesmo com DID duplicado entre empresas.
-exten => _X.,1,Goto(from-trunk-routed,${EXTEN}_${TRUNKID},1)
+; Roteia por CHANNEL(accountcode) (= Company.asteriskId, setado em todo endpoint/friend), não por
+; TRUNKID: quando 2 trunks da MESMA empresa compartilham host/IP (operadora com várias contas SIP
+; no mesmo IP), o Asterisk pode identificar o endpoint errado (ps_identifies ambíguo por IP) mesmo
+; a chamada entrando certa - TRUNKID (setvar do endpoint) viria do trunk errado. accountcode não
+; sofre disso: é idêntico nos 2 endpoints ambíguos (mesma empresa), então a rota acerta mesmo assim.
+exten => _X.,1,Goto(from-trunk-routed,${EXTEN}_${CHANNEL(accountcode)},1)
 
 [from-trunk-routed]
 ; Delega lookup de rotas de entrada para Realtime (tabela extensions no PostgreSQL)
-; exten gravado como <didNumber>_<trunkId> por InboundRouteRepository
+; exten gravado como <didNumber>_<companyAsteriskId> por InboundRouteRepository
 switch => Realtime/from-trunk-routed@extensions
 
 ; DID sem rota cadastrada - cause 1 (Unallocated number) -> PJSIP responde 404 Not Found
 ; HANGUPCAUSE é função read-only (${HANGUPCAUSE}); a cause real só é setada via argumento do Hangup()
 ; FIX: NÃO declarar um catch-all _X. estático aqui - padrão estático tem prioridade
 ; sobre "switch => Realtime/..." no mesmo contexto, então _X. bloquearia TODA rota
-; realtime válida (qualquer exten <didNumber>_<trunkId> começa com dígito). O "i"
+; realtime válida (qualquer exten <didNumber>_<companyAsteriskId> começa com dígito). O "i"
 ; já cobre o caso de nenhuma rota (estática ou realtime) ser encontrada.
 exten => i,1,Noop(DID sem rota: ${EXTEN})
  same => n,Hangup(1)

@@ -99,7 +99,7 @@ export const getInboundRouteById = async (id: string): Promise<InboundRouteDto> 
 }
 
 export const createInboundRoute = async (data: CreateInboundRouteInput) => {
-    const [, did, trunk] = await Promise.all([
+    const [company, did, trunk] = await Promise.all([
         getCompanyById(data.companyId),
         prisma.did.findUnique({ where: { id: data.didId }, select: { id: true, number: true, companyId: true } }),
         prisma.trunk.findUnique({
@@ -115,10 +115,12 @@ export const createInboundRoute = async (data: CreateInboundRouteInput) => {
     if (trunk.registrationMode === 'custom')
         throw new AppError('Trunk custom não recebe chamadas, não pode ter Inbound Route', 400)
 
-    const existing = await prisma.inboundRoute.findUnique({
-        where: { trunkId_didId: { trunkId: data.trunkId, didId: data.didId } },
-    })
-    if (existing) throw new AppError('Inbound route already exists for this trunk + DID combination', 409)
+    // Chave de roteamento é <did>_<companyAsteriskId> (ver inboundroute.repository.ts), não
+    // <did>_<trunkId> - um mesmo DID linkado a 2 trunks colidiria na mesma exten. Cenário sem uso
+    // real (um DID físico só chega por 1 conexão de operadora por vez), bloqueado aqui: só 1
+    // Inbound Route por DID, seja qual for o trunk.
+    const existing = await prisma.inboundRoute.findFirst({ where: { didId: data.didId } })
+    if (existing) throw new AppError('DID já tem Inbound Route cadastrada', 409)
 
     await validateDestination(data.destination ?? null, data.companyId)
 
@@ -135,7 +137,7 @@ export const createInboundRoute = async (data: CreateInboundRouteInput) => {
         })
 
         await FlowEdgeRepository.setSlot(tx, data.companyId, 'inboundroute', created.id, 'default', data.destination ?? null)
-        await InboundRouteRepository.create(tx, data.trunkId, did.number, data.destination ?? null, trunk.maxInChannels)
+        await InboundRouteRepository.create(tx, data.trunkId, company.asteriskId, did.number, data.destination ?? null, trunk.maxInChannels)
         return created
     })
 
@@ -151,6 +153,7 @@ export const updateInboundRoute = async (id: string, data: UpdateInboundRouteInp
         include: {
             did: { select: { number: true } },
             trunk: { select: { maxInChannels: true } },
+            company: { select: { asteriskId: true } },
         },
     })
     if (!existing) throw new AppError('Inbound route not found', 404)
@@ -171,7 +174,7 @@ export const updateInboundRoute = async (id: string, data: UpdateInboundRouteInp
         if (data.destination !== undefined) {
             await FlowEdgeRepository.setSlot(tx, existing.companyId, 'inboundroute', id, 'default', data.destination)
         }
-        await InboundRouteRepository.update(tx, existing.trunkId, existing.did.number, newDest, existing.trunk.maxInChannels)
+        await InboundRouteRepository.update(tx, existing.trunkId, existing.company.asteriskId, existing.did.number, newDest, existing.trunk.maxInChannels)
         return updated
     })
 
@@ -184,12 +187,12 @@ export const updateInboundRoute = async (id: string, data: UpdateInboundRouteInp
 export const deleteInboundRoute = async (id: string) => {
     const existing = await prisma.inboundRoute.findUnique({
         where: { id },
-        include: { did: { select: { number: true } } },
+        include: { did: { select: { number: true } }, company: { select: { asteriskId: true } } },
     })
     if (!existing) throw new AppError('Inbound route not found', 404)
 
     await prisma.$transaction(async (tx) => {
-        await InboundRouteRepository.delete(tx, existing.trunkId, existing.did.number)
+        await InboundRouteRepository.delete(tx, existing.company.asteriskId, existing.did.number)
         await tx.inboundRoute.delete({ where: { id } })
         await FlowEdgeRepository.deleteAllForSource(tx, 'inboundroute', id)
     })

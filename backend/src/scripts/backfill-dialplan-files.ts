@@ -21,6 +21,7 @@ import { FormatterNodeRepository } from '../asterisk/destinations/formatter-node
 import { IxcNodeRepository } from '../asterisk/destinations/ixc-node.repository'
 import { FlowRepository } from '../asterisk/flows/flow.repository'
 import { FlowNodeRepository } from '../asterisk/flows/flow-node.repository'
+import { InboundRouteRepository } from '../asterisk/inboundroute.repository'
 import { reloadDialplanNow } from '../asterisk/dialplan/dialplan-file.repository'
 
 async function main() {
@@ -42,6 +43,10 @@ async function main() {
         await IxcNodeRepository.regenerate(company.id)
         await FlowRepository.regenerate(company.id)
         await FlowNodeRepository.regenerate(company.id) // idempotente mesmo já rodado via Ivr/Queue acima
+        // Migração da chave de roteamento de from-trunk-routed: <did>_<trunkId> -> <did>_<companyAsteriskId>
+        // (ver inboundroute.repository.ts) - sem isso, InboundRoutes criadas antes dessa mudança ficam
+        // com exten no formato antigo e o novo [from-trunk] (Goto por CHANNEL(accountcode)) não acha rota.
+        await InboundRouteRepository.regenerateAll(company.id)
     }
 
     // regenerate() só dispara reloadDialplan() fire-and-forget (debounced 500ms) - sem isso o
