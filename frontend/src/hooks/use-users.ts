@@ -7,7 +7,7 @@ import { z } from "zod"
 
 import { api, apiError } from "@/lib/api"
 
-export type UserRole = "admin" | "reseller" | "user"
+export type UserRole = "admin" | "user"
 
 export type User = {
     id: string
@@ -15,7 +15,7 @@ export type User = {
     username: string
     role: UserRole
     status: string
-    // relevante só quando role === "user" (admin/reseller têm acesso irrestrito)
+    // relevante só quando role === "user" (admin tem acesso irrestrito)
     permissions: string[]
     extensionId: string | null
     webhookSlug: string
@@ -31,7 +31,7 @@ export const createUserSchema = z.object({
     name: z.string().min(1, "Informe o nome").max(255, "Máximo 255 caracteres"),
     username: z.email("E-mail inválido").max(255, "Máximo 255 caracteres"),
     password: z.string().min(6, "A senha deve ter no mínimo 6 caracteres"),
-    role: z.enum(["admin", "reseller", "user"], "Selecione uma permissão"),
+    role: z.enum(["admin", "user"], "Selecione uma permissão"),
     permissions: z.array(z.string()),
     // todo usuário precisa estar vinculado a >=1 empresa (ver users.schema.ts do backend)
     companyIds: z.array(z.string()).min(1, "Selecione ao menos uma empresa"),

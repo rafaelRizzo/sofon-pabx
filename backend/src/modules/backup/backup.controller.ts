@@ -13,7 +13,7 @@ export const exportBackup = async (req: FastifyRequest, reply: FastifyReply) => 
             req.scope.assertAccess(companyId)
         } else if (!req.scope.isAdmin) {
             // backup sem companyId inclui segredo (senha de tronco, token de integração) de
-            // TODA empresa do sistema - reseller não vê isso nem pra suas próprias empresas
+            // TODA empresa do sistema - não-admin não vê isso nem pra suas próprias empresas
             throw new AppError('Exportar backup de todas as empresas requer admin', 403)
         }
 

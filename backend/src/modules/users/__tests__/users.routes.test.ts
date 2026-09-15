@@ -13,8 +13,6 @@ const PASSWORD = 'test-password-123'
 let app: FastifyInstance
 let accessToken: string
 let userId: string
-let resellerToken: string
-let resellerId: string
 let companyId: string
 
 beforeAll(async () => {
@@ -37,28 +35,9 @@ beforeAll(async () => {
     })
     accessToken = loginRes.json().token
 
-    const reseller = await prisma.user.create({
-        data: {
-            name: 'Test Reseller',
-            username: `${PREFIX}reseller@test.com`,
-            password: await argon2.hash(PASSWORD),
-            role: 'reseller',
-        },
-    })
-    resellerId = reseller.id
-
-    const resellerLogin = await app.inject({
-        method: 'POST',
-        url: '/auth/login',
-        body: { username: `${PREFIX}reseller@test.com`, password: PASSWORD },
-    })
-    resellerToken = resellerLogin.json().token
-
-    // usuário sempre precisa de >=1 empresa (ver createUserSchema): cria uma e vincula
-    // o reseller a ela também, senão o próprio reseller não teria escopo pra atribuir a ninguém
+    // usuário sempre precisa de >=1 empresa (ver createUserSchema)
     const company = await prisma.company.create({ data: { name: `${PREFIX}company` } })
     companyId = company.id
-    await prisma.userCompany.create({ data: { userId: resellerId, companyId } })
 })
 
 afterAll(async () => {
@@ -71,7 +50,20 @@ afterAll(async () => {
 })
 
 const auth = () => ({ authorization: `Bearer ${accessToken}` })
-const resellerAuth = () => ({ authorization: `Bearer ${resellerToken}` })
+
+// role "user" comum - usado pra confirmar que rotas admin-only recusam mesmo com permissão
+// granular concedida (o guard real é req.scope.isAdmin no controller, não requirePermission)
+async function loginAsNonAdmin(usernameSuffix: string, password: string, permissions: string[] = []) {
+    await prisma.user.create({
+        data: { name: 'Non Admin', username: `${PREFIX}${usernameSuffix}@test.com`, password: await argon2.hash(password), permissions },
+    })
+    const login = await app.inject({
+        method: 'POST',
+        url: '/auth/login',
+        body: { username: `${PREFIX}${usernameSuffix}@test.com`, password },
+    })
+    return login.json().token as string
+}
 
 // -------------------------------------------------- GET /users
 describe('GET /users', () => {
@@ -82,18 +74,13 @@ describe('GET /users', () => {
         expect(Array.isArray(body.users)).toBe(true)
     })
 
-    it('200 reseller sees only their created users', async () => {
-        await app.inject({
-            method: 'POST',
-            url: '/users',
-            headers: resellerAuth(),
-            body: { name: 'Reseller Child', username: `${PREFIX}reschild@test.com`, password: PASSWORD, companyIds: [companyId] },
-        })
-
-        const res = await app.inject({ method: 'GET', url: '/users', headers: resellerAuth() })
+    it('200 role "user" sees only itself', async () => {
+        const token = await loginAsNonAdmin('selfonly', 'self-only-pwd-123')
+        const res = await app.inject({ method: 'GET', url: '/users', headers: { authorization: `Bearer ${token}` } })
         expect(res.statusCode).toBe(200)
         const { users } = ListUsersResponse.parse(res.json())
-        expect(users.every((u) => u.createdBy === resellerId)).toBe(true)
+        expect(users).toHaveLength(1)
+        expect(users[0]!.username).toBe(`${PREFIX}selfonly@test.com`)
     })
 
     it('401 without token', async () => {
@@ -142,46 +129,13 @@ describe('POST /users', () => {
         expect(body.userId).toBeTruthy()
     })
 
-    it('201 reseller creates user with role user', async () => {
+    it('403 non-admin cannot create user, even with users:manage granted', async () => {
+        const token = await loginAsNonAdmin('attemptcreate', 'attempt-create-pwd-123', ['users:manage'])
         const res = await app.inject({
             method: 'POST',
             url: '/users',
-            headers: resellerAuth(),
-            body: { name: 'Reseller Created', username: `${PREFIX}rescreated@test.com`, password: PASSWORD, companyIds: [companyId] },
-        })
-
-        expect(res.statusCode).toBe(201)
-        expect(res.json().userId).toBeTruthy()
-    })
-
-    it('403 reseller cannot create admin role', async () => {
-        const res = await app.inject({
-            method: 'POST',
-            url: '/users',
-            headers: resellerAuth(),
-            body: {
-                name: 'Attempt Admin',
-                username: `${PREFIX}attemptadmin@test.com`,
-                password: PASSWORD,
-                role: 'admin',
-                companyIds: [companyId],
-            },
-        })
-        expect(res.statusCode).toBe(403)
-    })
-
-    it('403 reseller cannot create reseller role', async () => {
-        const res = await app.inject({
-            method: 'POST',
-            url: '/users',
-            headers: resellerAuth(),
-            body: {
-                name: 'Attempt Reseller',
-                username: `${PREFIX}attemptreseller@test.com`,
-                password: PASSWORD,
-                role: 'reseller',
-                companyIds: [companyId],
-            },
+            headers: { authorization: `Bearer ${token}` },
+            body: { name: 'Attempt Create', username: `${PREFIX}attemptcreated@test.com`, password: PASSWORD, companyIds: [companyId] },
         })
         expect(res.statusCode).toBe(403)
     })

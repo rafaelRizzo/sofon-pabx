@@ -29,7 +29,7 @@ export const usersRoutes = async (app: FastifyInstance) => {
         schema: {
             tags: ['Users'],
             summary: 'Listar usuários',
-            description: 'Admin vê todos. Reseller vê apenas os usuários que criou.',
+            description: 'Admin vê todos. Role "user" vê apenas o próprio usuário.',
             security: [{ bearerAuth: [] }],
             response: {
                 200: ListUsersResponse,
@@ -74,7 +74,7 @@ export const usersRoutes = async (app: FastifyInstance) => {
         schema: {
             tags: ['Users'],
             summary: 'Criar usuário',
-            description: 'Admin pode criar qualquer role. Reseller só cria role "user" e o usuário fica vinculado a ele.',
+            description: 'Admin-only, independente de permissão granular concedida.',
             security: [{ bearerAuth: [] }],
             body: createUserSchema,
             response: {

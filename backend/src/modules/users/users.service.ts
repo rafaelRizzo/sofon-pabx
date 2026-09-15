@@ -32,20 +32,7 @@ const mapUser = <T extends { companies: { company: { id: string; name: string } 
     companies: user.companies.map((uc) => uc.company),
 })
 
-export const getAllUsers = async (options?: { createdBy?: string }) => {
-    if (options?.createdBy) {
-        const cached = await UsersCache.getUsersByCreatedBy(options.createdBy)
-        if (cached) return cached
-
-        const users = (await prisma.user.findMany({
-            where: { createdBy: options.createdBy },
-            select: userSelect,
-        })).map(mapUser)
-
-        await UsersCache.setUsersByCreatedBy(options.createdBy, users)
-        return users
-    }
-
+export const getAllUsers = async () => {
     const cached = await UsersCache.getAllUsers()
     if (cached) return cached
 
@@ -115,7 +102,6 @@ export const createUser = async (data: CreateUserInput, createdBy?: string) => {
     const user = mapUser(created)
 
     await UsersCache.invalidateAllUsers()
-    if (createdBy) await UsersCache.invalidateUsersByCreatedBy(createdBy)
     return user
 }
 
@@ -157,7 +143,6 @@ export const updateUser = async (id: string, data: UpdateUserInput) => {
 
     await UsersCache.invalidateUser(id)
     await UsersCache.invalidateAllUsers()
-    if (existingUser.createdBy) await UsersCache.invalidateUsersByCreatedBy(existingUser.createdBy)
     if (data.permissions) await invalidateUserPermissions(id)
     if (companyIds) {
         await invalidateUserCompanyIds(id)
@@ -245,7 +230,6 @@ export const deleteUser = async (id: string) => {
     await rm(avatarPath(id), { force: true })
     await UsersCache.invalidateUser(id)
     await UsersCache.invalidateAllUsers()
-    if (user.createdBy) await UsersCache.invalidateUsersByCreatedBy(user.createdBy)
     await jtiManager.revokeByUserId(id)
     return user
 }

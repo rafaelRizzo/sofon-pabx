@@ -29,9 +29,7 @@ export const getAllUsers = async (req: FastifyRequest, reply: FastifyReply) => {
             const user = await UsersService.getUserById(id)
             return reply.send({ success: true, message: 'Users fetched successfully', users: [user] })
         }
-        const users = await UsersService.getAllUsers(
-            role === 'reseller' ? { createdBy: id } : undefined
-        )
+        const users = await UsersService.getAllUsers()
         return reply.send({ success: true, message: 'Users fetched successfully', users })
     } catch (error) {
         return handleError(reply, error, req)
@@ -56,26 +54,18 @@ export const getUserById = async (req: FastifyRequest, reply: FastifyReply) => {
 
 export const createUser = async (req: FastifyRequest, reply: FastifyReply) => {
     try {
-        const { role: requesterRole, id: requesterId } = req.user!
+        const { id: requesterId } = req.user!
         const data = createUserSchema.parse(req.body)
 
-        // só admin/reseller criam usuários; não-admin só cria role "user" -
-        // sem isso, um "user" comum criava admin via POST /users (escalação de privilégio)
-        if (requesterRole !== 'admin' && requesterRole !== 'reseller') {
+        // só admin cria usuários - sem isso, um "user" comum criava outro usuário (inclusive
+        // admin) via POST /users, escalação de privilégio que nenhuma permissão granular cobre
+        if (!req.scope.isAdmin) {
             throw new AppError('Forbidden', 403)
         }
-        if (requesterRole !== 'admin' && data.role !== 'user') {
-            throw new AppError('Resellers can only create users with role "user"', 403)
-        }
 
-        // reseller só vincula o novo usuário a empresas do próprio escopo; sem isso, um reseller
-        // poderia criar um usuário com acesso a empresas fora do seu escopo (IDOR)
-        if (!req.scope.isAdmin) {
-            data.companyIds.forEach((companyId) => req.scope.assertAccess(companyId))
-        }
-
-        const createdBy = requesterRole !== 'admin' ? requesterId : undefined
-        const user = await UsersService.createUser(data, createdBy)
+        // createdBy é genérico (quem criou este usuário, seja admin ou não) - útil como metadado
+        // de auditoria mesmo sem lógica de negócio dependendo dele
+        const user = await UsersService.createUser(data, requesterId)
 
         return reply.status(201).send({ success: true, message: 'User created successfully', userId: user.id })
     } catch (error) {
@@ -104,7 +94,8 @@ export const updateUser = async (req: FastifyRequest, reply: FastifyReply) => {
             req.scope.assertAccess(ext.companyId)
         }
 
-        // mesma proteção de IDOR do create: reseller só vincula a empresas do próprio escopo
+        // não-admin (self-edit, ver assertSelfOrAdmin) só vincula a empresas do próprio escopo -
+        // sem isso, dava pra se auto-conceder acesso a empresa fora do escopo (IDOR)
         if (data.companyIds && !req.scope.isAdmin) {
             data.companyIds.forEach((companyId) => req.scope.assertAccess(companyId))
         }

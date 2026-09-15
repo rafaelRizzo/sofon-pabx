@@ -1,5 +1,5 @@
 // Catálogo de recursos controláveis por permissão granular; só se aplica a role="user"
-// (admin/reseller sempre têm acesso irrestrito, ver requirePermission em ../../middleware/permission.middleware).
+// (admin sempre tem acesso irrestrito, ver requirePermission em ../../middleware/permission.middleware).
 // Cada recurso gera duas chaves: "<recurso>:view" (ver no menu/listar) e "<recurso>:manage" (criar/editar/excluir).
 export const PERMISSION_RESOURCES = [
     'companies',

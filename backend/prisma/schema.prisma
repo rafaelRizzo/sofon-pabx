@@ -82,7 +82,7 @@ model User {
   token           String?       @unique @db.VarChar(1024)
   role            String        @default("user") @db.VarChar(20)
   status          String        @default("active") @db.VarChar(20)
-  // relevante só para role="user"; admin/reseller têm acesso irrestrito (ver requirePermission)
+  // relevante só para role="user"; admin tem acesso irrestrito (ver requirePermission)
   permissions     String[]      @default([])
   extensionId     String?       @unique
   notes           String?       @db.Text
@@ -90,6 +90,8 @@ model User {
   // usado como cache-bust na URL de GET /users/:id/avatar (arquivo em disco é sempre o mesmo
   // path determinístico por userId, ver avatar-storage.ts)
   avatarUpdatedAt DateTime?     @db.Timestamptz(3)
+  // metadado de auditoria genérico (quem criou este usuário, admin incluso) - sem lógica de
+  // negócio dependendo dele hoje (era usado pra filtrar GET /users no fluxo reseller, removido)
   createdBy       String?
   creator         User?         @relation("UserCreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
   createdUsers    User[]        @relation("UserCreatedBy")

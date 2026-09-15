@@ -60,7 +60,6 @@ import { CompanySelect } from "./company-select"
 
 const ROLES: { value: UserRole; label: string }[] = [
     { value: "user", label: "Usuário" },
-    { value: "reseller", label: "Revenda" },
     { value: "admin", label: "Administrador" },
 ]
 

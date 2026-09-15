@@ -20,7 +20,6 @@ import { type UsersTableProps } from "@/components/Users/types"
 
 const ROLE_LABELS: Record<UserRole, string> = {
     admin: "Administrador",
-    reseller: "Revenda",
     user: "Usuário",
 }
 

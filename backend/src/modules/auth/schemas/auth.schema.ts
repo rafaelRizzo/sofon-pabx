@@ -25,7 +25,7 @@ export const MeSchema = z.object({
     id: z.string(),
     name: z.string(),
     username: z.string(),
-    role: z.enum(['admin', 'reseller', 'user']),
+    role: z.enum(['admin', 'user']),
     permissions: z.array(z.string()),
     extensionId: z.string().nullable(),
     avatarUpdatedAt: timestamp.nullable(),

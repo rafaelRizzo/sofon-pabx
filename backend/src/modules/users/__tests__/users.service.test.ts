@@ -5,7 +5,7 @@ const db = createPrismaMock()
 
 mock.module('../../../lib/prisma', () => ({ prisma: db }))
 mock.module('../cache/users.cache', () => ({
-    UsersCache: { getAllUsers: mock(() => null), setAllUsers: mock(), getUser: mock(() => null), setUser: mock(), invalidateUser: mock(), invalidateAllUsers: mock(), getUsersByCreatedBy: mock(() => null), setUsersByCreatedBy: mock(), invalidateUsersByCreatedBy: mock() },
+    UsersCache: { getAllUsers: mock(() => null), setAllUsers: mock(), getUser: mock(() => null), setUser: mock(), invalidateUser: mock(), invalidateAllUsers: mock() },
 }))
 mock.module('../../companies/cache/companies.cache', () => ({
     CompaniesCache: { getCompaniesByUser: mock(() => null), setCompaniesByUser: mock(), invalidateCompaniesByUser: mock() },
@@ -79,9 +79,9 @@ describe('UsersService.createUser', () => {
         db.user.findUnique.mockResolvedValue(null)
         db.company.count.mockResolvedValue(1)
         db.user.create.mockResolvedValue({ id: 'u1' })
-        db.user.findUniqueOrThrow.mockResolvedValue({ ...USER, createdBy: 'reseller-id' })
-        const user = await UsersService.createUser({ name: 'Child', username: 'child@test.com', password: 'x', companyIds: ['c1'] }, 'reseller-id') as any
-        expect(user.createdBy).toBe('reseller-id')
+        db.user.findUniqueOrThrow.mockResolvedValue({ ...USER, createdBy: 'creator-id' })
+        const user = await UsersService.createUser({ name: 'Child', username: 'child@test.com', password: 'x', companyIds: ['c1'] }, 'creator-id') as any
+        expect(user.createdBy).toBe('creator-id')
     })
 })
 

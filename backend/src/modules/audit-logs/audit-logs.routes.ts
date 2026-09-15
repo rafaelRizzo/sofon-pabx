@@ -17,7 +17,7 @@ export const auditLogsRoutes = async (app: FastifyInstance) => {
                 tags: ['Audit Logs'],
                 summary: 'Listar log de auditoria (quem mudou o quê e quando)',
                 description:
-                    'Filtros opcionais: companyId, actorId, model, recordId, action (CREATE|UPDATE|DELETE), startDate/endDate (YYYY-MM-DD), limit (max 200), page (default 1), order (asc|desc, default desc). Sem admin/reseller, restrito às empresas do escopo do usuário.',
+                    'Filtros opcionais: companyId, actorId, model, recordId, action (CREATE|UPDATE|DELETE), startDate/endDate (YYYY-MM-DD), limit (max 200), page (default 1), order (asc|desc, default desc). Sem admin, restrito às empresas do escopo do usuário.',
                 security: [{ bearerAuth: [] }],
                 querystring: auditLogQuerySchema,
                 response: {

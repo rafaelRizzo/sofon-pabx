@@ -63,7 +63,7 @@ export const companiesRoutes = async (app: FastifyInstance) => {
         schema: {
             tags: ['Companies'],
             summary: 'Criar empresa',
-            description: 'Requer role admin ou reseller.',
+            description: 'Requer role admin ou permissão companies:manage.',
             security: [{ bearerAuth: [] }],
             body: createCompanySchema,
             response: {

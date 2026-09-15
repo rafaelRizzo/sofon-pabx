@@ -20,7 +20,6 @@ import { getInitials } from "@/lib/utils"
 
 const ROLE_LABELS: Record<AuthUser["role"], string> = {
     admin: "Administrador",
-    reseller: "Revenda",
     user: "Usuário",
 }
 

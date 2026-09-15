@@ -45,7 +45,7 @@ sofon-pabx/
 │   │   ├── asterisk/      # repositórios que escrevem nas tabelas
 │   │   │                  # realtime do Asterisk (sip_peers, ps_endpoints,
 │   │   │                  # queues, extensions/dialplan, etc.)
-│   │   ├── middleware/    # auth + escopo multi-empresa (admin/reseller/user)
+│   │   ├── middleware/    # auth + escopo multi-empresa (admin/user)
 │   │   ├── config/        # env, redis, cache
 │   │   └── schemas/       # respostas/erros padronizados
 │   ├── prisma/            # schema e migrations

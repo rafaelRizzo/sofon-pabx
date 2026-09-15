@@ -96,9 +96,9 @@ onRequest: [...protectedRoute, requireAdmin]
 onRequest: [...protectedRoute, requirePermission('<resource>', 'view'|'manage')]
 ```
 
-**Roles:** `admin` | `reseller` | `user`
+**Roles:** `admin` | `user`
 
-**Permissões granulares por usuário** (`src/middleware/permission.middleware.ts` + `src/utils/auth/permissions.ts`): só se aplica a `role === "user"`; admin/reseller sempre bypassam (acesso irrestrito, sem mudança de comportamento).
+**Permissões granulares por usuário** (`src/middleware/permission.middleware.ts` + `src/utils/auth/permissions.ts`): só se aplica a `role === "user"`; admin sempre bypassa (acesso irrestrito, sem mudança de comportamento).
 - `User.permissions: String[]`: chaves `"<recurso>:view"` / `"<recurso>:manage"`. `PERMISSION_RESOURCES` cobre `companies`, `users`, `extensions`, `queues`, `ivr`, `announcements`, `callcenter`, `dids`, `inbound-routes`, `outbound-routes`, `trunks`, `audios`, `time-groups`, `time-conditions`, `holiday-groups`, `request-templates`, `variables`, `variable-conditions`. `cdr` e `call-quality` são caso especial: só `view` (recurso somente leitura, gerado pelo sistema).
 - `requirePermission(resource, action)` checa `getUserPermissions(id)` (`src/utils/auth/access.ts`, cacheado como `getUserCompanyIds`, invalidado em `updateUser`): aplicado em toda rota GET (`:view`) e POST/PUT/PATCH/DELETE (`:manage`) de todos os módulos, exceto as já `requireAdmin`-only (gate redundante ali)
 - `GET /auth/me`: `{id, name, username, role, permissions}` do token atual; base pro frontend montar menu/checkboxes
@@ -230,9 +230,9 @@ Essa VPS **não** usa `network_mode: host` - os containers do backend (worker + 
 - Update: `{ name?, doc?, metadata?, elevenLabsApiKey? }` (min 1)
 - `elevenLabsApiKey`: key da conta ElevenLabs da própria empresa, usada pelo TTS de Audios (ver seção Audios) - sem fallback global, cada empresa usa sua conta/billing. Retornada em texto puro no GET (mesmo padrão de `Trunk.password`, sem criptografia própria no projeto)
 
-**DIDs** - `{ id, number, companyId, company, createdAt, updatedAt }`
+**DIDs** (admin-only, ver seção acima) - `{ id, number, companyId, company, createdAt, updatedAt }`
 - Create: `{ number(^\d+$), companyId }`; Update: `{ number?, status?, companyId? }` (min 1)
-- `companyId` no update reatribui o DID a outra empresa (revenda de número cancelado): valida a empresa destino, checa unicidade `(number, companyId)` no destino, e dentro da mesma transaction apaga as `InboundRoute`/dialplan (`from-trunk-routed`) da empresa antiga - não recria rotas de entrada na nova empresa (destino de rota é decisão de negócio, precisa ser recriado manualmente via `POST /inbound-routes`). Controller exige `assertAccess` tanto na empresa atual quanto na de destino.
+- `companyId` no update reatribui o DID a outra empresa (revenda de número cancelado): valida a empresa destino, checa unicidade global de `number` (não conflita reassign puro, já que o número não muda), e dentro da mesma transaction apaga as `InboundRoute`/dialplan (`from-trunk-routed`) da empresa antiga - não recria rotas de entrada na nova empresa (destino de rota é decisão de negócio, precisa ser recriado manualmente via `POST /inbound-routes`). Controller exige `assertAccess` tanto na empresa atual quanto na de destino.
 
 **Extensions** - discriminatedUnion por `type: "sip"|"pjsip"`
 - Create sip: `{ alias(2-6 dígitos), name, companyId, context?, allowOutbound?, ...sipFields }`

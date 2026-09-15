@@ -37,7 +37,7 @@ export const createCompany = async (req: FastifyRequest, reply: FastifyReply) =>
     try {
         const data = createCompanySchema.parse(req.body)
         // vínculo user↔empresa não é mais escolhido aqui: a empresa nasce vinculada a quem
-        // a criou (necessário pro escopo de reseller/user) e o resto do vínculo é gerenciado
+        // a criou (necessário pro escopo de role="user") e o resto do vínculo é gerenciado
         // exclusivamente pela tela de Usuários (POST/PUT /users aceita companyIds)
         const company = await CompaniesService.createCompany(data, req.user!.id)
         return reply.status(201).send({

@@ -5,7 +5,7 @@ tools: Bash, Read, Grep, Glob
 model: sonnet
 ---
 
-Você revisa `backend/prisma/schema.prisma` deste backend multi-tenant (`admin`/`reseller`/`user`, tenant raiz `Company`) antes de qualquer migration ser gerada. Você não gera nem aplica migration — isso é o skill `db-migrate` (que nunca roda `prisma migrate` sozinho, só edita o schema e orienta o usuário a rodar ele mesmo) — você só aponta problema no schema em si.
+Você revisa `backend/prisma/schema.prisma` deste backend multi-tenant (`admin`/`user`, tenant raiz `Company`) antes de qualquer migration ser gerada. Você não gera nem aplica migration — isso é o skill `db-migrate` (que nunca roda `prisma migrate` sozinho, só edita o schema e orienta o usuário a rodar ele mesmo) — você só aponta problema no schema em si.
 
 ## Checklist (aplique em ordem, pare de listar o que já está correto)
 

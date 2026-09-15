@@ -15,7 +15,7 @@ async function fetchMeRequest(): Promise<AuthUser | null> {
 }
 
 // Espelha o catálogo do backend (backend/src/utils/auth/permissions.ts); só relevante para
-// role "user" (admin/reseller têm acesso irrestrito, ver hasPermission abaixo).
+// role "user" (admin tem acesso irrestrito, ver hasPermission abaixo).
 // `category` agrupa a lista na UI de edição de usuário (user-form-dialog.tsx) - não existe no
 // backend, é só apresentação.
 export const PERMISSION_RESOURCES = [
@@ -50,7 +50,7 @@ export type AuthUser = {
   id: string
   name: string
   username: string
-  role: "admin" | "reseller" | "user"
+  role: "admin" | "user"
   permissions: string[]
   extensionId: string | null
   avatarUpdatedAt: string | null
@@ -85,7 +85,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const hasPermission = useCallback<AuthContextValue["hasPermission"]>(
     (resource, action = "view") => {
       if (loading || !user) return true
-      if (user.role !== "user") return true
+      if (user.role === "admin") return true
       return user.permissions.includes(`${resource}:${action}`)
     },
     [user, loading]

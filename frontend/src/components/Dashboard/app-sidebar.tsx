@@ -57,7 +57,7 @@ export type NavItem = {
   href: string
   icon: LucideIcon
   // omitido = sempre visível (ex: Dashboard); presente = precisa de "<permission>:view"
-  // (admin/reseller sempre veem tudo, só role "user" é filtrado; ver useAuth().hasPermission)
+  // (admin sempre vê tudo, só role "user" é filtrado; ver useAuth().hasPermission)
   permission?: PermissionResourceKey | "cdr" | "call-quality" | "audit-logs" | "backup" | "dids"
 }
 

@@ -28,8 +28,8 @@ const DID_STATUS_LABELS: Record<Did["status"], string> = {
 function DidsPage() {
     const { user } = useAuth()
     // Criar/editar/excluir DID é admin-only por role (não permissão granular) - só um admin pode
-    // disponibilizar/vincular número a uma empresa, nunca um "user" nem "reseller" (ver
-    // backend/CLAUDE.md, seção DIDs). Backend já recusa com 403 - isso é só a UI espelhando a regra.
+    // disponibilizar/vincular número a uma empresa, nunca um "user" (ver backend/CLAUDE.md, seção
+    // DIDs). Backend já recusa com 403 - isso é só a UI espelhando a regra.
     const isAdmin = user?.role === "admin"
     const { companies } = useCompanies()
     const [companyFilter, setCompanyFilter] = useCompanyFilter()

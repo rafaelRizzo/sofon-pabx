@@ -98,7 +98,7 @@ Dialog sem `ScrollArea` (form curto que nunca precisa rolar) fica com o `DialogC
 
 `components/Dashboard/app-sidebar.tsx` exporta `NAV: NavGroup[]` - única fonte de verdade da navegação, também consumida pelo breadcrumb (`components/Dashboard/dashboard-breadcrumb.tsx`). Cada grupo (`label` + `items[]`) vira uma seção; cada `NavItem` é `{ title, href, icon (lucide-react), permission? }`.
 
-- `permission` omitido = item sempre visível (ex: Dashboard); presente = exige `"<permission>:view"` (`useAuth().hasPermission`) - admin/reseller sempre veem tudo, só `role: "user"` é filtrado
+- `permission` omitido = item sempre visível (ex: Dashboard); presente = exige `"<permission>:view"` (`useAuth().hasPermission`) - admin sempre vê tudo, só `role: "user"` é filtrado
 - Ter rota (`routes/dashboard/<recurso>.tsx`) e chave de permissão registrada (`hooks/use-auth.tsx`, array `PERMISSION_RESOURCES`) **não** coloca o item no menu sozinho - é preciso o entry manual em `NAV`. Causa raiz de página pronta "invisível": ficou faltando esse passo (ex: `queues`/`callcenter` implementados e sem entrada até 2026-09-01)
 - Pra adicionar item novo: escolher o grupo semântico existente (Telefonia/Roteamento/Automação/Administração) e inserir `{ title, href, icon, permission }` - não precisa mexer em `AppSidebar()` nem no breadcrumb, ambos iteram `NAV` dinamicamente
 

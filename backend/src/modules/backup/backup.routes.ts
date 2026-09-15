@@ -22,7 +22,7 @@ export const backupRoutes = async (app: FastifyInstance) => {
                 tags: ['Backup'],
                 summary: 'Exportar backup de configuração (por empresa ou de todas)',
                 description:
-                    'Query opcional: ?companyId. Com companyId, exporta só aquela empresa (reseller/user com permissão só acessam empresas do próprio escopo). ' +
+                    'Query opcional: ?companyId. Com companyId, exporta só aquela empresa (user com permissão só acessa empresas do próprio escopo). ' +
                     'Sem companyId, exporta TODAS as empresas do sistema - admin only, já que o arquivo inclui segredo (senha de tronco, token de integração) ' +
                     'de toda empresa. Retorna um .json autocontido (áudios em base64) com todas as configs, incluindo fluxos (Flows).',
                 security: [{ bearerAuth: [] }],
