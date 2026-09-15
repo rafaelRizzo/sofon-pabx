@@ -216,31 +216,63 @@ export const PjsipRepository = {
     // Reconcilia ps_identifies com os DIDs atuais da trunk. Duas trunks pjsip outbound que
     // registram no mesmo host/provedor geram o mesmo match por IP - o Asterisk resolve o endpoint
     // errado de forma não-determinística (sem ORDER BY na query Realtime), TRUNKID sai errado e a
-    // InboundRoute do DID não bate ("destino inválido" intermitente). Com >=1 DID vinculado, troca
-    // match (IP) por match_header ancorado no user-info do To (`sip:<did>@`) - identifica a chamada
-    // pelo número discado, não pela origem, então funciona mesmo com host compartilhado entre trunks.
-    // Sem DID vinculado ainda (trunk recém-criada, antes de qualquer InboundRoute), cai no fallback
-    // por host de sempre - chamado por resyncTrunkIdentify (trunks.service.ts) a cada mudança de
-    // InboundRoute/trunk que possa ter deixado ps_identifies desatualizado.
+    // InboundRoute do DID não bate ("destino inválido" intermitente). match_header é um FILTRO
+    // ADICIONAL sobre match, nunca substituto: a lookup Realtime do módulo ip identifier busca
+    // candidatos por IP primeiro (WHERE match casa com a origem) e só then testa match_header nos
+    // candidatos retornados - zerar `match` deixa a linha invisível pra essa query e NENHUM endpoint
+    // é identificado (visto em produção: as 2 trunks compartilhando host ficaram com match_header
+    // sozinho e toda chamada passou a cair em "No matching endpoint found"). Por isso mantemos match
+    // por host sempre, e ligamos match_header por cima quando há >=1 DID vinculado - o host
+    // compartilhado retorna as 2 linhas como candidatas e o padrão do To (número discado) desempata.
+    // Sem DID vinculado ainda (trunk recém-criada, antes de qualquer InboundRoute), match_header fica
+    // nulo - chamado por resyncTrunkIdentify (trunks.service.ts) a cada mudança de InboundRoute/trunk
+    // que possa ter deixado ps_identifies desatualizado.
     async syncIdentify(tx: Tx, astId: string, endpointId: string, host: string | null | undefined, didNumbers: string[]) {
         if (isDynamicHost(host)) {
             await tx.ps_identifies.deleteMany({ where: { id: astId } })
             return
         }
-        if (didNumbers.length > 0) {
-            const matchHeader = `To: sip:(${didNumbers.join('|')})@`
-            await tx.ps_identifies.upsert({
-                where: { id: astId },
-                create: { id: astId, endpoint: endpointId, match_header: matchHeader },
-                update: { match_header: matchHeader, match: null, endpoint: endpointId },
+        const matchHeader = didNumbers.length > 0 ? `To: (${didNumbers.join('|')})` : null
+        await tx.ps_identifies.upsert({
+            where: { id: astId },
+            create: { id: astId, endpoint: endpointId, match: host, match_header: matchHeader },
+            update: { match: host, match_header: matchHeader, endpoint: endpointId },
+        })
+    },
+
+    // Renomeia a trunk (astId = `${asteriskId}-trunk-${name}`, ver toAsteriskId em trunks.service.ts)
+    // nas tabelas que usam esse id como PK. Endpoint/aor só são afetados se identifyBy !== 'username'
+    // (nesse caso o id deles já é o username, imune a rename de nome de trunk). Chamado ANTES do
+    // resto de updateTrunk - a partir daqui o astId novo é tratado como "o atual" pro resto do fluxo.
+    async renameTrunk(tx: Tx, oldAstId: string, newAstId: string, registrationMode: string, identifyBy?: 'ip' | 'username' | null) {
+        const endpointIsAstId = !(registrationMode === 'inbound' && identifyBy === 'username')
+        const hasAuthRow = registrationMode === 'outbound' || identifyBy === 'username'
+        const endpointHasAuthField = registrationMode === 'inbound' && identifyBy === 'username'
+
+        if (hasAuthRow) await tx.ps_auths.updateMany({ where: { id: oldAstId }, data: { id: newAstId } })
+
+        if (endpointIsAstId) {
+            await tx.ps_aors.updateMany({ where: { id: oldAstId }, data: { id: newAstId } })
+            await tx.ps_endpoints.updateMany({
+                where: { id: oldAstId },
+                data: {
+                    id: newAstId,
+                    aors: newAstId,
+                    ...(registrationMode === 'outbound' ? { outbound_auth: newAstId } : {}),
+                },
             })
-        } else {
-            await tx.ps_identifies.upsert({
-                where: { id: astId },
-                create: { id: astId, endpoint: endpointId, match: host },
-                update: { match: host, match_header: null, endpoint: endpointId },
-            })
+        } else if (endpointHasAuthField) {
+            await tx.ps_endpoints.updateMany({ where: { auth: oldAstId }, data: { auth: newAstId } })
         }
+
+        if (registrationMode === 'outbound') {
+            await tx.ps_registrations.updateMany({ where: { id: oldAstId }, data: { id: newAstId, outbound_auth: newAstId } })
+        }
+
+        await tx.ps_identifies.updateMany({
+            where: { id: oldAstId },
+            data: { id: newAstId, ...(endpointIsAstId ? { endpoint: newAstId } : {}) },
+        })
     },
 
     async renameExtension(tx: Tx, oldId: string, newId: string) {

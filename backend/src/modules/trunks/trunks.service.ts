@@ -275,13 +275,22 @@ export const updateTrunk = async (id: string, data: UpdateTrunkInput) => {
     if (data.context !== undefined && existing.registrationMode !== 'custom')
         throw new AppError('context só pode ser alterado em trunks custom', 400)
 
+    const nameChanged = data.name !== undefined && data.name !== existing.name
+    if (nameChanged) {
+        const nameTaken = await prisma.trunk.findUnique({
+            where: { name_companyId: { name: data.name!, companyId: existing.companyId } },
+        })
+        if (nameTaken) throw new AppError('Trunk already exists for this company', 409)
+    }
+
     if (existing.registrationMode === 'custom') {
         const contextChanged = data.context !== undefined && data.context !== existing.context
         await prisma.$transaction(async (tx) => {
-            if (data.context !== undefined || data.notes !== undefined) {
+            if (data.context !== undefined || data.notes !== undefined || nameChanged) {
                 await tx.trunk.update({
                     where: { id },
                     data: {
+                        ...(nameChanged ? { name: data.name } : {}),
                         ...(data.context !== undefined ? { context: data.context } : {}),
                         ...(data.notes !== undefined ? { notes: data.notes } : {}),
                     },
@@ -321,7 +330,8 @@ export const updateTrunk = async (id: string, data: UpdateTrunkInput) => {
         if (identifyBy !== existingIdentifyBy) trunkUpdate.identifyBy = identifyBy
     }
 
-    const astId = toAsteriskId(existing.company.asteriskId, existing.name)
+    const oldAstId = toAsteriskId(existing.company.asteriskId, existing.name)
+    const astId = nameChanged ? toAsteriskId(existing.company.asteriskId, data.name!) : oldAstId
 
     const maxInChanged = 'maxInChannels' in data && data.maxInChannels !== existing.maxInChannels
     const maxOutChanged = 'maxOutChannels' in data && data.maxOutChannels !== existing.maxOutChannels
@@ -331,6 +341,10 @@ export const updateTrunk = async (id: string, data: UpdateTrunkInput) => {
     const techPrefixChanged = 'techPrefix' in data && data.techPrefix !== existing.techPrefix
 
     await prisma.$transaction(async (tx) => {
+        if (nameChanged) {
+            if (existing.type === 'iax') await IaxRepository.renameTrunk(tx, oldAstId, astId, existing.registrationMode, existingIdentifyBy)
+            else await PjsipRepository.renameTrunk(tx, oldAstId, astId, existing.registrationMode, existingIdentifyBy)
+        }
         if (existing.type === 'iax') {
             await IaxRepository.updateTrunk(tx, astId, {
                 ...data,

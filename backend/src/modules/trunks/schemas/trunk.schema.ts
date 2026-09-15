@@ -109,6 +109,12 @@ export const createTrunkSchema = z.discriminatedUnion('registrationMode', [
 ])
 
 export const updateTrunkSchema = z.object({
+    name: z
+        .string()
+        .min(1)
+        .max(20)
+        .regex(/^[a-z0-9_-]+$/i, 'Only alphanumeric, dash and underscore allowed')
+        .optional(),
     host: z.string().min(1).max(255).optional(),
     port: z.number().int().min(1).max(65535).nullable().optional(),
     username: z.string().min(1).max(80).nullable().optional(),

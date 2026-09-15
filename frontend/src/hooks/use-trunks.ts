@@ -236,6 +236,12 @@ export const createTrunkSchema = z.discriminatedUnion("registrationMode", [
 ])
 
 export const updateTrunkSchema = z.object({
+    name: z
+        .string()
+        .min(1, "Informe o nome")
+        .max(20, "Máximo 20 caracteres")
+        .regex(/^[a-z0-9_-]+$/i, "Apenas letras, números, - e _")
+        .optional(),
     host: z.string().max(255).optional(),
     port: optPort,
     username: z.string().max(80).optional(),

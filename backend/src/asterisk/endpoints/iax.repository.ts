@@ -52,6 +52,13 @@ export const IaxRepository = {
         })
     },
 
+    // Renomeia a trunk (astId, ver toAsteriskId em trunks.service.ts) - no-op se identifyBy='username',
+    // já que aí "name" (PK de iax_friends) é o username, imune a rename de nome de trunk.
+    async renameTrunk(tx: Tx, oldAstId: string, newAstId: string, registrationMode: string, identifyBy?: 'ip' | 'username' | null) {
+        if (registrationMode === 'inbound' && identifyBy === 'username') return
+        await tx.iax_friends.updateMany({ where: { name: oldAstId }, data: { name: newAstId } })
+    },
+
     async updateTrunk(tx: Tx, astId: string, opts: Partial<IaxTrunkOpts> & { registrationMode: string, existingUsername?: string | null, existingIdentifyBy?: 'ip' | 'username' | null }) {
         const wasUsernameIdentity = opts.registrationMode === 'inbound' && opts.existingIdentifyBy === 'username'
         const isUsernameIdentity = opts.registrationMode === 'inbound' && opts.identifyBy === 'username'

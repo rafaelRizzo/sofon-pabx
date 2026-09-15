@@ -267,6 +267,7 @@ export function TrunkFormDialog({
         if (!open) return
         if (isEdit) {
             updateForm.reset({
+                name: trunk.name,
                 host: trunk.host ?? "",
                 port: trunk.port ?? undefined,
                 username: trunk.username ?? "",
@@ -447,23 +448,27 @@ export function TrunkFormDialog({
                                 </Field>
                             )}
 
-                            {!isEdit && (
-                                <Field>
-                                    <FieldLabel>Nome</FieldLabel>
-                                    <Input
-                                        placeholder="Ex: provedor-voip"
-                                        {...createForm.register("name")}
-                                    />
-                                    {createForm.formState.errors.name && (
-                                        <FieldError>
-                                            {
-                                                createForm.formState.errors.name
-                                                    .message as string
-                                            }
-                                        </FieldError>
-                                    )}
-                                </Field>
-                            )}
+                            <Field>
+                                <FieldLabel>Nome</FieldLabel>
+                                <Input
+                                    placeholder="Ex: provedor-voip"
+                                    {...r("name")}
+                                />
+                                {errors.name && (
+                                    <FieldError>
+                                        {errors.name.message as string}
+                                    </FieldError>
+                                )}
+                                {isEdit && (
+                                    <FieldDescription>
+                                        Renomear recria os registros PJSIP/IAX
+                                        internos com o novo id - não derruba a
+                                        chamada em andamento, mas o tronco fica
+                                        indisponível por um instante durante a
+                                        troca.
+                                    </FieldDescription>
+                                )}
+                            </Field>
 
                             {!isEdit && (
                                 <Field>
