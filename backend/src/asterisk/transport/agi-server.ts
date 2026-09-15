@@ -822,6 +822,17 @@ async function handleResolveDidRoute(conn: AgiConn) {
     }
 
     const companyAsteriskId = matches[0]!.company.asteriskId
+    // CHANNEL(accountcode) já veio herdado do endpoint do tronco FÍSICO de entrada (empresa errada,
+    // é justamente por isso que caímos aqui) - Asterisk seta isso antes de qualquer dialplan rodar,
+    // então não dá pra sobrescrever via AGI função (arriscado, ver comentário em agiExecGoto) sem
+    // antes validar contra um Asterisk real. Em vez disso, grava uma variável de canal SIMPLES
+    // (mecanismo já usado à exaustão neste arquivo, ver QUEUE_PRIO/mapping.variable) - o próprio
+    // dialplan (buildInboundEntries, ver inboundroute.repository.ts) sobrescreve CHANNEL(accountcode)
+    // de verdade via Set() nativo (sintaxe Asterisk padrão, não side-effect de AGI) quando essa
+    // variável vier preenchida. Sem isso, CDR/gravação (MIXMONITOR_FILENAME) continuariam presos
+    // à empresa do tronco físico mesmo com o Goto certo - reportado pelo usuário como CDR vazando
+    // pra empresa errada.
+    await agiSetVariable(conn, 'RESOLVED_ACCOUNTCODE', companyAsteriskId)
     await agiVerbose(conn, `Resolve DID Route: "${did}" pertence à empresa ${companyAsteriskId}, redirecionando`)
     await agiExecGoto(conn, { context: TRUNK_ROUTED_CONTEXT, exten: routedExten(companyAsteriskId, did), priority: 1 })
 }

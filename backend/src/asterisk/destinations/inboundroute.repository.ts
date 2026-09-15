@@ -56,6 +56,16 @@ function buildInboundEntries(
         entries.push({ context: TRUNK_ROUTED_CONTEXT, exten, priority: priority++, app: stepApp, appdata: stepAppdata })
     }
 
+    // CHANNEL(accountcode) já vem herdado do endpoint do tronco que FISICAMENTE recebeu a
+    // chamada (nativo do Asterisk, fixado antes de qualquer dialplan rodar) - no caminho normal
+    // (chave rápida bateu de primeira em [from-trunk]) isso já é a empresa certa, então o IF()
+    // abaixo é um no-op (mantém o próprio valor atual). Só diverge quando o AGI resolve-did-route
+    // (agi-server.ts) reentrou aqui via Goto depois de descobrir a empresa REAL dona do DID (tronco
+    // de entrada de empresa diferente) - nesse caso RESOLVED_ACCOUNTCODE vem preenchido e este Set
+    // corrige o accountcode do canal de verdade (sintaxe Set() nativa, não side-effect via AGI) -
+    // sem isso, CDR e a gravação (MIXMONITOR_FILENAME abaixo, que também lê CHANNEL(accountcode))
+    // ficariam presos à empresa do tronco físico mesmo com o Goto da chamada já certo.
+    push('Set', 'CHANNEL(accountcode)=${IF($["${RESOLVED_ACCOUNTCODE}" != ""]?${RESOLVED_ACCOUNTCODE}:${CHANNEL(accountcode)})}')
     push('Set', `${ROUTING_TRUNK_VAR}=${trunkId}`)
     // Contexto nativo do canal do cliente é from-trunk-routed, não ramais - sem isso, uma
     // transferência atendida (DTMF *2) tentaria resolver o destino em from-trunk-routed e falharia com

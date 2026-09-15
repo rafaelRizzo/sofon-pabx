@@ -33,8 +33,12 @@ describe('InboundRouteRepository dialplan shape', () => {
 
         const { data } = tx.extensions.createMany.mock.calls[0][0]
         expect(data.map((d: any) => d.app)).toEqual([
-            'Set', 'Set', 'Set', 'Set', 'Set', 'Set', 'Answer', 'Wait', 'Set', 'MixMonitor', 'Set', 'Goto',
+            'Set', 'Set', 'Set', 'Set', 'Set', 'Set', 'Set', 'Answer', 'Wait', 'Set', 'MixMonitor', 'Set', 'Goto',
         ])
+        expect(data[0]).toEqual(expect.objectContaining({
+            app: 'Set',
+            appdata: 'CHANNEL(accountcode)=${IF($["${RESOLVED_ACCOUNTCODE}" != ""]?${RESOLVED_ACCOUNTCODE}:${CHANNEL(accountcode)})}',
+        }))
         expect(data).toContainEqual(
             expect.objectContaining({ app: 'Set', appdata: 'CDR(entry_trunk_id)=${TRUNKID}' })
         )
